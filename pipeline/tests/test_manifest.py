@@ -15,7 +15,7 @@ def _write_report(parts_dir: Path, source: str, categories: list[str]) -> None:
             for c in categories
         ],
     }
-    (parts_dir / f"{stem}.parts.json").write_text(json.dumps(report))
+    (parts_dir / f"{stem}.parts.json").write_text(json.dumps(report), encoding="utf-8")
 
 
 @pytest.fixture
@@ -54,7 +54,8 @@ def test_write_manifest_writes_utf8_json(tmp_path):
     _write_report(tmp_path, "Ayşe.vrm", ["base"])
     sources_path = tmp_path / "sources.json"
     sources_path.write_text(
-        json.dumps({"sources": {"Ayşe": {"gender": "female", "label": "Ayşe"}}})
+        json.dumps({"sources": {"Ayşe": {"gender": "female", "label": "Ayşe"}}}),
+        encoding="utf-8",
     )
     out = tmp_path / "manifest.json"
     write_manifest(tmp_path, sources_path, out)

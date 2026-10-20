@@ -30,3 +30,5 @@ select = ["E", "F", "I", "UP", "B", "ANN", "SIM", "RUF"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Unreal-side helpers (pipeline/unreal) are imported by tests without Unreal.
+pythonpath = ["unreal"]

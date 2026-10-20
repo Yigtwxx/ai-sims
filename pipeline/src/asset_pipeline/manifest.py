@@ -19,7 +19,7 @@ class Sources:
 
     @staticmethod
     def load(path: Path) -> "Sources":
-        return Sources(entries=json.loads(path.read_text())["sources"])
+        return Sources(entries=json.loads(path.read_text(encoding="utf-8"))["sources"])
 
     def gender(self, stem: str) -> Gender:
         gender = self.entries.get(stem, {}).get("gender", "unisex")
@@ -40,7 +40,7 @@ def build_manifest(parts_dir: Path, sources: Sources) -> dict[str, object]:
     bases: list[dict[str, object]] = []
     parts: list[dict[str, object]] = []
     for report_path in sorted(parts_dir.glob("*.parts.json")):
-        report = json.loads(report_path.read_text())
+        report = json.loads(report_path.read_text(encoding="utf-8"))
         stem = Path(report["source"]).stem
         for part in report["parts"]:
             entry = {
@@ -60,5 +60,5 @@ def build_manifest(parts_dir: Path, sources: Sources) -> dict[str, object]:
 
 def write_manifest(parts_dir: Path, sources_path: Path, out: Path) -> dict[str, object]:
     manifest = build_manifest(parts_dir, Sources.load(sources_path))
-    out.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
+    out.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return manifest

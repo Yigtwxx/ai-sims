@@ -15,10 +15,10 @@ def _paths() -> Paths:
 
 def test_build_command_passes_script_args_after_separator():
     cmd = build_command(_paths(), "build_base.py", ["--gender", "male"])
-    assert cmd[0] == "/bin/blender"
+    assert Path(cmd[0]) == Path("/bin/blender")
     assert "--background" in cmd
     sep = cmd.index("--")
-    assert cmd[sep - 1] == "/repo/pipeline/blender_scripts/build_base.py"
+    assert Path(cmd[sep - 1]) == Path("/repo/pipeline/blender_scripts/build_base.py")
     assert cmd[sep + 1 :] == ["--gender", "male"]
 
 

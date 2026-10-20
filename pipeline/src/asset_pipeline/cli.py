@@ -1,6 +1,7 @@
 """Command-line entry point: `uv run asset-pipeline <command>`."""
 
 import argparse
+import json
 from pathlib import Path
 
 from asset_pipeline.blender import run_blender
@@ -35,6 +36,11 @@ def main(argv: list[str] | None = None) -> None:
     base = sub.add_parser("base", help="Generate base human GLB(s) with MPFB")
     base.add_argument("--gender", choices=["male", "female", "all"], default="all")
 
+    ue = sub.add_parser("ue", help="Run a MetaHuman export job inside Unreal Editor (Windows)")
+    ue.add_argument("job", help="Job name from pipeline/unreal/mh_export/jobs.py")
+    ue.add_argument("--args", default="{}", help="Job options as a JSON object")
+    ue.add_argument("--keep-open", action="store_true", help="Leave the editor open afterwards")
+
     args = parser.parse_args(argv)
     paths = load_paths()
     paths.out_dir.mkdir(parents=True, exist_ok=True)
@@ -63,6 +69,11 @@ def main(argv: list[str] | None = None) -> None:
         _write_vrm_manifest(paths)
     elif args.command == "manifest":
         _write_vrm_manifest(paths)
+    elif args.command == "ue":
+        from asset_pipeline.unreal import run_job
+
+        result = run_job(args.job, json.loads(args.args), quit_after=not args.keep_open)
+        print(json.dumps(result.get("result"), indent=2))
     elif args.command == "base":
         genders = ["male", "female"] if args.gender == "all" else [args.gender]
         for gender in genders:
