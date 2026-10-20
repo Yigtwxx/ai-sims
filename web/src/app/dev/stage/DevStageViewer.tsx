@@ -14,15 +14,27 @@ const FACES = ['Ada', 'Aera', 'Aoi'] as const;
  * Retargeted crowd idles (web/scripts/retarget-fbx.mjs output) that its
  * clips.json flags `standing` with an upright torso; used as the body layer.
  */
-const BENCH_IDLES = [20, 29, 34, 36, 38, 41, 49, 57].map(
-  (n) => `Crowd_Idle_UE5_Smooth${String(n).padStart(3, '0')}`,
-);
+const CROWD_IDLES = [20, 29, 34, 36, 38, 41, 49, 57].map((n) => ({
+  id: `crowd${n}`,
+  kind: 'body' as const,
+  file: `animations/fab/crowd_idle_59/Crowd_Idle_UE5_Smooth${String(n).padStart(3, '0')}.glb`,
+  tags: ['idle', 'standing'],
+}));
+/** The calm HumanIK stand loop, listed three times so it drives the full body (MIN_CALM_IDLES). */
+const STAND_IDLES = [1, 2, 3].map((n) => ({
+  id: `stand${n}`,
+  kind: 'body' as const,
+  file: 'animations/fab/standing_idle_npc/24shibuya_stand3_youngman_loop_hik_60fps.glb',
+  tags: ['idle', 'standing', 'calm'],
+}));
+const IDLE_SETS = { crowd: CROWD_IDLES, stand: STAND_IDLES } as const;
+type IdleSet = keyof typeof IDLE_SETS;
 
 /**
  * Minimal manifest over the converted files on this machine, until the
  * converter writes the real manifest.json. Dev only.
  */
-function benchManifest(): MhManifest {
+function benchManifest(idles: IdleSet): MhManifest {
   const body = (gender: 'female' | 'male') => ({
     gender,
     glb: `bodies/${gender}/body.glb`,
@@ -41,19 +53,15 @@ function benchManifest(): MhManifest {
     })),
     skins: FACES.map(benchSkin),
     irises: FACES.map(benchIris),
-    animations: BENCH_IDLES.map((name) => ({
-      id: name,
-      kind: 'body',
-      file: `animations/fab/crowd_idle_59/${name}.glb`,
-      tags: ['idle', 'standing'],
-    })),
+    animations: IDLE_SETS[idles],
     bodies: [body('female'), body('male')],
   });
 }
 
 /** MhStage in talk or creator mode with the Turkish sample, for checking life and lip-sync. */
 export function DevStageViewer() {
-  const manifest = useMemo(() => benchManifest(), []);
+  const [idles, setIdles] = useState<IdleSet>('crowd');
+  const manifest = useMemo(() => benchManifest(idles), [idles]);
   const [face, setFace] = useState<(typeof FACES)[number]>('Ada');
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
   const [thinking, setThinking] = useState(false);
@@ -115,6 +123,12 @@ export function DevStageViewer() {
           <select value={mode} onChange={(e) => setMode(e.target.value as 'talk' | 'creator')}>
             <option>talk</option>
             <option>creator</option>
+          </select>
+          idles
+          <select value={idles} onChange={(e) => setIdles(e.target.value as IdleSet)}>
+            {Object.keys(IDLE_SETS).map((key) => (
+              <option key={key}>{key}</option>
+            ))}
           </select>
         </label>
         <label className="flex items-center gap-2">

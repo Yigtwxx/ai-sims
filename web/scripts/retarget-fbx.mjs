@@ -75,9 +75,56 @@ function loadSource(path) {
   };
   // Some exports carry the skeleton as plain transform nodes instead of bones.
   const bones = collect((node) => node.isBone);
-  const byName = bones.has('pelvis') ? bones : collect((node) => node !== object);
+  const named = (map) => map.has('pelvis') || map.has('Hips');
+  const byName = named(bones) ? bones : collect((node) => node !== object);
+  // HumanIK (Maya/MotionBuilder) names: look the same joints up by UE names.
+  for (const [hik, ue] of HIK_NAMES) {
+    if (byName.has(hik) && !byName.has(ue)) byName.set(ue, byName.get(hik));
+  }
   return { object, byName, clip: object.animations[0] };
 }
+
+/** HumanIK joint names -> UE5 Mannequin / MetaHuman names. */
+const HIK_NAMES = (() => {
+  const names = new Map([
+    ['Reference', 'root'],
+    ['Hips', 'pelvis'],
+    ['spine', 'spine_01'],
+    ['spine1', 'spine_02'],
+    ['spine2', 'spine_03'],
+    ['spine3', 'spine_04'],
+    ['spine4', 'spine_05'],
+    ['Neck', 'neck_01'],
+    ['Neck1', 'neck_02'],
+    ['Head', 'head'],
+  ]);
+  const limbs = [
+    ['Shoulder', 'clavicle'],
+    ['Arm', 'upperarm'],
+    ['ForeArm', 'lowerarm'],
+    ['Hand', 'hand'],
+    ['UpLeg', 'thigh'],
+    ['Leg', 'calf'],
+    ['Foot', 'foot'],
+    ['ToeBase', 'ball'],
+  ];
+  const fingers = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
+  for (const [side, suffix] of [
+    ['Left', 'l'],
+    ['Right', 'r'],
+  ]) {
+    for (const [hik, ue] of limbs) names.set(`${side}${hik}`, `${ue}_${suffix}`);
+    for (const finger of fingers) {
+      for (const n of [1, 2, 3]) {
+        names.set(`${side}Hand${finger}${n}`, `${finger.toLowerCase()}_0${n}_${suffix}`);
+      }
+      if (finger !== 'Thumb') {
+        names.set(`${side}InHand${finger}`, `${finger.toLowerCase()}_metacarpal_${suffix}`);
+      }
+    }
+  }
+  return names;
+})();
 
 /** Joints the rest-frame alignment and the pelvis scale need on both skeletons. */
 const REQUIRED_JOINTS = ['pelvis', 'head', 'upperarm_l', 'upperarm_r'];
@@ -170,6 +217,30 @@ function calibrationEnd(mixer, source, fps) {
   return end < 0 ? 0 : Math.min(end + SETTLE, clip.duration - 1);
 }
 
+const IDENTITY = new Quaternion();
+
+const LIMB_CHILD = {
+  clavicle: 'upperarm',
+  upperarm: 'lowerarm',
+  lowerarm: 'hand',
+  hand: 'middle_01',
+  thigh: 'calf',
+  calf: 'foot',
+  foot: 'ball',
+};
+
+/** The joint a limb or finger bone points at (undefined for the spine and head). */
+function chainChild(name) {
+  const sided = /^(.+)_([lr])$/.exec(name);
+  if (!sided) return undefined;
+  const [, base, side] = sided;
+  if (LIMB_CHILD[base]) return `${LIMB_CHILD[base]}_${side}`;
+  const finger = /^(thumb|index|middle|ring|pinky)_(metacarpal|01|02)$/.exec(base);
+  if (!finger) return undefined;
+  const next = finger[2] === 'metacarpal' ? 1 : Number(finger[2]) + 1;
+  return `${finger[1]}_0${next}_${side}`;
+}
+
 function retarget(source, target, fps) {
   const { clip } = source;
   const mapped = target.joints.filter((joint) => source.byName.has(joint.name));
@@ -190,6 +261,21 @@ function retarget(source, target, fps) {
 
   const sourceUp = worldPosition(source.byName.get('head')).sub(sourcePelvisRest).normalize();
   const hipsRest = hipsSide(source.byName, sourceUp);
+
+  // The rest poses differ (an A-pose against a relaxed stance, say): turn each
+  // limb bone's rest to point where the source's does before carrying
+  // rotations over, or the difference would persist through the whole clip.
+  const restFix = new Map();
+  for (const joint of mapped) {
+    const child = chainChild(joint.name);
+    if (!child || !source.byName.has(child) || !target.byName.has(child)) continue;
+    const from = worldPosition(target.byName.get(child)).sub(worldPosition(joint)).normalize();
+    const to = worldPosition(source.byName.get(child))
+      .sub(worldPosition(source.byName.get(joint.name)))
+      .applyQuaternion(align)
+      .normalize();
+    restFix.set(joint.name, new Quaternion().setFromUnitVectors(from, to));
+  }
 
   const mixer = new AnimationMixer(source.object);
   mixer.clipAction(clip).play();
@@ -237,6 +323,7 @@ function retarget(source, target, fps) {
     drift: 0,
     crouch: 0,
     lean: 0,
+    floor: [Infinity, -Infinity],
   };
   const world = new Map();
   const delta = new Quaternion();
@@ -250,6 +337,8 @@ function retarget(source, target, fps) {
   const handRight = target.byName.get('hand_r');
   const chestHeight = worldPosition(target.byName.get('spine_03')).y;
   const headJoint = target.byName.get('head');
+  const balls = ['ball_l', 'ball_r'].map((name) => target.byName.get(name)).filter(Boolean);
+  const ballRest = Math.min(...balls.map((ball) => worldPosition(ball).y));
   let handsUp = 0;
   let crossed = 0;
 
@@ -268,7 +357,10 @@ function retarget(source, target, fps) {
         // World-space rotation since rest, expressed in the target's frame.
         delta.copy(now).multiply(sourceRest.get(joint.name).clone().invert());
         delta.premultiply(align).multiply(alignInverse).premultiply(facing);
-        jointWorld = delta.clone().multiply(targetRest.get(joint.name));
+        jointWorld = delta
+          .clone()
+          .multiply(restFix.get(joint.name) ?? IDENTITY)
+          .multiply(targetRest.get(joint.name));
         local.copy(parentWorld).invert().multiply(jointWorld);
         local.toArray(rotations.get(joint.name), frame * 4);
       } else {
@@ -287,14 +379,27 @@ function retarget(source, target, fps) {
         parentScale,
       )
       .invert();
-    moved.applyMatrix4(parentInverse).toArray(pelvisPositions, frame * 3);
+    // Pose the target (the GLB writer reads the JSON nodes, not these objects).
+    const pose = () => {
+      moved
+        .clone()
+        .applyMatrix4(parentInverse)
+        .toArray(pelvisPositions, frame * 3);
+      for (const [name, values] of rotations)
+        target.byName.get(name).quaternion.fromArray(values, frame * 4);
+      targetPelvis.position.fromArray(pelvisPositions, frame * 3);
+      targetTop.updateMatrixWorld(true);
+    };
+    pose();
+    // Plant the feet: leg proportions and rest stances differ, so the copied
+    // leg angles leave the feet above or below the floor. One foot carries the
+    // weight in an idle, so the lower toe joint goes back to its rest height.
+    const lowest = Math.min(...balls.map((ball) => worldPosition(ball).y)) - ballRest;
+    stats.floor = [Math.min(stats.floor[0], lowest), Math.max(stats.floor[1], lowest)];
+    moved.y -= lowest;
+    pose();
 
-    // Pose the target (the GLB writer reads the JSON nodes, not these objects)
-    // to see where the hands go: conversation idles keep them low and apart.
-    for (const [name, values] of rotations)
-      target.byName.get(name).quaternion.fromArray(values, frame * 4);
-    targetPelvis.position.fromArray(pelvisPositions, frame * 3);
-    targetTop.updateMatrixWorld(true);
+    // Where the hands go: conversation idles keep them low and apart.
     const left = worldPosition(handLeft);
     const right = worldPosition(handRight);
     if (Math.max(left.y, right.y) > chestHeight) handsUp += 1;
@@ -437,7 +542,7 @@ for (const file of args.files) {
   const name = basename(file).replace(/\.fbx$/i, '');
   const out = join(args.out, `${name}.glb`);
   writeAnimationGlb(out, target, result, name);
-  const { start, yaw, drift, crouch, lean, handsUp, crossed } = result.stats;
+  const { start, yaw, drift, crouch, lean, floor, handsUp, crossed } = result.stats;
   const duration = result.times.at(-1);
   // A standing idle for a conversation: faces the viewer, stays in place, long enough to loop.
   const standing =
@@ -459,6 +564,8 @@ for (const file of args.files) {
     // Deepest pelvis drop (share of its rest height) and largest pelvis->head tilt (degrees).
     crouch: round(crouch, 3),
     lean: round(lean, 1),
+    // Lower toe joint height against the floor before planting, [min, max] metres.
+    floor: floor.map((height) => round(height, 3)),
     handsUp: round(handsUp, 2),
     crossed: round(crossed, 2),
     standing,
