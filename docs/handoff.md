@@ -119,6 +119,8 @@ Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığım�
 - **Windows'tan ayrılmadan önce** en az bir yüz bu PC'de uçtan uca glTF'e çevrilip test edilir (eksik dışa aktarma yüzünden geri dönmemek için).
 - **ARKit kaynağı:** ARKit 52 → MetaHuman kontrol eşlemesi DNA'da değil, Unreal'daki bir PoseAsset'te. Windows'ta JSON olarak dışa aktarılır; Mac'te Blender + Poly Hammer Character DNA (OpenRigLogic) ile shape key olarak bake edilir.
 - **Lisans notu:** UE EULA, MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor; LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
+- **Seat lisansı:** şirket gerekmediğini söyledi (gelir eşiği altında); tekrar sorulmaz.
+- **Kıyafet kaynağı:** Core Data'da yalnızca 1 kıyafet (`WI_DefaultGarment`) var. Önce Fab'deki ücretsiz MetaHuman uyumlu kıyafetler Windows'ta projeye eklenip dışa aktarılır; eksik kalan parçalar sonradan Mac'teki kıyafet ekleme hattıyla gelir.
 
 ## Açık kararlar
 
