@@ -7,7 +7,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Character } from '@/features/avatar/Character';
 import type { CameraFocus } from '@/features/avatar/cameraFocus';
 import { Stage } from '@/features/avatar/Stage';
-import { VrmCharacter } from '@/features/avatar/VrmCharacter';
+import { VrmAvatar } from '@/features/avatar/VrmAvatar';
+import { BODY_BUILDS, type BodyBuild } from '@/features/avatar/vrm/bodyShape';
+import type { PartSelection } from '@/features/avatar/vrm/parts';
+import type { Tints } from '@/features/avatar/vrm/tint';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 
 const SAMPLE_AUDIO = '/assets/samples/tr-greeting.wav';
@@ -23,6 +26,36 @@ const MODELS = {
 
 const FOCUSES: CameraFocus[] = ['body', 'torso', 'face', 'legs', 'feet'];
 
+const PARTS_DIR = '/assets/vrm/parts';
+const donorPart = (category: string) => `${PARTS_DIR}/AvatarSample_B__${category}.vrm`;
+
+/** Part presets for testing donor assembly on the naked VRoid bases. */
+const OUTFITS = {
+  'parts: own': {},
+  'parts: donor outfit': {
+    top: donorPart('top'),
+    bottom: donorPart('bottom'),
+    shoes: donorPart('shoes'),
+  },
+  'parts: donor all': {
+    top: donorPart('top'),
+    bottom: donorPart('bottom'),
+    shoes: donorPart('shoes'),
+    hair: donorPart('hair'),
+  },
+  'parts: none': { top: null, bottom: null, shoes: null },
+} satisfies Record<string, PartSelection>;
+
+type OutfitId = keyof typeof OUTFITS;
+
+const TINTS = {
+  'tint: none': {},
+  'tint: warm': { skin: '#e0b090', hair: '#c06040', top: '#ffd0d0' },
+  'tint: cool': { skin: '#f0e6e0', hair: '#7090ff', eyes: '#60c0ff', bottom: '#a0c0ff' },
+} satisfies Record<string, Tints>;
+
+type TintId = keyof typeof TINTS;
+
 type ModelId = keyof typeof MODELS;
 
 /** Developer-only comparison bench for the realism spike (not product UI). */
@@ -32,6 +65,9 @@ export function SpikeScene() {
   const [measured, setMeasured] = useState<{ id: ModelId; height: number }>();
   const subjectHeight = measured?.id === modelId ? measured.height : undefined;
   const [focus, setFocus] = useState<CameraFocus>('body');
+  const [outfit, setOutfit] = useState<OutfitId>('parts: own');
+  const [build, setBuild] = useState<BodyBuild>('average');
+  const [tint, setTint] = useState<TintId>('tint: none');
   const [sss, setSss] = useState(true);
   const [stats, setStats] = useState(false);
   const [post, setPost] = useState(true);
@@ -61,9 +97,12 @@ export function SpikeScene() {
         className="absolute inset-0"
       >
         {model.look === 'anime' ? (
-          <VrmCharacter
+          <VrmAvatar
             key={modelId}
-            url={model.url}
+            baseUrl={model.url}
+            parts={OUTFITS[outfit]}
+            bodyShape={{ build, height: 1 }}
+            tints={TINTS[tint]}
             speech={speech}
             onMeasured={(height) => setMeasured({ id: modelId, height })}
           />
@@ -77,6 +116,9 @@ export function SpikeScene() {
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap gap-2 p-3 font-sans text-xs">
         <Toggle options={Object.keys(MODELS) as ModelId[]} value={modelId} onChange={setModelId} />
         <Toggle options={FOCUSES} value={focus} onChange={setFocus} />
+        <Toggle options={Object.keys(OUTFITS) as OutfitId[]} value={outfit} onChange={setOutfit} />
+        <Toggle options={BODY_BUILDS} value={build} onChange={setBuild} />
+        <Toggle options={Object.keys(TINTS) as TintId[]} value={tint} onChange={setTint} />
         <Toggle
           options={['sss on', 'sss off']}
           value={sss ? 'sss on' : 'sss off'}

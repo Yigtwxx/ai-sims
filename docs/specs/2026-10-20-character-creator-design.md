@@ -6,6 +6,21 @@
 > - **Lip-sync:** Render'dan bağımsız Türkçe viseme motoru (`web/src/features/lipsync`). Ara format olarak Oculus 15 viseme kullanılır; m/b/p'de dudaklar tam kapanır; cümleler sesteki konuşma bölgelerine hizalanır; ağız açıklığı ses yüksekliğine göre ölçeklenir. VRM'de aa/ih/ou/ee/oh ifadeleri ve `Fcl_MTH_Close`, MPFB'de `viseme_*` morph'ları sürülür. Faz 4'te Azure TTS viseme olayları doğrudan beslenecek.
 > - **Lisans riski (kullanıcı kararı):** VRoid kuralları ve AvatarSample koşulları, VRoid parçalarını birleştiren karakter oluşturucuları pixiv lisansı olmadan yasaklıyor. İç demo için risk kullanıcı tarafından kabul edildi. Halka açık yayından önce pixiv lisansı alınmalı ya da parçalar değiştirilmeli.
 > - Unreal / Pixel Streaming kaçış yolu artık gerekmiyor.
+> - **Öncelik:** Önce anime tarafı tamamen bitecek, sonra gerçekçi taraf.
+> - **Oluşturucu gereksinimleri (anime):**
+>   - Düzen: tüm seçenekler **sol panelde**, karakter sahnenin geri kalanında.
+>   - Seçenekler:
+>     1. Karakter adı.
+>     2. Cinsiyet.
+>     3. Yüz: base seçimi, her VRoid modelinin yüzü.
+>     4. Vücut tipi: İnce / Normal / Atletik / Kıvrımlı + boy.
+>     5. Ten rengi.
+>     6. Göz: renk ve stil.
+>     7. Saç: model ve renk.
+>     8. Üst, alt, ayakkabı (renkleriyle birlikte).
+>     9. Takı: prosedürel küpe, kolye, gerdanlık, gözlük ve VRoid aksesuarları.
+>     10. Dövme: VRoid vücut UV'sine işlenen desenler ve yerleşim noktaları.
+>   - "Bitti" deyince karakter kaydedilir ve lip-sync'li sohbete geçilir.
 
 
 ## Context
