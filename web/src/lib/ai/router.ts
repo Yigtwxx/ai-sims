@@ -8,8 +8,19 @@ import {
 import { getOrderedProviders } from './providers';
 import type { ChatProvider, ChatRequest, ProviderId } from './types';
 
-/** How long one provider may take to produce its first token before the next one is tried. */
+/**
+ * How long each provider may take to produce its first token before the next
+ * one is tried. Groq answers in well under a second and Gemini Flash-Lite in
+ * about one, but a cold Gemini call was measured at up to 26 s, so both get a
+ * short leash: falling through to Claude Haiku costs a fraction of a cent.
+ * Claude is last in the chain, so it gets the long default.
+ */
 export const DEFAULT_FIRST_TOKEN_TIMEOUT_MS = 25_000;
+export const FIRST_TOKEN_TIMEOUT_MS: Readonly<Record<ProviderId, number>> = {
+  groq: 10_000,
+  gemini: 10_000,
+  anthropic: DEFAULT_FIRST_TOKEN_TIMEOUT_MS,
+};
 
 export interface FallbackStream {
   /** The provider that produced the first token. */
@@ -21,6 +32,7 @@ export interface FallbackStream {
 export interface StreamWithFallbackOptions {
   /** Defaults to the providers in AI_PROVIDER_ORDER. Unconfigured ones are skipped. */
   providers?: readonly ChatProvider[];
+  /** Overrides the per-provider first-token timeouts for every provider. */
   firstTokenTimeoutMs?: number;
 }
 
@@ -47,13 +59,13 @@ export async function streamWithFallback(
   );
   if (providers.length === 0) throw new AiNotConfiguredError();
 
-  const timeoutMs = options.firstTokenTimeoutMs ?? DEFAULT_FIRST_TOKEN_TIMEOUT_MS;
   const failures: ProviderFailure[] = [];
 
   for (const provider of providers) {
     // The caller already left: do not spend another provider on it.
     request.signal?.throwIfAborted();
 
+    const timeoutMs = options.firstTokenTimeoutMs ?? FIRST_TOKEN_TIMEOUT_MS[provider.id];
     const attempt = await startAttempt(provider, request, timeoutMs);
     if (attempt.ok) return attempt.value;
     failures.push(attempt.failure);

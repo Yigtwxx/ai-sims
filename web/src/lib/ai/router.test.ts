@@ -7,7 +7,7 @@ import {
   ProviderError,
   type ProviderFailureKind,
 } from './errors';
-import { streamWithFallback } from './router';
+import { FIRST_TOKEN_TIMEOUT_MS, streamWithFallback } from './router';
 import type { ChatProvider, ChatRequest, ProviderId } from './types';
 
 const REQUEST: ChatRequest = {
@@ -225,6 +225,27 @@ describe('streamWithFallback', () => {
 
     expect(result.provider).toBe('gemini');
     expect(a.stream.mock.calls[0]![0].signal?.aborted).toBe(true);
+  });
+
+  it('gives a stalled Gemini the short per-provider leash before falling back', async () => {
+    vi.useFakeTimers();
+    try {
+      const g = fakeProvider('gemini', async function* () {
+        yield* [];
+        await new Promise<never>(() => undefined);
+      });
+      const a = fakeProvider('anthropic', () => chunks('fallback reply'));
+
+      const pending = streamWithFallback(REQUEST, { providers: [g.provider, a.provider] });
+      await vi.advanceTimersByTimeAsync(FIRST_TOKEN_TIMEOUT_MS.gemini - 1);
+      expect(a.stream).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2);
+
+      expect((await pending).provider).toBe('anthropic');
+      expect(FIRST_TOKEN_TIMEOUT_MS.gemini).toBeLessThan(FIRST_TOKEN_TIMEOUT_MS.anthropic);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reports a first-token timeout as a timeout failure', async () => {
