@@ -11,6 +11,8 @@ import {
   type Texture,
 } from 'three';
 
+import { WRINKLE_MASK_LAYERS, WRINKLE_WEIGHT_COUNT } from './wrinkles';
+
 /**
  * Material pass for converted MetaHuman GLBs. The converter writes plain glTF
  * PBR materials; skin gets a physical material with the look of MetaHuman's
@@ -19,7 +21,9 @@ import {
  *  - per-pixel specular level from the SRMF map's red channel (the glTF
  *    metallic-roughness slot already carries roughness in green),
  *  - a tiled micro-normal for pore detail up close,
- *  - a faint sheen for peach fuzz at grazing angles.
+ *  - a faint sheen for peach fuzz at grazing angles,
+ *  - on the head, wrinkle normals (wm1..wm3) blended in where RigLogic's
+ *    region masks are active (see ./wrinkles.ts).
  */
 
 export interface SkinDetail {
@@ -36,6 +40,8 @@ export interface SkinTuning {
   microTiling: number;
   microStrength: number;
   sheen: number;
+  /** Blend wrinkle normal maps by region weights (head only). */
+  wrinkles: boolean;
 }
 
 export const HEAD_SKIN: SkinTuning = {
@@ -44,9 +50,15 @@ export const HEAD_SKIN: SkinTuning = {
   microTiling: 48,
   microStrength: 0.35,
   sheen: 0.1,
+  wrinkles: true,
 };
 
-export const BODY_SKIN: SkinTuning = { ...HEAD_SKIN, microTiling: 36, microStrength: 0.3 };
+export const BODY_SKIN: SkinTuning = {
+  ...HEAD_SKIN,
+  microTiling: 36,
+  microStrength: 0.3,
+  wrinkles: false,
+};
 
 const DIFFUSE_LINE =
   'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseContribution ) * ( 1.0 - F );';
@@ -66,14 +78,62 @@ const SPECULAR_FROM_RED = /* glsl */ `
 `;
 const F90_CLAMPED =
   'material.specularF90 = mix( min( specularIntensityFactor, 1.0 ), 1.0, metalnessFactor );';
-// Whiteout blend of the tiled micro normal (DirectX green flipped to OpenGL).
+// Wrinkle sets first (they replace the base normal regionally), then the
+// whiteout blend of the tiled micro normal (DirectX green flipped to OpenGL).
 const MICRO_NORMAL = /* glsl */ `
   mapN.xy *= normalScale;
+  #if defined( MH_WRINKLES ) && defined( USE_NORMALMAP_TANGENTSPACE )
+  if ( wrinkleActive > 0.5 ) {
+    float wrinkle1 = 0.0;
+    float wrinkle2 = 0.0;
+    float wrinkle3 = 0.0;
+    for ( int layer = 0; layer < ${WRINKLE_MASK_LAYERS.length}; layer ++ ) {
+      vec4 regions = texture( wrinkleMasks, vec3( vNormalMapUv, float( layer ) ) );
+      wrinkle1 += dot( regions, wrinkleWeights[ layer ] );
+      wrinkle2 += dot( regions, wrinkleWeights[ ${WRINKLE_MASK_LAYERS.length} + layer ] );
+      wrinkle3 += dot( regions, wrinkleWeights[ ${2 * WRINKLE_MASK_LAYERS.length} + layer ] );
+    }
+    mapN = mix( mapN, mhWrinkleNormal( wrinkleNormal1 ), saturate( wrinkle1 ) );
+    mapN = mix( mapN, mhWrinkleNormal( wrinkleNormal2 ), saturate( wrinkle2 ) );
+    mapN = mix( mapN, mhWrinkleNormal( wrinkleNormal3 ), saturate( wrinkle3 ) );
+  }
+  #endif
   vec3 skinMicro = texture2D( skinMicroNormal, vNormalMapUv * skinMicroTiling ).xyz * 2.0 - 1.0;
   skinMicro.y = -skinMicro.y;
   skinMicro.xy *= skinMicroStrength;
   mapN = vec3( mapN.xy + skinMicro.xy, mapN.z );
 `;
+
+// Decodes a wrinkle normal exactly like three decodes the base normal map
+// (only compiled when the head has a tangent-space normal map at all).
+const WRINKLE_PARS = /* glsl */ `
+#if defined( MH_WRINKLES ) && defined( USE_NORMALMAP_TANGENTSPACE )
+uniform sampler2D wrinkleNormal1;
+uniform sampler2D wrinkleNormal2;
+uniform sampler2D wrinkleNormal3;
+uniform sampler2DArray wrinkleMasks;
+uniform vec4 wrinkleWeights[ ${WRINKLE_WEIGHT_COUNT / 4} ];
+uniform float wrinkleActive;
+vec3 mhWrinkleNormal( sampler2D map ) {
+  vec3 n = texture2D( map, vNormalMapUv ).xyz * 2.0 - 1.0;
+  #ifdef USE_PACKED_NORMALMAP
+  n = vec3( n.xy, sqrt( saturate( 1.0 - dot( n.xy, n.xy ) ) ) );
+  #endif
+  n.xy *= normalScale;
+  return n;
+}
+#endif
+`;
+
+/** Wrinkle inputs of a head skin; textures arrive asynchronously. */
+export interface WrinkleUniforms {
+  wrinkleNormal1: { value: Texture | null };
+  wrinkleNormal2: { value: Texture | null };
+  wrinkleNormal3: { value: Texture | null };
+  wrinkleMasks: { value: Texture | null };
+  wrinkleWeights: { value: Float32Array };
+  wrinkleActive: { value: number };
+}
 
 let warned = false;
 function chunksMatch(): boolean {
@@ -120,10 +180,22 @@ export function createSkinMaterial(
     skinMicroTiling: { value: tuning.microTiling },
     skinMicroStrength: { value: micro ? tuning.microStrength : 0 },
   };
+  const wrinkles: WrinkleUniforms | null = tuning.wrinkles
+    ? {
+        wrinkleNormal1: { value: null },
+        wrinkleNormal2: { value: null },
+        wrinkleNormal3: { value: null },
+        wrinkleMasks: { value: null },
+        wrinkleWeights: { value: new Float32Array(WRINKLE_WEIGHT_COUNT) },
+        wrinkleActive: { value: 0 },
+      }
+    : null;
+  if (wrinkles) material.defines = { MH_WRINKLES: '' };
   material.userData.skinUniforms = uniforms;
+  material.userData.wrinkleUniforms = wrinkles;
   material.userData.skinTuning = tuning;
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, uniforms, wrinkles ?? {});
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
@@ -135,6 +207,11 @@ export function createSkinMaterial(
           'uniform float skinMicroTiling;',
           'uniform float skinMicroStrength;',
         ].join('\n'),
+      )
+      // After the normal map uniforms it reads (normalScale, vNormalMapUv).
+      .replace(
+        '#include <normalmap_pars_fragment>',
+        `#include <normalmap_pars_fragment>\n${WRINKLE_PARS}`,
       )
       .replace(
         '#include <lights_physical_pars_fragment>',
@@ -151,7 +228,7 @@ export function createSkinMaterial(
         ShaderChunk.normal_fragment_maps.replace(NORMAL_SCALE_LINE, MICRO_NORMAL),
       );
   };
-  material.customProgramCacheKey = () => 'mh-skin-v1';
+  material.customProgramCacheKey = () => (wrinkles ? 'mh-skin-v2-wrinkles' : 'mh-skin-v2');
   return material;
 }
 
