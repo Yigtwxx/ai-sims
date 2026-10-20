@@ -6,9 +6,9 @@ import { Suspense, type ReactNode } from 'react';
 import { AgXToneMapping, NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
 
 import { CameraRig } from './CameraRig';
-import { CAMERA_POSES, type CameraFocus } from './cameraFocus';
+import { getCameraPose, type CameraFocus } from './cameraFocus';
 import { Cyclorama } from './Cyclorama';
-import { PostEffects } from './PostEffects';
+import { PostEffects, type RenderLook } from './PostEffects';
 import { StudioLighting } from './StudioLighting';
 import { Turntable } from './Turntable';
 
@@ -18,14 +18,24 @@ interface StageProps {
   className?: string;
   /** Disable the post-processing stack (for debugging and A/B checks). */
   post?: boolean;
+  look?: RenderLook;
+  /** Measured character height (metres) used to scale camera framing. */
+  subjectHeight?: number;
 }
 
 /**
  * The photo studio: renderer settings, lighting, backdrop, camera and post.
  * Tone mapping happens in the post stack (AgX), so the renderer outputs linear.
  */
-export function Stage({ children, focus = 'body', className, post = true }: StageProps) {
-  const initial = CAMERA_POSES[focus];
+export function Stage({
+  children,
+  focus = 'body',
+  className,
+  post = true,
+  look = 'realistic',
+  subjectHeight,
+}: StageProps) {
+  const initial = getCameraPose(focus, subjectHeight);
   return (
     <Canvas
       className={['cursor-grab touch-none active:cursor-grabbing', className]
@@ -49,9 +59,9 @@ export function Stage({ children, focus = 'body', className, post = true }: Stag
         <Cyclorama />
         <ContactShadows position={[0, 0.002, 0]} scale={3} blur={2.4} far={1.2} opacity={0.55} />
         <Turntable>{children}</Turntable>
-        {post && <PostEffects />}
+        {post && <PostEffects look={look} />}
       </Suspense>
-      <CameraRig focus={focus} />
+      <CameraRig focus={focus} height={subjectHeight} />
     </Canvas>
   );
 }

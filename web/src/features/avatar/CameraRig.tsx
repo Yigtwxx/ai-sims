@@ -3,7 +3,7 @@
 import { CameraControls, CameraControlsImpl } from '@react-three/drei';
 import { useEffect, useRef } from 'react';
 
-import { CAMERA_POSES, type CameraFocus } from './cameraFocus';
+import { getCameraPose, type CameraFocus } from './cameraFocus';
 
 const { ACTION } = CameraControlsImpl;
 
@@ -11,13 +11,13 @@ const { ACTION } = CameraControlsImpl;
  * Camera that only dollies (wheel/pinch) and glides between framing presets.
  * Left-drag is reserved for the Turntable, which rotates the character.
  */
-export function CameraRig({ focus }: { focus: CameraFocus }) {
+export function CameraRig({ focus, height }: { focus: CameraFocus; height?: number }) {
   const controls = useRef<CameraControlsImpl>(null);
 
   useEffect(() => {
-    const pose = CAMERA_POSES[focus];
+    const pose = getCameraPose(focus, height);
     void controls.current?.setLookAt(...pose.position, ...pose.target, true);
-  }, [focus]);
+  }, [focus, height]);
 
   return (
     <CameraControls

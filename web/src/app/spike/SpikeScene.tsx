@@ -7,23 +7,30 @@ import { useEffect, useMemo, useState } from 'react';
 import { Character } from '@/features/avatar/Character';
 import type { CameraFocus } from '@/features/avatar/cameraFocus';
 import { Stage } from '@/features/avatar/Stage';
+import { VrmCharacter } from '@/features/avatar/VrmCharacter';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 
 const SAMPLE_AUDIO = '/assets/samples/tr-greeting.wav';
 const SAMPLE_TEXT = '/assets/samples/tr-greeting.txt';
 
-const CHARACTERS = {
-  male: '/assets/spike/base_male.glb',
-  female: '/assets/spike/base_female.glb',
+const MODELS = {
+  'anime: avatar-b': { look: 'anime', url: '/assets/spike/vrm/AvatarSample_B.vrm' },
+  'anime: fem': { look: 'anime', url: '/assets/spike/vrm/fem_vroid.vrm' },
+  'anime: masc': { look: 'anime', url: '/assets/spike/vrm/masc_vroid.vrm' },
+  'real: male': { look: 'realistic', url: '/assets/spike/base_male.glb' },
+  'real: female': { look: 'realistic', url: '/assets/spike/base_female.glb' },
 } as const;
 
 const FOCUSES: CameraFocus[] = ['body', 'torso', 'face', 'legs', 'feet'];
 
-type Gender = keyof typeof CHARACTERS;
+type ModelId = keyof typeof MODELS;
 
 /** Developer-only comparison bench for the realism spike (not product UI). */
 export function SpikeScene() {
-  const [gender, setGender] = useState<Gender>('male');
+  const [modelId, setModelId] = useState<ModelId>('anime: avatar-b');
+  const model = MODELS[modelId];
+  const [measured, setMeasured] = useState<{ id: ModelId; height: number }>();
+  const subjectHeight = measured?.id === modelId ? measured.height : undefined;
   const [focus, setFocus] = useState<CameraFocus>('body');
   const [sss, setSss] = useState(true);
   const [stats, setStats] = useState(false);
@@ -45,14 +52,30 @@ export function SpikeScene() {
 
   return (
     <main className="relative h-dvh w-full">
-      <Stage key={String(post)} focus={focus} post={post} className="absolute inset-0">
-        <Character key={`${gender}-${sss}`} url={CHARACTERS[gender]} sss={sss} speech={speech} />
+      <Stage
+        key={String(post)}
+        focus={focus}
+        post={post}
+        look={model.look}
+        subjectHeight={subjectHeight}
+        className="absolute inset-0"
+      >
+        {model.look === 'anime' ? (
+          <VrmCharacter
+            key={modelId}
+            url={model.url}
+            speech={speech}
+            onMeasured={(height) => setMeasured({ id: modelId, height })}
+          />
+        ) : (
+          <Character key={`${modelId}-${sss}`} url={model.url} sss={sss} speech={speech} />
+        )}
         <DebugHandle />
         {stats && <StatsGl className="!top-auto !bottom-3 !left-3" />}
       </Stage>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap gap-2 p-3 font-sans text-xs">
-        <Toggle options={Object.keys(CHARACTERS) as Gender[]} value={gender} onChange={setGender} />
+        <Toggle options={Object.keys(MODELS) as ModelId[]} value={modelId} onChange={setModelId} />
         <Toggle options={FOCUSES} value={focus} onChange={setFocus} />
         <Toggle
           options={['sss on', 'sss off']}
