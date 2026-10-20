@@ -15,8 +15,13 @@ import {
   filterCoveredTriangles,
 } from './skinCoverage';
 
-/** Coverage cylinder around each skin normal (metres); see skinCoverage.ts. */
-const COVER_LIMITS = { lateral: 0.022, inner: 0.045, outer: 0.035 };
+/**
+ * Coverage cylinder around each skin normal (metres); see skinCoverage.ts.
+ * Tuned for poke-through only: skin is hidden when it sits outside a garment
+ * (garment below the surface); skin under a garment is left alone because the
+ * opaque garment already hides it, and removing it opens holes at open edges.
+ */
+const COVER_LIMITS = { lateral: 0.016, inner: 0.045, outer: 0.004 };
 const ALPHA_CUTOFF = 0.5;
 const SAMPLE_SIZE = 256;
 

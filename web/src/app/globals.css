@@ -1,26 +1,74 @@
 @import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * AI Sims design tokens. Source of truth: /DESIGN.md ("The Premiere Wall").
+ * One dark backstage neutral family, one marquee accent; artwork and the
+ * character carry every other colour.
+ */
+@theme {
+  --color-backstage: #121113;
+  --color-backstage-raised: #1b1a1d;
+  --color-backstage-lift: #252328;
+  --color-hairline: #2e2c32;
+  --color-ink: #f4f1ec;
+  --color-ink-muted: #a39fa8;
+  --color-ink-faint: #6e6a74;
+  --color-marquee: #ffb547;
+  --color-marquee-deep: #e8962a;
+  --color-alert: #ff6b5e;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-sans-face), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-display-face), ui-serif, Georgia, serif;
+  --font-display: var(--font-display-face), var(--font-sans-face), ui-sans-serif, sans-serif;
+
+  --radius-tile: 10px;
+  --radius-control: 12px;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-backstage);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01', 'cv11';
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-marquee) 40%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-marquee);
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+@utility font-display {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 72;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

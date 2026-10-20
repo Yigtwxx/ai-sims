@@ -1,14 +1,17 @@
-import { Bodoni_Moda, Schibsted_Grotesk } from 'next/font/google';
+import { Big_Shoulders, Schibsted_Grotesk } from 'next/font/google';
 
 /**
- * Typography: a fashion-editorial display serif paired with a crisp grotesk.
- * Both ship latin-ext so Turkish glyphs (ç ğ ı İ ö ş ü) render in-face.
+ * Typography (see /DESIGN.md): Big Shoulders at display optical size carries
+ * marquee/poster energy for names and title cards; Schibsted Grotesk is the
+ * precise UI workhorse. Both ship latin-ext for Turkish (ç ğ ı İ ö ş ü).
  */
-export const displayFont = Bodoni_Moda({
+export const displayFont = Big_Shoulders({
   subsets: ['latin', 'latin-ext'],
   axes: ['opsz'],
   variable: '--font-display-face',
   display: 'swap',
+  // next/font has no fallback metrics for this family; skip the size-adjusted fallback.
+  adjustFontFallback: false,
 });
 
 export const sansFont = Schibsted_Grotesk({

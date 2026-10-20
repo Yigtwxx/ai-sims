@@ -65,7 +65,53 @@
       "female": "Kadın"
     },
     "invalid": "Lütfen 1 ile 40 karakter arasında bir isim gir.",
-    "failed": "Karakter oluşturulamadı. Lütfen tekrar dene."
+    "failed": "Karakter oluşturulamadı. Lütfen tekrar dene.",
+    "nameLabel": "Karakterin adı",
+    "namePlaceholder": "Bir isim ver",
+    "nameRequired": "Önce karakterine bir isim ver.",
+    "rows": {
+      "gender": "Cinsiyet",
+      "face": "Yüz",
+      "body": "Vücut tipi",
+      "skin": "Ten rengi",
+      "eyes": "Gözler",
+      "hair": "Saç",
+      "top": "Üst",
+      "bottom": "Alt",
+      "shoes": "Ayakkabı",
+      "jewelry": "Takı",
+      "tattoos": "Dövme"
+    },
+    "builds": {
+      "slim": "İnce",
+      "average": "Normal",
+      "athletic": "Atletik",
+      "curvy": "Kıvrımlı"
+    },
+    "height": "Boy",
+    "heightShort": "Kısa",
+    "heightTall": "Uzun",
+    "color": "Renk",
+    "original": "Orijinal renk",
+    "none": "Yok",
+    "own": "Kendi saçı",
+    "count": "{count, plural, one {# seçenek} other {# seçenek}}",
+    "undo": "Geri al",
+    "redo": "İleri al",
+    "randomize": "Rastgele",
+    "done": "Bitti",
+    "saving": "Kaydediliyor…",
+    "saveFailed": "Kaydedilemedi. Bağlantını kontrol edip tekrar dene.",
+    "dragHint": "Sürükle ve döndür",
+    "loadingStage": "Sahne hazırlanıyor",
+    "manifestFailed": "Parça listesi yüklenemedi.",
+    "retry": "Tekrar dene",
+    "backToList": "Karakterlerim",
+    "premiere": {
+      "tagline": "Sahne senin.",
+      "start": "Sohbete başla",
+      "edit": "Düzenlemeye dön"
+    }
   },
   "Common": {
     "save": "Kaydet",

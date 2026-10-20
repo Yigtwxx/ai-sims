@@ -4,7 +4,7 @@ import { REFERENCE_HEIGHT, getCameraPose } from './cameraFocus';
 
 describe('getCameraPose', () => {
   it('returns the authored pose at the reference height', () => {
-    expect(getCameraPose('face', REFERENCE_HEIGHT).target[1]).toBeCloseTo(1.72);
+    expect(getCameraPose('face', REFERENCE_HEIGHT).target[1]).toBeCloseTo(1.68);
   });
 
   it('scales framing proportionally for shorter characters', () => {

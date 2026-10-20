@@ -17,8 +17,31 @@ describe('CharacterConfigSchema', () => {
 
   it('returns independent copies from createDefaultConfig', () => {
     const a = createDefaultConfig('anime', 'male');
-    a.hair.color = '#ffffff';
-    expect(createDefaultConfig('anime', 'male').hair.color).not.toBe('#ffffff');
+    a.hair.color = '#123456';
+    a.accessories.push('earring_hoop');
+    const b = createDefaultConfig('anime', 'male');
+    expect(b.hair.color).not.toBe('#123456');
+    expect(b.accessories).toEqual([]);
+  });
+
+  it('rejects a height outside the supported range', () => {
+    for (const height of [0.5, 1.5]) {
+      const config = createDefaultConfig('anime', 'female');
+      config.body.height = height;
+      expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
+    }
+  });
+
+  it('rejects an unknown body build', () => {
+    const config = createDefaultConfig('anime', 'female');
+    (config.body as { build: string }).build = 'giant';
+    expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
+  });
+
+  it('limits the number of tattoos', () => {
+    const config = createDefaultConfig('anime', 'female');
+    config.tattoos = Array.from({ length: 5 }, (_, i) => ({ design: `d${i}`, placement: 'arm' }));
+    expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
   });
 
   it('rejects an invalid hex color', () => {

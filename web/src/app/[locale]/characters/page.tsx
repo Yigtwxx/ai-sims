@@ -1,3 +1,4 @@
+import { SiteHeader } from '@/components/SiteHeader';
 import { Suspense } from 'react';
 import { getTranslations } from 'next-intl/server';
 import { useTranslations } from 'next-intl';
@@ -13,6 +14,7 @@ export default function CharactersPage() {
 
   return (
     <main>
+      <SiteHeader />
       <h1>{t('title')}</h1>
       <SignOutForm />
       <Suspense fallback={<p>{t('loading')}</p>}>

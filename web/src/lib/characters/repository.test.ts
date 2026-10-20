@@ -129,7 +129,7 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
     await expect(repo.updateCharacter(userA, ok.id, { config: bad })).rejects.toThrow(
       repo.InvalidCharacterInputError,
     );
-    expect((await repo.getCharacter(userA, ok.id))?.config.skin.tone).toBe(0.5);
+    expect((await repo.getCharacter(userA, ok.id))?.config.skin.tone).toBe(config().skin.tone);
   });
 
   it('stores thumbnails, enforces the size limit and removes them on delete', async () => {

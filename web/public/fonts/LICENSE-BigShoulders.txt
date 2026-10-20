@@ -1,0 +1,2 @@
+Big Shoulders (c) The Big Shoulders Project Authors, SIL Open Font License 1.1.
+Static instance opsz 72 / wght 800 served by Google Fonts; used by 3D title text.

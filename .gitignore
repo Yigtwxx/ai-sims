@@ -43,3 +43,7 @@ web/public/assets/spike/
 # User-downloaded VRoid sources and generated VRM parts (see docs/setup-accounts.md)
 pipeline/source/vroid/
 web/public/assets/vrm/
+
+# Impeccable local state (keep surface briefs)
+.impeccable/hook.cache.json
+.impeccable/questions/

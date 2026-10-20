@@ -4,6 +4,7 @@ import { MathUtils, Object3D, Vector3, type Mesh } from 'three';
 import type { SpeechPlayer } from '../../lipsync/speechPlayer';
 import { emptyVrmMouth, toVrmMouth, type VrmMouthWeights } from '../../lipsync/visemes';
 import { stepBlink, type BlinkState } from '../life';
+import { applyPose, idleOffsets } from './pose';
 
 const VOWELS = ['aa', 'ih', 'ou', 'ee', 'oh'] as const;
 // VRoid faces expose a raw lip-closure morph; VRM presets have no "closed" vowel.
@@ -41,14 +42,8 @@ function normalizedBone(vrm: VRM, name: VRMHumanBoneName) {
 export function setupBase(vrm: VRM): BaseRuntime {
   prepareVrm(vrm);
 
-  // Relaxed stance from the T-pose: arms down, slight elbow bend. Part VRMs
-  // copy this pose every frame, so it is defined once here. VRM 0.x normalized
-  // space mirrors the X and Z rotation axes relative to VRM 1.0.
-  const mirror = isVrm0(vrm) ? -1 : 1;
-  normalizedBone(vrm, 'leftUpperArm')?.rotation.set(0, 0, -1.2 * mirror);
-  normalizedBone(vrm, 'rightUpperArm')?.rotation.set(0, 0, 1.2 * mirror);
-  normalizedBone(vrm, 'leftLowerArm')?.rotation.set(0, -0.15, 0);
-  normalizedBone(vrm, 'rightLowerArm')?.rotation.set(0, 0.15, 0);
+  // Natural standing pose (see pose.ts). Part VRMs copy it every frame.
+  applyPose(vrm, isVrm0(vrm));
 
   const closeTargets: BaseRuntime['closeTargets'] = [];
   vrm.scene.traverse((obj) => {
@@ -118,14 +113,8 @@ export function animateBase(
   runtime.lookTarget.position.x += s.x;
   runtime.lookTarget.position.y += s.y;
 
-  // Breathing and a slow head sway.
-  const chest = normalizedBone(vrm, 'chest');
-  if (chest) chest.rotation.x = Math.sin(t * 1.45) * 0.015;
-  const neck = normalizedBone(vrm, 'neck');
-  if (neck) {
-    neck.rotation.y = Math.sin(t * 0.37) * 0.04;
-    neck.rotation.x = Math.sin(t * 0.53 + 1.3) * 0.02;
-  }
+  // Layered idle (breathing, weight shift, head drift) on top of the pose.
+  applyPose(vrm, isVrm0(vrm), idleOffsets(t));
 
   vrm.update(dt);
 }

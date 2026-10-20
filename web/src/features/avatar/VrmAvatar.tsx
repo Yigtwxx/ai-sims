@@ -69,10 +69,14 @@ export function VrmAvatar({
   speech,
   onMeasured,
 }: VrmAvatarProps) {
-  const donorUrls = useMemo(
-    () => [...new Set(Object.values(parts).filter((u): u is string => !!u && u !== baseUrl))],
-    [parts, baseUrl],
-  );
+  // Effects key on values, not object identity, so parent re-renders with an
+  // equal selection never rebuild the models.
+  const partsKey = JSON.stringify(parts);
+  const tintsKey = JSON.stringify(tints);
+  const donorUrls = useMemo(() => {
+    const selection = JSON.parse(partsKey) as PartSelection;
+    return [...new Set(Object.values(selection).filter((u): u is string => !!u && u !== baseUrl))];
+  }, [partsKey, baseUrl]);
   const gltfs = useLoader(GLTFLoader, [baseUrl, ...donorUrls], registerVrm);
   const camera = useThree((s) => s.camera);
 
@@ -90,8 +94,13 @@ export function VrmAvatar({
     const baseVrm = vrmOf(baseGltf, baseUrl);
     const donorVrms = donorGltfs.map((g, i) => vrmOf(g, donorUrls[i]));
 
-    const topDonor = parts.top ? donorVrms[donorUrls.indexOf(parts.top)] : undefined;
-    const visibility = resolveVisibility(baseUrl, parts, topDonor ? hasOnepiece(topDonor) : false);
+    const selection = JSON.parse(partsKey) as PartSelection;
+    const topDonor = selection.top ? donorVrms[donorUrls.indexOf(selection.top)] : undefined;
+    const visibility = resolveVisibility(
+      baseUrl,
+      selection,
+      topDonor ? hasOnepiece(topDonor) : false,
+    );
 
     const base = setupBase(baseVrm);
     applyBaseVisibility(baseVrm, visibility.base);
@@ -111,7 +120,7 @@ export function VrmAvatar({
     return () => {
       runtimeRef.current = undefined;
     };
-  }, [gltfs, baseUrl, donorUrls, parts]);
+  }, [gltfs, baseUrl, donorUrls, partsKey]);
 
   // Body shape: same bone scales on base and parts so garments follow the body.
   const { build, height } = bodyShape;
@@ -132,11 +141,12 @@ export function VrmAvatar({
     runtime.needsSpringReset = true;
     runtime.needsCoverage = true;
     onMeasuredRef.current?.(measureHeight(runtime.base.vrm));
-  }, [gltfs, parts, build, height]);
+  }, [gltfs, partsKey, build, height]);
 
   useLayoutEffect(() => {
-    for (const gltf of gltfs) applyTints(gltf.scene, tints);
-  }, [gltfs, tints]);
+    const values = JSON.parse(tintsKey) as Tints;
+    for (const gltf of gltfs) applyTints(gltf.scene, values);
+  }, [gltfs, tintsKey]);
 
   useFrame(({ clock }, delta) => {
     const runtime = runtimeRef.current;

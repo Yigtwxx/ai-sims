@@ -65,7 +65,53 @@
       "female": "Female"
     },
     "invalid": "Please enter a name of 1 to 40 characters.",
-    "failed": "Could not create the character. Please try again."
+    "failed": "Could not create the character. Please try again.",
+    "nameLabel": "Character name",
+    "namePlaceholder": "Give a name",
+    "nameRequired": "Give your character a name first.",
+    "rows": {
+      "gender": "Gender",
+      "face": "Face",
+      "body": "Body type",
+      "skin": "Skin tone",
+      "eyes": "Eyes",
+      "hair": "Hair",
+      "top": "Top",
+      "bottom": "Bottom",
+      "shoes": "Shoes",
+      "jewelry": "Jewellery",
+      "tattoos": "Tattoos"
+    },
+    "builds": {
+      "slim": "Slim",
+      "average": "Average",
+      "athletic": "Athletic",
+      "curvy": "Curvy"
+    },
+    "height": "Height",
+    "heightShort": "Short",
+    "heightTall": "Tall",
+    "color": "Colour",
+    "original": "Original colour",
+    "none": "None",
+    "own": "Own hair",
+    "count": "{count, plural, one {# option} other {# options}}",
+    "undo": "Undo",
+    "redo": "Redo",
+    "randomize": "Randomize",
+    "done": "Done",
+    "saving": "Saving…",
+    "saveFailed": "Couldn't save. Check your connection and try again.",
+    "dragHint": "Drag to turn",
+    "loadingStage": "Setting the stage",
+    "manifestFailed": "Couldn't load the parts list.",
+    "retry": "Try again",
+    "backToList": "My characters",
+    "premiere": {
+      "tagline": "The stage is yours.",
+      "start": "Start talking",
+      "edit": "Back to editing"
+    }
   },
   "Common": {
     "save": "Save",

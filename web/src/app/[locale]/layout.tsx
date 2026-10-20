@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { locale as localeParam } from 'next/root-params';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
-import { SiteHeader } from '@/components/SiteHeader';
 import { routing } from '@/i18n/routing';
 import { fontVariables } from '@/styles/fonts';
 import '../globals.css';
@@ -29,10 +28,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   return (
     <html lang={locale} className={`${fontVariables} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        <NextIntlClientProvider>
-          <SiteHeader />
-          {children}
-        </NextIntlClientProvider>
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>
     </html>
   );
