@@ -1,0 +1,32 @@
+[project]
+name = "asset-pipeline"
+version = "0.1.0"
+description = "Builds and optimizes AI Sims character assets with headless Blender"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+asset-pipeline = "asset_pipeline.cli:main"
+
+[dependency-groups]
+dev = ["ruff>=0.14", "pytest>=8", "fake-bpy-module-latest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/asset_pipeline"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ANN", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

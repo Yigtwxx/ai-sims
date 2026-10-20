@@ -63,7 +63,7 @@ Asset pipeline:
 ```bash
 cd pipeline
 uv sync
-uv run python -m scripts.build_all   # runs Blender headless, writes to web/public/assets
+uv run asset-pipeline base          # runs Blender headless (MPFB), writes GLBs to pipeline/out
 ```
 
 ## Quality checks
