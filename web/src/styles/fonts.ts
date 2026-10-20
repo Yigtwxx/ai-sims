@@ -1,24 +1,17 @@
-import { Big_Shoulders, Schibsted_Grotesk } from 'next/font/google';
+import { Mona_Sans } from 'next/font/google';
 
 /**
- * Typography (see /DESIGN.md): Big Shoulders at display optical size carries
- * marquee/poster energy for names and title cards; Schibsted Grotesk is the
- * precise UI workhorse. Both ship latin-ext for Turkish (ç ğ ı İ ö ş ü).
+ * Typography (see /DESIGN.md, "The Lit Stage"): one family, Mona Sans, at two
+ * widths. Display type is expanded and tightly tracked like a title card; UI
+ * type stays at normal width. The variable font carries both axes (wght, wdth)
+ * and ships latin-ext for Turkish (ç ğ ı İ ö ş ü). Self-hosted by next/font.
  */
-export const displayFont = Big_Shoulders({
+export const sansFont = Mona_Sans({
   subsets: ['latin', 'latin-ext'],
-  axes: ['opsz'],
-  variable: '--font-display-face',
-  display: 'swap',
-  // next/font has no fallback metrics for this family; skip the size-adjusted fallback.
-  adjustFontFallback: false,
-});
-
-export const sansFont = Schibsted_Grotesk({
-  subsets: ['latin', 'latin-ext'],
+  axes: ['wdth'],
   variable: '--font-sans-face',
   display: 'swap',
 });
 
 /** Apply to <html> so the CSS variables are available everywhere. */
-export const fontVariables = `${displayFont.variable} ${sansFont.variable}`;
+export const fontVariables = sansFont.variable;

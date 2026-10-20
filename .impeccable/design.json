@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-20T20:05:00Z",
+  "title": "Design System: AI Sims",
+  "extensions": {
+    "colorMeta": {
+      "backstage": {
+        "role": "neutral",
+        "displayName": "Backstage Graphite",
+        "tonalRamp": ["#0b0b0a", "#121211", "#1a1918", "#23221f", "#302e2a"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "tonalRamp": ["#f3efe8", "#aaa59c", "#85817a"]
+      },
+      "marquee": {
+        "role": "primary",
+        "displayName": "Marquee Amber",
+        "tonalRamp": ["#ffb547", "#e8962a"]
+      },
+      "tungsten": {
+        "role": "light",
+        "displayName": "Tungsten Light",
+        "purpose": "Stage light only (spot cones, floor pools, haze, key falloff). Never text, border or fill.",
+        "tonalRamp": [
+          "#ffe2b0",
+          "rgb(255 240 214 / 0.2)",
+          "rgb(255 236 212 / 0.05)",
+          "rgb(255 234 200 / 0.26)",
+          "rgb(255 234 200 / 0.14)",
+          "rgb(255 230 196 / 0.1)",
+          "rgb(255 230 196 / 0.06)",
+          "rgb(255 228 184 / 0.2)",
+          "rgb(255 228 184 / 0.14)",
+          "rgb(255 226 176 / 0.2)",
+          "rgb(255 226 176 / 0.12)",
+          "rgb(255 226 176 / 0.06)"
+        ]
+      },
+      "alert": { "role": "error", "displayName": "Alert Coral" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero and closing titles, character name on the premiere card. Mona Sans wdth 112 (100 below 640px)." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles. Mona Sans wdth 108." },
+      "subhead": { "displayName": "Subhead", "purpose": "List headings inside a section, large menu links." },
+      "lede": { "displayName": "Lede", "purpose": "The one paragraph under a hero or section title." }
+    },
+    "shadows": [
+      { "name": "lift", "value": "0 18px 40px rgb(5 5 4 / 0.55)", "purpose": "Focused poster tile, open menus and sheets, toasts." },
+      { "name": "press", "value": "inset 0 1px 0 rgb(255 255 255 / 0.06)", "purpose": "Top edge of raised quiet controls." }
+    ],
+    "motion": [
+      { "name": "duration-instant", "value": "120ms", "purpose": "Press feedback." },
+      { "name": "duration-quick", "value": "200ms", "purpose": "Hover and focus." },
+      { "name": "duration-base", "value": "320ms", "purpose": "Menus, sheets, small state changes." },
+      { "name": "duration-slow", "value": "640ms", "purpose": "Reveals, page enter." },
+      { "name": "duration-cinematic", "value": "1200ms", "purpose": "Lamps warming up, title cards, viewfinder draw." },
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Arrivals." },
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "UI state." },
+      { "name": "ease-in-out-quart", "value": "cubic-bezier(0.76, 0, 0.24, 1)", "purpose": "Light sweeps and camera moves." },
+      { "name": "ease-in-quart", "value": "cubic-bezier(0.5, 0, 0.75, 0)", "purpose": "Exits." },
+      { "name": "spring-magnetic", "value": "stiffness 220, damping 22, mass 0.6", "purpose": "Magnetic primary action." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one decision on a view: marquee amber, dark label, magnetic on hover.",
+      "html": "<button class=\"ds-btn-primary\">Karakterini oluştur</button>",
+      "css": ".ds-btn-primary { background: #ffb547; color: #121211; height: 52px; padding: 0 24px; border: 0; border-radius: 12px; font: 600 15px/1 'Mona Sans', system-ui, sans-serif; transition: background 200ms cubic-bezier(0.22, 1, 0.36, 1), transform 120ms; } .ds-btn-primary:hover { background: #e8962a; } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 2px solid #ffb547; outline-offset: 3px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Secondary actions: raised graphite with a hairline.",
+      "html": "<button class=\"ds-btn-quiet\">Giriş</button>",
+      "css": ".ds-btn-quiet { background: #1a1918; color: #f3efe8; height: 40px; padding: 0 16px; border: 1px solid #302e2a; border-radius: 12px; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06); font: 600 14px/1 'Mona Sans', system-ui, sans-serif; } .ds-btn-quiet:hover { background: #23221f; }"
+    }
+  ]
+}

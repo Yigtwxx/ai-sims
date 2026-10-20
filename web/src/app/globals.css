@@ -1,60 +1,263 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /*
- * AI Sims design tokens. Source of truth: /DESIGN.md ("The Premiere Wall").
- * One dark backstage neutral family, one marquee accent; artwork and the
- * character carry every other colour.
+ * AI Sims design tokens. Source of truth: /DESIGN.md ("The Lit Stage",
+ * Karanlık sinematik). Warm-neutral graphite, one marquee accent, tungsten
+ * light that only exists inside stage lighting. The site is dark only, so the
+ * `dark` variant is bound to the `.dark` class set on <html>.
+ *
+ * Z-index scale (keep in sync with usages):
+ *   --z-header 40 · --z-grain 45 · --z-overlay 50 (sheets, menus) · toasts are
+ *   managed by sonner above everything.
  */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-backstage: #121113;
-  --color-backstage-raised: #1b1a1d;
-  --color-backstage-lift: #252328;
-  --color-hairline: #2e2c32;
-  --color-ink: #f4f1ec;
-  --color-ink-muted: #a39fa8;
-  --color-ink-faint: #6e6a74;
+  --color-backstage-deep: #0b0b0a;
+  --color-backstage: #121211;
+  --color-backstage-raised: #1a1918;
+  --color-backstage-lift: #23221f;
+  --color-hairline: #302e2a;
+  --color-ink: #f3efe8;
+  --color-ink-muted: #aaa59c;
+  --color-ink-faint: #85817a;
   --color-marquee: #ffb547;
   --color-marquee-deep: #e8962a;
+  --color-tungsten: #ffe2b0;
   --color-alert: #ff6b5e;
 
+  /* shadcn/ui semantic aliases, mapped onto the tokens above. */
+  --color-background: var(--color-backstage);
+  --color-foreground: var(--color-ink);
+  --color-card: var(--color-backstage-raised);
+  --color-card-foreground: var(--color-ink);
+  --color-popover: var(--color-backstage-raised);
+  --color-popover-foreground: var(--color-ink);
+  --color-primary: var(--color-marquee);
+  --color-primary-foreground: var(--color-backstage);
+  --color-secondary: var(--color-backstage-raised);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted: var(--color-backstage-lift);
+  --color-muted-foreground: var(--color-ink-muted);
+  --color-accent: var(--color-backstage-lift);
+  --color-accent-foreground: var(--color-ink);
+  --color-destructive: var(--color-alert);
+  --color-border: var(--color-hairline);
+  --color-input: var(--color-hairline);
+  --color-ring: var(--color-marquee);
+
   --font-sans: var(--font-sans-face), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-display-face), var(--font-sans-face), ui-sans-serif, sans-serif;
+  --font-display: var(--font-sans-face), ui-sans-serif, system-ui, sans-serif;
+
+  /* Type ramp (DESIGN.md typography). Display and headline sizes live on the utilities. */
+  --text-label: 13px;
+  --text-label--line-height: 1.25;
+  --text-ui: 14px;
+  --text-ui--line-height: 1.35;
+  --text-body-sm: 15px;
+  --text-body-sm--line-height: 1.5;
+  --text-body: 16px;
+  --text-body--line-height: 1.55;
+  --text-title: 17px;
+  --text-title--line-height: 1.3;
+  --text-subhead: clamp(1.5rem, 1.2rem + 0.8vw, 1.75rem);
+  --text-subhead--line-height: 1.15;
+  --text-lede: clamp(1.0625rem, 0.95rem + 0.45vw, 1.25rem);
+  --text-lede--line-height: 1.5;
+  --text-headline: clamp(2rem, 3.4vw, 3.25rem);
+  --text-display: clamp(2.75rem, 4.6vw, 5.5rem);
+
+  /* Vertical rhythm between landing sections (DESIGN.md spacing.section). */
+  --spacing-section: clamp(6rem, 14vw, 12.5rem);
 
   --radius-tile: 10px;
   --radius-control: 12px;
 
+  /* Motion tokens (mirrored in src/components/motion/tokens.ts). */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-in-quart: cubic-bezier(0.5, 0, 0.75, 0);
+
+  --animate-lamp-on: lamp-on 1.6s var(--ease-out-quint) both;
+  --animate-light-sweep: light-sweep 11s var(--ease-in-out-quart) infinite;
+  --animate-haze-drift: haze-drift 24s ease-in-out infinite alternate;
+  --animate-grain: grain 0.9s steps(6) infinite;
+  --animate-skeleton-sweep: skeleton-sweep 2.4s var(--ease-in-out-quart) infinite;
+  --animate-rise-in: rise-in 0.9s var(--ease-out-expo) both;
+
+  @keyframes lamp-on {
+    0% {
+      opacity: 0;
+    }
+    9% {
+      opacity: 0.38;
+    }
+    14% {
+      opacity: 0.12;
+    }
+    34% {
+      opacity: 0.82;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes light-sweep {
+    0% {
+      transform: translateX(-60%);
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    70% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(260%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes haze-drift {
+    from {
+      transform: translate3d(-4%, 2%, 0) scale(1);
+    }
+    to {
+      transform: translate3d(5%, -3%, 0) scale(1.08);
+    }
+  }
+
+  @keyframes grain {
+    0% {
+      transform: translate3d(0, 0, 0);
+    }
+    20% {
+      transform: translate3d(-3%, 2%, 0);
+    }
+    40% {
+      transform: translate3d(2%, -4%, 0);
+    }
+    60% {
+      transform: translate3d(-4%, -1%, 0);
+    }
+    80% {
+      transform: translate3d(3%, 3%, 0);
+    }
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+
+  @keyframes skeleton-sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+}
+
+:root {
+  --header-h: 4rem;
+  --z-header: 40;
+  --z-grain: 45;
+  --z-overlay: 50;
+
+  --duration-instant: 120ms;
+  --duration-quick: 200ms;
+  --duration-base: 320ms;
+  --duration-slow: 640ms;
+  --duration-cinematic: 1200ms;
+
+  /* Display width axis: expanded on wide screens, normal below 640px. */
+  --display-wdth: 100;
+  --headline-wdth: 100;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --display-wdth: 112;
+    --headline-wdth: 108;
+  }
 }
 
 @layer base {
   html {
     color-scheme: dark;
+    background: var(--color-backstage);
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: var(--header-h);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   body {
     background: var(--color-backstage);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-feature-settings: 'ss01', 'cv11';
+    font-feature-settings: 'kern', 'calt';
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   ::selection {
     background: color-mix(in oklab, var(--color-marquee) 40%, transparent);
+    color: var(--color-ink);
   }
 
   :focus-visible {
     outline: 2px solid var(--color-marquee);
-    outline-offset: 2px;
+    outline-offset: 3px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 }
 
+/* Title-card display type: expanded Mona Sans, sentence case, tight tracking. */
 @utility font-display {
   font-family: var(--font-display);
-  font-variation-settings: 'opsz' 72;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
+  font-variation-settings: 'wdth' var(--display-wdth);
+  font-weight: 560;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+}
+
+@utility font-headline {
+  font-family: var(--font-display);
+  font-variation-settings: 'wdth' var(--headline-wdth);
+  font-weight: 540;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+}
+
+/* Wordmark and other short expanded labels. */
+@utility font-wide {
+  font-variation-settings: 'wdth' 118;
 }
 
 @utility scrollbar-none {
@@ -64,11 +267,125 @@
   }
 }
 
+/*
+ * Film grain: a fixed, pointer-transparent layer over the whole site. It moves
+ * only by transform (compositor-only) and freezes under reduced motion.
+ */
+.film-grain {
+  position: fixed;
+  inset: -20%;
+  z-index: var(--z-grain);
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: var(--animate-grain);
+}
+
+/*
+ * Page transitions (React <ViewTransition>). The header stays anchored; the
+ * old page leaves fast, the new one rises out of a slight blur.
+ */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+
+::view-transition-old(site-header) {
+  display: none;
+}
+
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+::view-transition-old(.page-exit) {
+  animation: var(--duration-quick) var(--ease-in-quart) both vt-leave;
+}
+
+::view-transition-new(.page-enter) {
+  animation: var(--duration-slow) var(--ease-out-expo) 80ms both vt-arrive;
+}
+
+@keyframes vt-leave {
+  to {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+@keyframes vt-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(6px);
+  }
+}
+
+/*
+ * SplitText reveal: hide titles that are about to be split only when JS runs
+ * (the .js class is set by an inline script before first paint) and motion is
+ * allowed. The failsafe animation reveals them if hydration stalls.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .js [data-split-reveal]:not([data-split-ready]) {
+    visibility: hidden;
+    animation: reveal-failsafe 0s 2.6s forwards;
+  }
+}
+
+/* Dust motes in the stage beam (used from inline styles, so defined outside @theme). */
+@keyframes mote-drift {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  15% {
+    opacity: 0.55;
+  }
+  80% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(14px, -140px, 0);
+  }
+}
+
+/* SplitText failsafe: a title hidden for its reveal must never stay hidden. */
+@keyframes reveal-failsafe {
+  to {
+    visibility: visible;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .film-grain {
+    animation: none;
+  }
+
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

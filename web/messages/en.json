@@ -1,27 +1,194 @@
 {
   "App": {
     "name": "AI Sims",
-    "description": "Photorealistic 3D character creator."
-  },
-  "Landing": {
-    "title": "Create your character",
-    "subtitle": "Design a photorealistic 3D character, then talk to it.",
-    "enter": "Enter",
-    "entering": "Signing in…",
-    "notConfigured": "Database not configured: set MONGODB_URI, BETTER_AUTH_SECRET and BETTER_AUTH_URL in web/.env.local.",
-    "signInFailed": "Could not sign in. Please try again."
+    "description": "Design a photoreal 3D character, then talk to it in Turkish or English."
   },
   "Nav": {
     "label": "Main navigation",
     "home": "Home",
     "characters": "My characters",
     "create": "Create",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "menu": "Menu",
+    "closeMenu": "Close menu",
+    "skipToContent": "Skip to content"
   },
   "LocaleSwitcher": {
     "label": "Language",
     "tr": "Türkçe",
-    "en": "English"
+    "en": "English",
+    "short": {
+      "tr": "TR",
+      "en": "EN"
+    }
+  },
+  "Session": {
+    "enter": "Sign in",
+    "entering": "Signing in…",
+    "signingOut": "Signing out…",
+    "notConfigured": "Database not configured: set MONGODB_URI, BETTER_AUTH_SECRET and BETTER_AUTH_URL in web/.env.local.",
+    "signInFailed": "Could not sign in. Check your connection and try again.",
+    "guest": "Guest session"
+  },
+  "Footer": {
+    "tagline": "Photoreal characters that speak Turkish.",
+    "demo": "Internal demo.",
+    "trademark": "MetaHuman and Unreal Engine are trademarks of Epic Games, Inc."
+  },
+  "Status": {
+    "loading": "Setting the stage",
+    "notFoundTitle": "This stage is empty.",
+    "notFoundBody": "The page you are looking for does not exist or has moved.",
+    "backHome": "Back to home",
+    "errorTitle": "Something went wrong.",
+    "errorBody": "We can try to set the stage again. If it keeps happening, reload the page.",
+    "retry": "Try again",
+    "errorCode": "Error code: {digest}",
+    "notifications": "Notifications"
+  },
+  "Landing": {
+    "hero": {
+      "titleLine1": "Create your character.",
+      "titleLine2": "Then talk to it.",
+      "lede": "Design a photoreal digital character. Press Done and it talks back, its lips moving with every word.",
+      "cta": "Create your character",
+      "listen": "Hear it speak",
+      "stageLabel": "An empty, lit stage where your character will stand"
+    },
+    "marquee": {
+      "label": "Built with",
+      "items": ["MetaHuman", "three.js", "ARKit 52", "15 visemes", "Turkish lip-sync"]
+    },
+    "realism": {
+      "title": "Look closer. Still real.",
+      "lede": "Skin, eyes, hair and light are computed as separate materials, so a close-up never turns to plastic.",
+      "stageLabel": "Close-up: an eye under studio light, iris and cornea",
+      "layers": {
+        "skin": {
+          "title": "Skin",
+          "body": "Pore detail, fine wrinkles and light scattering beneath the surface."
+        },
+        "eyes": {
+          "title": "Eyes",
+          "body": "Corneal gloss, iris depth and the wet line along the lid. The gaze follows your cursor."
+        },
+        "hair": {
+          "title": "Hair",
+          "body": "Strand-based hair cards. Colour, roots, ombre and highlights change in real time."
+        },
+        "light": {
+          "title": "Light",
+          "body": "Studio portrait light stays fixed to the face. The character turns, the light holds."
+        }
+      }
+    },
+    "customize": {
+      "title": "Face, skin, hair, wardrobe. Your call.",
+      "lede": "Every choice shows on the character at once. Not right? Undo, mix, try again.",
+      "categoriesLabel": "Customization categories",
+      "categories": {
+        "face": {
+          "label": "Face",
+          "hint": "Blend between ready-made faces.",
+          "blendLabel": "Blend between two faces",
+          "blendValue": "{left}% {leftName}, {right}% {rightName}",
+          "weight": "{value}%"
+        },
+        "skin": {
+          "label": "Skin",
+          "hint": "Skin sets sorted by tone.",
+          "tone": "Skin tone {n}"
+        },
+        "eyes": {
+          "label": "Eyes",
+          "hint": "Iris colour and texture.",
+          "colors": {
+            "darkBrown": "Dark brown",
+            "brown": "Brown",
+            "hazel": "Hazel",
+            "amber": "Amber",
+            "green": "Green",
+            "grey": "Grey",
+            "blue": "Blue",
+            "deepBlue": "Deep blue"
+          }
+        },
+        "hair": {
+          "label": "Hair",
+          "hint": "Style, colour and dye pattern.",
+          "colorsLabel": "Colour",
+          "patternsLabel": "Pattern",
+          "stylesLabel": "Style",
+          "colors": {
+            "black": "Black",
+            "darkBrown": "Dark brown",
+            "chestnut": "Chestnut",
+            "auburn": "Auburn",
+            "copper": "Copper",
+            "darkBlonde": "Dark blonde",
+            "blonde": "Blonde",
+            "platinum": "Platinum"
+          },
+          "patterns": {
+            "ombre": "Ombre",
+            "roots": "Roots",
+            "highlights": "Highlights",
+            "underlayer": "Underlayer"
+          },
+          "styles": {
+            "dutchBraid": "Dutch braid",
+            "messyBun": "Messy bun",
+            "highPonytail": "High ponytail",
+            "slickPonytail": "Slick ponytail",
+            "bantuKnots": "Bantu knots",
+            "cornrows": "Cornrows"
+          }
+        },
+        "wardrobe": {
+          "label": "Wardrobe",
+          "hint": "Top, bottom and shoes, each in its own colour.",
+          "items": {
+            "hoodie": "Hoodie",
+            "tshirt": "T-shirt",
+            "sweater": "Sweater",
+            "rolledShirt": "Rolled-sleeve shirt",
+            "jeans": "Jeans",
+            "cargo": "Cargo pants",
+            "chelsea": "Chelsea boots",
+            "sneakers": "Sneakers",
+            "loafers": "Loafers"
+          }
+        },
+        "jewelry": {
+          "label": "Jewellery",
+          "hint": "Fine jewellery, piercings and small tattoos.",
+          "items": {
+            "studs": "Studs",
+            "hoops": "Hoops",
+            "nose": "Nose piercing",
+            "brow": "Brow piercing",
+            "lip": "Lip piercing",
+            "helix": "Helix",
+            "fineTattoo": "Fine-line tattoo"
+          }
+        }
+      }
+    },
+    "talk": {
+      "title": "When it speaks, its lips follow every word.",
+      "lede": "Voice and mouth shapes come from one timeline: words, syllables and 15 visemes.",
+      "play": "Listen",
+      "pause": "Pause",
+      "sample": "Sample recording, in Turkish",
+      "waveformLabel": "Waveform of the sample recording",
+      "visemeLabel": "Mouth shape (viseme)",
+      "loading": "Preparing audio",
+      "error": "The audio could not play. Reload the page and try again."
+    },
+    "closing": {
+      "title": "The stage is set. Your character is waiting.",
+      "lede": "Build your own character in a minute, then ask it how it is doing."
+    }
   },
   "Characters": {
     "title": "My characters",
@@ -36,7 +203,8 @@
     "style": {
       "anime": "Anime",
       "realistic": "Realistic"
-    }
+    },
+    "lede": "Characters you have saved. Open one to edit it or talk to it."
   },
   "Creator": {
     "title": "Character creator",

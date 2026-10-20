@@ -1,27 +1,194 @@
 {
   "App": {
     "name": "AI Sims",
-    "description": "Fotogerçekçi 3D karakter oluşturucu."
-  },
-  "Landing": {
-    "title": "Karakterini yarat",
-    "subtitle": "Fotogerçekçi bir 3D karakter tasarla, sonra onunla konuş.",
-    "enter": "Giriş",
-    "entering": "Giriş yapılıyor…",
-    "notConfigured": "Veritabanı yapılandırılmamış (Database not configured): MONGODB_URI, BETTER_AUTH_SECRET ve BETTER_AUTH_URL değerlerini web/.env.local dosyasına ekleyin.",
-    "signInFailed": "Giriş yapılamadı. Lütfen tekrar deneyin."
+    "description": "Fotogerçekçi 3D karakterini tasarla, sonra onunla Türkçe konuş."
   },
   "Nav": {
     "label": "Ana gezinme",
     "home": "Ana sayfa",
     "characters": "Karakterlerim",
     "create": "Oluştur",
-    "signOut": "Çıkış"
+    "signOut": "Çıkış",
+    "menu": "Menü",
+    "closeMenu": "Menüyü kapat",
+    "skipToContent": "İçeriğe geç"
   },
   "LocaleSwitcher": {
     "label": "Dil",
     "tr": "Türkçe",
-    "en": "English"
+    "en": "English",
+    "short": {
+      "tr": "TR",
+      "en": "EN"
+    }
+  },
+  "Session": {
+    "enter": "Giriş",
+    "entering": "Giriş yapılıyor…",
+    "signingOut": "Çıkış yapılıyor…",
+    "notConfigured": "Veritabanı yapılandırılmamış (Database not configured): MONGODB_URI, BETTER_AUTH_SECRET ve BETTER_AUTH_URL değerlerini web/.env.local dosyasına ekleyin.",
+    "signInFailed": "Giriş yapılamadı. Bağlantını kontrol edip tekrar dene.",
+    "guest": "Misafir oturumu"
+  },
+  "Footer": {
+    "tagline": "Fotogerçekçi karakterler, Türkçe konuşan.",
+    "demo": "Şirket içi demo.",
+    "trademark": "MetaHuman ve Unreal Engine, Epic Games, Inc. şirketinin ticari markalarıdır."
+  },
+  "Status": {
+    "loading": "Sahne hazırlanıyor",
+    "notFoundTitle": "Bu sahne boş.",
+    "notFoundBody": "Aradığın sayfa yok ya da başka bir yere taşındı.",
+    "backHome": "Ana sayfaya dön",
+    "errorTitle": "Bir şeyler ters gitti.",
+    "errorBody": "Sahneyi yeniden kurmayı deneyebiliriz. Sorun sürerse sayfayı yenile.",
+    "retry": "Tekrar dene",
+    "errorCode": "Hata kodu: {digest}",
+    "notifications": "Bildirimler"
+  },
+  "Landing": {
+    "hero": {
+      "titleLine1": "Karakterini yarat.",
+      "titleLine2": "Sonra onunla konuş.",
+      "lede": "Fotogerçekçi bir dijital karakter tasarla. Bitti dediğinde seninle konuşur, dudakları her kelimeyle birlikte oynar.",
+      "cta": "Karakterini oluştur",
+      "listen": "Konuşmayı dinle",
+      "stageLabel": "Karakterinin duracağı, ışığı yanmış boş sahne"
+    },
+    "marquee": {
+      "label": "Altyapı",
+      "items": ["MetaHuman", "three.js", "ARKit 52", "15 viseme", "Türkçe lip-sync"]
+    },
+    "realism": {
+      "title": "Yakından bak. Hâlâ gerçek.",
+      "lede": "Ten, göz, saç ve ışık ayrı malzemeler olarak hesaplanır; yakın planda da plastik durmaz.",
+      "stageLabel": "Yakın plan: stüdyo ışığında bir göz, iris ve kornea",
+      "layers": {
+        "skin": {
+          "title": "Ten",
+          "body": "Gözenek dokusu, ince kırışıklar ve ışığın tenin altında dağılması."
+        },
+        "eyes": {
+          "title": "Gözler",
+          "body": "Kornea parlaklığı, iris derinliği ve göz kenarındaki ıslaklık. Bakış imleci izler."
+        },
+        "hair": {
+          "title": "Saç",
+          "body": "Tel tel saç kartları. Renk, kökler, ombre ve röfle gerçek zamanlı değişir."
+        },
+        "light": {
+          "title": "Işık",
+          "body": "Stüdyo portre ışığı yüze göre sabit kalır. Karakter döner, ışık bozulmaz."
+        }
+      }
+    },
+    "customize": {
+      "title": "Yüz, ten, saç, kıyafet. Seçim senin.",
+      "lede": "Her seçim karakterin üzerinde anında görünür. Beğenmezsen geri al, karıştır, yeniden dene.",
+      "categoriesLabel": "Kişiselleştirme kategorileri",
+      "categories": {
+        "face": {
+          "label": "Yüz",
+          "hint": "Hazır yüzler arasında karışım yap.",
+          "blendLabel": "İki yüz arasında karışım",
+          "blendValue": "%{left} {leftName}, %{right} {rightName}",
+          "weight": "%{value}"
+        },
+        "skin": {
+          "label": "Ten",
+          "hint": "Tona göre sıralı cilt setleri.",
+          "tone": "Ten tonu {n}"
+        },
+        "eyes": {
+          "label": "Gözler",
+          "hint": "İris rengi ve dokusu.",
+          "colors": {
+            "darkBrown": "Koyu kahve",
+            "brown": "Kahve",
+            "hazel": "Ela",
+            "amber": "Bal rengi",
+            "green": "Yeşil",
+            "grey": "Gri",
+            "blue": "Mavi",
+            "deepBlue": "Lacivert"
+          }
+        },
+        "hair": {
+          "label": "Saç",
+          "hint": "Stil, renk ve boya deseni.",
+          "colorsLabel": "Renk",
+          "patternsLabel": "Desen",
+          "stylesLabel": "Stil",
+          "colors": {
+            "black": "Siyah",
+            "darkBrown": "Koyu kahve",
+            "chestnut": "Kestane",
+            "auburn": "Kızıl kahve",
+            "copper": "Bakır",
+            "darkBlonde": "Koyu sarı",
+            "blonde": "Sarı",
+            "platinum": "Platin"
+          },
+          "patterns": {
+            "ombre": "Ombre",
+            "roots": "Kökler",
+            "highlights": "Röfle",
+            "underlayer": "İç katman"
+          },
+          "styles": {
+            "dutchBraid": "Hollanda örgüsü",
+            "messyBun": "Dağınık topuz",
+            "highPonytail": "Yüksek at kuyruğu",
+            "slickPonytail": "Sıkı at kuyruğu",
+            "bantuKnots": "Bantu düğümleri",
+            "cornrows": "Cornrow örgü"
+          }
+        },
+        "wardrobe": {
+          "label": "Kıyafet",
+          "hint": "Üst, alt ve ayakkabı, her biri kendi rengiyle.",
+          "items": {
+            "hoodie": "Kapüşonlu",
+            "tshirt": "Tişört",
+            "sweater": "Kazak",
+            "rolledShirt": "Kolları kıvrık gömlek",
+            "jeans": "Kot pantolon",
+            "cargo": "Kargo pantolon",
+            "chelsea": "Chelsea bot",
+            "sneakers": "Spor ayakkabı",
+            "loafers": "Loafer"
+          }
+        },
+        "jewelry": {
+          "label": "Takı",
+          "hint": "İnce takılar, piercing ve küçük dövmeler.",
+          "items": {
+            "studs": "Küpe",
+            "hoops": "Halka küpe",
+            "nose": "Burun piercingi",
+            "brow": "Kaş piercingi",
+            "lip": "Dudak piercingi",
+            "helix": "Kıkırdak",
+            "fineTattoo": "Minimal dövme"
+          }
+        }
+      }
+    },
+    "talk": {
+      "title": "Konuştuğunda dudakları her kelimeyi takip eder.",
+      "lede": "Ses ve ağız şekli aynı zaman çizelgesinden gelir: kelime, hece ve 15 viseme.",
+      "play": "Dinle",
+      "pause": "Durdur",
+      "sample": "Örnek kayıt, Türkçe",
+      "waveformLabel": "Örnek kaydın ses dalgası",
+      "visemeLabel": "Ağız şekli (viseme)",
+      "loading": "Ses hazırlanıyor",
+      "error": "Ses çalınamadı. Sayfayı yenileyip tekrar dene."
+    },
+    "closing": {
+      "title": "Sahne hazır. Karakterin seni bekliyor.",
+      "lede": "Bir dakikada kendi karakterini kur, sonra ona “nasılsın?” diye sor."
+    }
   },
   "Characters": {
     "title": "Karakterlerim",
@@ -36,7 +203,8 @@
     "style": {
       "anime": "Anime",
       "realistic": "Gerçekçi"
-    }
+    },
+    "lede": "Kaydettiğin karakterler. Birini aç, düzenle ya da onunla konuş."
   },
   "Creator": {
     "title": "Karakter oluşturucu",
