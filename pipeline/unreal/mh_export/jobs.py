@@ -48,6 +48,7 @@ JOBS: dict[str, Job] = {
             "wardrobe",
             "fab_import",
             "bodies",
+            "outfits",
             "probe",
         )
     },

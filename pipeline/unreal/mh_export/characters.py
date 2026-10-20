@@ -17,6 +17,7 @@ Per character, in this order (Epic's tests rig first, then fetch textures):
 from __future__ import annotations
 
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,27 @@ MATERIALS_ROOT = "/Game/MHExport/Materials"
 FACE_FIELDS = ("face_albedo", "face_normal", "face_cavity", "face_animated_maps")
 BODY_FIELDS = ("body_albedo", "body_normal", "body_cavity", "body_masks")
 RESOLUTIONS = {"res2k": "Res2k", "res4k": "Res4k", "res8k": "Res8k"}
+# Epic's texture service intermittently answers "Server Error"; the export then
+# silently lacks maps, so every unit is checked and the request retried.
+TEXTURE_ATTEMPTS = 3
+RETRY_PAUSE_SECONDS = 45
+REQUIRED_DCC_FILES = (
+    "head.dna",
+    "body.dna",
+    "Maps/Head_Basecolor.png",
+    "Maps/Head_Normal.png",
+    "Maps/Head_SRMF.png",
+    "Maps/Head_Basecolor_Animated_CM1.png",
+    "Maps/Head_Normal_Animated_WM1.png",
+    "Maps/Body_Basecolor.png",
+    "Maps/Body_Normal.png",
+    "Maps/Eyes_Color.png",
+    "Maps/Teeth_Color.png",
+)
+REQUIRED_SOURCE_TEXTURES = {
+    "face": ("Basecolor", "Normal", "Cavity", "Animated_CM1", "Animated_WM1"),
+    "body": ("Basecolor", "Normal"),
+}
 
 
 def preset_paths() -> list[str]:
@@ -121,6 +143,18 @@ def export_dcc(character: unreal.MetaHumanCharacter, out_dir: Path, bake_makeup:
         raise RuntimeError(f"DCC export wrote nothing to {out_dir}; see the MetaHuman message log")
 
 
+def missing_dcc_files(dcc_dir: Path) -> list[str]:
+    return [rel for rel in REQUIRED_DCC_FILES if not (dcc_dir / rel).is_file()]
+
+
+def missing_source_textures(textures: dict[str, Any]) -> list[str]:
+    missing = []
+    for part, needles in REQUIRED_SOURCE_TEXTURES.items():
+        files = [t["file"] for t in textures.values() if t["part"] == part]
+        missing += [f"{part}:{n}" for n in needles if not any(n in f for f in files)]
+    return missing
+
+
 def export_source_textures(character: unreal.MetaHumanCharacter, out_dir: Path) -> dict[str, Any]:
     """Full-resolution synthesized face/body textures via the materials export."""
     project_path = f"{MATERIALS_ROOT}/{character.get_name()}"
@@ -162,13 +196,25 @@ def export_character(source: str, work: Path, face_res: str, body_res: str) -> d
     with ue.editing(character):
         request_resolution(character, face_res, body_res)
         rig(character)
-        download_textures(character)
-        export_dcc(character, work / "dcc", bake_makeup=False)
+        missing: list[str] = []
+        for attempt in range(1, TEXTURE_ATTEMPTS + 1):
+            download_textures(character)
+            export_dcc(character, work / "dcc", bake_makeup=False)
+            missing = missing_dcc_files(work / "dcc" / name)
+            if not missing:
+                break
+            unreal.log_warning(f"[mh_export] {name}: attempt {attempt} missing {missing}; retrying")
+            shutil.rmtree(work / "dcc", ignore_errors=True)
+            time.sleep(RETRY_PAUSE_SECONDS)
+        if missing:
+            raise RuntimeError(f"Textures unavailable after {TEXTURE_ATTEMPTS} attempts: {missing}")
         export_dcc(character, work / "dcc_makeup", bake_makeup=True)
         dropped = drop_shared_files(work / "dcc", work / "dcc_makeup")
         if (work / "dcc_makeup").exists() and not any((work / "dcc_makeup").iterdir()):
             shutil.rmtree(work / "dcc_makeup")
         sources = export_source_textures(character, work / "textures")
+        if absent := missing_source_textures(sources):
+            raise RuntimeError(f"Source textures missing {absent}")
         write_json(work / "textures" / "textures.json", sources)
         write_json(work / "settings.json", ue.dump_properties(character))
     # Keep the rigged, textured copy: outfit builds later reuse it without new cloud requests.
