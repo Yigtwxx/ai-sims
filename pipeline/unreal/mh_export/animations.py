@@ -20,6 +20,7 @@ from mh_export.exporters import export_object, fbx_options
 
 ROOTS = ("/MetaHumanCharacter/Optional/Animation", "/MetaHumanCharacter/Animation")
 SKIP_NAMES = {"AS_MetaHuman_ARKit_Mapping"}  # exported by the arkit job
+CONTROL_PREFIXES = ("ctrl_", "head_", "neck_")
 
 
 def clip_paths() -> list[str]:
@@ -47,29 +48,48 @@ def sample_bones(anim: unreal.AnimSequence, frames: int) -> dict[str, Any]:
     return {"bones": [str(n) for n in names], "frames": samples}
 
 
-def sample_curves(anim: unreal.AnimSequence, frames: int) -> dict[str, list[float]]:
-    curves: dict[str, list[float]] = {}
-    names = unreal.AnimationLibrary.get_animation_curve_names(
-        anim, unreal.RawCurveTrackTypes.RCT_FLOAT
-    )
+def sample_curves(
+    anim: unreal.AnimSequence, frames: int
+) -> tuple[dict[str, list[float]], list[str]]:
+    """Dense per-frame values of the rig control curves, plus every curve name.
+
+    Face clips also carry ~900 derived mesh/blend-shape curves; the converter
+    re-evaluates those through RigLogic from the controls, so only `ctrl_*`
+    curves are sampled (sampling everything made each clip ~80 MB).
+    """
+    names = [
+        str(n)
+        for n in unreal.AnimationLibrary.get_animation_curve_names(
+            anim, unreal.RawCurveTrackTypes.RCT_FLOAT
+        )
+    ]
+    controls = [n for n in names if n.lower().startswith(CONTROL_PREFIXES)]
     times = [unreal.AnimationLibrary.get_time_at_frame(anim, f) for f in range(frames)]
-    for name in names:
+    curves: dict[str, list[float]] = {}
+    for name in controls:
         key_times, key_values = unreal.AnimationLibrary.get_float_keys(anim, name)
-        curves[str(name)] = [_sample(list(key_times), list(key_values), t) for t in times]
-    return curves
+        curves[name] = _resample(list(key_times), list(key_values), times)
+    return curves, names
 
 
-def _sample(times: list[float], values: list[float], t: float) -> float:
+def _resample(times: list[float], values: list[float], targets: list[float]) -> list[float]:
+    """Linear interpolation of key (times, values) at sorted target times."""
     if not times:
-        return 0.0
-    if t <= times[0]:
-        return float(values[0])
-    for (t0, v0), (t1, v1) in zip(
-        zip(times, values, strict=True), zip(times[1:], values[1:], strict=True), strict=False
-    ):
-        if t0 <= t <= t1:
-            return float(v0 if t1 == t0 else v0 + (v1 - v0) * (t - t0) / (t1 - t0))
-    return float(values[-1])
+        return [0.0] * len(targets)
+    out: list[float] = []
+    i = 0
+    for t in targets:
+        while i + 1 < len(times) and times[i + 1] < t:
+            i += 1
+        if t <= times[0]:
+            out.append(float(values[0]))
+        elif i + 1 >= len(times):
+            out.append(float(values[-1]))
+        else:
+            t0, t1 = times[i], times[i + 1]
+            v0, v1 = values[i], values[i + 1]
+            out.append(float(v0 if t1 == t0 else v0 + (v1 - v0) * (t - t0) / (t1 - t0)))
+    return out
 
 
 def export_clip(path: str, work: Path) -> dict[str, Any]:
@@ -78,7 +98,7 @@ def export_clip(path: str, work: Path) -> dict[str, Any]:
     length = float(unreal.AnimationLibrary.get_sequence_length(anim))
     skeleton = anim.get_editor_property("skeleton")
     bones = sample_bones(anim, frames)
-    curves = sample_curves(anim, frames)
+    curves, curve_names = sample_curves(anim, frames)
     meta = {
         "asset": path,
         "frames": frames,
@@ -87,6 +107,7 @@ def export_clip(path: str, work: Path) -> dict[str, Any]:
         "skeleton": skeleton.get_path_name() if skeleton else None,
         "bone_count": len(bones["bones"]),
         "curve_count": len(curves),
+        "all_curve_names": curve_names,
         "properties": ue.dump_properties(
             anim, ["rate_scale", "interpolation", "enable_root_motion"]
         ),

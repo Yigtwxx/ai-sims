@@ -157,6 +157,9 @@ def export_character(source: str, work: Path, face_res: str, body_res: str) -> d
         sources = export_source_textures(character, work / "textures")
         write_json(work / "textures" / "textures.json", sources)
         write_json(work / "settings.json", ue.dump_properties(character))
+    # Keep the rigged, textured copy: outfit builds later reuse it without new cloud requests.
+    if not unreal.EditorAssetLibrary.save_loaded_asset(character, False):
+        raise RuntimeError(f"Could not save {character.get_path_name()}")
     return {
         "source": source,
         "project_copy": character.get_path_name(),
