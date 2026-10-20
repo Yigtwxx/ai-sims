@@ -6,19 +6,20 @@ import { MathUtils, type PerspectiveCamera } from 'three';
 
 /**
  * Centres the subject in the part of the canvas that is not covered by an
- * overlay panel, by shifting the projection (setViewOffset) instead of moving
+ * overlay panel (left or right), by shifting the projection (setViewOffset) instead of moving
  * the camera. Animating the inset to 0 glides the character to the middle of
  * the screen with no change in perspective.
  */
-export function ViewInset({ left = 0 }: { left?: number }) {
+export function ViewInset({ left = 0, right = 0 }: { left?: number; right?: number }) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const size = useThree((s) => s.size);
-  const current = useRef(left);
-  const target = useRef(left);
+  // Net inset: a left panel pushes the subject right, a right panel pushes it left.
+  const current = useRef(left - right);
+  const target = useRef(left - right);
 
   useEffect(() => {
-    target.current = left;
-  }, [left]);
+    target.current = left - right;
+  }, [left, right]);
 
   useEffect(
     () => () => {

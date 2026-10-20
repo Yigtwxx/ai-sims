@@ -96,6 +96,14 @@ export class SpeechPlayer {
     return contextTime - this.startedAt;
   }
 
+  /** Loudness 0..1 of what is heard right now (0 when silent); drives head emphasis. */
+  loudness(): number {
+    if (!this.source || !this.envelope) return 0;
+    const t = this.heardTime();
+    if (t < 0 || t > this.duration) return 0;
+    return Math.min(1, sampleEnvelope(this.envelope, t) * 1.8);
+  }
+
   /** Viseme weights for the current frame (empty when silent). */
   sample(): VisemeWeights {
     if (!this.source || !this.envelope) return {};

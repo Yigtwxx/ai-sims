@@ -33,3 +33,21 @@ export function getCameraPose(focus: CameraFocus, height = REFERENCE_HEIGHT): Ca
   const pose = REFERENCE_POSES[focus];
   return { position: scale(pose.position, s), target: scale(pose.target, s) };
 }
+
+const smooth = (t: number) => t * t * (3 - 2 * t);
+
+/**
+ * Talk-screen framing between the full body (0) and the face (1). Eased, so
+ * equal zoom steps feel even and the end points settle softly.
+ */
+export function zoomPose(zoom: number, height = REFERENCE_HEIGHT): CameraPose {
+  const t = smooth(Math.min(1, Math.max(0, zoom)));
+  const from = getCameraPose('body', height);
+  const to = getCameraPose('face', height);
+  const mix = (a: Vec3, b: Vec3): Vec3 => [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
+  return { position: mix(from.position, to.position), target: mix(from.target, to.target) };
+}

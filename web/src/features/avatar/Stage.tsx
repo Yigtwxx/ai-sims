@@ -7,7 +7,7 @@ import { AgXToneMapping, NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'thr
 
 import { Backlight } from './Backlight';
 import { CameraRig } from './CameraRig';
-import { getCameraPose, type CameraFocus } from './cameraFocus';
+import { getCameraPose, zoomPose, type CameraFocus } from './cameraFocus';
 import { Cyclorama } from './Cyclorama';
 import { PostEffects, type RenderLook } from './PostEffects';
 import { StudioLighting } from './StudioLighting';
@@ -27,6 +27,12 @@ interface StageProps {
   backdrop?: 'light' | 'dark';
   /** Pixels covered by an overlay panel on the left; the subject centres in the rest. */
   insetLeft?: number;
+  /** Pixels covered by an overlay panel on the right (talk chat). */
+  insetRight?: number;
+  /** Owner-driven framing from full body (0) to face (1); replaces `focus`. */
+  zoom?: number;
+  /** False for presentation renders: no turning, no dolly. */
+  interactive?: boolean;
   /** Static scene elements that must not turn with the character (e.g. backdrop type). */
   scenery?: ReactNode;
   /** Called once the WebGL context exists. */
@@ -51,14 +57,21 @@ export function Stage({
   subjectHeight,
   backdrop = 'light',
   insetLeft = 0,
+  insetRight = 0,
+  zoom,
+  interactive = true,
   scenery,
   onCreated,
 }: StageProps) {
-  const initial = getCameraPose(focus, subjectHeight);
+  const initial =
+    zoom === undefined ? getCameraPose(focus, subjectHeight) : zoomPose(zoom, subjectHeight);
   const theme = BACKDROPS[backdrop];
   return (
     <Canvas
-      className={['cursor-grab touch-none active:cursor-grabbing', className]
+      className={[
+        interactive ? 'cursor-grab touch-none active:cursor-grabbing' : 'pointer-events-none',
+        className,
+      ]
         .filter(Boolean)
         .join(' ')}
       shadows={{ type: PCFShadowMap }}
@@ -90,8 +103,8 @@ export function Stage({
         <Turntable>{children}</Turntable>
         {post && <PostEffects look={look} />}
       </Suspense>
-      <CameraRig focus={focus} height={subjectHeight} />
-      <ViewInset left={insetLeft} />
+      <CameraRig focus={focus} height={subjectHeight} zoom={zoom} interactive={interactive} />
+      <ViewInset left={insetLeft} right={insetRight} />
     </Canvas>
   );
 }
