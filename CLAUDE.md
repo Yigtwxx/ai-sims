@@ -4,6 +4,8 @@ Tarayıcıda çalışan, fotogerçekçi ve kişiselleştirilebilir 3D karakter o
 
 Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu dosyadaki kararları tekrar sorma.
 
+**Yeni oturuma başlarken önce `docs/handoff.md`'yi oku**: güncel yön (anime iptal, MetaHuman), mevcut durum ve sıradaki iş orada.
+
 ## Öncelikler
 1. **Gerçekçilik** en kritik gereksinim. Kalite hedefi Holoxone tanıtım videosu (2D video, kalite çıtası olarak alındı).
 2. Kişiselleştirme: Erkek + Kadın base, yüz, cilt, göz, saç, sakal, üst, alt, ayakkabı.
