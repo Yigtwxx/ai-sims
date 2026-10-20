@@ -1,5 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
+import { PROVIDER_IDS, isProviderId, type ProviderId } from '@/lib/ai/types';
+import type { TtsVoices } from '@/lib/tts/types';
 
 const MongoEnvSchema = z.object({
   uri: z.string().regex(/^mongodb(\+srv)?:\/\/.+/, 'Expected a mongodb:// or mongodb+srv:// URI'),
@@ -53,4 +55,145 @@ export function requireAuthEnv(): AuthEnv {
   const env = getAuthEnv();
   if (!env) throw new DatabaseNotConfiguredError();
   return env;
+}
+
+/* ------------------------------------------------------------------------- *
+ * AI providers and text-to-speech. Every variable here is optional: without
+ * keys the app still runs and the API routes answer "not configured".
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Defaults, verified on 2026-10-20 against the providers' official docs:
+ * - Claude: `claude-opus-5-5`, written without a date suffix.
+ *   https://platform.claude.com/docs/en/get-started
+ * - Gemini: stable `gemini-3.8-flash`. The models page says "For any new projects, use our
+ *   latest models: 3.5 Flash-Lite or 3.8 Flash"; pricing lists a free tier for it.
+ *   https://ai.google.dev/gemini-api/docs/models
+ *   https://ai.google.dev/gemini-api/docs/pricing
+ * - Groq: `openai/gpt-oss-120b`, the flagship of the "Production Models" table.
+ *   https://console.groq.com/docs/models
+ *   https://console.groq.com/docs/reasoning
+ * - Azure voices: Standard neural voices from the voice table. tr-TR is also listed in the
+ *   "Visemes" table of the same page (Viseme ID, no blend shapes).
+ *   https://learn.microsoft.com/azure/ai-services/speech-service/language-support?tabs=tts
+ */
+export const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5-5';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
+export const DEFAULT_PROVIDER_ORDER: readonly ProviderId[] = PROVIDER_IDS;
+
+export const DEFAULT_TTS_VOICES: TtsVoices = {
+  tr: { female: 'tr-TR-EmelNeural', male: 'tr-TR-AhmetNeural' },
+  en: { female: 'en-US-AvaNeural', male: 'en-US-AndrewNeural' },
+};
+
+export interface AiEnv {
+  /** Providers to try, in order. Providers without a key are skipped at call time. */
+  providerOrder: readonly ProviderId[];
+  anthropicApiKey: string | undefined;
+  anthropicModel: string;
+  geminiApiKey: string | undefined;
+  geminiModel: string;
+  groqApiKey: string | undefined;
+  groqModel: string;
+}
+
+export interface AzureSpeechEnv {
+  key: string;
+  region: string;
+  voices: TtsVoices;
+}
+
+/** Trimmed value, or undefined when the variable is unset or blank (`KEY=` placeholders). */
+function readEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
+/** API keys never contain whitespace; a value that does is treated as not set. */
+function readSecret(name: string): string | undefined {
+  const value = readEnv(name);
+  return value && /^\S+$/.test(value) ? value : undefined;
+}
+
+const ModelIdSchema = z.string().regex(/^[\w./:-]{1,120}$/);
+const VoiceNameSchema = z.string().regex(/^[\p{L}\p{N}._:-]{1,100}$/u);
+const RegionSchema = z.string().regex(/^[a-z0-9-]{2,40}$/);
+
+function readModel(name: string, fallback: string): string {
+  const parsed = ModelIdSchema.safeParse(readEnv(name));
+  return parsed.success ? parsed.data : fallback;
+}
+
+function readVoice(name: string, fallback: string): string {
+  const parsed = VoiceNameSchema.safeParse(readEnv(name));
+  return parsed.success ? parsed.data : fallback;
+}
+
+/**
+ * Parses AI_PROVIDER_ORDER ("anthropic,gemini,groq"). Unknown names are reported
+ * in `ignored`; when nothing valid remains the default order is used.
+ */
+export function parseProviderOrder(raw: string | undefined): {
+  order: ProviderId[];
+  ignored: string[];
+} {
+  const order = new Set<ProviderId>();
+  const ignored: string[] = [];
+  for (const part of (raw ?? '').split(',')) {
+    const id = part.trim().toLowerCase();
+    if (!id) continue;
+    if (isProviderId(id)) order.add(id);
+    else ignored.push(id);
+  }
+  return { order: order.size > 0 ? [...order] : [...DEFAULT_PROVIDER_ORDER], ignored };
+}
+
+const warnedProviderNames = new Set<string>();
+
+/** Never throws and never logs values of secrets; values are read on each call. */
+export function getAiEnv(): AiEnv {
+  const { order, ignored } = parseProviderOrder(process.env.AI_PROVIDER_ORDER);
+  for (const name of ignored) {
+    if (warnedProviderNames.has(name)) continue;
+    warnedProviderNames.add(name);
+    console.warn(
+      `[env] AI_PROVIDER_ORDER: ignoring unknown provider "${name}" (expected ${PROVIDER_IDS.join(', ')})`,
+    );
+  }
+  return {
+    providerOrder: order,
+    anthropicApiKey: readSecret('ANTHROPIC_API_KEY'),
+    anthropicModel: readModel('ANTHROPIC_MODEL', DEFAULT_ANTHROPIC_MODEL),
+    geminiApiKey: readSecret('GEMINI_API_KEY'),
+    geminiModel: readModel('GEMINI_MODEL', DEFAULT_GEMINI_MODEL),
+    groqApiKey: readSecret('GROQ_API_KEY'),
+    groqModel: readModel('GROQ_MODEL', DEFAULT_GROQ_MODEL),
+  };
+}
+
+/** Null unless both the key and a valid region are set. */
+export function getAzureSpeechEnv(): AzureSpeechEnv | null {
+  const key = readSecret('AZURE_SPEECH_KEY');
+  const region = RegionSchema.safeParse(readEnv('AZURE_SPEECH_REGION')?.toLowerCase());
+  if (!key || !region.success) return null;
+
+  return {
+    key,
+    region: region.data,
+    voices: {
+      tr: {
+        female: readVoice('AZURE_TTS_VOICE_TR_FEMALE', DEFAULT_TTS_VOICES.tr.female),
+        male: readVoice('AZURE_TTS_VOICE_TR_MALE', DEFAULT_TTS_VOICES.tr.male),
+      },
+      en: {
+        female: readVoice('AZURE_TTS_VOICE_EN_FEMALE', DEFAULT_TTS_VOICES.en.female),
+        male: readVoice('AZURE_TTS_VOICE_EN_MALE', DEFAULT_TTS_VOICES.en.male),
+      },
+    },
+  };
+}
+
+export function isAzureSpeechConfigured(): boolean {
+  return getAzureSpeechEnv() !== null;
 }

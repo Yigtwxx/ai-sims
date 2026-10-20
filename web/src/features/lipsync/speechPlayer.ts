@@ -2,12 +2,13 @@ import { alignTextToAudio } from './align';
 import { computeEnvelope, detectSpeechRegions, sampleEnvelope, type Envelope } from './envelope';
 import { sampleTimeline, scaleWeights, timelineFromEvents, type TimedViseme } from './timeline';
 import type { Viseme, VisemeWeights } from './visemes';
+import { timelineFromWords, type WordBoundary } from './wordAlign';
 
 /**
  * Plays a speech clip and reports the mouth shape for "what the listener hears
- * right now". Timing comes from either exact TTS viseme events or our Turkish
- * text rules aligned to the audio's pauses; loudness modulates how wide the
- * mouth opens.
+ * right now". Timing comes from exact TTS viseme events, else TTS word
+ * boundaries, else our Turkish text rules aligned to the audio's pauses;
+ * loudness modulates how wide the mouth opens.
  */
 export class SpeechPlayer {
   private context: AudioContext | undefined;
@@ -33,21 +34,29 @@ export class SpeechPlayer {
 
   /**
    * Decode audio and prepare its viseme timeline. Pass `events` when the TTS
-   * provides viseme timings; otherwise `text` is aligned to the audio.
+   * provides viseme timings, else `words` when it provides word boundaries;
+   * otherwise `text` is aligned to the audio. If several are given, that is
+   * also the order of priority.
    */
   async load(
     audio: ArrayBuffer,
-    script: { text: string } | { events: { viseme: Viseme; time: number }[] },
+    script:
+      { text: string } | { events: { viseme: Viseme; time: number }[] } | { words: WordBoundary[] },
   ): Promise<void> {
     this.stop();
     const buffer = await this.getContext().decodeAudioData(audio);
     const samples = buffer.getChannelData(0);
     this.buffer = buffer;
     this.envelope = computeEnvelope(samples, buffer.sampleRate);
-    this.timeline =
-      'events' in script
-        ? timelineFromEvents(script.events, buffer.duration)
-        : alignTextToAudio(script.text, detectSpeechRegions(this.envelope), buffer.duration);
+    if ('events' in script) this.timeline = timelineFromEvents(script.events, buffer.duration);
+    else if ('words' in script) this.timeline = timelineFromWords(script.words);
+    else {
+      this.timeline = alignTextToAudio(
+        script.text,
+        detectSpeechRegions(this.envelope),
+        buffer.duration,
+      );
+    }
   }
 
   async play(onEnded?: () => void): Promise<void> {

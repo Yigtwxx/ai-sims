@@ -16,6 +16,8 @@
     "db:start": "mongod --dbpath ../.data/mongo --port 27018 --bind_ip 127.0.0.1 --fork --logpath ../.data/mongod.log"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@google/genai": "^2.30.0",
     "@pixiv/three-vrm": "^3.5.5",
     "@pixiv/three-vrm-animation": "^3.5.5",
     "@react-three/drei": "^10.7.9",
@@ -23,7 +25,9 @@
     "@react-three/postprocessing": "^3.2.0",
     "better-auth": "^1.7.11",
     "camera-controls": "^3.1.2",
+    "groq-sdk": "^1.6.0",
     "gsap": "^3.15.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.52.0",
     "mongodb": "^7.7.0",
     "motion": "^14.3.1",
     "next": "16.4.2",

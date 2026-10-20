@@ -56,6 +56,11 @@ Database:
 - Stop the dev instance with `mongod --dbpath .data/mongo --shutdown`.
 - Without these env vars the app still builds and the landing page renders; the login button shows a "Database not configured" message.
 
+AI chat and voice (optional):
+- API keys for Anthropic, Gemini, Groq (chat) and Azure Speech (voice) go into `web/.env.local`. Step-by-step setup for every account, free-tier limits and how to verify each key: [`docs/setup-accounts.md`](docs/setup-accounts.md) (Turkish).
+- Without keys the app still runs: `POST /api/chat` answers `503 ai_not_configured` and `POST /api/tts` answers `503 tts_not_configured`.
+- In development, `curl localhost:3000/api/health` reports which services are configured (booleans only; the route returns 404 in production).
+
 Asset pipeline:
 
 ```bash

@@ -14,7 +14,7 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 - 3D: three.js, @react-three/fiber, drei, postprocessing. Render tarayıcıda (WebGL2).
 - Veri: MongoDB (resmi `mongodb` driver) + Better Auth (`anonymous` plugin). Geliştirmede yerel mongod: `127.0.0.1:27018`, veri `.data/mongo` (gitignored). Compass: `mongodb://localhost:27018`.
 - `pipeline/`: Python (uv) + headless Blender (`bpy`) + MPFB2. Çıktı `web/public/assets/` + `manifest.json`.
-- Ayrı backend yok. Sunucu işleri Next.js route handler'larında; AI için Vercel AI SDK (faz 4).
+- Ayrı backend yok. Sunucu işleri Next.js route handler'larında. AI için resmi SDK'lar: `@anthropic-ai/sdk` (Claude), `@google/genai` (Gemini), `groq-sdk` (Groq); TTS için `microsoft-cognitiveservices-speech-sdk`. Vercel AI SDK kullanılmaz.
 
 ## Mimari kuralları
 - `CharacterConfig` (zod, `web/src/lib/character/`) render'dan bağımsızdır ve yalnızca manifest ID'lerine referans verir. Şema değişirse `schemaVersion` artırılır ve migration yazılır.
@@ -45,6 +45,14 @@ cd web && pnpm db:start       # mongod'u arka planda başlatır; önce `mkdir -p
 - Thumbnail ayrı `thumbnails` koleksiyonunda (`_id` = karakter `_id`, WebP, en çok 512 KB). Sadece `/api/characters/[id]/thumbnail` üzerinden, oturum + sahiplik kontrolüyle servis edilir.
 - Proxy yalnızca iyimser cookie kontrolü yapar; sayfa ve action'lar `requireUserId()` ile oturumu sunucuda doğrular.
 - Stil: `anime` ana stil, `realistic` kullanıcının seçebileceği yan seçenek (`CharacterConfig.style`).
+
+## AI sohbet ve TTS
+- Hesap, anahtar ve doğrulama adımları: `docs/setup-accounts.md`. Anahtarların hepsi isteğe bağlıdır; yoksa `POST /api/chat` `503 ai_not_configured`, `POST /api/tts` `503 tts_not_configured` döner ve uygulama çalışır. `GET /api/health` yalnızca dev'de, değer değil boolean döner (production'da 404).
+- `web/src/lib/ai/`: `providers/` (anthropic, gemini, groq), `router.ts` (`streamWithFallback`, sıra `AI_PROVIDER_ORDER`), `persona.ts` + `prompts/persona.template.ts` (prompt'lar şablon modülünde durur, kodda inline yazılmaz). Sağlayıcıdan sonrakine **yalnızca ilk token'dan önce** geçilir; metin başladıktan sonra sağlayıcı asla değişmez.
+- Claude yalnızca `@anthropic-ai/sdk` ile çağrılır. `claude-opus-5-5` için: `thinking` gönderilmez (`disabled` 400 verir), `output_config.effort: 'low'`, prefill yok, sunucu tarafı refusal fallback (`fallbacks: 'default'`) açık, `stop_reason === 'refusal'` her zaman kontrol edilir.
+- Anahtar ve ham sağlayıcı hata gövdesi asla loglanmaz: hatalar `ProviderError`'a (sağlayıcı, tür, status) indirgenir.
+- `web/src/lib/tts/`: Azure Speech (bellekte MP3, viseme ve kelime olayları; tr-TR için viseme ID desteklenir). Lip-sync adaptörleri `web/src/features/lipsync/azureVisemes.ts` ve `wordAlign.ts`; `SpeechPlayer.load()` önceliği: events, words, text.
+- Route handler'larda `runtime` export'u yoktur: Cache Components altında desteklenmez, Node tek runtime'dır.
 
 ## Dil ve stil
 - İletişim Türkçe. Kod, identifier ve yorumlar İngilizce.
