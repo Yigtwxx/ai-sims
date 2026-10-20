@@ -32,6 +32,20 @@ Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığım�
 5. **İlk partide kütüphanenin tamamını dışa aktar.** MetaHuman'daki tüm saç modellerini (örgü, topuz, kıvırcık dahil) ve tüm kıyafetleri al. Saçlar ve kıyafetler bütün MetaHuman kafalarına ve vücutlarına oturuyor. Böylece yeni saç veya kıyafet için Windows'a nadiren dönmek gerekir; saç rengi ve boya desenleri zaten tarayıcıda (shader) yapılıyor.
 6. Çıktıları Mac'e taşı (USB disk / Drive): `pipeline/source/metahuman/` (gitignore'da olmalı). Yedeği Drive'da da tut.
 
+## Kullanıcının hedefi: Windows bir kez, ekleme her zaman Mac'ten
+
+- Unreal yalnızca Windows'ta ve bir kez kullanılır. MetaHuman kütüphanesinin tamamı (yüzler, tüm saçlar, tüm kıyafetler) dosya olarak dışa aktarılır. Unreal Mac'e kurulmaz ve uygulama çalışırken hiç gerekmez.
+- Sonradan eklemelerin hepsi Mac'ten yapılabilmeli:
+  - Renk, boya deseni, ten, göz, makyaj, dövme, piercing ve takı uygulamanın içinde (kod).
+  - Yeni yüzler, yüz şablonları arasında slider karışımıyla (morph) gelir.
+  - **Yeni saç veya kıyafet** için Mac'te bir "varlık ekleme" hattı kurulacak, örnek:
+    ```bash
+    uv run asset-pipeline add-hair  path/to/hair.fbx  --label "..."
+    uv run asset-pipeline add-outfit path/to/top.fbx  --label "..."
+    ```
+    Bu hat (Blender headless) dosyayı MetaHuman kafasına veya vücuduna oturtur. Kıyafette ağırlıklar vücuttan aktarılır, saçta kafa kemiğine bağlanır. Ardından dokular web formatına çevrilir, küçük resim üretilir ve kayıt manifest'e eklenir.
+- Unreal yalnızca Epic'in MetaHuman kütüphanesine sonradan eklediği yeni bir varlık için gerekir.
+
 ## Mac'te sıradaki iş (web)
 
 - **Dönüştürme hattı:** DNA/FBX → glTF.
