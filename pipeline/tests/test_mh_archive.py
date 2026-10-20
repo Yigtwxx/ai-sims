@@ -6,6 +6,7 @@ from mh_export.archive import (
     DONE_FILE,
     Archive,
     JobLog,
+    SkipList,
     Unit,
     is_done,
     run_units,
@@ -132,3 +133,34 @@ def test_run_units_force_reexports_done_units(tmp_path):
     run_units([Unit("Ada", target, export)], JobLog(archive.logs, "x"), force=True)
     assert (target / "new.dna").exists()
     assert not (target / "old.dna").exists()
+
+
+def test_run_units_rereads_skip_list_before_every_unit(tmp_path):
+    archive = Archive(tmp_path)
+    archive.root.mkdir(exist_ok=True)
+    archive.skip_file.write_text('["Bo"]', encoding="utf-8")
+    exported: list[str] = []
+
+    def export_and_skip_next(work: Path) -> dict:
+        exported.append(work.name)
+        archive.skip_file.write_text('["Bo", "Cy"]', encoding="utf-8")
+        _write(work, "head.dna", b"dna")
+        return {}
+
+    units = [
+        Unit(name, archive.unit_dir("characters", name), export_and_skip_next)
+        for name in ("Ada", "Bo", "Cy")
+    ]
+    summary = run_units(units, JobLog(archive.logs, "x"), skip=SkipList(archive.skip_file))
+    assert summary.done == ["Ada"]
+    assert summary.excluded == ["Bo", "Cy"]
+    assert exported == ["Ada.partial"]
+
+
+def test_skip_list_keeps_last_good_names_when_file_is_mid_edit(tmp_path):
+    path = tmp_path / "skip.json"
+    path.write_text('["Ada"]', encoding="utf-8")
+    skip = SkipList(path)
+    assert skip.names() == {"Ada"}
+    path.write_text('["Ada", "B', encoding="utf-8")
+    assert skip.names() == {"Ada"}

@@ -9,6 +9,7 @@ unit that looks complete.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -62,6 +63,11 @@ class Archive:
     @property
     def logs(self) -> Path:
         return self.root / "logs"
+
+    @property
+    def skip_file(self) -> Path:
+        """JSON list of unit names the user chose to leave out of the export."""
+        return self.root / "skip.json"
 
     def unit_dir(self, kind: str, *parts: str) -> Path:
         """Final directory of one unit, e.g. `raw/characters/Ada`."""
@@ -179,16 +185,48 @@ class Unit:
 class Summary:
     done: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+    excluded: list[str] = field(default_factory=list)
     failed: dict[str, str] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"done": self.done, "skipped": self.skipped, "failed": self.failed}
+        return {
+            "done": self.done,
+            "skipped": self.skipped,
+            "excluded": self.excluded,
+            "failed": self.failed,
+        }
 
 
-def run_units(units: Iterable[Unit], log: JobLog, *, force: bool = False) -> Summary:
+class SkipList:
+    """Unit names to leave out, re-read before every unit so it can change mid-run.
+
+    A half-written edit (invalid JSON) keeps the last good list instead of
+    stopping an overnight export.
+    """
+
+    def __init__(self, path: Path | None) -> None:
+        self.path = path
+        self._names: set[str] = set()
+
+    def names(self) -> set[str]:
+        if self.path is None or not self.path.is_file():
+            return self._names
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
+            self._names = set(json.loads(self.path.read_text(encoding="utf-8")))
+        return self._names
+
+
+def run_units(
+    units: Iterable[Unit], log: JobLog, *, force: bool = False, skip: SkipList | None = None
+) -> Summary:
     """Export every unit that is not already done; a failure never stops the run."""
     summary = Summary()
+    skip = skip or SkipList(None)
     for unit in units:
+        if unit.name in skip.names():
+            summary.excluded.append(unit.name)
+            log.event("excluded", unit.name)
+            continue
         if not force and is_done(unit.directory):
             summary.skipped.append(unit.name)
             log.event("skipped", unit.name)
