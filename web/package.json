@@ -7,13 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "db:start": "mongod --dbpath ../.data/mongo --port 27018 --bind_ip 127.0.0.1 --fork --logpath ../.data/mongod.log"
+    "db:start": "node scripts/db-start.mjs",
+    "db:stop": "node scripts/db-stop.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
