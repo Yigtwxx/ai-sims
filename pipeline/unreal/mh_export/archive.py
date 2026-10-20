@@ -93,6 +93,25 @@ def file_records(directory: Path) -> list[dict[str, Any]]:
     return records
 
 
+def drop_shared_files(baseline: Path, variant: Path) -> int:
+    """Delete files in `variant` that are byte-identical to the same path in `baseline`.
+
+    Used to keep only what a second export variant (e.g. baked makeup) changes.
+    Empty folders left behind are removed; returns how many files were dropped.
+    """
+    dropped = 0
+    for path in sorted(p for p in variant.rglob("*") if p.is_file()):
+        twin = baseline / path.relative_to(variant)
+        same_size = twin.is_file() and twin.stat().st_size == path.stat().st_size
+        if same_size and sha256_of(twin) == sha256_of(path):
+            path.unlink()
+            dropped += 1
+    for folder in sorted((p for p in variant.rglob("*") if p.is_dir()), reverse=True):
+        if not any(folder.iterdir()):
+            folder.rmdir()
+    return dropped
+
+
 def write_json(path: Path, payload: object) -> None:
     """Write JSON atomically so a crash never leaves a truncated file."""
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -23,9 +23,23 @@ def _arkit(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
     return {"poses": len(mapping["pose_names"]), "curves": len(mapping["curves"])}
 
 
+def _characters(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
+    from mh_export import characters
+
+    return characters.run(archive, args)
+
+
+def _grooms(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
+    from mh_export import grooms
+
+    return grooms.run(archive, args)
+
+
 JOBS: dict[str, Job] = {
     "inventory": _inventory,
     "arkit": _arkit,
+    "characters": _characters,
+    "grooms": _grooms,
 }
 
 

@@ -8,6 +8,7 @@ from mh_export.archive import (
     JobLog,
     SkipList,
     Unit,
+    drop_shared_files,
     is_done,
     run_units,
     safe_name,
@@ -164,3 +165,18 @@ def test_skip_list_keeps_last_good_names_when_file_is_mid_edit(tmp_path):
     assert skip.names() == {"Ada"}
     path.write_text('["Ada", "B', encoding="utf-8")
     assert skip.names() == {"Ada"}
+
+
+def test_drop_shared_files_keeps_only_what_the_variant_changed(tmp_path):
+    clean, baked = tmp_path / "dcc", tmp_path / "dcc_makeup"
+    _write(clean, "Maps/head_albedo.png", b"no makeup")
+    _write(clean, "Maps/head_normal.png", b"normal")
+    _write(clean, "head.dna", b"dna")
+    _write(baked, "Maps/head_albedo.png", b"with lipstick")
+    _write(baked, "Maps/head_normal.png", b"normal")
+    _write(baked, "head.dna", b"dna")
+    assert drop_shared_files(clean, baked) == 2
+    assert [p.relative_to(baked).as_posix() for p in baked.rglob("*")] == [
+        "Maps",
+        "Maps/head_albedo.png",
+    ]
