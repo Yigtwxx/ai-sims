@@ -84,8 +84,8 @@ function skinnedPositions(mesh: SkinnedMesh, keep?: (index: number) => boolean):
   const count = mesh.geometry.getAttribute('position').count;
   for (let i = 0; i < count; i++) {
     if (keep && !keep(i)) continue;
+    // SkinnedMesh.getVertexPosition already applies morphs and skinning.
     mesh.getVertexPosition(i, _vertex);
-    mesh.applyBoneTransform(i, _vertex);
     _vertex.applyMatrix4(mesh.matrixWorld);
     out.push(_vertex.x, _vertex.y, _vertex.z);
   }
