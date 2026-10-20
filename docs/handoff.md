@@ -58,6 +58,12 @@ Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığım�
 - **Montaj:** MetaHuman'lar aynı iskelet ve topolojiyi paylaşıyor, bu yüzden parça montajı basit.
   - Yüz şablonları arasında morph ile "blend" slider'ları.
   - Saç, kıyafet ve ten seçenekleri.
+- **Isı ve pil (kullanıcı için önemli):** MacBook'ta ısınma ve pil tüketimi defalarca dile getirildi.
+  - Kalite modu: Yüksek / Dengeli / Pil tasarrufu. Demoda şarjdayken Yüksek.
+  - Boşta (sürükleme ve konuşma yokken) 30 fps sınırı.
+  - Kare süresi uzarsa DPR ve post efektleri otomatik düşer (`PerformanceMonitor`).
+  - Gizli sekmede çizim durur.
+  - Varlık ekleme işleri kısa sürmeli; doku sıkıştırma paralelliği ölçülü tutulmalı.
 - **Yeniden kullanılacak katmanlar** (stilden bağımsız):
   - `web/src/features/lipsync/`: Türkçe viseme motoru, Azure viseme ve kelime hizalama.
   - Canlılık: göz kırpma, sakkad, nefes ve idle (`web/src/features/avatar/vrm/pose.ts`, `life.ts`; yeni rig'e uyarlanacak).
