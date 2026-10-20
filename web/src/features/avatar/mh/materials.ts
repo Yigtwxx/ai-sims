@@ -173,6 +173,8 @@ export function applySkinMaterials(root: Object3D, detail: SkinDetail): Material
     const tuning = source?.name === 'head' ? HEAD_SKIN : source?.name === 'body' ? BODY_SKIN : null;
     if (!tuning || Array.isArray(mesh.material)) return;
     const skin = createSkinMaterial(source as MeshStandardMaterial, detail, tuning);
+    // Kept for A/B checks on the dev bench.
+    mesh.userData.mhSourceMaterial = source;
     mesh.material = skin;
     created.push(skin);
   });

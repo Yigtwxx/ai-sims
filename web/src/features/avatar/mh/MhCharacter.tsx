@@ -19,6 +19,7 @@ import {
   type NeckSeamExtras,
 } from './assembly';
 import { useMhGltf } from './loaders';
+import { applyEyeMaterials } from './eyeMaterials';
 import { applySkinMaterials, loadSkinDetail, setSkinDetail } from './materials';
 
 export interface MhCharacterHandle {
@@ -73,13 +74,14 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       }
     });
     const skins = applySkinMaterials(bodyRoot, { microNormal: null });
+    const eyes = applyEyeMaterials(bodyRoot);
     const faceMeshes = collectMorphMeshes(bodyRoot).filter((mesh) => mesh !== body.mesh);
     const handle: MhCharacterHandle = {
       body,
       faceMeshes,
       setFaceMorph: (name, weight) => setMorph(faceMeshes, name, weight),
     };
-    return { root: bodyRoot, handle, skins };
+    return { root: bodyRoot, handle, skins, eyes };
   }, [bodyGltf, headGltf]);
 
   useEffect(() => {
@@ -89,7 +91,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     });
     return () => {
       live = false;
-      for (const material of assembled.skins) material.dispose();
+      for (const material of [...assembled.skins, ...assembled.eyes]) material.dispose();
     };
   }, [assembled]);
 
