@@ -17,12 +17,21 @@ import {
 } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
+import {
+  applyMouthToMorphs,
+  createMouthState,
+  stepMouth,
+  type MouthState,
+} from '../lipsync/mouthDriver';
+import type { SpeechPlayer } from '../lipsync/speechPlayer';
 import { stepBlink, type BlinkState } from './life';
 import { createSkinMaterial } from './materials/skin';
 import { applyRelaxedPose, collectBones, collectMorphMeshes, type BoneMap } from './rig';
 
 interface CharacterProps {
   url: string;
+  /** Speech source driving the mouth; omit for a silent character. */
+  speech?: SpeechPlayer;
   /** Toggle the skin SSS approximation (for A/B comparison in the spike). */
   sss?: boolean;
 }
@@ -116,12 +125,14 @@ function buildRig(model: Object3D): Rig {
 
 interface LifeState {
   blink: BlinkState;
+  mouth: MouthState;
   saccade: { x: number; y: number; targetX: number; targetY: number; nextIn: number };
 }
 
 function createLifeState(): LifeState {
   return {
     blink: { nextIn: 1.5, phase: -1 },
+    mouth: createMouthState(),
     saccade: { x: 0, y: 0, targetX: 0, targetY: 0, nextIn: 0.8 },
   };
 }
@@ -130,7 +141,17 @@ function createLifeState(): LifeState {
  * Per-frame procedural motion. Kept outside the component because it mutates
  * three.js objects imperatively, which React's render rules don't model.
  */
-function animateRig(rig: Rig, life: LifeState, t: number, step: number): void {
+function animateRig(
+  rig: Rig,
+  life: LifeState,
+  t: number,
+  step: number,
+  speech: SpeechPlayer | undefined,
+): void {
+  // Lip-sync: smoothed viseme weights from the speech currently heard.
+  stepMouth(life.mouth, speech?.sample() ?? {}, step);
+  applyMouthToMorphs(rig.morphMeshes, life.mouth);
+
   // Blink: drive ARKit eyeBlink shape keys on every mesh that has them.
   const result = stepBlink(life.blink, step, Math.random);
   life.blink = result.state;
@@ -181,7 +202,7 @@ function animateRig(rig: Rig, life: LifeState, t: number, step: number): void {
   }
 }
 
-export function Character({ url, sss = true }: CharacterProps) {
+export function Character({ url, sss = true, speech }: CharacterProps) {
   const { scene } = useGLTF(url);
 
   const model = useMemo(() => {
@@ -210,9 +231,15 @@ export function Character({ url, sss = true }: CharacterProps) {
   );
 
   const life = useRef<LifeState>(createLifeState());
+  const speechRef = useRef(speech);
+  useEffect(() => {
+    speechRef.current = speech;
+  }, [speech]);
   useFrame(({ clock }, dt) => {
     const rig = rigRef.current;
-    if (rig) animateRig(rig, life.current, clock.elapsedTime, Math.min(dt, 0.1));
+    if (rig) {
+      animateRig(rig, life.current, clock.elapsedTime, Math.min(dt, 0.1), speechRef.current);
+    }
   });
 
   return <primitive object={model} />;

@@ -2,11 +2,15 @@
 
 import { StatsGl } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Character } from '@/features/avatar/Character';
 import type { CameraFocus } from '@/features/avatar/cameraFocus';
 import { Stage } from '@/features/avatar/Stage';
+import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
+
+const SAMPLE_AUDIO = '/assets/samples/tr-greeting.wav';
+const SAMPLE_TEXT = '/assets/samples/tr-greeting.txt';
 
 const CHARACTERS = {
   male: '/assets/spike/base_male.glb',
@@ -24,11 +28,25 @@ export function SpikeScene() {
   const [sss, setSss] = useState(true);
   const [stats, setStats] = useState(false);
   const [post, setPost] = useState(true);
+  const speech = useMemo(() => new SpeechPlayer(), []);
+  const [speaking, setSpeaking] = useState(false);
+
+  useEffect(() => () => void speech.dispose(), [speech]);
+
+  const speak = async () => {
+    const [audio, text] = await Promise.all([
+      fetch(SAMPLE_AUDIO).then((r) => r.arrayBuffer()),
+      fetch(SAMPLE_TEXT).then((r) => r.text()),
+    ]);
+    await speech.load(audio, { text });
+    setSpeaking(true);
+    await speech.play(() => setSpeaking(false));
+  };
 
   return (
     <main className="relative h-dvh w-full">
       <Stage key={String(post)} focus={focus} post={post} className="absolute inset-0">
-        <Character key={`${gender}-${sss}`} url={CHARACTERS[gender]} sss={sss} />
+        <Character key={`${gender}-${sss}`} url={CHARACTERS[gender]} sss={sss} speech={speech} />
         <DebugHandle />
         {stats && <StatsGl className="!top-auto !bottom-3 !left-3" />}
       </Stage>
@@ -41,6 +59,14 @@ export function SpikeScene() {
           value={sss ? 'sss on' : 'sss off'}
           onChange={(v) => setSss(v === 'sss on')}
         />
+        <button
+          type="button"
+          onClick={() => void speak()}
+          disabled={speaking}
+          className="pointer-events-auto rounded-full bg-neutral-900 px-4 py-1.5 text-white disabled:opacity-50"
+        >
+          {speaking ? 'speaking…' : 'speak (tr)'}
+        </button>
         <Toggle
           options={['post on', 'post off']}
           value={post ? 'post on' : 'post off'}
