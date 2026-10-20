@@ -5,6 +5,9 @@ export const CURRENT_SCHEMA_VERSION = 1 as const;
 
 export const CHARACTER_BASES = ['male', 'female'] as const;
 
+/** Anime is the main style; realistic is a side option the user can pick. */
+export const CHARACTER_STYLES = ['anime', 'realistic'] as const;
+
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Expected a #RRGGBB hex color');
 const UnitIntervalSchema = z.number().min(0).max(1);
 
@@ -20,6 +23,7 @@ const OutfitItemSchema = z.object({
  */
 export const CharacterConfigSchema = z.object({
   schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
+  style: z.enum(CHARACTER_STYLES),
   base: z.enum(CHARACTER_BASES),
   face: z.object({
     preset: z.string().min(1),
@@ -42,4 +46,5 @@ export const CharacterConfigSchema = z.object({
 
 export type CharacterConfig = z.infer<typeof CharacterConfigSchema>;
 export type CharacterBase = CharacterConfig['base'];
+export type CharacterStyle = CharacterConfig['style'];
 export type OutfitItem = z.infer<typeof OutfitItemSchema>;

@@ -12,7 +12,7 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 ## Stack
 - `web/`: Next.js App Router, React 19, TypeScript `strict`, Tailwind v4, shadcn/ui, Motion, GSAP, next-intl (`/tr`, `/en`), zustand + zundo.
 - 3D: three.js, @react-three/fiber, drei, postprocessing. Render tarayıcıda (WebGL2).
-- Veri: Supabase cloud. Postgres + RLS, anonim giriş, `thumbnails` storage bucket. Migration'lar `supabase/migrations/` altında.
+- Veri: MongoDB (resmi `mongodb` driver) + Better Auth (`anonymous` plugin). Geliştirmede yerel mongod: `127.0.0.1:27018`, veri `.data/mongo` (gitignored). Compass: `mongodb://localhost:27018`.
 - `pipeline/`: Python (uv) + headless Blender (`bpy`) + MPFB2. Çıktı `web/public/assets/` + `manifest.json`.
 - Ayrı backend yok. Sunucu işleri Next.js route handler'larında; AI için Vercel AI SDK (faz 4).
 
@@ -21,7 +21,7 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 - Tüm giysi ve saç GLB'leri base iskelete skinlenir; runtime'da `SkinnedMesh.bind` ile bağlanır.
 - Base mesh'te ARKit 52 + Oculus 15 viseme morph'ları **zorunlu** (lip-sync için).
 - Turntable: sürükleyince kamerayı değil karakteri döndür. Stüdyo ışığı yüze göre sabit kalmalı.
-- Secret'lar yalnızca env'de durur. `NEXT_PUBLIC_` önekini sadece Supabase URL ve anon key alır. AI ve TTS key'leri yalnızca server tarafında kullanılır.
+- Secret'lar yalnızca env'de durur. Şu an hiçbir değişken `NEXT_PUBLIC_` almaz. `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, AI ve TTS key'leri yalnızca server tarafında kullanılır. Env eksikse build ve landing çökmez; login "Database not configured" gösterir.
 
 ## Komutlar
 ```bash
@@ -29,14 +29,22 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 cd web && pnpm dev            # localhost:3000
 pnpm typecheck && pnpm lint && pnpm test
 pnpm test:e2e                 # Playwright
+# repository testleri 27018'deki mongod'a karşı `ai-sims-test` DB'sinde çalışır, mongod yoksa skip edilir
 
 # pipeline
 cd pipeline && uv sync
 uv run ruff check && uv run ruff format --check && uv run pytest
 
-# supabase
-pnpm dlx supabase db push     # migration'ları cloud projeye uygular
+# veritabanı (yerel MongoDB, port 27018)
+cd web && pnpm db:start       # mongod'u arka planda başlatır; önce `mkdir -p .data/mongo`
 ```
+
+## Veri kuralları
+- **Her repository sorgusu `userId` ile filtrelenir** (RLS yok, tek yetki katmanı bu). `userId` yalnızca `requireUserId()`'den gelir, client'tan asla.
+- `web/src/lib/db/` mongo client + `ensureIndexes()`; `web/src/lib/characters/repository.ts` tek veri erişim noktası. Config okunurken ve yazılırken zod ile doğrulanır; `style`, `base`, `schemaVersion` config'ten türetilir.
+- Thumbnail ayrı `thumbnails` koleksiyonunda (`_id` = karakter `_id`, WebP, en çok 512 KB). Sadece `/api/characters/[id]/thumbnail` üzerinden, oturum + sahiplik kontrolüyle servis edilir.
+- Proxy yalnızca iyimser cookie kontrolü yapar; sayfa ve action'lar `requireUserId()` ile oturumu sunucuda doğrular.
+- Stil: `anime` ana stil, `realistic` kullanıcının seçebileceği yan seçenek (`CharacterConfig.style`).
 
 ## Dil ve stil
 - İletişim Türkçe. Kod, identifier ve yorumlar İngilizce.

@@ -8,7 +8,7 @@
     "subtitle": "Design a photorealistic 3D character, then talk to it.",
     "enter": "Enter",
     "entering": "Signing in…",
-    "notConfigured": "Supabase not configured: add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to web/.env.local.",
+    "notConfigured": "Database not configured: set MONGODB_URI, BETTER_AUTH_SECRET and BETTER_AUTH_URL in web/.env.local.",
     "signInFailed": "Could not sign in. Please try again."
   },
   "Nav": {
@@ -32,11 +32,15 @@
     "status": {
       "draft": "Draft",
       "finalized": "Finalized"
+    },
+    "style": {
+      "anime": "Anime",
+      "realistic": "Realistic"
     }
   },
   "Creator": {
     "title": "Character creator",
-    "comingSoon": "Creator coming soon",
+    "comingSoon": "The full creator is coming soon. For now, create a draft character.",
     "categories": {
       "face": "Face",
       "skin": "Skin",
@@ -46,7 +50,22 @@
       "top": "Top",
       "bottom": "Bottom",
       "shoes": "Shoes"
-    }
+    },
+    "name": "Name",
+    "style": "Style",
+    "base": "Base",
+    "submit": "Create draft",
+    "creating": "Creating…",
+    "styles": {
+      "anime": "Anime",
+      "realistic": "Realistic"
+    },
+    "bases": {
+      "male": "Male",
+      "female": "Female"
+    },
+    "invalid": "Please enter a name of 1 to 40 characters.",
+    "failed": "Could not create the character. Please try again."
   },
   "Common": {
     "save": "Save",

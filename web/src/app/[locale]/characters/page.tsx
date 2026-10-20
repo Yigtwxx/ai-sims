@@ -1,11 +1,10 @@
 import { Suspense } from 'react';
-import { getLocale, getTranslations } from 'next-intl/server';
+import { getTranslations } from 'next-intl/server';
 import { useTranslations } from 'next-intl';
 import { SignOutForm } from '@/components/SignOutForm';
-import { Link, redirect } from '@/i18n/navigation';
-import { getSessionUser } from '@/lib/auth/session';
+import { Link } from '@/i18n/navigation';
+import { requireUserId } from '@/lib/auth/session';
 import { listCharacters } from '@/lib/characters/repository';
-import { createClient } from '@/lib/supabase/server';
 
 // The static shell (heading, sign-out) is prerendered; the session and the
 // character list are request-time data and stream in behind <Suspense>.
@@ -24,15 +23,10 @@ export default function CharactersPage() {
 }
 
 async function CharacterList() {
-  const [t, locale, user] = await Promise.all([
-    getTranslations('Characters'),
-    getLocale(),
-    getSessionUser(),
-  ]);
-  // The proxy already redirects signed-out users; this is the authoritative check.
-  if (!user) redirect({ href: '/', locale });
-
-  const characters = await listCharacters(await createClient());
+  const t = await getTranslations('Characters');
+  // The proxy only checks the cookie; this is the authoritative check.
+  const userId = await requireUserId();
+  const characters = await listCharacters(userId);
 
   if (characters.length === 0) {
     return (
@@ -47,7 +41,19 @@ async function CharacterList() {
     <ul>
       {characters.map((character) => (
         <li key={character.id}>
-          <span>{character.name}</span> <span>{t(`status.${character.status}`)}</span>
+          {character.hasThumbnail ? (
+            // Private, session-gated image: next/image optimization does not apply.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/characters/${character.id}/thumbnail`}
+              alt=""
+              width={64}
+              height={64}
+              loading="lazy"
+            />
+          ) : null}
+          <span>{character.name}</span> <span>{t(`style.${character.style}`)}</span>{' '}
+          <span>{t(`status.${character.status}`)}</span>
         </li>
       ))}
     </ul>

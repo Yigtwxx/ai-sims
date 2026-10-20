@@ -1,29 +1,45 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import 'server-only';
+import { Binary, ObjectId } from 'mongodb';
+import { z } from 'zod';
 import {
   CharacterConfigSchema,
   type CharacterBase,
   type CharacterConfig,
+  type CharacterStyle,
 } from '@/lib/character/schema';
-import type { CharacterRow, Database, Json } from '@/lib/supabase/database.types';
+import { getCollections, type CharacterDoc, type CharacterStatus } from '@/lib/db/collections';
 
-export type CharacterStatus = CharacterRow['status'];
+export type { CharacterStatus };
+
+/**
+ * Data access layer for characters.
+ *
+ * Authorization rule (replaces Postgres RLS): EVERY query filters on `userId`.
+ * Callers pass the id from `requireUserId()`, never a value from the client.
+ */
+
+export const MAX_THUMBNAIL_BYTES = 512 * 1024;
+
+const NameSchema = z.string().trim().min(1).max(40);
+const StatusSchema = z.enum(['draft', 'finalized']);
 
 export type Character = {
   id: string;
   userId: string;
   name: string;
+  style: CharacterStyle;
   base: CharacterBase;
   config: CharacterConfig;
   schemaVersion: number;
   status: CharacterStatus;
-  thumbnailPath: string | null;
-  createdAt: string;
-  updatedAt: string;
+  hasThumbnail: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export type NewCharacter = {
   name: string;
-  /** `base` and `schema_version` columns are derived from this. */
+  /** `style`, `base` and `schemaVersion` are derived from this. */
   config: CharacterConfig;
   status?: CharacterStatus;
 };
@@ -32,19 +48,13 @@ export type CharacterPatch = {
   name?: string;
   config?: CharacterConfig;
   status?: CharacterStatus;
-  thumbnailPath?: string | null;
 };
 
-type Client = SupabaseClient<Database>;
-
-/** Thrown for database failures. Carries only the PostgREST code, never the raw response. */
-export class CharacterRepositoryError extends Error {
-  constructor(
-    readonly operation: string,
-    readonly code?: string,
-  ) {
-    super(`Character repository: ${operation} failed${code ? ` (${code})` : ''}`);
-    this.name = 'CharacterRepositoryError';
+/** Thrown when input (name, status, config) fails validation. */
+export class InvalidCharacterInputError extends Error {
+  constructor(readonly issues: string[]) {
+    super(`Invalid character input: ${issues.join('; ')}`);
+    this.name = 'InvalidCharacterInputError';
   }
 }
 
@@ -56,88 +66,182 @@ export class InvalidCharacterConfigError extends Error {
   }
 }
 
-function toCharacter(row: CharacterRow): Character {
-  const parsed = CharacterConfigSchema.safeParse(row.config);
-  if (!parsed.success) throw new InvalidCharacterConfigError(row.id);
+export class InvalidThumbnailError extends Error {
+  constructor(readonly reason: 'too_large' | 'not_webp' | 'empty') {
+    super(`Invalid thumbnail: ${reason}`);
+    this.name = 'InvalidThumbnailError';
+  }
+}
+
+function parseOrThrow<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new InvalidCharacterInputError(
+      result.error.issues.map((issue) => `${issue.path.join('.') || 'value'}: ${issue.message}`),
+    );
+  }
+  return result.data;
+}
+
+const OBJECT_ID_PATTERN = /^[0-9a-f]{24}$/i;
+
+/** Returns null for malformed ids so they behave like "not found". */
+function toObjectId(id: string): ObjectId | null {
+  return OBJECT_ID_PATTERN.test(id) ? new ObjectId(id) : null;
+}
+
+function toCharacter(doc: CharacterDoc): Character {
+  const parsed = CharacterConfigSchema.safeParse(doc.config);
+  if (!parsed.success) throw new InvalidCharacterConfigError(doc._id.toHexString());
 
   return {
-    id: row.id,
-    userId: row.user_id,
-    name: row.name,
-    base: row.base,
+    id: doc._id.toHexString(),
+    userId: doc.userId,
+    name: doc.name,
+    style: parsed.data.style,
+    base: parsed.data.base,
     config: parsed.data,
-    schemaVersion: row.schema_version,
-    status: row.status,
-    thumbnailPath: row.thumbnail_path,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    schemaVersion: parsed.data.schemaVersion,
+    status: doc.status,
+    hasThumbnail: doc.hasThumbnail,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
   };
 }
 
-// The zod output is JSON-compatible; Json's index signature just can't express that.
-function configToJson(config: CharacterConfig): Json {
-  return CharacterConfigSchema.parse(config) as unknown as Json;
-}
-
-/** Lists the signed-in user's characters, newest first (RLS scopes the rows). */
-export async function listCharacters(client: Client): Promise<Character[]> {
-  const { data, error } = await client
-    .from('characters')
-    .select('*')
-    .order('updated_at', { ascending: false });
-  if (error) throw new CharacterRepositoryError('list', error.code);
-  return data.map(toCharacter);
+/** Lists the user's characters, most recently updated first. */
+export async function listCharacters(userId: string): Promise<Character[]> {
+  const { characters } = await getCollections();
+  const docs = await characters.find({ userId }).sort({ updatedAt: -1 }).toArray();
+  return docs.map(toCharacter);
 }
 
 /** Returns null when the character does not exist or belongs to someone else. */
-export async function getCharacter(client: Client, id: string): Promise<Character | null> {
-  const { data, error } = await client.from('characters').select('*').eq('id', id).maybeSingle();
-  if (error) throw new CharacterRepositoryError('get', error.code);
-  return data ? toCharacter(data) : null;
+export async function getCharacter(userId: string, id: string): Promise<Character | null> {
+  const _id = toObjectId(id);
+  if (!_id) return null;
+  const { characters } = await getCollections();
+  const doc = await characters.findOne({ _id, userId });
+  return doc ? toCharacter(doc) : null;
 }
 
-export async function createCharacter(client: Client, input: NewCharacter): Promise<Character> {
-  const { data, error } = await client
-    .from('characters')
-    .insert({
-      name: input.name,
-      base: input.config.base,
-      config: configToJson(input.config),
-      schema_version: input.config.schemaVersion,
-      status: input.status ?? 'draft',
-    })
-    .select('*')
-    .single();
-  if (error) throw new CharacterRepositoryError('create', error.code);
-  return toCharacter(data);
+export async function createCharacter(userId: string, input: NewCharacter): Promise<Character> {
+  const name = parseOrThrow(NameSchema, input.name);
+  const status = parseOrThrow(StatusSchema, input.status ?? 'draft');
+  const config = parseOrThrow(CharacterConfigSchema, input.config);
+
+  const now = new Date();
+  const doc: CharacterDoc = {
+    _id: new ObjectId(),
+    userId,
+    name,
+    style: config.style,
+    base: config.base,
+    config,
+    schemaVersion: config.schemaVersion,
+    status,
+    hasThumbnail: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const { characters } = await getCollections();
+  await characters.insertOne(doc);
+  return toCharacter(doc);
 }
 
+/** Returns null when the character does not exist or belongs to someone else. */
 export async function updateCharacter(
-  client: Client,
+  userId: string,
   id: string,
   patch: CharacterPatch,
-): Promise<Character> {
-  const update: Database['public']['Tables']['characters']['Update'] = {};
-  if (patch.name !== undefined) update.name = patch.name;
-  if (patch.status !== undefined) update.status = patch.status;
-  if (patch.thumbnailPath !== undefined) update.thumbnail_path = patch.thumbnailPath;
+): Promise<Character | null> {
+  const _id = toObjectId(id);
+  if (!_id) return null;
+
+  const set: Partial<CharacterDoc> = { updatedAt: new Date() };
+  if (patch.name !== undefined) set.name = parseOrThrow(NameSchema, patch.name);
+  if (patch.status !== undefined) set.status = parseOrThrow(StatusSchema, patch.status);
   if (patch.config !== undefined) {
-    update.config = configToJson(patch.config);
-    update.base = patch.config.base;
-    update.schema_version = patch.config.schemaVersion;
+    const config = parseOrThrow(CharacterConfigSchema, patch.config);
+    set.config = config;
+    set.style = config.style;
+    set.base = config.base;
+    set.schemaVersion = config.schemaVersion;
   }
 
-  const { data, error } = await client
-    .from('characters')
-    .update(update)
-    .eq('id', id)
-    .select('*')
-    .single();
-  if (error) throw new CharacterRepositoryError('update', error.code);
-  return toCharacter(data);
+  const { characters } = await getCollections();
+  const doc = await characters.findOneAndUpdate(
+    { _id, userId },
+    { $set: set },
+    { returnDocument: 'after' },
+  );
+  return doc ? toCharacter(doc) : null;
 }
 
-export async function deleteCharacter(client: Client, id: string): Promise<void> {
-  const { error } = await client.from('characters').delete().eq('id', id);
-  if (error) throw new CharacterRepositoryError('delete', error.code);
+/** Deletes the character and its thumbnail. Returns false when nothing was deleted. */
+export async function deleteCharacter(userId: string, id: string): Promise<boolean> {
+  const _id = toObjectId(id);
+  if (!_id) return false;
+
+  const { characters, thumbnails } = await getCollections();
+  const { deletedCount } = await characters.deleteOne({ _id, userId });
+  if (deletedCount === 0) return false;
+  await thumbnails.deleteOne({ _id, userId });
+  return true;
+}
+
+/** RIFF....WEBP container signature. */
+function isWebp(data: Uint8Array): boolean {
+  if (data.length < 12) return false;
+  const ascii = (start: number, end: number) => String.fromCharCode(...data.subarray(start, end));
+  return ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';
+}
+
+/**
+ * Stores or replaces the character's WebP thumbnail (max 512 KB).
+ * Returns false when the character does not exist or belongs to someone else.
+ */
+export async function saveThumbnail(
+  userId: string,
+  id: string,
+  data: Uint8Array,
+): Promise<boolean> {
+  if (data.byteLength === 0) throw new InvalidThumbnailError('empty');
+  if (data.byteLength > MAX_THUMBNAIL_BYTES) throw new InvalidThumbnailError('too_large');
+  if (!isWebp(data)) throw new InvalidThumbnailError('not_webp');
+
+  const _id = toObjectId(id);
+  if (!_id) return false;
+
+  const { characters, thumbnails } = await getCollections();
+  const now = new Date();
+  const owned = await characters.updateOne(
+    { _id, userId },
+    { $set: { hasThumbnail: true, updatedAt: now } },
+  );
+  if (owned.matchedCount === 0) return false;
+
+  await thumbnails.replaceOne(
+    { _id, userId },
+    { userId, contentType: 'image/webp', data: new Binary(data), updatedAt: now },
+    { upsert: true },
+  );
+  return true;
+}
+
+export type Thumbnail = { contentType: 'image/webp'; data: Buffer; updatedAt: Date };
+
+/** Returns null when there is no thumbnail or the character belongs to someone else. */
+export async function getThumbnail(userId: string, id: string): Promise<Thumbnail | null> {
+  const _id = toObjectId(id);
+  if (!_id) return null;
+  const { thumbnails } = await getCollections();
+  const doc = await thumbnails.findOne({ _id, userId });
+  if (!doc) return null;
+  return {
+    contentType: doc.contentType,
+    data: Buffer.from(doc.data.buffer.subarray(0, doc.data.length())),
+    updatedAt: doc.updatedAt,
+  };
 }

@@ -8,7 +8,7 @@
     "subtitle": "Fotogerçekçi bir 3D karakter tasarla, sonra onunla konuş.",
     "enter": "Giriş",
     "entering": "Giriş yapılıyor…",
-    "notConfigured": "Supabase yapılandırılmamış (Supabase not configured): NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY değerlerini web/.env.local dosyasına ekleyin.",
+    "notConfigured": "Veritabanı yapılandırılmamış (Database not configured): MONGODB_URI, BETTER_AUTH_SECRET ve BETTER_AUTH_URL değerlerini web/.env.local dosyasına ekleyin.",
     "signInFailed": "Giriş yapılamadı. Lütfen tekrar deneyin."
   },
   "Nav": {
@@ -32,11 +32,15 @@
     "status": {
       "draft": "Taslak",
       "finalized": "Tamamlandı"
+    },
+    "style": {
+      "anime": "Anime",
+      "realistic": "Gerçekçi"
     }
   },
   "Creator": {
     "title": "Karakter oluşturucu",
-    "comingSoon": "Oluşturucu çok yakında",
+    "comingSoon": "Tam karakter oluşturucu yakında. Şimdilik taslak bir karakter oluşturabilirsin.",
     "categories": {
       "face": "Yüz",
       "skin": "Cilt",
@@ -46,7 +50,22 @@
       "top": "Üst",
       "bottom": "Alt",
       "shoes": "Ayakkabı"
-    }
+    },
+    "name": "İsim",
+    "style": "Stil",
+    "base": "Base",
+    "submit": "Taslak oluştur",
+    "creating": "Oluşturuluyor…",
+    "styles": {
+      "anime": "Anime",
+      "realistic": "Gerçekçi"
+    },
+    "bases": {
+      "male": "Erkek",
+      "female": "Kadın"
+    },
+    "invalid": "Lütfen 1 ile 40 karakter arasında bir isim gir.",
+    "failed": "Karakter oluşturulamadı. Lütfen tekrar dene."
   },
   "Common": {
     "save": "Kaydet",

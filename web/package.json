@@ -12,16 +12,19 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "db:start": "mongod --dbpath ../.data/mongo --port 27018 --bind_ip 127.0.0.1 --fork --logpath ../.data/mongod.log"
   },
   "dependencies": {
+    "@pixiv/three-vrm": "^3.5.5",
+    "@pixiv/three-vrm-animation": "^3.5.5",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@react-three/postprocessing": "^3.2.0",
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.118.0",
+    "better-auth": "^1.7.11",
     "camera-controls": "^3.1.2",
     "gsap": "^3.15.0",
+    "mongodb": "^7.7.0",
     "motion": "^14.3.1",
     "next": "16.4.2",
     "next-intl": "^4.14.9",

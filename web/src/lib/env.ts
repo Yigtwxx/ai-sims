@@ -1,41 +1,56 @@
+import 'server-only';
 import { z } from 'zod';
 
-const SupabaseEnvSchema = z.object({
-  url: z.url(),
-  anonKey: z.string().min(1),
+const MongoEnvSchema = z.object({
+  uri: z.string().regex(/^mongodb(\+srv)?:\/\/.+/, 'Expected a mongodb:// or mongodb+srv:// URI'),
 });
 
-export type SupabaseEnv = z.infer<typeof SupabaseEnvSchema>;
+const AuthEnvSchema = z.object({
+  secret: z.string().min(32),
+  url: z.url(),
+});
 
-export class SupabaseNotConfiguredError extends Error {
+export type MongoEnv = z.infer<typeof MongoEnvSchema>;
+export type AuthEnv = z.infer<typeof AuthEnvSchema>;
+
+export class DatabaseNotConfiguredError extends Error {
   constructor() {
-    super(
-      'Supabase is not configured: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    );
-    this.name = 'SupabaseNotConfiguredError';
+    super('Database is not configured: set MONGODB_URI, BETTER_AUTH_SECRET and BETTER_AUTH_URL');
+    this.name = 'DatabaseNotConfiguredError';
   }
 }
 
 /**
- * Returns validated Supabase settings, or null when they are missing/invalid.
- * Never throws, so the app can build and render public pages without a .env.
- * NEXT_PUBLIC_* values must be referenced literally so Next.js inlines them in client bundles.
+ * Env readers never throw and never run at import time, so the app can build and
+ * render public pages without a .env file. Values are read on each call so tests
+ * can change them.
  */
-export function getSupabaseEnv(): SupabaseEnv | null {
-  const parsed = SupabaseEnvSchema.safeParse({
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+export function getMongoEnv(): MongoEnv | null {
+  const parsed = MongoEnvSchema.safeParse({ uri: process.env.MONGODB_URI });
+  return parsed.success ? parsed.data : null;
+}
+
+export function getAuthEnv(): AuthEnv | null {
+  const parsed = AuthEnvSchema.safeParse({
+    secret: process.env.BETTER_AUTH_SECRET,
+    url: process.env.BETTER_AUTH_URL,
   });
   return parsed.success ? parsed.data : null;
 }
 
-export function isSupabaseConfigured(): boolean {
-  return getSupabaseEnv() !== null;
+/** True when both the database and the auth settings are present and valid. */
+export function isDatabaseConfigured(): boolean {
+  return getMongoEnv() !== null && getAuthEnv() !== null;
 }
 
-/** Like getSupabaseEnv but throws SupabaseNotConfiguredError; for code that cannot proceed without it. */
-export function requireSupabaseEnv(): SupabaseEnv {
-  const env = getSupabaseEnv();
-  if (!env) throw new SupabaseNotConfiguredError();
+export function requireMongoEnv(): MongoEnv {
+  const env = getMongoEnv();
+  if (!env) throw new DatabaseNotConfiguredError();
+  return env;
+}
+
+export function requireAuthEnv(): AuthEnv {
+  const env = getAuthEnv();
+  if (!env) throw new DatabaseNotConfiguredError();
   return env;
 }

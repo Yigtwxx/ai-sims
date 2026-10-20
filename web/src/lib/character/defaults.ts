@@ -1,7 +1,7 @@
-import type { CharacterBase, CharacterConfig } from './schema';
+import type { CharacterBase, CharacterConfig, CharacterStyle } from './schema';
 
 // Placeholder ids; they will be replaced by real manifest ids from the asset pipeline.
-const DEFAULTS_BY_BASE: Record<CharacterBase, CharacterConfig> = {
+const DEFAULTS_BY_BASE: Record<CharacterBase, Omit<CharacterConfig, 'style'>> = {
   male: {
     schemaVersion: 1,
     base: 'male',
@@ -32,7 +32,7 @@ const DEFAULTS_BY_BASE: Record<CharacterBase, CharacterConfig> = {
   },
 };
 
-/** Returns a fresh, independently mutable default config for the given base. */
-export function createDefaultConfig(base: CharacterBase): CharacterConfig {
-  return structuredClone(DEFAULTS_BY_BASE[base]);
+/** Returns a fresh, independently mutable default config for the given style and base. */
+export function createDefaultConfig(style: CharacterStyle, base: CharacterBase): CharacterConfig {
+  return { style, ...structuredClone(DEFAULTS_BY_BASE[base]) };
 }

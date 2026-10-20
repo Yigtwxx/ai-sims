@@ -18,7 +18,7 @@ Kullanıcı kararları:
 - Önce web; masaüstü uygulaması sonra.
 - Dil: TR + EN.
 - Backend: sadece Next.js.
-- Supabase cloud free tier.
+- Veri: MongoDB (yerel dev instance 27018) + Better Auth. Önce Supabase seçilmişti, free-tier proje limiti nedeniyle değişti.
 - Asset bütçesi ve 3D artist yok. Geliştirme MacBook'ta, Windows yedekte.
 - GitHub: private `ai-sims` reposu, parça parça commit + push.
 
@@ -34,12 +34,11 @@ ai-sims/
 │   ├── src/features/avatar/        # R3F renderer: Stage, Avatar, materials, TurntableControls, CameraRig
 │   ├── src/features/creator/       # zustand store (+zundo undo/redo), panels, swatches, randomize
 │   ├── src/lib/character/          # CharacterConfig zod schema, defaults, migrations
-│   ├── src/lib/supabase/           # @supabase/ssr browser/server clients
+│   ├── src/lib/{db,auth,characters}/ # mongo client, Better Auth, repository (userId filtreli)
 │   ├── messages/{tr,en}.json       # next-intl
 │   └── public/assets/              # optimize GLB (KTX2+meshopt) + manifest.json
 ├── pipeline/       # Python (uv, ruff, pytest): Blender headless (bpy) scriptleri
 │   └── scripts/ build_base.py, export_glb.py, optimize.py, make_thumbnails.py, build_manifest.py
-└── supabase/       # Supabase CLI: config.toml, migrations/
 ```
 
 **Stack:**
@@ -55,27 +54,26 @@ ai-sims/
 | Test | Vitest, Playwright, pytest |
 | Backend | Yok, sadece Next.js. Python yalnızca asset pipeline'ında. |
 
-## Veri modeli (Supabase)
+## Veri modeli (MongoDB + Better Auth)
 
-- **Auth:** Supabase **Anonymous Sign-in**. "Giriş" butonu `signInAnonymously()` çağırır. Gerçek bir `auth.users` kaydı oluşur, sonradan `updateUser({ email })` ile e-postaya bağlanabilir. Dashboard'dan Anonymous provider'ın açılması gerekiyor.
-- **Migration `0001_characters.sql`:**
-  - `characters`:
-    - `id uuid pk`
-    - `user_id uuid default auth.uid() references auth.users on delete cascade`
-    - `name text`
-    - `base text check in ('male','female')`
-    - `config jsonb`
-    - `schema_version int`
-    - `status text check in ('draft','finalized')`
-    - `thumbnail_path text`
-    - `created_at`, `updated_at` (trigger)
-  - RLS: 4 policy (select/insert/update/delete), hepsi `user_id = auth.uid()` koşuluyla.
-  - Storage: private `thumbnails` bucket. Dosya yolu `{uid}/{characterId}.webp`. Policy: `(storage.foldername(name))[1] = auth.uid()::text`.
-- `profiles` ve sohbet tabloları eklenmiyor (YAGNI). Sohbet tabloları faz 3'te gelecek.
+Supabase free-tier proje limiti ve Compass ile veriye bakma isteği nedeniyle MongoDB + Better Auth'a geçildi.
+
+- **Auth:** Better Auth, `anonymous` plugin. "Giriş" butonu `auth.api.signInAnonymous` çağırır; `user` ve `session` koleksiyonlarında gerçek kayıt oluşur. E-posta/şifre şimdilik kapalı; sonradan açılıp anonim kullanıcı yükseltilecek. Oturum cookie'si `nextCookies` plugin'i ile yazılır, proxy `getSessionCookie` ile iyimser kontrol yapar, sayfalar oturumu sunucuda doğrular.
+- **`characters` koleksiyonu:**
+  - `_id: ObjectId`, `userId: string` (Better Auth user id)
+  - `name` (1..40), `style: 'anime'|'realistic'`, `base: 'male'|'female'`
+  - `config` (CharacterConfig), `schemaVersion`, `status: 'draft'|'finalized'`
+  - `hasThumbnail: boolean`, `createdAt`, `updatedAt`
+  - İndeks: `{ userId: 1, updatedAt: -1 }` (`ensureIndexes()` ile, süreç başına bir kez, idempotent)
+- **`thumbnails` koleksiyonu:** `_id` = karakterin `_id`'si, `userId`, `contentType: 'image/webp'`, `data: Binary` (en çok 512 KB), `updatedAt`. Karakter silinince birlikte silinir. `GET /api/characters/[id]/thumbnail` oturum ve sahiplik kontrolü yapar, `private` cache header'ı ve ETag verir.
+- **Yetkilendirme:** RLS yok. Repository'deki **her sorgu `userId` ile filtrelenir**; başkasının kaydı "yok" gibi davranır. `userId` yalnızca sunucuda oturumdan okunur.
+- **Yerel geliştirme:** ayrı mongod `127.0.0.1:27018` (auth yok), veri `.data/mongo` (gitignored), `pnpm db:start`. Compass bağlantısı: `mongodb://localhost:27018`.
+- Env: `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`. Eksikse build ve landing çalışır, login "Database not configured" gösterir.
+- `profiles` ve sohbet koleksiyonları eklenmiyor (YAGNI). Sohbet verisi faz 3'te gelecek.
 
 **CharacterConfig (zod, render'dan bağımsız):**
 ```ts
-{ schemaVersion: 1, base: 'male'|'female',
+{ schemaVersion: 1, style: 'anime'|'realistic', base: 'male'|'female',
   face: { preset: string, blend: Record<string, number> },   // morph blend between face presets
   skin: { tone: number },                                      // 0..1 along melanin ramp
   eyes: { color: string },                                     // hex
@@ -95,7 +93,7 @@ ai-sims/
 2. Dokümanlar:
    - `CLAUDE.md` (TR). İçerik: stack, komutlar, dil kuralları (kod/yorum EN), doğrulama komutları, asset pipeline akışı, commit kuralları.
    - `README.md` (EN). İçerik: overview, setup, env, scripts.
-   - `.env.example`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, faz 3 için AI key adları. Değer yok.
+   - `.env.example`: `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, faz 3 için AI key adları. Gerçek değer yok.
    - Bu planın spec kopyası `docs/specs/` altına.
 3. `web/` scaffold: create-next-app, Tailwind, shadcn init, prettier, ESLint, Vitest, Playwright. `pipeline/` için uv projesi, ruff, pytest, fake-bpy-module.
 4. Çalışma doğrudan `main` üzerinde (tek kişilik POC). Her adım ayrı Conventional Commit olacak ve push edilecek. Commit sırası: `chore: init repo` → `docs: add CLAUDE.md and README` → `chore(web): scaffold next.js` → …
@@ -143,10 +141,10 @@ Dürüst risk: asset bütçesi olmadan en zayıf halka saç ve kıyafet kalitesi
 ## Faz 2 — Temel (spike ile paralel yürütülebilir, en fazla 2–3 agent)
 
 1. next-intl: `[locale]` routing, `messages/tr.json`, `messages/en.json`, dil değiştirici.
-2. Supabase:
-   - `@supabase/ssr` client'ları.
-   - Session yenileme ve next-intl, aynı middleware/proxy içinde birleşik çalışacak.
-   - `supabase link` + `supabase db push` ile migration uygulanacak.
+2. MongoDB + Better Auth:
+   - `mongodb` client singleton, tipli koleksiyonlar, `ensureIndexes()`.
+   - Better Auth (anonymous + nextCookies). Proxy next-intl ile birlikte `getSessionCookie` ile iyimser kontrol yapar.
+   - Yerel mongod: `pnpm db:start` (27018).
 3. Landing/Login:
    - Animasyonlu hero ve "Giriş" butonu (anonim giriş).
    - Korunan route'lar giriş yapılmamışsa landing'e yönlendirir.
