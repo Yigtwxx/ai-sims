@@ -39,3 +39,7 @@ web/public/assets/spike/
 
 # Local MongoDB data for development
 .data/
+
+# User-downloaded VRoid sources and generated VRM parts (see docs/setup-accounts.md)
+pipeline/source/vroid/
+web/public/assets/vrm/

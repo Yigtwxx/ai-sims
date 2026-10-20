@@ -1,5 +1,6 @@
 """Thin wrapper for running Python scripts inside headless Blender."""
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -26,11 +27,18 @@ def build_command(paths: Paths, script: str, script_args: list[str]) -> list[str
     ]
 
 
-def run_blender(paths: Paths, script: str, script_args: list[str], cwd: Path | None = None) -> None:
+def run_blender(
+    paths: Paths,
+    script: str,
+    script_args: list[str],
+    cwd: Path | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> None:
     """Run a Blender script headlessly; raise BlenderError on failure."""
     if not paths.blender_bin.exists():
         raise BlenderError(f"Blender not found at {paths.blender_bin}; set BLENDER_BIN")
     cmd = build_command(paths, script, script_args)
-    result = subprocess.run(cmd, cwd=cwd, check=False)
+    env = {**os.environ, **(extra_env or {})}
+    result = subprocess.run(cmd, cwd=cwd, env=env, check=False)
     if result.returncode != 0:
         raise BlenderError(f"Blender script {script} failed with exit code {result.returncode}")
