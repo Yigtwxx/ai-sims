@@ -13,6 +13,9 @@ const HOST = '127.0.0.1';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const dataDir = join(repoRoot, '.data', 'mongo');
 const logPath = join(repoRoot, '.data', 'mongod.log');
+// mongod opens logPath itself; on Windows a second open handle makes it fail, so
+// anything printed before logging starts goes to its own file.
+const bootLogPath = join(repoRoot, '.data', 'mongod.boot.log');
 
 function isListening() {
   return new Promise((done) => {
@@ -57,7 +60,7 @@ if (await isListening()) {
 
 mkdirSync(dataDir, { recursive: true });
 const mongod = findMongod();
-const log = openSync(logPath, 'a');
+const bootLog = openSync(bootLogPath, 'a');
 const child = spawn(
   mongod,
   [
@@ -71,7 +74,7 @@ const child = spawn(
     logPath,
     '--logappend',
   ],
-  { detached: true, stdio: ['ignore', log, log], windowsHide: true },
+  { detached: true, stdio: ['ignore', bootLog, bootLog], windowsHide: true },
 );
 child.once('error', (error) => {
   console.error(`Could not start ${mongod}: ${error.message}`);
