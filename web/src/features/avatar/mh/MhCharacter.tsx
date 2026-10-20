@@ -1,7 +1,7 @@
 'use client';
 
 import { useFrame } from '@react-three/fiber';
-import { forwardRef, useImperativeHandle, useLayoutEffect, useMemo } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo } from 'react';
 import type { Mesh, Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
@@ -19,6 +19,7 @@ import {
   type NeckSeamExtras,
 } from './assembly';
 import { useMhGltf } from './loaders';
+import { applySkinMaterials, loadSkinDetail, setSkinDetail } from './materials';
 
 export interface MhCharacterHandle {
   /** Body rig (skeleton master) once assembled. */
@@ -40,8 +41,7 @@ export interface MhCharacterProps {
 /**
  * Loads one body and one head GLB, clones them (the loader cache is shared) and
  * assembles a single character: head skinned to the body skeleton, body sliders
- * applied with rebinding. Materials are left as loaded here; the material pass
- * replaces them.
+ * applied with rebinding, skin materials replaced by the MetaHuman skin shader.
  */
 export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(function MhCharacter(
   { bodyUrl, headUrl, sliders, onFrame },
@@ -72,14 +72,26 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         mesh.receiveShadow = true;
       }
     });
+    const skins = applySkinMaterials(bodyRoot, { microNormal: null });
     const faceMeshes = collectMorphMeshes(bodyRoot).filter((mesh) => mesh !== body.mesh);
     const handle: MhCharacterHandle = {
       body,
       faceMeshes,
       setFaceMorph: (name, weight) => setMorph(faceMeshes, name, weight),
     };
-    return { root: bodyRoot, handle };
+    return { root: bodyRoot, handle, skins };
   }, [bodyGltf, headGltf]);
+
+  useEffect(() => {
+    let live = true;
+    void loadSkinDetail().then((detail) => {
+      if (live) setSkinDetail(assembled.skins, detail);
+    });
+    return () => {
+      live = false;
+      for (const material of assembled.skins) material.dispose();
+    };
+  }, [assembled]);
 
   useImperativeHandle(ref, () => assembled.handle, [assembled]);
 
