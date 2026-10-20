@@ -29,7 +29,8 @@ Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığım�
    - Çeşitlilik hedefi: iki cinsiyet, farklı etnik kökenler, yüz şablonları.
    - Örgü ve kıvırcık dahil çok sayıda saç; kıyafetler.
 4. Yüksek çözünürlüklü dokuları indir → **Assemble → DCC Export**. Bu adım baş/yüz DNA'sını ve dokuları zip olarak verir. Saç kartları (groom → cards) ve kıyafetler FBX olarak dışa aktarılacak; betikler Windows oturumunda yazılacak.
-5. Çıktıları Mac'e taşı (USB disk / Drive): `pipeline/source/metahuman/` (gitignore'da olmalı).
+5. **İlk partide kütüphanenin tamamını dışa aktar.** MetaHuman'daki tüm saç modellerini (örgü, topuz, kıvırcık dahil) ve tüm kıyafetleri al. Saçlar ve kıyafetler bütün MetaHuman kafalarına ve vücutlarına oturuyor. Böylece yeni saç veya kıyafet için Windows'a nadiren dönmek gerekir; saç rengi ve boya desenleri zaten tarayıcıda (shader) yapılıyor.
+6. Çıktıları Mac'e taşı (USB disk / Drive): `pipeline/source/metahuman/` (gitignore'da olmalı). Yedeği Drive'da da tut.
 
 ## Mac'te sıradaki iş (web)
 
@@ -91,4 +92,4 @@ Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığım�
 ## Açık kararlar
 
 - Azure kaydı mı, Gemini TTS mi? (öneri: önce Azure, çünkü kelime senkronu için viseme verisi veriyor)
-- İlk teslimde kaç MetaHuman, kaç saç ve kaç kıyafet? (öneri: 6 yüz, 8 saç, 6 üst/alt, 4 ayakkabı; kalite ve indirme boyutu dengesi için)
+- İlk partide kaç yüz? (öneri: 6-8 yüz, iki cinsiyet ve farklı kökenler; saç ve kıyafetin tamamı alınır, çünkü hepsi her yüze oturuyor)
