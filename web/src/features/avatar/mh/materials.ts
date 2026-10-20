@@ -72,9 +72,11 @@ const SCATTER = /* glsl */ `
   vec3 skinScatter = skinScatterColor * max( skinWrapNL - dotNL, 0.0 ) * directLight.color;
   reflectedLight.directDiffuse += ( irradiance + skinScatter ) * BRDF_Lambert( material.diffuseContribution ) * ( 1.0 - F );
 `;
-// SRMF red is Unreal's "Specular" (0.5 = the default F0 of 0.04).
+// SRMF red is Unreal's "Specular" (0.5 = the default F0 of 0.04); the cavity map
+// takes the specular out of pores and creases (specular occlusion).
 const SPECULAR_FROM_RED = /* glsl */ `
   specularIntensityFactor *= texture2D( specularIntensityMap, vSpecularIntensityMapUv ).r * 2.0;
+  specularIntensityFactor *= mix( 1.0, texture2D( skinCavity, vSpecularIntensityMapUv ).r, skinCavityStrength );
 `;
 const F90_CLAMPED =
   'material.specularF90 = mix( min( specularIntensityFactor, 1.0 ), 1.0, metalnessFactor );';
@@ -100,7 +102,8 @@ const MICRO_NORMAL = /* glsl */ `
   #endif
   vec3 skinMicro = texture2D( skinMicroNormal, vNormalMapUv * skinMicroTiling ).xyz * 2.0 - 1.0;
   skinMicro.y = -skinMicro.y;
-  skinMicro.xy *= skinMicroStrength;
+  // Follow the base map's tangent-frame flip (glTF meshes without tangents use y = -1).
+  skinMicro.xy *= skinMicroStrength * sign( normalScale );
   mapN = vec3( mapN.xy + skinMicro.xy, mapN.z );
 `;
 
@@ -179,6 +182,8 @@ export function createSkinMaterial(
     skinMicroNormal: { value: micro },
     skinMicroTiling: { value: tuning.microTiling },
     skinMicroStrength: { value: micro ? tuning.microStrength : 0 },
+    skinCavity: { value: null as Texture | null },
+    skinCavityStrength: { value: 0 },
   };
   const wrinkles: WrinkleUniforms | null = tuning.wrinkles
     ? {
@@ -206,6 +211,8 @@ export function createSkinMaterial(
           'uniform sampler2D skinMicroNormal;',
           'uniform float skinMicroTiling;',
           'uniform float skinMicroStrength;',
+          'uniform sampler2D skinCavity;',
+          'uniform float skinCavityStrength;',
         ].join('\n'),
       )
       // After the normal map uniforms it reads (normalScale, vNormalMapUv).
@@ -228,7 +235,7 @@ export function createSkinMaterial(
         ShaderChunk.normal_fragment_maps.replace(NORMAL_SCALE_LINE, MICRO_NORMAL),
       );
   };
-  material.customProgramCacheKey = () => (wrinkles ? 'mh-skin-v2-wrinkles' : 'mh-skin-v2');
+  material.customProgramCacheKey = () => (wrinkles ? 'mh-skin-v3-wrinkles' : 'mh-skin-v3');
   return material;
 }
 

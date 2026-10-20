@@ -131,6 +131,9 @@ export function MhStage({
                 bodyUrl={resolved.bodyUrl}
                 headUrl={resolved.headUrl}
                 sliders={resolved.sliders}
+                skin={resolved.skin}
+                makeup={resolved.makeup}
+                iris={resolved.iris}
                 onFrame={onFrame}
               />
               <FirstFrame onReady={onReady} />

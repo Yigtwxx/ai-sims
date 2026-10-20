@@ -11,6 +11,8 @@ import { MhLighting } from '@/features/avatar/mh/MhLighting';
 import { applyMouthToMorphs, createMouthState, stepMouth } from '@/features/lipsync/mouthDriver';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 
+import { benchIris, benchSkin } from '../benchSkins';
+
 const FACES = ['Ada', 'Aera', 'Aoi'] as const;
 const ARKIT = [
   'eyeBlinkLeft',
@@ -98,6 +100,8 @@ export function DevMhViewer() {
   const [sweep, setSweep] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [rig, setRig] = useState<'studio' | 'portrait' | 'legacy'>('studio');
+  const skinSet = useMemo(() => benchSkin(face), [face]);
+  const iris = useMemo(() => benchIris(face), [face]);
   const player = useRef<SpeechPlayer | null>(null);
   const mouth = useRef(createMouthState());
   const blink = useRef<BlinkState>({ nextIn: 1.5, phase: -1 });
@@ -165,6 +169,8 @@ export function DevMhViewer() {
             bodyUrl={`/assets/mh/bodies/${gender}/body.glb`}
             headUrl={`/assets/mh/faces/${face}/head.glb`}
             sliders={sliders}
+            skin={skinSet}
+            iris={iris}
             onFrame={onFrame}
           />
         </Suspense>

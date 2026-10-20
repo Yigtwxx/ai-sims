@@ -7,6 +7,7 @@ import {
   type Mesh,
   type MeshStandardMaterial,
   type Object3D,
+  type Texture,
 } from 'three';
 
 /**
@@ -181,4 +182,20 @@ export function applyEyeMaterials(root: Object3D): Material[] {
     created.push(next);
   });
   return created;
+}
+
+/** Puts an iris set on the eyeball materials created by applyEyeMaterials. */
+export function bindIrisTextures(
+  materials: readonly Material[],
+  textures: { color: Texture; normal: Texture | null },
+): void {
+  for (const material of materials) {
+    if (!material.name.endsWith('_eyeball')) continue;
+    const eyeball = material as MeshPhysicalMaterial;
+    eyeball.map = textures.color;
+    eyeball.normalMap = textures.normal;
+    // No tangents in our GLBs: glTF normal maps need y flipped (as GLTFLoader does).
+    eyeball.normalScale.set(1, -1);
+    eyeball.needsUpdate = true;
+  }
 }

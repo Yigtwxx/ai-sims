@@ -1,4 +1,4 @@
-import { assetUrl, type MhManifest } from '@/lib/assets/manifest';
+import { assetUrl, type MhIris, type MhManifest, type MhSkin } from '@/lib/assets/manifest';
 import type { BodySlider, CharacterConfig } from '@/lib/character/schema';
 
 /** Standing heights (m) of the neutral MetaHuman bodies (pipeline bodies job). */
@@ -12,6 +12,11 @@ export interface ResolvedCharacter {
   headUrl: string;
   bodyUrl: string;
   sliders: Partial<Record<BodySlider, number>>;
+  /** Skin set to wear: the configured one, else the face's own, else none (GLB materials). */
+  skin: MhSkin | null;
+  makeup: boolean;
+  /** Eyes: the configured iris, else the face's default, else the iris named like the face. */
+  iris: MhIris | null;
   /** Approximate standing height (m), for camera framing. */
   height: number;
 }
@@ -39,6 +44,16 @@ export function resolveCharacter(
     headUrl: assetUrl(face.head),
     bodyUrl: assetUrl(body.glb),
     sliders,
+    skin:
+      manifest.skins.find((s) => s.id === config.skin.set) ??
+      manifest.skins.find((s) => s.id === face.defaultSkin) ??
+      null,
+    makeup: config.skin.makeup,
+    iris:
+      manifest.irises.find((i) => i.id === config.eyes.iris) ??
+      manifest.irises.find((i) => i.id === face.defaultIris) ??
+      manifest.irises.find((i) => i.id === face.id) ??
+      null,
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };
 }

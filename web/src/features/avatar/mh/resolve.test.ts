@@ -57,6 +57,32 @@ describe('resolveCharacter', () => {
     );
   });
 
+  it('picks the configured skin set, else the face default', () => {
+    const withSkins = {
+      ...manifest,
+      skins: ['Ada', 'Aoi'].map((id) => ({
+        id,
+        label: id,
+        tone: 0.5,
+        swatch: '#a07050',
+        face: {
+          albedo: `skins/${id}/face_albedo.ktx2`,
+          normal: `skins/${id}/face_normal.ktx2`,
+          wrinkleColor: [],
+          wrinkleNormal: [],
+          wrinkleMasks: [],
+        },
+        body: { albedo: `skins/${id}/body_albedo.ktx2`, normal: `skins/${id}/body_normal.ktx2` },
+      })),
+    };
+    const config = createDefaultConfig('female');
+    config.skin.set = 'Aoi';
+    expect(resolveCharacter(config, withSkins)?.skin?.id).toBe('Aoi');
+    config.skin.set = 'Gone';
+    expect(resolveCharacter(config, withSkins)?.skin?.id).toBe('Ada');
+    expect(resolveCharacter(config, manifest)?.skin).toBeNull();
+  });
+
   it('returns null when the manifest has no body for the gender', () => {
     expect(resolveCharacter(createDefaultConfig('male'), manifest)).toBeNull();
   });

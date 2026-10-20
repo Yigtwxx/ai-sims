@@ -7,6 +7,8 @@ import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import { MhManifestSchema, type MhManifest } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 
+import { benchIris, benchSkin } from '../benchSkins';
+
 const FACES = ['Ada', 'Aera', 'Aoi'] as const;
 
 /**
@@ -30,7 +32,8 @@ function benchManifest(): MhManifest {
       head: `faces/${id}/head.glb`,
       defaultSkin: id,
     })),
-    skins: [],
+    skins: FACES.map(benchSkin),
+    irises: FACES.map(benchIris),
     bodies: [body('female'), body('male')],
   });
 }
