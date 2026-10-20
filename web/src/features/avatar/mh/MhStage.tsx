@@ -20,6 +20,7 @@ import { Stage } from '../Stage';
 import { CharacterLife, type LifeInput } from './characterLife';
 import type { LifeMode } from './idle';
 import { MhCharacter, type MhCharacterHandle } from './MhCharacter';
+import { MhLighting } from './MhLighting';
 import { resolveCharacter } from './resolve';
 
 /**
@@ -117,6 +118,7 @@ export function MhStage({
         insetLeft={insetLeft}
         insetRight={insetRight}
         backdrop="dark"
+        lighting={<MhLighting rig="studio" />}
         subjectHeight={resolved?.height}
         interactive={mode === 'creator' || talk}
         className="size-full"

@@ -35,6 +35,8 @@ interface StageProps {
   interactive?: boolean;
   /** Static scene elements that must not turn with the character (e.g. backdrop type). */
   scenery?: ReactNode;
+  /** Replaces the default studio lights (e.g. the MetaHuman Creator rig). */
+  lighting?: ReactNode;
   /** Called once the WebGL context exists. */
   onCreated?: () => void;
 }
@@ -61,6 +63,7 @@ export function Stage({
   zoom,
   interactive = true,
   scenery,
+  lighting,
   onCreated,
 }: StageProps) {
   const initial =
@@ -89,7 +92,7 @@ export function Stage({
     >
       <color attach="background" args={[theme.background]} />
       <Suspense fallback={null}>
-        <StudioLighting />
+        {lighting ?? <StudioLighting />}
         <Cyclorama color={theme.cyc} glow={theme.glow} />
         {backdrop === 'dark' && <Backlight height={subjectHeight} />}
         <ContactShadows

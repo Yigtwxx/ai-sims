@@ -7,6 +7,7 @@ import type { CameraFocus } from '@/features/avatar/cameraFocus';
 import { stepBlink, type BlinkState } from '@/features/avatar/life';
 import { BODY_SLIDER_IDS, type BodySliderId } from '@/features/avatar/mh/assembly';
 import { MhCharacter, type MhCharacterHandle } from '@/features/avatar/mh/MhCharacter';
+import { MhLighting } from '@/features/avatar/mh/MhLighting';
 import { applyMouthToMorphs, createMouthState, stepMouth } from '@/features/lipsync/mouthDriver';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 
@@ -96,6 +97,7 @@ export function DevMhViewer() {
   const [morph, setMorph] = useState<string>('');
   const [sweep, setSweep] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [rig, setRig] = useState<'studio' | 'portrait' | 'legacy'>('studio');
   const player = useRef<SpeechPlayer | null>(null);
   const mouth = useRef(createMouthState());
   const blink = useRef<BlinkState>({ nextIn: 1.5, phase: -1 });
@@ -150,7 +152,12 @@ export function DevMhViewer() {
 
   return (
     <div className="relative h-full w-full">
-      <Stage focus={focus} backdrop="dark" subjectHeight={gender === 'female' ? 1.66 : 1.78}>
+      <Stage
+        focus={focus}
+        backdrop="dark"
+        subjectHeight={gender === 'female' ? 1.66 : 1.78}
+        lighting={rig === 'legacy' ? undefined : <MhLighting rig={rig} />}
+      >
         <Suspense fallback={null}>
           <MhCharacter
             key={`${gender}-${face}`}
@@ -173,6 +180,17 @@ export function DevMhViewer() {
           <select value={gender} onChange={(e) => setGender(e.target.value as 'female' | 'male')}>
             <option>female</option>
             <option>male</option>
+          </select>
+        </label>
+        <label className="flex gap-2">
+          light
+          <select
+            value={rig}
+            onChange={(e) => setRig(e.target.value as 'studio' | 'portrait' | 'legacy')}
+          >
+            <option>studio</option>
+            <option>portrait</option>
+            <option>legacy</option>
           </select>
         </label>
         <label className="flex gap-2">
