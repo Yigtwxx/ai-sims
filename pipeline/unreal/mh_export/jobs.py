@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Callable
 from typing import Any
 
@@ -23,23 +24,33 @@ def _arkit(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
     return {"poses": len(mapping["pose_names"]), "curves": len(mapping["curves"])}
 
 
-def _characters(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
-    from mh_export import characters
+def _module_job(module: str) -> Job:
+    """Jobs whose module exposes `run(archive, args)`; imported lazily inside the editor."""
 
-    return characters.run(archive, args)
+    def job(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
+        return importlib.import_module(f"mh_export.{module}").run(archive, args)
 
-
-def _grooms(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
-    from mh_export import grooms
-
-    return grooms.run(archive, args)
+    return job
 
 
 JOBS: dict[str, Job] = {
     "inventory": _inventory,
     "arkit": _arkit,
-    "characters": _characters,
-    "grooms": _grooms,
+    **{
+        name: _module_job(name)
+        for name in (
+            "characters",
+            "grooms",
+            "statics",
+            "animations",
+            "lighting",
+            "materials",
+            "wardrobe",
+            "fab_import",
+            "bodies",
+            "probe",
+        )
+    },
 }
 
 

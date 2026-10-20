@@ -1,14 +1,17 @@
-"""Export every MetaHuman preset: 8K textures, blendshape rig, DCC files, settings.
+"""Export every MetaHuman preset: high-res textures, blendshape rig, DCC files, settings.
 
-Per preset, in this order (Epic's tests rig first, then fetch textures):
+Per character, in this order (Epic's tests rig first, then fetch textures):
 1. Copy the preset into the project; presets themselves are read-only plugin content.
-2. Ask for 8K on every texture group through the skin settings; the texture
-   request has no resolution argument of its own.
+2. Ask for the texture resolutions through the skin settings (face 8K, body 4K by
+   default: 8K body requests fail on Epic's side with "Server Error").
 3. Auto-rig with joints + blend shapes (MetaHuman cloud, blocking).
 4. Download texture sources (MetaHuman cloud, blocking).
 5. DCC Export without baked makeup, then again with makeup baked; files the
-   second export shares byte-for-byte with the first are dropped.
-6. Dump every editor property (skin, eyes, makeup, head, body) as text.
+   second export shares byte-for-byte with the first are dropped. DCC Export
+   bakes its maps through texture graphs at a fixed 2K, so:
+6. Materials export persists the full-resolution synthesized face and body
+   textures as project assets, which are then written out as PNG sources.
+7. Dump every editor property (skin, eyes, makeup, head, body) as text.
 """
 
 from __future__ import annotations
@@ -29,19 +32,15 @@ from mh_export.archive import (
     run_units,
     write_json,
 )
+from mh_export.exporters import export_texture
 
 PRESETS_ROOT = "/MetaHumanCharacter/Optional/Presets"
+EXTRA_ROOTS = ("/Game/Fab",)  # Fab character assets (e.g. the Vampire) land here
 WORK_ROOT = "/Game/MHExport/Characters"
-RESOLUTION_FIELDS = (
-    "face_albedo",
-    "face_normal",
-    "face_cavity",
-    "face_animated_maps",
-    "body_albedo",
-    "body_normal",
-    "body_cavity",
-    "body_masks",
-)
+MATERIALS_ROOT = "/Game/MHExport/Materials"
+FACE_FIELDS = ("face_albedo", "face_normal", "face_cavity", "face_animated_maps")
+BODY_FIELDS = ("body_albedo", "body_normal", "body_cavity", "body_masks")
+RESOLUTIONS = {"res2k": "Res2k", "res4k": "Res4k", "res8k": "Res8k"}
 
 
 def preset_paths() -> list[str]:
@@ -49,8 +48,13 @@ def preset_paths() -> list[str]:
     return inventory.find_assets({"MetaHumanCharacter"}, (PRESETS_ROOT,))
 
 
-def request_resolution(character: unreal.MetaHumanCharacter, name: str) -> None:
-    """Set every texture group to `name` ("res2k" | "res4k" | "res8k").
+def fab_character_paths() -> list[str]:
+    inventory.scan(EXTRA_ROOTS)
+    return inventory.find_assets({"MetaHumanCharacter"}, EXTRA_ROOTS)
+
+
+def request_resolution(character: unreal.MetaHumanCharacter, face: str, body: str) -> None:
+    """Set the face and body texture groups ("res2k" | "res4k" | "res8k").
 
     ERequestTextureResolution is not a BlueprintType enum, so Python may not
     expose it; the struct's text import works either way.
@@ -58,28 +62,28 @@ def request_resolution(character: unreal.MetaHumanCharacter, name: str) -> None:
     skin = character.get_editor_property("skin_settings")
     wanted = skin.get_editor_property("desired_texture_sources_resolutions")
     enum = getattr(unreal, "RequestTextureResolution", None)
+    plan = {**dict.fromkeys(FACE_FIELDS, face), **dict.fromkeys(BODY_FIELDS, body)}
     if enum is not None:
-        for field in RESOLUTION_FIELDS:
+        for field, name in plan.items():
             wanted.set_editor_property(field, getattr(enum, name.upper()))
     else:
-        value = {"res2k": "Res2k", "res4k": "Res4k", "res8k": "Res8k"}[name]
         fields = ",".join(
-            f"{''.join(part.title() for part in field.split('_'))}={value}"
-            for field in RESOLUTION_FIELDS
+            f"{''.join(part.title() for part in field.split('_'))}={RESOLUTIONS[name]}"
+            for field, name in plan.items()
         )
         wanted.import_text(f"({fields})")
     skin.set_editor_property("desired_texture_sources_resolutions", wanted)
     ue.subsystem().commit_skin_settings(character, skin)
-    applied = character.get_editor_property("skin_settings").get_editor_property(
-        "desired_texture_sources_resolutions"
-    )
-    if name[3:] not in str(ue.to_text(applied)).lower():
-        raise RuntimeError(f"Texture resolution not applied: {ue.to_text(applied)}")
-
-
-def has_high_resolution_textures(character: unreal.MetaHumanCharacter) -> bool:
-    value = character.has_high_resolution_textures
-    return bool(value() if callable(value) else value)
+    applied = str(
+        ue.to_text(
+            character.get_editor_property("skin_settings").get_editor_property(
+                "desired_texture_sources_resolutions"
+            )
+        )
+    ).lower()
+    for name in {face, body}:
+        if name[3:] not in applied:
+            raise RuntimeError(f"Texture resolution not applied: {applied}")
 
 
 def joints_and_blend_shapes() -> unreal.MetaHumanRigType:
@@ -103,8 +107,6 @@ def download_textures(character: unreal.MetaHumanCharacter) -> None:
     params.blocking = True
     params.report_progress = False
     ue.subsystem().request_texture_sources(character, params)
-    if not has_high_resolution_textures(character):
-        raise RuntimeError("Texture request finished without high resolution textures")
 
 
 def export_dcc(character: unreal.MetaHumanCharacter, out_dir: Path, bake_makeup: bool) -> None:
@@ -116,14 +118,35 @@ def export_dcc(character: unreal.MetaHumanCharacter, out_dir: Path, bake_makeup:
     params.compress_in_zip_file = False
     unreal.MetaHumanCharacterExportBlueprintLibrary.export_dcc(character, params)
     if not any(path.is_file() for path in out_dir.rglob("*")):
-        raise RuntimeError(f"DCC export wrote nothing to {out_dir}")
+        raise RuntimeError(f"DCC export wrote nothing to {out_dir}; see the MetaHuman message log")
 
 
-def export_preset(preset: str, work: Path, texture_resolution: str) -> dict[str, Any]:
-    name = preset.rsplit(".", 1)[-1]
-    character = ue.duplicate(preset, f"{WORK_ROOT}/{name}.{name}")
+def export_source_textures(character: unreal.MetaHumanCharacter, out_dir: Path) -> dict[str, Any]:
+    """Full-resolution synthesized face/body textures via the materials export."""
+    project_path = f"{MATERIALS_ROOT}/{character.get_name()}"
+    params = unreal.MetaHumanMaterialsExportParams()
+    params.project_path = project_path
+    params.apply_as_overrides = False
+    unreal.MetaHumanCharacterExportBlueprintLibrary.export_materials(character, params)
+    inventory.scan((project_path,))
+    textures: dict[str, Any] = {}
+    for asset in inventory.assets_under(project_path):
+        if inventory.class_name(asset) != "Texture2D":
+            continue
+        package = str(asset.package_name)
+        part = "body" if "/Body/" in package else "face"
+        textures[package] = {"part": part, **export_texture(asset.get_asset(), out_dir / part)}
+        textures[package]["file"] = f"{part}/{textures[package]['file']}"
+    if not textures:
+        raise RuntimeError(f"Materials export created no textures under {project_path}")
+    return textures
+
+
+def export_character(source: str, work: Path, face_res: str, body_res: str) -> dict[str, Any]:
+    name = source.rsplit(".", 1)[-1]
+    character = ue.duplicate(source, f"{WORK_ROOT}/{name}.{name}")
     with ue.editing(character):
-        request_resolution(character, texture_resolution)
+        request_resolution(character, face_res, body_res)
         rig(character)
         download_textures(character)
         export_dcc(character, work / "dcc", bake_makeup=False)
@@ -131,32 +154,37 @@ def export_preset(preset: str, work: Path, texture_resolution: str) -> dict[str,
         dropped = drop_shared_files(work / "dcc", work / "dcc_makeup")
         if (work / "dcc_makeup").exists() and not any((work / "dcc_makeup").iterdir()):
             shutil.rmtree(work / "dcc_makeup")
+        sources = export_source_textures(character, work / "textures")
+        write_json(work / "textures" / "textures.json", sources)
         write_json(work / "settings.json", ue.dump_properties(character))
     return {
-        "preset": preset,
+        "source": source,
         "project_copy": character.get_path_name(),
-        "texture_resolution": texture_resolution,
-        "rig_type": "JOINTS_AND_BLENDSHAPES",
+        "texture_resolution": {"face": face_res, "body": body_res},
+        "rig_type": "JOINTS_AND_BLEND_SHAPES",
         "makeup_files_identical_to_clean": dropped,
+        "source_textures": len(sources),
     }
 
 
 def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
-    """Args: only (list of preset names), resolution ("res2k"|"res4k"|"res8k"), force."""
+    """Args: only (names), face ("res8k"), body ("res4k"), fab (include Fab characters), force."""
     only = set(args.get("only") or [])
-    texture_resolution = args.get("resolution", "res8k")
-    presets = [p for p in preset_paths() if not only or p.rsplit(".", 1)[-1] in only]
-    if not presets:
-        raise RuntimeError(f"No presets matched under {PRESETS_ROOT} (only={sorted(only)})")
+    face_res = args.get("face", "res8k")
+    body_res = args.get("body", "res4k")
+    sources = preset_paths() + (fab_character_paths() if args.get("fab", True) else [])
+    sources = [p for p in sources if not only or p.rsplit(".", 1)[-1] in only]
+    if not sources:
+        raise RuntimeError(f"No characters matched (only={sorted(only)})")
     units = [
         Unit(
             # Skip-list names look like "characters/Ada".
-            name=f"characters/{preset.rsplit('.', 1)[-1]}",
-            directory=archive.unit_dir("characters", preset.rsplit(".", 1)[-1]),
-            export=lambda work, preset=preset: export_preset(preset, work, texture_resolution),
+            name=f"characters/{source.rsplit('.', 1)[-1]}",
+            directory=archive.unit_dir("characters", source.rsplit(".", 1)[-1]),
+            export=lambda work, source=source: export_character(source, work, face_res, body_res),
         )
-        for preset in presets
+        for source in sources
     ]
     log = JobLog(archive.logs, "characters")
     summary = run_units(units, log, force=bool(args.get("force")), skip=SkipList(archive.skip_file))
-    return {"presets": len(presets), "log": str(log.path), **summary.as_dict()}
+    return {"characters": len(sources), "log": str(log.path), **summary.as_dict()}

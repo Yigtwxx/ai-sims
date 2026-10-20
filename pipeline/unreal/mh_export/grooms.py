@@ -18,6 +18,7 @@ import unreal
 
 from mh_export import inventory, ue
 from mh_export.archive import Archive, JobLog, SkipList, Unit, run_units, write_json
+from mh_export.exporters import export_object, export_texture, fbx_options
 
 GROOMS_ROOT = "/MetaHumanCharacter/Optional/Grooms"
 GROOM_ASSETS = f"{GROOMS_ROOT}/GroomAssets"
@@ -27,48 +28,6 @@ EYELASH_TEXTURES = "/MetaHumanCharacter/Textures/Eyelashes"
 PLUGIN_PREFIX = "/MetaHumanCharacter/"
 MESH_CLASSES = {"StaticMesh", "SkeletalMesh"}
 TEXTURE_CLASSES = {"Texture2D"}
-TEXTURE_EXTENSIONS = (".png", ".tga", ".exr")
-
-
-def fbx_options() -> unreal.FbxExportOption:
-    options = unreal.FbxExportOption()
-    options.ascii = False
-    options.collision = False
-    options.level_of_detail = False
-    options.vertex_color = True
-    options.export_morph_targets = True
-    return options
-
-
-def export_object(obj: unreal.Object, path: Path, options: object | None = None) -> bool:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    task = unreal.AssetExportTask()
-    task.object = obj
-    task.filename = str(path)
-    task.automated = True
-    task.prompt = False
-    task.replace_identical = True
-    if options is not None:
-        task.options = options
-    return bool(unreal.Exporter.run_asset_export_task(task)) and path.is_file()
-
-
-def texture_info(texture: unreal.Texture2D) -> dict[str, Any]:
-    return {
-        "size": [texture.blueprint_get_size_x(), texture.blueprint_get_size_y()],
-        **ue.dump_properties(
-            texture, ["srgb", "compression_settings", "lod_group", "filter", "address_x"]
-        ),
-    }
-
-
-def export_texture(texture: unreal.Texture2D, out_dir: Path) -> dict[str, Any]:
-    """Try lossless formats in order; 16-bit and float sources may refuse PNG."""
-    for extension in TEXTURE_EXTENSIONS:
-        path = out_dir / f"{texture.get_name()}{extension}"
-        if export_object(texture, path):
-            return {"file": path.name, **texture_info(texture)}
-    raise RuntimeError(f"No exporter wrote {texture.get_path_name()}")
 
 
 def related_assets(package_paths: list[str]) -> set[str]:
