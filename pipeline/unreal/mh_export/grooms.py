@@ -18,7 +18,7 @@ import unreal
 
 from mh_export import inventory, ue
 from mh_export.archive import Archive, JobLog, SkipList, Unit, run_units, write_json
-from mh_export.exporters import export_object, export_texture, fbx_options
+from mh_export.exporters import export_gltf, export_object, export_texture, fbx_options
 
 GROOMS_ROOT = "/MetaHumanCharacter/Optional/Grooms"
 GROOM_ASSETS = f"{GROOMS_ROOT}/GroomAssets"
@@ -69,13 +69,9 @@ def export_style(slot: str, style_path: str, work: Path) -> dict[str, Any]:
     }
     linked = related_assets(sorted(own_packages | binding_packages)) - own_packages
 
-    meshes: dict[str, str] = {}
+    meshes: dict[str, dict[str, str]] = {}
     for asset in [a for a in own if inventory.class_name(a) in MESH_CLASSES]:
-        mesh = asset.get_asset()
-        path = work / "meshes" / f"{asset.asset_name}.fbx"
-        if not export_object(mesh, path, fbx_options()):
-            raise RuntimeError(f"FBX export failed for {asset.package_name}")
-        meshes[str(asset.asset_name)] = path.relative_to(work).as_posix()
+        meshes[str(asset.asset_name)] = export_mesh(asset, work / "meshes", work)
 
     textures: dict[str, Any] = {}
     texture_assets = [a for a in own if inventory.class_name(a) in TEXTURE_CLASSES]
@@ -113,14 +109,23 @@ def export_style(slot: str, style_path: str, work: Path) -> dict[str, Any]:
     return {"slot": slot, "style": style, "meshes": len(meshes), "textures": len(textures)}
 
 
+def export_mesh(asset: unreal.AssetData, out_dir: Path, work: Path) -> dict[str, str]:
+    """GLB (what the converter reads) plus FBX (archival); both must succeed."""
+    mesh = asset.get_asset()
+    glb = out_dir / f"{asset.asset_name}.glb"
+    fbx = out_dir / f"{asset.asset_name}.fbx"
+    if not export_gltf(mesh, glb):
+        raise RuntimeError(f"glTF export failed for {asset.package_name}")
+    if not export_object(mesh, fbx, fbx_options()):
+        raise RuntimeError(f"FBX export failed for {asset.package_name}")
+    return {"glb": glb.relative_to(work).as_posix(), "fbx": fbx.relative_to(work).as_posix()}
+
+
 def export_groom_head(work: Path) -> dict[str, Any]:
     exported = []
     for asset in inventory.assets_under(GROOM_HEAD):
         if inventory.class_name(asset) in MESH_CLASSES:
-            path = work / f"{asset.asset_name}.fbx"
-            if not export_object(asset.get_asset(), path, fbx_options()):
-                raise RuntimeError(f"FBX export failed for {asset.package_name}")
-            exported.append(path.name)
+            exported.append(export_mesh(asset, work, work))
     if not exported:
         raise RuntimeError(f"No groom head mesh under {GROOM_HEAD}")
     return {"meshes": exported}

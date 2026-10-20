@@ -142,6 +142,20 @@ def export_source_textures(character: unreal.MetaHumanCharacter, out_dir: Path) 
     return textures
 
 
+def release(character: unreal.MetaHumanCharacter) -> None:
+    """Unload the character and its exported materials; 8K sources stay resident otherwise."""
+    packages = [character.get_outermost()]
+    for asset in inventory.assets_under(f"{MATERIALS_ROOT}/{character.get_name()}"):
+        loaded = unreal.find_object(None, inventory.object_path(asset))
+        if loaded is not None:
+            packages.append(loaded.get_outermost())
+    try:
+        unreal.EditorLoadingAndSavingUtils.unload_packages(packages)
+    except Exception as exc:  # unloading is best effort; the process restarts every few units
+        unreal.log_warning(f"[mh_export] could not unload {character.get_name()}: {exc}")
+    unreal.SystemLibrary.collect_garbage()
+
+
 def export_character(source: str, work: Path, face_res: str, body_res: str) -> dict[str, Any]:
     name = source.rsplit(".", 1)[-1]
     character = ue.duplicate(source, f"{WORK_ROOT}/{name}.{name}")
@@ -160,6 +174,7 @@ def export_character(source: str, work: Path, face_res: str, body_res: str) -> d
     # Keep the rigged, textured copy: outfit builds later reuse it without new cloud requests.
     if not unreal.EditorAssetLibrary.save_loaded_asset(character, False):
         raise RuntimeError(f"Could not save {character.get_path_name()}")
+    release(character)
     return {
         "source": source,
         "project_copy": character.get_path_name(),
@@ -171,7 +186,7 @@ def export_character(source: str, work: Path, face_res: str, body_res: str) -> d
 
 
 def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
-    """Args: only (names), face ("res8k"), body ("res4k"), fab (include Fab characters), force."""
+    """Args: only (names), face ("res8k"), body ("res4k"), fab (Fab characters), limit, force."""
     only = set(args.get("only") or [])
     face_res = args.get("face", "res8k")
     body_res = args.get("body", "res4k")
@@ -189,5 +204,11 @@ def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
         for source in sources
     ]
     log = JobLog(archive.logs, "characters")
-    summary = run_units(units, log, force=bool(args.get("force")), skip=SkipList(archive.skip_file))
+    summary = run_units(
+        units,
+        log,
+        force=bool(args.get("force")),
+        skip=SkipList(archive.skip_file),
+        limit=args.get("limit"),
+    )
     return {"characters": len(sources), "log": str(log.path), **summary.as_dict()}

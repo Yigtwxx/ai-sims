@@ -180,3 +180,24 @@ def test_drop_shared_files_keeps_only_what_the_variant_changed(tmp_path):
         "Maps",
         "Maps/head_albedo.png",
     ]
+
+
+def test_run_units_limit_defers_the_rest(tmp_path):
+    archive = Archive(tmp_path)
+    log = JobLog(archive.logs, "limit")
+    calls: list[str] = []
+
+    def make(name: str) -> Unit:
+        def export(work: Path) -> dict[str, str]:
+            calls.append(name)
+            (work / "a.txt").write_text(name)
+            return {}
+
+        return Unit(name, archive.unit_dir("u", name), export)
+
+    summary = run_units([make("one"), make("two"), make("three")], log, limit=1)
+    assert summary.done == ["one"], f"Expected only the first unit, got {summary.done}"
+    assert summary.deferred == ["two", "three"], f"Unexpected deferred list {summary.deferred}"
+    again = run_units([make("one"), make("two"), make("three")], log, limit=1)
+    assert again.skipped == ["one"] and again.done == ["two"], f"Resume broke: {again.as_dict()}"
+    assert calls == ["one", "two"]

@@ -206,6 +206,7 @@ class Summary:
     skipped: list[str] = field(default_factory=list)
     excluded: list[str] = field(default_factory=list)
     failed: dict[str, str] = field(default_factory=dict)
+    deferred: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -213,6 +214,7 @@ class Summary:
             "skipped": self.skipped,
             "excluded": self.excluded,
             "failed": self.failed,
+            "deferred": self.deferred,
         }
 
 
@@ -236,12 +238,24 @@ class SkipList:
 
 
 def run_units(
-    units: Iterable[Unit], log: JobLog, *, force: bool = False, skip: SkipList | None = None
+    units: Iterable[Unit],
+    log: JobLog,
+    *,
+    force: bool = False,
+    skip: SkipList | None = None,
+    limit: int | None = None,
 ) -> Summary:
-    """Export every unit that is not already done; a failure never stops the run."""
+    """Export every unit that is not already done; a failure never stops the run.
+
+    `limit` caps how many units are exported (skipped and excluded ones don't
+    count), so a long batch can run in several short-lived processes.
+    """
     summary = Summary()
     skip = skip or SkipList(None)
     for unit in units:
+        if limit is not None and len(summary.done) + len(summary.failed) >= limit:
+            summary.deferred.append(unit.name)
+            continue
         if unit.name in skip.names():
             summary.excluded.append(unit.name)
             log.event("excluded", unit.name)

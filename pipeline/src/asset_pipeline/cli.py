@@ -40,6 +40,11 @@ def main(argv: list[str] | None = None) -> None:
     ue.add_argument("job", help="Job name from pipeline/unreal/mh_export/jobs.py")
     ue.add_argument("--args", default="{}", help="Job options as a JSON object")
     ue.add_argument("--keep-open", action="store_true", help="Leave the editor open afterwards")
+    ue.add_argument(
+        "--until-done",
+        action="store_true",
+        help="Relaunch the editor while the job reports deferred units (use with a 'limit' arg)",
+    )
 
     args = parser.parse_args(argv)
     paths = load_paths()
@@ -72,8 +77,14 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "ue":
         from asset_pipeline.unreal import run_job
 
-        result = run_job(args.job, json.loads(args.args), quit_after=not args.keep_open)
-        print(json.dumps(result.get("result"), indent=2))
+        job_args = json.loads(args.args)
+        while True:
+            result = run_job(args.job, job_args, quit_after=not args.keep_open)
+            print(json.dumps(result.get("result"), indent=2), flush=True)
+            report = result.get("result") or {}
+            progressed = bool(report.get("done") or report.get("failed"))
+            if not (args.until_done and report.get("deferred") and progressed):
+                break
     elif args.command == "base":
         genders = ["male", "female"] if args.gender == "all" else [args.gender]
         for gender in genders:
