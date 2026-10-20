@@ -120,7 +120,14 @@ Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığım�
 - **ARKit kaynağı:** ARKit 52 → MetaHuman kontrol eşlemesi DNA'da değil, Unreal'daki bir PoseAsset'te. Windows'ta JSON olarak dışa aktarılır; Mac'te Blender + Poly Hammer Character DNA (OpenRigLogic) ile shape key olarak bake edilir.
 - **Lisans notu:** UE EULA, MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor; LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
 - **Seat lisansı:** şirket gerekmediğini söyledi (gelir eşiği altında); tekrar sorulmaz.
-- **Kıyafet kaynağı:** Core Data'da yalnızca 1 kıyafet (`WI_DefaultGarment`) var. Önce Fab'deki ücretsiz MetaHuman uyumlu kıyafetler Windows'ta projeye eklenip dışa aktarılır; eksik kalan parçalar sonradan Mac'teki kıyafet ekleme hattıyla gelir.
+- **Kıyafet kaynağı:** Core Data'da yalnızca 1 kıyafet (`WI_DefaultGarment`) var. Fab'den kullanıcının kütüphanesine eklenenler (hepsi ücretsiz, iki lisans katmanında da $0):
+  - Epic, 20 kıyafet (UE 5.7 `.mhpkg`, boyutlanabilir Outfit): Boots, Cargo Pants, Casual Sneakers, Chelsea Boots, Crop Top Variants, Flats, FlipFlops, Hightops, Hoodie, Jeans, Loafers, Oxfords, Running Shoes, Shorts, Slim Jeans Variants, Sweater, T Shirt Variants, Techwear Outfit, Tucked T Shirt Variants, Yoga Pants Variants.
+  - Epic, 6 saç (groom, UE 5.6–5.8): Bantu Knots, Long High Ponytail, Slick Ponytail, Updo Cornrows, Updo Dutch Braid, Updo Messy Bun. Kart LOD'ları var mı doğrulanacak; yoksa Hair Card Generator.
+  - Epic, MetaHuman Vampire Character Asset (eğlence için; Mac'te elenebilir).
+  - Nyanpasinka: Shirt V-neck with rolled sleeves, Shirt longsleeve with pockets (FBX + MetaHuman).
+- **Ücretli içerik alınmaz.** Takım elbise, blazer ve kadın iş kıyafeti sonradan Mac'teki kıyafet ekleme hattıyla (ör. CC0 MakeHuman takımları) gelir.
+- **Mac bütçesi:** ~208 GB boş, 30 GB boş kalacak; küçültülmüş set için **~170 GB** kullanılabilir.
+- **Eleme Mac'te yapılır:** her şey küçültülüp taşınır; kullanıcı oluşturucu ekranında gizler. Yalnızca renk farkı olan varyantlar (ör. iki yakın ton kot) küçültme sırasında otomatik birleştirilir: geometri bir kez saklanır, renkler tint preset'i olur.
 
 ## Açık kararlar
 
