@@ -211,3 +211,45 @@ export function getAzureSpeechEnv(): AzureSpeechEnv | null {
 export function isAzureSpeechConfigured(): boolean {
   return getAzureSpeechEnv() !== null;
 }
+
+export const TTS_PROVIDER_IDS = ['azure', 'edge', 'gemini'] as const;
+export type TtsProviderId = (typeof TTS_PROVIDER_IDS)[number];
+/** Azure first (visemes), then Edge (same voices, word timings), Gemini last (no timings). */
+export const DEFAULT_TTS_PROVIDER_ORDER: readonly TtsProviderId[] = ['azure', 'edge', 'gemini'];
+export const DEFAULT_GEMINI_TTS_MODEL = 'gemini-3.8-flash-tts';
+
+export interface TtsEnv {
+  /** Providers to try in order; unconfigured ones are dropped. */
+  order: TtsProviderId[];
+  azure: AzureSpeechEnv | null;
+  /** Edge voices are an unofficial endpoint: only used when TTS_ENABLE_EDGE=1. */
+  edgeEnabled: boolean;
+  gemini: { apiKey: string; model: string } | null;
+}
+
+function isTtsProviderId(value: string): value is TtsProviderId {
+  return (TTS_PROVIDER_IDS as readonly string[]).includes(value);
+}
+
+/** Never throws and never logs secret values; read on each call. */
+export function getTtsEnv(): TtsEnv {
+  const requested = (readEnv('TTS_PROVIDER_ORDER') ?? '')
+    .split(',')
+    .map((part) => part.trim().toLowerCase())
+    .filter(isTtsProviderId);
+  const azure = getAzureSpeechEnv();
+  const edgeEnabled = readEnv('TTS_ENABLE_EDGE') === '1';
+  const geminiKey = readSecret('GEMINI_API_KEY');
+  const gemini = geminiKey
+    ? { apiKey: geminiKey, model: readModel('GEMINI_TTS_MODEL', DEFAULT_GEMINI_TTS_MODEL) }
+    : null;
+  const available: Record<TtsProviderId, boolean> = {
+    azure: azure !== null,
+    edge: edgeEnabled,
+    gemini: gemini !== null,
+  };
+  const order = [...new Set(requested.length > 0 ? requested : DEFAULT_TTS_PROVIDER_ORDER)].filter(
+    (id) => available[id],
+  );
+  return { order, azure, edgeEnabled, gemini };
+}

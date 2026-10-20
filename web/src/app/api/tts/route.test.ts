@@ -11,7 +11,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({ getSession: mocks.getSession }));
-vi.mock('@/lib/env', () => ({ getAzureSpeechEnv: mocks.getAzureSpeechEnv }));
+// The route reads the provider chain from getTtsEnv; these tests pin it to Azure only
+// (the chain itself is covered in src/lib/tts/providers.test.ts).
+vi.mock('@/lib/env', () => ({
+  DEFAULT_TTS_VOICES: {
+    tr: { female: 'tr-TR-EmelNeural', male: 'tr-TR-AhmetNeural' },
+    en: { female: 'en-US-AvaNeural', male: 'en-US-AndrewNeural' },
+  },
+  getTtsEnv: () => {
+    const azure = mocks.getAzureSpeechEnv();
+    return { order: azure ? ['azure'] : [], azure, edgeEnabled: false, gemini: null };
+  },
+}));
 vi.mock('@/lib/tts/azure', () => ({ synthesizeSpeech: mocks.synthesizeSpeech }));
 
 const { POST } = await import('./route');

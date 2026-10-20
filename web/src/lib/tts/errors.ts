@@ -6,7 +6,7 @@ export class TtsError extends Error {
   readonly kind: TtsFailureKind;
 
   constructor(kind: TtsFailureKind) {
-    super(`Azure text-to-speech failed: ${kind}`);
+    super(`Text-to-speech failed: ${kind}`);
     this.name = 'TtsError';
     this.kind = kind;
   }
