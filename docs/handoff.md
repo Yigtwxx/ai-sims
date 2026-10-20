@@ -80,6 +80,14 @@ Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığım�
   - Karar gerekiyorsa `Senin Kararın:` bölümü eklenir; her madde öneri ve gerekçeyle biter.
   - Secret'lar koda ve loga asla yazılmaz.
 
+## Kararlar (2026-10-20 akşam, kullanıcı onaylı)
+
+- **Demo cihazı:** yalnızca bu MacBook (M4 Pro, 48 GB). Kalite en üste çekilir: yüksek çözünürlüklü dokular, akıcı çalışan en detaylı LOD.
+- **Dövme ve piercing:** kalıyor ama ölçülü. Küçük/minimal dövmeler, küpe ve ince piercing'ler var; abartılı büyük vücut parçaları yok.
+- **Kıyafet:** karışık; iş/kurumsal (takım, ceket, gömlek) + günlük parçalar.
+- **Sohbet rolü:** genel sohbet asistanı (mevcut persona ayarı).
+- **Anime oluşturucu:** sonraki oturumda arayüzden kaldırılacak; kod git geçmişinde kalır.
+
 ## Açık kararlar
 
 - Azure kaydı mı, Gemini TTS mi? (öneri: önce Azure, çünkü kelime senkronu için viseme verisi veriyor)
