@@ -1,0 +1,61 @@
+{
+  "App": {
+    "name": "AI Sims",
+    "description": "Photorealistic 3D character creator."
+  },
+  "Landing": {
+    "title": "Create your character",
+    "subtitle": "Design a photorealistic 3D character, then talk to it.",
+    "enter": "Enter",
+    "entering": "Signing in…",
+    "notConfigured": "Supabase not configured: add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to web/.env.local.",
+    "signInFailed": "Could not sign in. Please try again."
+  },
+  "Nav": {
+    "label": "Main navigation",
+    "home": "Home",
+    "characters": "My characters",
+    "create": "Create",
+    "signOut": "Sign out"
+  },
+  "LocaleSwitcher": {
+    "label": "Language",
+    "tr": "Türkçe",
+    "en": "English"
+  },
+  "Characters": {
+    "title": "My characters",
+    "loading": "Loading characters…",
+    "empty": "You have no characters yet.",
+    "createFirst": "Create your first character",
+    "untitled": "Untitled",
+    "status": {
+      "draft": "Draft",
+      "finalized": "Finalized"
+    }
+  },
+  "Creator": {
+    "title": "Character creator",
+    "comingSoon": "Creator coming soon",
+    "categories": {
+      "face": "Face",
+      "skin": "Skin",
+      "eyes": "Eyes",
+      "hair": "Hair",
+      "facialHair": "Facial hair",
+      "top": "Top",
+      "bottom": "Bottom",
+      "shoes": "Shoes"
+    }
+  },
+  "Common": {
+    "save": "Save",
+    "done": "Done",
+    "cancel": "Cancel",
+    "randomize": "Randomize",
+    "undo": "Undo",
+    "redo": "Redo",
+    "delete": "Delete",
+    "edit": "Edit"
+  }
+}

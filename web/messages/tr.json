@@ -1,0 +1,61 @@
+{
+  "App": {
+    "name": "AI Sims",
+    "description": "Fotogerçekçi 3D karakter oluşturucu."
+  },
+  "Landing": {
+    "title": "Karakterini yarat",
+    "subtitle": "Fotogerçekçi bir 3D karakter tasarla, sonra onunla konuş.",
+    "enter": "Giriş",
+    "entering": "Giriş yapılıyor…",
+    "notConfigured": "Supabase yapılandırılmamış (Supabase not configured): NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY değerlerini web/.env.local dosyasına ekleyin.",
+    "signInFailed": "Giriş yapılamadı. Lütfen tekrar deneyin."
+  },
+  "Nav": {
+    "label": "Ana gezinme",
+    "home": "Ana sayfa",
+    "characters": "Karakterlerim",
+    "create": "Oluştur",
+    "signOut": "Çıkış"
+  },
+  "LocaleSwitcher": {
+    "label": "Dil",
+    "tr": "Türkçe",
+    "en": "English"
+  },
+  "Characters": {
+    "title": "Karakterlerim",
+    "loading": "Karakterler yükleniyor…",
+    "empty": "Henüz karakterin yok.",
+    "createFirst": "İlk karakterini oluştur",
+    "untitled": "İsimsiz",
+    "status": {
+      "draft": "Taslak",
+      "finalized": "Tamamlandı"
+    }
+  },
+  "Creator": {
+    "title": "Karakter oluşturucu",
+    "comingSoon": "Oluşturucu çok yakında",
+    "categories": {
+      "face": "Yüz",
+      "skin": "Cilt",
+      "eyes": "Gözler",
+      "hair": "Saç",
+      "facialHair": "Sakal",
+      "top": "Üst",
+      "bottom": "Alt",
+      "shoes": "Ayakkabı"
+    }
+  },
+  "Common": {
+    "save": "Kaydet",
+    "done": "Bitti",
+    "cancel": "Vazgeç",
+    "randomize": "Rastgele",
+    "undo": "Geri al",
+    "redo": "İleri al",
+    "delete": "Sil",
+    "edit": "Düzenle"
+  }
+}
