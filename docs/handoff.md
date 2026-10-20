@@ -109,7 +109,17 @@ Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığım�
 - **Sohbet rolü:** genel sohbet asistanı (mevcut persona ayarı).
 - **Anime oluşturucu:** sonraki oturumda arayüzden kaldırılacak; kod git geçmişinde kalır.
 
+## Kararlar (2026-10-20, Windows oturumu, kullanıcı onaylı)
+
+- **Kurulum:** UE **5.8.4**, seçenekler: Çekirdek + Şablonlar + Motor Kaynağı + **MetaHuman Creator Temel Verileri**. Hata ayıklama simgeleri ve hedef platformlar kapalı.
+- **Kapsam:** Windows'ta seçim yapılmaz. **Tüm hazır yüzler**, tüm saç/kaş/sakal/kirpik ve tüm kıyafetler dışa aktarılır. Ayıklama sonradan Mac'teki kişiselleştirme ekranında yapılır.
+- **Otomasyon:** Dışa aktarma Unreal editör Python betikleriyle yapılır, tek tek tıklanmaz.
+- **Doku çözünürlüğü:** kaynak **8K**.
+- **Ham arşiv bu Windows PC'de kalır** (C: ~416 GB boş). Aynı PC'de bir küçültme adımı çalışır: yalnızca web'in kullandığı haritalar, sıkıştırılmış format, yüz 8K, vücut ve ikincil haritalar 4K. Mac'e yalnızca küçültülmüş set gider.
+- **Windows'tan ayrılmadan önce** en az bir yüz bu PC'de uçtan uca glTF'e çevrilip test edilir (eksik dışa aktarma yüzünden geri dönmemek için).
+- **ARKit kaynağı:** ARKit 52 → MetaHuman kontrol eşlemesi DNA'da değil, Unreal'daki bir PoseAsset'te. Windows'ta JSON olarak dışa aktarılır; Mac'te Blender + Poly Hammer Character DNA (OpenRigLogic) ile shape key olarak bake edilir.
+- **Lisans notu:** UE EULA, MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor; LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
+
 ## Açık kararlar
 
 - Azure kaydı mı, Gemini TTS mi? (öneri: önce Azure, çünkü kelime senkronu için viseme verisi veriyor)
-- İlk partide kaç yüz? (öneri: 6-8 yüz, iki cinsiyet ve farklı kökenler; saç ve kıyafetin tamamı alınır, çünkü hepsi her yüze oturuyor)
