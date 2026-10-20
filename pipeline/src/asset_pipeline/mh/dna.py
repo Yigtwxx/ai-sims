@@ -268,6 +268,16 @@ class Behavior:
     rbf_pose_names: tuple[str, ...]
     rbf_pose_control_names: tuple[str, ...]  # RBF outputs, last in the input vector
     ml_control_names: tuple[str, ...]
+    # Joints listed by joint groups / twist and swing setups (sorted). In a body DNA these are
+    # exactly the correctives and twists RigLogic poses; a face DNA also lists the body
+    # joints it shares (spine_04 ... head) without really driving them.
+    joint_group_joints: I32
+    twist_swing_joints: I32
+
+    @property
+    def driven_joints(self) -> I32:
+        """Joints RigLogic may write (joint groups plus twist/swing outputs)."""
+        return np.union1d(self.joint_group_joints, self.twist_swing_joints).astype(np.int32)
 
     @property
     def input_count(self) -> int:
@@ -487,6 +497,29 @@ def _read_behavior(reader: SwigProxy) -> Behavior:
         ),
         ml_control_names=tuple(
             reader.getMLControlName(i) for i in range(reader.getMLControlCount())
+        ),
+        joint_group_joints=np.unique(
+            _i32(
+                joint
+                for group in range(reader.getJointGroupCount())
+                for joint in reader.getJointGroupJointIndices(group)
+            )
+        ),
+        twist_swing_joints=np.unique(
+            _i32(
+                [
+                    *(
+                        j
+                        for t in range(reader.getTwistCount())
+                        for j in reader.getTwistOutputJointIndices(t)
+                    ),
+                    *(
+                        j
+                        for s in range(reader.getSwingCount())
+                        for j in reader.getSwingOutputJointIndices(s)
+                    ),
+                ]
+            )
         ),
     )
 

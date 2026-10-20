@@ -88,6 +88,44 @@ def quaternion_to_matrix(q: ArrayLike) -> F64:
     )
 
 
+def matrix_to_quaternion(matrices: ArrayLike) -> F64:
+    """Unit quaternions `(N, 4)` (x, y, z, w; w >= 0) of rotation matrices `(N, 3, 3)`.
+
+    Shepperd's method: pick the largest of w, x, y, z to divide by, so it stays stable.
+    """
+    m = np.asarray(matrices, dtype=np.float64).reshape(-1, 3, 3)
+    trace = m[:, 0, 0] + m[:, 1, 1] + m[:, 2, 2]
+    candidates = np.stack([trace, m[:, 0, 0], m[:, 1, 1], m[:, 2, 2]], axis=1)
+    pick = np.argmax(candidates, axis=1)
+    q = np.empty((len(m), 4), dtype=np.float64)
+    for case in range(4):
+        rows = pick == case
+        r = m[rows]
+        if case == 0:
+            s = np.sqrt(1.0 + trace[rows]) * 2.0
+            q[rows] = np.stack(
+                [(r[:, 2, 1] - r[:, 1, 2]) / s, (r[:, 0, 2] - r[:, 2, 0]) / s,
+                 (r[:, 1, 0] - r[:, 0, 1]) / s, 0.25 * s], axis=1)  # fmt: skip
+        elif case == 1:
+            s = np.sqrt(1.0 + r[:, 0, 0] - r[:, 1, 1] - r[:, 2, 2]) * 2.0
+            q[rows] = np.stack(
+                [0.25 * s, (r[:, 0, 1] + r[:, 1, 0]) / s, (r[:, 0, 2] + r[:, 2, 0]) / s,
+                 (r[:, 2, 1] - r[:, 1, 2]) / s], axis=1)  # fmt: skip
+        elif case == 2:
+            s = np.sqrt(1.0 + r[:, 1, 1] - r[:, 0, 0] - r[:, 2, 2]) * 2.0
+            q[rows] = np.stack(
+                [(r[:, 0, 1] + r[:, 1, 0]) / s, 0.25 * s, (r[:, 1, 2] + r[:, 2, 1]) / s,
+                 (r[:, 0, 2] - r[:, 2, 0]) / s], axis=1)  # fmt: skip
+        else:
+            s = np.sqrt(1.0 + r[:, 2, 2] - r[:, 0, 0] - r[:, 1, 1]) * 2.0
+            q[rows] = np.stack(
+                [(r[:, 0, 2] + r[:, 2, 0]) / s, (r[:, 1, 2] + r[:, 2, 1]) / s, 0.25 * s,
+                 (r[:, 1, 0] - r[:, 0, 1]) / s], axis=1)  # fmt: skip
+    q /= np.linalg.norm(q, axis=1, keepdims=True)
+    q[q[:, 3] < 0] *= -1.0
+    return q
+
+
 def rotate_vectors(q: ArrayLike, v: ArrayLike) -> F64:
     """Rotate vectors `(…, 3)` by quaternions `(…, 4)` (broadcasting)."""
     return np.einsum("...ij,...j->...i", quaternion_to_matrix(q), np.asarray(v, np.float64))
