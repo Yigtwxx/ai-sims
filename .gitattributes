@@ -1,3 +1,7 @@
+# Keep LF in the working tree on every OS (Prettier and ruff expect LF; Windows git
+# defaults to core.autocrlf=true).
+* text=auto eol=lf
+
 # Heavy source assets go through Git LFS; optimized runtime GLBs stay in plain git.
 *.blend filter=lfs diff=lfs merge=lfs -text
 *.fbx filter=lfs diff=lfs merge=lfs -text
