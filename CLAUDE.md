@@ -44,7 +44,7 @@ cd web && pnpm db:start       # mongod'u arka planda başlatır; önce `mkdir -p
 - `web/src/lib/db/` mongo client + `ensureIndexes()`; `web/src/lib/characters/repository.ts` tek veri erişim noktası. Config okunurken ve yazılırken zod ile doğrulanır; `style`, `base`, `schemaVersion` config'ten türetilir.
 - Thumbnail ayrı `thumbnails` koleksiyonunda (`_id` = karakter `_id`, WebP, en çok 512 KB). Sadece `/api/characters/[id]/thumbnail` üzerinden, oturum + sahiplik kontrolüyle servis edilir.
 - Proxy yalnızca iyimser cookie kontrolü yapar; sayfa ve action'lar `requireUserId()` ile oturumu sunucuda doğrular.
-- Stil: `anime` ana stil, `realistic` kullanıcının seçebileceği yan seçenek (`CharacterConfig.style`).
+- Stil (2026-10-20 güncel): şirket anime (VRoid/VRM) yönünü reddetti; **ciddi, gerçekçi görünüm zorunlu** ve MacBook'ta geliştirilebilir olmalı. Gerçekçi rota (MetaHuman / Microsoft Rocketbox) kullanıcı kararını bekliyor. Anime kodu (`d147f71`'e kadar) dondurulmuş durumda; üzerinde çalışılmaz. Stilden bağımsız katmanlar (parça montajı ve fit, lip-sync, canlılık, takı ve piercing, oluşturucu arayüzü) yeni rotada yeniden kullanılır.
 
 ## AI sohbet ve TTS
 - Hesap, anahtar ve doğrulama adımları: `docs/setup-accounts.md`. Anahtarların hepsi isteğe bağlıdır; yoksa `POST /api/chat` `503 ai_not_configured`, `POST /api/tts` `503 tts_not_configured` döner ve uygulama çalışır. `GET /api/health` yalnızca dev'de, değer değil boolean döner (production'da 404).
