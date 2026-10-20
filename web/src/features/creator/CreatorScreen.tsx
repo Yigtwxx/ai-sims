@@ -85,6 +85,7 @@ export function CreatorScreen({ initial }: CreatorScreenProps) {
   const canRedo = useStore(useCreatorStore.temporal, (s) => s.futureStates.length > 0);
 
   const manifest = manifestState.status === 'ready' ? manifestState.manifest : undefined;
+  const profiles = manifestState.status === 'ready' ? manifestState.profiles : undefined;
 
   // Reconcile defaults (or the edited character) with the parts actually offered.
   const loaded = useRef(false);
@@ -98,8 +99,8 @@ export function CreatorScreen({ initial }: CreatorScreenProps) {
   }, [manifest, initial, load]);
 
   const avatar = useMemo(
-    () => (manifest ? toAvatarProps(config, manifest) : undefined),
-    [config, manifest],
+    () => (manifest ? toAvatarProps(config, manifest, profiles) : undefined),
+    [config, manifest, profiles],
   );
 
   // Active row lifts immediately; the camera follows after a short settle so

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+import type { BodyProfile } from '../avatar/vrm/fitDonor';
+import { PROFILES_URL, ProfilesFileSchema } from '../avatar/vrm/profileSchema';
+
 /**
  * The anime part manifest written by the asset pipeline
  * (`uv run asset-pipeline manifest`). It is the single source of the
@@ -51,6 +54,22 @@ export function loadManifest(): Promise<VrmManifest> {
       throw error;
     });
   return pending;
+}
+
+/** Body profiles per source model; parts are used as authored when the file is missing. */
+export type SourceProfiles = Record<string, BodyProfile>;
+
+let pendingProfiles: Promise<SourceProfiles> | undefined;
+
+export function loadProfiles(): Promise<SourceProfiles> {
+  pendingProfiles ??= fetch(PROFILES_URL)
+    .then(async (response) => {
+      if (!response.ok) return {};
+      const parsed = ProfilesFileSchema.safeParse(await response.json());
+      return parsed.success ? (parsed.data.sources as SourceProfiles) : {};
+    })
+    .catch(() => ({}));
+  return pendingProfiles;
 }
 
 const fits = (entry: ManifestEntry, gender: Gender) =>

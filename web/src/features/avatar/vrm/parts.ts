@@ -1,6 +1,14 @@
 import { VRMHumanBoneList, type VRM } from '@pixiv/three-vrm';
-import { Vector3, type Material, type Mesh, type Object3D, type SkinnedMesh } from 'three';
+import {
+  Quaternion,
+  Vector3,
+  type Material,
+  type Mesh,
+  type Object3D,
+  type SkinnedMesh,
+} from 'three';
 
+import type { PreparedFit } from './fitDonor';
 import {
   PART_CATEGORIES,
   classifyMaterial,
@@ -126,14 +134,18 @@ export function pruneSpringBones(vrm: VRM): number {
 }
 
 const _position = new Vector3();
+const _offset = new Vector3();
+const _rotation = new Quaternion();
 
 /**
  * Drive a donor from the base: copy normalized rotations (version-agnostic,
  * works across VRM 0.x/1.0), then move each raw joint onto the base joint's
  * world position so limb lengths match, then step the donor's spring bones.
- * The base's world matrices must be current (call after the base update).
+ * A fit's offsets shift a joint's contents (e.g. a hair cap re-centred on a
+ * taller skull). The base's world matrices must be current (call after the
+ * base update).
  */
-export function syncDonor(base: VRM, donor: VRM, dt: number): void {
+export function syncDonor(base: VRM, donor: VRM, dt: number, fit?: PreparedFit): void {
   const baseHumanoid = base.humanoid;
   const donorHumanoid = donor.humanoid;
   if (!baseHumanoid || !donorHumanoid) return;
@@ -159,6 +171,14 @@ export function syncDonor(base: VRM, donor: VRM, dt: number): void {
     const to = donorHumanoid.getRawBoneNode(name);
     if (!from || !to?.parent) continue;
     from.getWorldPosition(_position);
+    const offset = fit?.offsets.get(to);
+    if (offset) {
+      // Rotation only depends on the copied pose, so it is current already.
+      to.getWorldQuaternion(_rotation);
+      _position.add(
+        _offset.copy(offset).multiplyScalar(donor.scene.scale.x).applyQuaternion(_rotation),
+      );
+    }
     to.parent.updateWorldMatrix(false, false);
     to.position.copy(to.parent.worldToLocal(_position));
     to.updateWorldMatrix(false, false);

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { CameraFocus } from '../avatar/cameraFocus';
 import { Stage } from '../avatar/Stage';
-import { VrmAvatar } from '../avatar/VrmAvatar';
+import { VrmAvatar, type Assembly } from '../avatar/VrmAvatar';
 import type { SpeechPlayer } from '../lipsync/speechPlayer';
 import type { AvatarProps } from './avatarProps';
 import { BackdropName } from './BackdropName';
@@ -26,6 +26,17 @@ interface StagePaneProps {
   /** Show the one-time drag hint (hidden during the premiere). */
   showHint?: boolean;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
+}
+
+declare global {
+  interface Window {
+    /** Development only: the live character, for inspecting geometry from DevTools. */
+    __assembly?: Assembly;
+  }
+}
+
+function exposeForDebugging(assembly: Assembly): void {
+  if (process.env.NODE_ENV === 'development') window.__assembly = assembly;
 }
 
 /** The premiere stage: full-bleed canvas with overlays aligned to the visible area. */
@@ -59,7 +70,14 @@ export function StagePane({
         }}
         scenery={<BackdropName name={name} height={height} locale={locale} />}
       >
-        {avatar && <VrmAvatar {...avatar} speech={speech} onMeasured={setHeight} />}
+        {avatar && (
+          <VrmAvatar
+            {...avatar}
+            speech={speech}
+            onMeasured={setHeight}
+            onAssembled={exposeForDebugging}
+          />
+        )}
       </Stage>
 
       <div

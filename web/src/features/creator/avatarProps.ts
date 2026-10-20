@@ -1,6 +1,7 @@
 import { NO_PART, OWN_PART, type CharacterConfig } from '@/lib/character/schema';
 
 import type { BodyShape } from '../avatar/vrm/bodyShape';
+import type { BodyProfile } from '../avatar/vrm/fitDonor';
 import type { PartSelection } from '../avatar/vrm/parts';
 import type { Tints } from '../avatar/vrm/tint';
 import {
@@ -9,6 +10,7 @@ import {
   partsFor,
   type Gender,
   type PartCategory,
+  type SourceProfiles,
   type VrmManifest,
 } from './manifest';
 
@@ -41,6 +43,8 @@ export interface AvatarProps {
   parts: PartSelection;
   bodyShape: BodyShape;
   tints: Tints;
+  /** Source body profile per part URL, so parts refit onto the chosen base. */
+  sourceProfiles: Record<string, BodyProfile>;
 }
 
 function partUrl(manifest: VrmManifest, id: string): string | null | undefined {
@@ -52,9 +56,16 @@ function partUrl(manifest: VrmManifest, id: string): string | null | undefined {
 export function toAvatarProps(
   config: CharacterConfig,
   manifest: VrmManifest,
+  profiles: SourceProfiles = {},
 ): AvatarProps | undefined {
   const base = findEntry(manifest, config.face.preset) ?? basesFor(manifest, config.base)[0];
   if (!base) return undefined;
+  const sourceProfiles: Record<string, BodyProfile> = {};
+  for (const id of Object.values(CATEGORY_IDS).map((read) => read(config))) {
+    const entry = findEntry(manifest, id);
+    const profile = entry && profiles[entry.source];
+    if (entry && profile) sourceProfiles[entry.url] = profile;
+  }
   return {
     baseUrl: base.url,
     parts: {
@@ -72,6 +83,7 @@ export function toAvatarProps(
       bottom: config.outfit.bottom.color,
       shoes: config.outfit.shoes.color,
     },
+    sourceProfiles,
   };
 }
 

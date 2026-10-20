@@ -58,6 +58,35 @@ describe('applyBodyShape', () => {
     expect(worldScale(bones.head).x).toBeCloseTo(1.05);
   });
 
+  it('maps profile axes onto rotated bones (VRM 1.0 rest orientation)', () => {
+    const { bones, lookup } = makeSkeleton();
+    // The chest's local x points up the spine, so the canonical width goes to local y.
+    const rolled = { axis: [1, 0, 2] as const, sign: [1, 1, 1] as const };
+    applyBodyShape(
+      lookup,
+      ALL,
+      { build: 'athletic', height: 1 },
+      {
+        axes: (bone) => (bone === bones.chest ? rolled : { axis: [0, 1, 2], sign: [1, 1, 1] }),
+      },
+    );
+    expect(bones.chest.scale.x).toBeCloseTo(1);
+    expect(bones.chest.scale.y).toBeGreaterThan(1);
+  });
+
+  it('applies a fit to its own bone only', () => {
+    const { bones, lookup } = makeSkeleton();
+    applyBodyShape(
+      lookup,
+      ALL,
+      { build: 'average', height: 1 },
+      { fit: (name) => (name === 'chest' ? [1.2, 1, 1] : undefined) },
+    );
+    expect(worldScale(bones.chest).x).toBeCloseTo(1.2);
+    expect(worldScale(bones.neck).x).toBeCloseTo(1);
+    expect(worldScale(bones.head).x).toBeCloseTo(1);
+  });
+
   it('is idempotent across repeated calls', () => {
     const { bones, lookup } = makeSkeleton();
     applyBodyShape(lookup, ALL, { build: 'curvy', height: 1 });

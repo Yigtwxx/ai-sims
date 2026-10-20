@@ -2,21 +2,23 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { loadManifest, type VrmManifest } from './manifest';
+import { loadManifest, loadProfiles, type SourceProfiles, type VrmManifest } from './manifest';
 
 type ManifestState =
-  { status: 'loading' } | { status: 'ready'; manifest: VrmManifest } | { status: 'error' };
+  | { status: 'loading' }
+  | { status: 'ready'; manifest: VrmManifest; profiles: SourceProfiles }
+  | { status: 'error' };
 
-/** Loads the part manifest once, with a retry for transient failures. */
+/** Loads the part manifest (and body profiles) once, with a retry for transient failures. */
 export function useManifest(): ManifestState & { retry: () => void } {
   const [state, setState] = useState<ManifestState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    loadManifest()
-      .then((manifest) => {
-        if (!cancelled) setState({ status: 'ready', manifest });
+    Promise.all([loadManifest(), loadProfiles()])
+      .then(([manifest, profiles]) => {
+        if (!cancelled) setState({ status: 'ready', manifest, profiles });
       })
       .catch(() => {
         if (!cancelled) setState({ status: 'error' });
