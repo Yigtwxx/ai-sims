@@ -37,3 +37,6 @@ pipeline/cache/
 # Supabase local
 supabase/.branches/
 supabase/.temp/
+
+# Spike/pipeline GLB outputs (rebuild with `uv run asset-pipeline base`)
+web/public/assets/spike/

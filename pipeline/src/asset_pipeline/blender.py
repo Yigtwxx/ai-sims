@@ -16,9 +16,7 @@ def build_command(paths: Paths, script: str, script_args: list[str]) -> list[str
     return [
         str(paths.blender_bin),
         "--background",
-        "--factory-startup",
-        "--addons",
-        "bl_ext.blender_org.mpfb",
+        # No --factory-startup: MPFB is enabled through the user preferences.
         "--python-exit-code",
         "1",
         "--python",
