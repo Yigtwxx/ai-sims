@@ -10,6 +10,15 @@ import { timelineFromWords, type WordBoundary } from './wordAlign';
  * boundaries, else our Turkish text rules aligned to the audio's pauses;
  * loudness modulates how wide the mouth opens.
  */
+/**
+ * How far the mouth runs ahead of the heard audio (seconds). Budget: the mouth
+ * driver's smoothing reaches a new shape ~30 ms late and a frame reaches the
+ * screen ~25 ms after it is sampled; on top of that lips should lead the sound
+ * by ~35 ms, as they do in real speech (the plan's 40-80 ms window, measured
+ * from what the viewer sees).
+ */
+export const VISUAL_LEAD = 0.09;
+
 export class SpeechPlayer {
   private context: AudioContext | undefined;
   private source: AudioBufferSourceNode | undefined;
@@ -96,6 +105,8 @@ export class SpeechPlayer {
     return contextTime - this.startedAt;
   }
 
+  constructor(private readonly visualLead = VISUAL_LEAD) {}
+
   /** Loudness 0..1 of what is heard right now (0 when silent); drives head emphasis. */
   loudness(): number {
     if (!this.source || !this.envelope) return 0;
@@ -104,11 +115,13 @@ export class SpeechPlayer {
     return Math.min(1, sampleEnvelope(this.envelope, t) * 1.8);
   }
 
-  /** Viseme weights for the current frame (empty when silent). */
+  /** Viseme weights for the current frame (empty when silent), `visualLead` ahead of the audio. */
   sample(): VisemeWeights {
     if (!this.source || !this.envelope) return {};
-    const t = this.heardTime();
-    if (t < 0 || t > this.duration) return {};
+    const heard = this.heardTime();
+    if (heard < 0) return {};
+    const t = heard + this.visualLead;
+    if (t > this.duration) return {};
     const loudness = sampleEnvelope(this.envelope, t);
     // Keep shapes readable in quiet passages; louder speech opens wider.
     const openness = 0.45 + 0.55 * Math.min(1, loudness * 1.8);

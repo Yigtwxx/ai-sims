@@ -129,6 +129,10 @@ export function DevMhViewer() {
       (window as unknown as { __mh?: MhCharacterHandle }).__mh = handle;
       const t = clock.current;
       for (const name of ALL_MORPHS) handle.setFaceMorph(name, 0);
+      // Speech first, so an inspected morph (visemes included) wins over it.
+      const weights = player.current?.isPlaying ? player.current.sample() : {};
+      stepMouth(mouth.current, weights, delta);
+      applyMouthToMorphs(handle.faceMeshes, mouth.current);
       if (sweep) {
         const index = Math.floor(t / 1.2) % ALL_MORPHS.length;
         const phase = (t % 1.2) / 1.2;
@@ -137,9 +141,6 @@ export function DevMhViewer() {
       } else if (morph) {
         handle.setFaceMorph(morph, 1);
       }
-      const weights = player.current?.isPlaying ? player.current.sample() : {};
-      stepMouth(mouth.current, weights, delta);
-      applyMouthToMorphs(handle.faceMeshes, mouth.current);
       const step = stepBlink(blink.current, delta, Math.random);
       blink.current = step.state;
       if (!sweep && !morph) {

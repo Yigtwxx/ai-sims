@@ -1,4 +1,9 @@
-import { applyMouthToMorphs, createMouthState, stepMouth } from '@/features/lipsync/mouthDriver';
+import {
+  applyMouthToMorphs,
+  createMouthState,
+  prioritizeClosures,
+  stepMouth,
+} from '@/features/lipsync/mouthDriver';
 import type { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 
 import { stepBlink, type BlinkState } from '../life';
@@ -72,8 +77,11 @@ export class CharacterLife {
     handle.setFaceMorph('eyeBlinkLeft', lid);
     handle.setFaceMorph('eyeBlinkRight', lid);
 
-    stepMouth(this.mouth, speaking ? speech!.sample() : {}, delta);
+    stepMouth(this.mouth, speaking ? prioritizeClosures(speech!.sample()) : {}, delta);
     applyMouthToMorphs(handle.faceMeshes, this.mouth);
+    // Loud open vowels drop the jaw a little further than the viseme shape alone.
+    const open = this.mouth.aa + 0.6 * this.mouth.O + 0.4 * this.mouth.E + 0.2 * this.mouth.I;
+    handle.setFaceMorph('jawOpen', Math.min(0.35, open * loudness * 0.35));
   }
 }
 

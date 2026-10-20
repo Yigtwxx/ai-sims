@@ -50,7 +50,8 @@ afterEach(() => {
 
 /** Loads a script, starts playback and returns the mouth shape heard at `seconds`. */
 async function mouthAt(script: Parameters<SpeechPlayer['load']>[1], seconds: number) {
-  const player = new SpeechPlayer();
+  // No visual lead: these tests pin timing sources, not the lead (tested below).
+  const player = new SpeechPlayer(0);
   await player.load(new ArrayBuffer(8), script);
   await player.play();
   context.currentTime = seconds;
@@ -92,5 +93,21 @@ describe('SpeechPlayer.load', () => {
   it('stays silent outside the spoken part of the clip', async () => {
     const weights = await mouthAt({ words: [{ text: 'ma', time: 0.5, duration: 0.5 }] }, 1.8);
     expect(weights).toEqual({});
+  });
+});
+
+describe('SpeechPlayer visual lead', () => {
+  it('shows the mouth shape that is about to be heard', async () => {
+    const player = new SpeechPlayer(0.1);
+    await player.load(new ArrayBuffer(8), {
+      events: [
+        { viseme: 'aa', time: 0 },
+        { viseme: 'PP', time: 0.5 },
+      ],
+    });
+    await player.play();
+    context.currentTime = 0.45;
+    // Heard: still "aa"; shown: the closure 0.1 s ahead.
+    expect(player.sample().PP).toBeGreaterThan(0.5);
   });
 });
