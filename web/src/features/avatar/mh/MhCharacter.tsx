@@ -3,6 +3,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo } from 'react';
 import type { Material, Mesh, Object3D } from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 import type { MhIris, MhSkin } from '@/lib/assets/manifest';
@@ -22,6 +23,7 @@ import {
 } from './assembly';
 import { applyEyeMaterials, bindIrisTextures } from './eyeMaterials';
 import { useMhGltf } from './loaders';
+import { MotionPlayer, type MocapLayer, type MotionClip } from './motion';
 import {
   applySkinMaterials,
   loadSkinDetail,
@@ -38,6 +40,8 @@ export interface MhCharacterHandle {
   faceMeshes: Mesh[];
   /** Sets a face morph on every head primitive that has it. */
   setFaceMorph: (name: string, weight: number) => void;
+  /** Mocap body clips, once loaded (null: procedural idle only). */
+  motion: MotionPlayer | null;
 }
 
 export interface MhCharacterProps {
@@ -54,6 +58,10 @@ export interface MhCharacterProps {
   makeup?: boolean;
   /** Eyeball maps; converted heads carry none, so the eyes are white without one. */
   iris?: MhIris | null;
+  /** Idle body clips (GLB animations targeting MetaHuman bone names). */
+  idleClips?: readonly string[];
+  /** How much of the body the idle clips drive; the procedural layer does the rest. */
+  idleLayer?: MocapLayer;
   /** Called every frame after the mixer and before rendering (life, lip-sync). */
   onFrame?: (handle: MhCharacterHandle, delta: number) => void;
 }
@@ -64,7 +72,17 @@ export interface MhCharacterProps {
  * applied with rebinding, skin materials replaced by the MetaHuman skin shader.
  */
 export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(function MhCharacter(
-  { bodyUrl, headUrl, sliders, skin = null, makeup = false, iris = null, onFrame },
+  {
+    bodyUrl,
+    headUrl,
+    sliders,
+    skin = null,
+    makeup = false,
+    iris = null,
+    idleClips = NO_CLIPS,
+    idleLayer = 'full',
+    onFrame,
+  },
   ref,
 ) {
   const gl = useThree((state) => state.gl);
@@ -100,6 +118,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       body,
       faceMeshes,
       setFaceMorph: (name, weight) => setMorph(faceMeshes, name, weight),
+      motion: null,
     };
     return {
       root: bodyRoot,
@@ -148,6 +167,32 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     };
   }, [assembled]);
 
+  const clipKey = idleClips.join('|');
+  useEffect(() => {
+    if (!clipKey) return;
+    let live = true;
+    let player: MotionPlayer | null = null;
+    void loadClips(clipKey.split('|'))
+      .then((clips) => {
+        if (!live || clips.length === 0) return;
+        const body = assembled.handle.body;
+        player = new MotionPlayer(
+          assembled.root,
+          clips,
+          body.bones.get('pelvis') ?? null,
+          body.sliderPosition.get('pelvis') ?? null,
+          idleLayer,
+        );
+        attachMotion(assembled.handle, player);
+      })
+      .catch((error: unknown) => console.warn('[mh] idle clips failed to load', error));
+    return () => {
+      live = false;
+      attachMotion(assembled.handle, null);
+      player?.dispose();
+    };
+  }, [assembled, clipKey, idleLayer]);
+
   useImperativeHandle(ref, () => assembled.handle, [assembled]);
 
   useLayoutEffect(() => {
@@ -170,6 +215,40 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
 
   return <primitive object={assembled.root} />;
 });
+
+const NO_CLIPS: readonly string[] = [];
+
+const clipCache = new Map<string, Promise<MotionClip[]>>();
+
+/**
+ * Animation clips of animation-only GLBs (with their skeleton's pelvis rest),
+ * once per URL. A file that fails to load is skipped, not fatal to the others.
+ */
+async function loadClips(urls: readonly string[]): Promise<MotionClip[]> {
+  const results = await Promise.allSettled(
+    urls.map((url) => {
+      let pending = clipCache.get(url);
+      if (!pending) {
+        pending = new GLTFLoader().loadAsync(url).then((gltf) => {
+          const pelvisRest = gltf.scene.getObjectByName('pelvis')?.position.clone() ?? null;
+          return gltf.animations.map((clip) => ({ clip, pelvisRest }));
+        });
+        pending.catch(() => clipCache.delete(url));
+        clipCache.set(url, pending);
+      }
+      return pending;
+    }),
+  );
+  return results.flatMap((result, i) => {
+    if (result.status === 'fulfilled') return result.value;
+    console.warn('[mh] idle clip failed to load', urls[i], result.reason);
+    return [];
+  });
+}
+
+function attachMotion(handle: MhCharacterHandle, motion: MotionPlayer | null): void {
+  handle.motion = motion;
+}
 
 function hasMaps(materials: readonly Material[]): boolean {
   return materials.every((material) => (material as Material & { map?: unknown }).map);

@@ -17,7 +17,7 @@ import {
   type LifeMode,
 } from './idle';
 import type { MhCharacterHandle } from './MhCharacter';
-import { applyPose, createPoseRig, type PoseRig } from './pose';
+import { addRotations, createPoseRig, resetPose, type PoseRig } from './pose';
 
 const EYES = ['FACIAL_L_Eye', 'FACIAL_R_Eye'] as const;
 /** Share of a head turn the eyes cancel, so the gaze stays on the viewer. */
@@ -56,7 +56,16 @@ export class CharacterLife {
     const lifeMode: LifeMode = speaking ? 'speaking' : mode;
     const loudness = speaking ? speech!.loudness() : 0;
 
-    const rotations = idlePose({ t: this.t, mode: lifeMode, loudness });
+    // Rest first (for bones no clip drives), then the mocap clip, then our layers on top.
+    resetPose(this.rig!);
+    const motion = handle.motion;
+    motion?.update(delta);
+    const rotations = idlePose({
+      t: this.t,
+      mode: lifeMode,
+      loudness,
+      mocap: motion?.active ? motion.layer : null,
+    });
     this.gaze = stepGaze(this.gaze, delta, lifeMode, this.random);
     const head = headTurn(rotations);
     const eyeYaw = this.gaze.yaw - head.yaw * EYE_COUNTER;
@@ -65,7 +74,7 @@ export class CharacterLife {
       rotations.push({ bone: eye, axis: [0, 1, 0], angle: eyeYaw });
       rotations.push({ bone: eye, axis: [1, 0, 0], angle: -eyePitch });
     }
-    applyPose(this.rig!, rotations);
+    addRotations(this.rig!, rotations);
 
     for (const [name, weight] of Object.entries(eyeLookMorphs(eyeYaw, eyePitch))) {
       handle.setFaceMorph(name, weight);

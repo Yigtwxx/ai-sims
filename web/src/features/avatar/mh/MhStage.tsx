@@ -134,6 +134,8 @@ export function MhStage({
                 skin={resolved.skin}
                 makeup={resolved.makeup}
                 iris={resolved.iris}
+                idleClips={resolved.idleClips}
+                idleLayer={resolved.idleLayer}
                 onFrame={onFrame}
               />
               <FirstFrame onReady={onReady} />

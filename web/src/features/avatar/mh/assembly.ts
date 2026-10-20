@@ -35,6 +35,8 @@ export interface BodyRig {
   /** Neutral local transforms, restored before every rebind. */
   restPosition: Map<string, Vector3>;
   restQuaternion: Map<string, Quaternion>;
+  /** Joint positions with the current body sliders applied (the pose clips move from). */
+  sliderPosition: Map<string, Vector3>;
   jointDeltas: JointDeltas;
   /** Head neck snapped to this body's neck; re-snapped whenever the sliders move it. */
   seam?: NeckSeamBinding;
@@ -84,7 +86,8 @@ export function createBodyRig(root: Object3D, jointDeltas: JointDeltas): BodyRig
     restPosition.set(name, bone.position.clone());
     restQuaternion.set(name, bone.quaternion.clone());
   }
-  return { root, mesh, bones, restPosition, restQuaternion, jointDeltas };
+  const sliderPosition = new Map([...restPosition].map(([name, p]) => [name, p.clone()]));
+  return { root, mesh, bones, restPosition, restQuaternion, sliderPosition, jointDeltas };
 }
 
 /**
@@ -172,6 +175,7 @@ export function applyBodySliders(
       if (delta)
         bone.position.add(scratch.set(delta[0], delta[1], delta[2]).multiplyScalar(weight));
     }
+    body.sliderPosition.get(name)!.copy(bone.position);
   }
   body.root.updateMatrixWorld(true);
   // Re-bake the rest pose: inverse bind matrices from the moved joints. In

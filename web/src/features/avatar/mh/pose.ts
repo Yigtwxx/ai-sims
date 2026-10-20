@@ -39,9 +39,23 @@ const axis = new Vector3();
 const delta = new Quaternion();
 const local = new Quaternion();
 
+/** Puts every rig bone back to its rest rotation. */
+export function resetPose(rig: PoseRig): void {
+  for (const [name, bone] of rig.bones) bone.quaternion.copy(rig.rest.get(name)!);
+}
+
 /** Resets every rig bone to rest, then applies the rotations in order. */
 export function applyPose(rig: PoseRig, rotations: readonly BoneRotation[]): void {
-  for (const [name, bone] of rig.bones) bone.quaternion.copy(rig.rest.get(name)!);
+  resetPose(rig);
+  addRotations(rig, rotations);
+}
+
+/**
+ * Applies character-space rotations on top of the bones' current rotation
+ * (e.g. what a mocap clip wrote this frame). Call resetPose first each frame
+ * for bones no clip animates, or the rotations accumulate.
+ */
+export function addRotations(rig: PoseRig, rotations: readonly BoneRotation[]): void {
   for (const { bone: name, axis: a, angle } of rotations) {
     const bone = rig.bones.get(name);
     if (!bone || angle === 0) continue;

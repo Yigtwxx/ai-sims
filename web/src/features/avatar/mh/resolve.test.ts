@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { MhManifestSchema } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 
-import { BASE_HEIGHT, HEIGHT_RANGE, resolveCharacter } from './resolve';
+import { BASE_HEIGHT, HEIGHT_RANGE, idleSet, MIN_CALM_IDLES, resolveCharacter } from './resolve';
 
 const manifest = MhManifestSchema.parse({
   version: 2,
@@ -81,6 +81,39 @@ describe('resolveCharacter', () => {
     config.skin.set = 'Gone';
     expect(resolveCharacter(config, withSkins)?.skin?.id).toBe('Ada');
     expect(resolveCharacter(config, manifest)?.skin).toBeNull();
+  });
+
+  describe('idleSet', () => {
+    const withIdles = (tags: string[][]) =>
+      MhManifestSchema.parse({
+        ...manifest,
+        animations: tags.map((clipTags, i) => ({
+          id: `idle${i}`,
+          kind: 'body',
+          file: `animations/idle${i}.glb`,
+          tags: clipTags,
+        })),
+      });
+
+    it('drives the whole body with enough calm clips', () => {
+      const set = idleSet(withIdles([...Array(MIN_CALM_IDLES)].map(() => ['idle', 'calm'])));
+      expect(set.idleLayer).toBe('full');
+      expect(set.idleClips).toHaveLength(MIN_CALM_IDLES);
+    });
+
+    it('falls back to the body layer of standing clips', () => {
+      const set = idleSet(
+        withIdles([['idle', 'calm'], ['idle', 'standing'], ['idle', 'standing'], ['idle']]),
+      );
+      expect(set).toEqual({
+        idleLayer: 'body',
+        idleClips: ['/assets/mh/animations/idle1.glb', '/assets/mh/animations/idle2.glb'],
+      });
+    });
+
+    it('has no clips when nothing is tagged idle', () => {
+      expect(idleSet(manifest).idleClips).toEqual([]);
+    });
   });
 
   it('returns null when the manifest has no body for the gender', () => {

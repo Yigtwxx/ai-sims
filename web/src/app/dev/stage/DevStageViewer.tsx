@@ -10,6 +10,13 @@ import { createDefaultConfig } from '@/lib/character/defaults';
 import { benchIris, benchSkin } from '../benchSkins';
 
 const FACES = ['Ada', 'Aera', 'Aoi'] as const;
+/**
+ * Retargeted crowd idles (web/scripts/retarget-fbx.mjs output) that its
+ * clips.json flags `standing` with an upright torso; used as the body layer.
+ */
+const BENCH_IDLES = [20, 29, 34, 36, 38, 41, 49, 57].map(
+  (n) => `Crowd_Idle_UE5_Smooth${String(n).padStart(3, '0')}`,
+);
 
 /**
  * Minimal manifest over the converted files on this machine, until the
@@ -34,6 +41,12 @@ function benchManifest(): MhManifest {
     })),
     skins: FACES.map(benchSkin),
     irises: FACES.map(benchIris),
+    animations: BENCH_IDLES.map((name) => ({
+      id: name,
+      kind: 'body',
+      file: `animations/fab/crowd_idle_59/${name}.glb`,
+      tags: ['idle', 'standing'],
+    })),
     bodies: [body('female'), body('male')],
   });
 }

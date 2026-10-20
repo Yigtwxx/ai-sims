@@ -47,6 +47,19 @@ describe('idlePose', () => {
     );
   });
 
+  it('leaves the weight shift to a body-layer clip but keeps arms and head', () => {
+    const bones = new Set(idlePose({ t: 2, mode: 'idle', mocap: 'body' }).map((r) => r.bone));
+    expect(bones.has('upperarm_l')).toBe(true);
+    expect(bones.has('head')).toBe(true);
+    expect(bones.has('pelvis')).toBe(false);
+    expect(bones.has('spine_01')).toBe(false);
+  });
+
+  it('adds only a head layer on top of a full-body clip', () => {
+    const bones = new Set(idlePose({ t: 2, mode: 'idle', mocap: 'full' }).map((r) => r.bone));
+    expect([...bones].sort()).toEqual(['head', 'neck_01']);
+  });
+
   it('nods the head down with speech loudness', () => {
     const quiet = angleOf(idlePose({ t: 3, mode: 'speaking', loudness: 0 }), 'head', 0);
     const loud = angleOf(idlePose({ t: 3, mode: 'speaking', loudness: 1 }), 'head', 0);
