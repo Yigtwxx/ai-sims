@@ -55,3 +55,9 @@ Hedef artık fotogerçekçilik değil, **yüksek kaliteli stilize (animasyon fil
 - Holoxone yalnızca "kaliteli his" referansı olarak kalıyor.
 - Bu spike'ta yazılan stüdyo, turntable, post-processing, canlılık animasyonları ve lip-sync morph altyapısı stilize karakterde aynen kullanılacak.
 - Yalnızca asset kaynağı ve malzeme stili değişecek.
+
+## Sonuç: anime (VRM)
+
+- `spike/04-vrm-anime-body.jpeg`: VRoid örnek modeli (AvatarSample_B), MToon ve Neutral ton eşlemeyle.
+- Kalite, MPFB gerçekçi yolundan belirgin şekilde yüksek; stilize hedefe uygun.
+- Lip-sync VRM yüzünde doğrulandı: `Fcl_MTH_A/I/U/E` sesle senkron sürülüyor, `Fcl_MTH_Close` m/b/p'de kapanıyor.

@@ -1,5 +1,13 @@
 # AI Sims — Photoreal Character Creator + AI Chat (Design & Plan)
 
+> **Revizyon (2026-10-20, aynı gün).** Bu belgedeki bazı kararlar spike sonrası değişti; çakışma olursa bu kutu geçerlidir:
+> - **Stil:** Fotogerçekçilik şart değil. Ana stil **anime (VRoid → VRM → `@pixiv/three-vrm`, MToon)**. Gerçekçi (MPFB) stil, kullanıcının seçebildiği yan seçenek olarak daha az parçayla kalır. `CharacterConfig.style: 'anime' | 'realistic'`.
+> - **Veri/Auth:** Supabase yerine **MongoDB + Better Auth** (anonim giriş). Geliştirmede izole `mongod` `127.0.0.1:27018` adresinde çalışır; Compass bağlantısı `mongodb://localhost:27018`.
+> - **Lip-sync:** Render'dan bağımsız Türkçe viseme motoru (`web/src/features/lipsync`). Ara format olarak Oculus 15 viseme kullanılır; m/b/p'de dudaklar tam kapanır; cümleler sesteki konuşma bölgelerine hizalanır; ağız açıklığı ses yüksekliğine göre ölçeklenir. VRM'de aa/ih/ou/ee/oh ifadeleri ve `Fcl_MTH_Close`, MPFB'de `viseme_*` morph'ları sürülür. Faz 4'te Azure TTS viseme olayları doğrudan beslenecek.
+> - **Lisans riski (kullanıcı kararı):** VRoid kuralları ve AvatarSample koşulları, VRoid parçalarını birleştiren karakter oluşturucuları pixiv lisansı olmadan yasaklıyor. İç demo için risk kullanıcı tarafından kabul edildi. Halka açık yayından önce pixiv lisansı alınmalı ya da parçalar değiştirilmeli.
+> - Unreal / Pixel Streaming kaçış yolu artık gerekmiyor.
+
+
 ## Context
 
 Şirket içi demo/POC: Sims tarzı bir **karakter oluşturucu**. Erkek + Kadın base, saç, göz rengi, cilt tonu, yüz, üst/alt kıyafet, ayakkabı. Karakter mouse ile sürüklenip 360° döndürülebilecek. Kullanıcı "Bitti/Onayla" deyince karakter (sonraki fazda) LLM ile genel amaçlı sohbet edecek. Konuşurken **ağzı kelimelerle senkron oynayacak** (TTS + lip-sync). **En kritik gereksinim gerçekçilik**: kalite hedefi Holoxone tanıtım videosundaki adam.
