@@ -33,7 +33,7 @@ vi.mock('@google/genai', async (importOriginal) => {
   return { ...actual, GoogleGenAI: FakeGoogleGenAI };
 });
 
-const { geminiProvider } = await import('./gemini');
+const { geminiProvider, thinkingLevelFor } = await import('./gemini');
 const { ApiError, FinishReason, ThinkingLevel } =
   await vi.importActual<typeof import('@google/genai')>('@google/genai');
 
@@ -90,7 +90,7 @@ describe('geminiProvider', () => {
     await collect(geminiProvider.stream({ ...REQUEST, signal: controller.signal }));
 
     expect(sdk.requests[0]).toMatchObject({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.5-flash-lite',
       contents: [
         { role: 'user', parts: [{ text: 'Merhaba' }] },
         { role: 'model', parts: [{ text: 'Selam!' }] },
@@ -99,7 +99,8 @@ describe('geminiProvider', () => {
       config: {
         systemInstruction: 'You are Mira.',
         abortSignal: controller.signal,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        // Flash-Lite spends no thinking tokens at MINIMAL, which keeps the first token fast.
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       },
     });
   });
@@ -121,6 +122,17 @@ describe('geminiProvider', () => {
     const request = sdk.requests[0] as { model: string; config: Record<string, unknown> };
     expect(request.model).toBe('gemini-2.5-flash');
     expect(request.config).not.toHaveProperty('thinkingConfig');
+  });
+
+  it('falls back to LOW thinking for a model that rejects MINIMAL', async () => {
+    vi.stubEnv('GEMINI_MODEL', 'gemini-3.8-flash');
+    sdk.nextChunks = [chunk('ok', 'STOP')];
+    await collect(geminiProvider.stream(REQUEST));
+
+    expect(sdk.requests[0]).toMatchObject({
+      model: 'gemini-3.8-flash',
+      config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
+    });
   });
 
   it('throws a refusal error when the prompt is blocked', async () => {
@@ -153,6 +165,30 @@ describe('geminiProvider', () => {
     await expect(collect(geminiProvider.stream(REQUEST))).rejects.toMatchObject({
       kind: 'empty',
     });
+  });
+
+  describe('thinkingLevelFor', () => {
+    it.each([
+      ['gemini-3.5-flash-lite', ThinkingLevel.MINIMAL],
+      ['gemini-3.1-flash-lite', ThinkingLevel.MINIMAL],
+      ['gemini-3.5-flash', ThinkingLevel.MINIMAL],
+      ['gemini-3.6-flash', ThinkingLevel.MINIMAL],
+      // gemini-3.7-flash, gemini-3.8-flash and gemini-flash-latest answer MINIMAL with a 400.
+      ['gemini-3.7-flash', ThinkingLevel.LOW],
+      ['gemini-3.8-flash', ThinkingLevel.LOW],
+      // Unknown future 3.x models get the level every 3.x model accepted so far.
+      ['gemini-3.9-flash', ThinkingLevel.LOW],
+      ['gemini-3-pro', ThinkingLevel.LOW],
+    ])('picks the accepted level for %s', (model, expected) => {
+      expect(thinkingLevelFor(model)).toBe(expected);
+    });
+
+    it.each(['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemma-3'])(
+      'leaves the API default for %s (thinkingBudget models and moving aliases)',
+      (model) => {
+        expect(thinkingLevelFor(model)).toBeUndefined();
+      },
+    );
   });
 
   describe('errors', () => {

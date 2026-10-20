@@ -10,7 +10,7 @@ const PROVIDERS: Record<ProviderId, ChatProvider> = {
   groq: groqProvider,
 };
 
-/** Providers in AI_PROVIDER_ORDER (default: anthropic, gemini, groq), configured or not. */
+/** Providers in AI_PROVIDER_ORDER (default: groq, gemini, anthropic), configured or not. */
 export function getOrderedProviders(): ChatProvider[] {
   return getAiEnv().providerOrder.map((id) => PROVIDERS[id]);
 }

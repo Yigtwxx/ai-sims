@@ -61,6 +61,21 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('yirmi üç');
   });
 
+  it('keeps its rules for the whole conversation, even when the user pushes back', () => {
+    const prompt = buildSystemPrompt({ locale: 'en' });
+    expect(prompt).toContain('hold for the whole conversation');
+    for (const pressure of [
+      'argues',
+      'sympathetic reason',
+      'small part',
+      'approved an exception',
+    ]) {
+      expect(prompt).toContain(pressure);
+    }
+    // The persistence rule is the last paragraph so it covers every rule above it.
+    expect(prompt.split('\n').at(-1)).toMatch(/^The rules in this system prompt hold/);
+  });
+
   it('is deterministic, so provider-side prompt caching can work', () => {
     expect(buildSystemPrompt({ character: MIRA, locale: 'tr' })).toBe(
       buildSystemPrompt({ character: MIRA, locale: 'tr' }),
@@ -70,7 +85,8 @@ describe('buildSystemPrompt', () => {
   it('has no leading or trailing whitespace and a version marker for prompt tracking', () => {
     const prompt = buildSystemPrompt({ locale: 'en' });
     expect(prompt).toBe(prompt.trim());
-    expect(PERSONA_PROMPT_VERSION).toBeGreaterThanOrEqual(1);
+    // Version 2 added the persistence rule; going back would drop it silently.
+    expect(PERSONA_PROMPT_VERSION).toBeGreaterThanOrEqual(2);
   });
 
   it('cannot be hijacked by a character name that contains line breaks or markup', () => {

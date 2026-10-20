@@ -15,6 +15,21 @@ const REQUEST_TIMEOUT_MS = 60_000;
 // The SDK retries 408/409/429/5xx and connection errors with exponential backoff.
 const MAX_RETRIES = 2;
 
+const SERVER_SIDE_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+
+/**
+ * Models that accept the server-side refusal fallback (`fallbacks: 'default'` plus the beta
+ * above). Claude Haiku 5.5, the default, has none: with `'default'` a declined request just
+ * stays declined and a model list is a 400, so it is sent without the beta and a refusal is
+ * handled by the router like any other provider failure. Add a model here only after checking
+ * https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback#server-side-fallback
+ */
+const SERVER_SIDE_FALLBACK_MODELS: ReadonlySet<string> = new Set(['claude-opus-5-5']);
+
+export function supportsServerSideFallback(model: string): boolean {
+  return SERVER_SIDE_FALLBACK_MODELS.has(model);
+}
+
 export const anthropicProvider: ChatProvider = {
   id: 'anthropic',
   isConfigured: () => getAiEnv().anthropicApiKey !== undefined,
@@ -31,22 +46,25 @@ async function* streamClaude({ system, messages, signal }: ChatRequest): AsyncGe
     timeout: REQUEST_TIMEOUT_MS,
   });
 
-  const stream = client.beta.messages.stream(
-    {
-      model: anthropicModel,
-      max_tokens: MAX_TOKENS,
-      system,
-      messages: [...messages],
-      // Claude Opus 5.5 always thinks: `thinking: {type: "disabled"}` is a 400 and so is a
-      // trailing assistant message (prefill). Effort is the latency control.
-      output_config: { effort: 'low' },
-      // Server-side refusal fallback: a classifier decline is retried on Anthropic's
-      // recommended model inside the same call instead of coming back as a refusal.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-    },
-    { signal },
-  );
+  const params = {
+    model: anthropicModel,
+    max_tokens: MAX_TOKENS,
+    system,
+    messages: [...messages],
+    // Claude Haiku 5.5 and Opus 5.5 think adaptively by default, so `thinking` stays unset
+    // (`disabled` is a 400 on Opus 5.5 and Anthropic's guidance is to lower effort instead).
+    // Low effort is the latency control. Never send temperature, top_p or top_k (400 on both
+    // models) and never end `messages` with an assistant turn (prefill is a 400).
+    output_config: { effort: 'low' as const },
+  };
+
+  // The beta endpoint is used only when a server-side fallback is actually available.
+  const stream = supportsServerSideFallback(anthropicModel)
+    ? client.beta.messages.stream(
+        { ...params, betas: [SERVER_SIDE_FALLBACK_BETA], fallbacks: 'default' },
+        { signal },
+      )
+    : client.messages.stream(params, { signal });
 
   let emitted = false;
   try {
@@ -58,8 +76,9 @@ async function* streamClaude({ system, messages, signal }: ChatRequest): AsyncGe
       }
     }
 
-    // A refusal arrives as a normal 200 response; always check before trusting the text.
-    // Without a fallback model the whole chain declined; partial text must not be treated as complete.
+    // A refusal arrives as a normal 200 response (safety classifiers can decline); always check
+    // before trusting the text. Nothing retries it server-side on the default model, and partial
+    // text before a decline must not be treated as a complete reply.
     const final = await stream.finalMessage();
     if (final.stop_reason === 'refusal') throw new ProviderError('anthropic', 'refusal');
     if (!emitted) throw new ProviderError('anthropic', 'empty');

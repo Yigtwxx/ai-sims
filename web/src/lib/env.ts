@@ -63,24 +63,38 @@ export function requireAuthEnv(): AuthEnv {
  * ------------------------------------------------------------------------- */
 
 /**
- * Defaults, verified on 2026-10-20 against the providers' official docs:
- * - Claude: `claude-opus-5-5`, written without a date suffix.
- *   https://platform.claude.com/docs/en/get-started
- * - Gemini: stable `gemini-3.8-flash`. The models page says "For any new projects, use our
- *   latest models: 3.5 Flash-Lite or 3.8 Flash"; pricing lists a free tier for it.
- *   https://ai.google.dev/gemini-api/docs/models
- *   https://ai.google.dev/gemini-api/docs/pricing
- * - Groq: `openai/gpt-oss-120b`, the flagship of the "Production Models" table.
+ * Defaults, chosen on 2026-10-20 by timing one Turkish persona turn on this project's own keys
+ * (time to first token over several runs per candidate) and checking the providers' docs.
+ * Groq and Gemini are used on their free tiers, so the picks are fast, reliable and light on
+ * quota rather than the biggest model each provider has:
+ * - Groq: `openai/gpt-oss-120b` with low, hidden reasoning. About 0.3 s to the first token,
+ *   correct facts, natural Turkish. `gpt-oss-20b` got a fact wrong and `qwen/qwen3.8-27b` made
+ *   typos. All three share the same free base limits (docs and response headers).
  *   https://console.groq.com/docs/models
  *   https://console.groq.com/docs/reasoning
+ *   https://console.groq.com/docs/rate-limits
+ * - Gemini: pinned `gemini-3.5-flash-lite` with `MINIMAL` thinking. No errors in 40+ calls and
+ *   about 0.6 s to the first token when warm (a call after minutes of idle took 0.6 to 11 s).
+ *   The bigger Flash models were slow, overloaded or out of free quota (`gemini-3.8-flash`:
+ *   timeouts and 429). The models page says "For any new projects, use our latest models:
+ *   3.5 Flash-Lite or 3.8 Flash"; pricing lists a free tier for 3.5 Flash-Lite.
+ *   https://ai.google.dev/gemini-api/docs/models
+ *   https://ai.google.dev/gemini-api/docs/pricing
+ * - Claude: `claude-haiku-5-5`, exactly this id (no date suffix). Cheap ($0.10 / $0.50 per
+ *   million tokens up to a 100K-token prompt), about 1 s to the first token, natural Turkish.
+ *   It is the paid last resort, used only when both free providers fail before their first token.
+ *   https://platform.claude.com/docs/en/about-claude/models/overview
+ *   https://platform.claude.com/docs/en/about-claude/pricing
+ * - Order: free providers first, the paid one last. Written out on purpose instead of
+ *   deriving it from PROVIDER_IDS, whose order is only the registry order.
  * - Azure voices: Standard neural voices from the voice table. tr-TR is also listed in the
  *   "Visemes" table of the same page (Viseme ID, no blend shapes).
  *   https://learn.microsoft.com/azure/ai-services/speech-service/language-support?tabs=tts
  */
-export const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5-5';
-export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+export const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-5-5';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
-export const DEFAULT_PROVIDER_ORDER: readonly ProviderId[] = PROVIDER_IDS;
+export const DEFAULT_PROVIDER_ORDER: readonly ProviderId[] = ['groq', 'gemini', 'anthropic'];
 
 export const DEFAULT_TTS_VOICES: TtsVoices = {
   tr: { female: 'tr-TR-EmelNeural', male: 'tr-TR-AhmetNeural' },
@@ -131,7 +145,7 @@ function readVoice(name: string, fallback: string): string {
 }
 
 /**
- * Parses AI_PROVIDER_ORDER ("anthropic,gemini,groq"). Unknown names are reported
+ * Parses AI_PROVIDER_ORDER ("groq,gemini,anthropic"). Unknown names are reported
  * in `ignored`; when nothing valid remains the default order is used.
  */
 export function parseProviderOrder(raw: string | undefined): {

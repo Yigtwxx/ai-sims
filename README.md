@@ -10,7 +10,7 @@ A photorealistic, customizable 3D character creator that runs in the browser. Af
 - **Turntable viewer:** drag to rotate the character 360°. The camera focuses on the face or the feet depending on the category.
 - **Realistic rendering:** studio HDRI lighting, skin subsurface approximation, eye and hair shading, idle animation, procedural blinking.
 - **Profiles:** each user's characters are saved to MongoDB. For now the demo uses anonymous login with one click.
-- **AI chat (phase 4):** multi-provider LLM (Anthropic, Gemini and Groq, with fallback) and TTS with viseme-driven lip-sync, including Turkish.
+- **AI chat (phase 4):** multi-provider LLM (Groq, then Gemini, then Claude Haiku as the paid last resort) and TTS with viseme-driven lip-sync, including Turkish.
 - **i18n:** Turkish and English.
 
 ## Tech stack
@@ -57,7 +57,7 @@ Database:
 - Without these env vars the app still builds and the landing page renders; the login button shows a "Database not configured" message.
 
 AI chat and voice (optional):
-- API keys for Anthropic, Gemini, Groq (chat) and Azure Speech (voice) go into `web/.env.local`. Step-by-step setup for every account, free-tier limits and how to verify each key: [`docs/setup-accounts.md`](docs/setup-accounts.md) (Turkish).
+- API keys for Groq, Gemini, Anthropic (chat) and Azure Speech (voice) go into `web/.env.local`. Step-by-step setup for every account, free-tier limits and how to verify each key: [`docs/setup-accounts.md`](docs/setup-accounts.md) (Turkish).
 - Without keys the app still runs: `POST /api/chat` answers `503 ai_not_configured` and `POST /api/tts` answers `503 tts_not_configured`.
 - In development, `curl localhost:3000/api/health` reports which services are configured (booleans only; the route returns 404 in production).
 

@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PROVIDER_IDS } from './ai/types';
 import {
   DEFAULT_ANTHROPIC_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GROQ_MODEL,
+  DEFAULT_PROVIDER_ORDER,
   DEFAULT_TTS_VOICES,
   getAiEnv,
   getAzureSpeechEnv,
@@ -38,9 +40,15 @@ afterEach(() => {
 });
 
 describe('parseProviderOrder', () => {
-  it('defaults to anthropic, gemini, groq', () => {
-    expect(parseProviderOrder(undefined).order).toEqual(['anthropic', 'gemini', 'groq']);
-    expect(parseProviderOrder('').order).toEqual(['anthropic', 'gemini', 'groq']);
+  it('defaults to groq, gemini, anthropic: free providers first, the paid one last', () => {
+    expect(parseProviderOrder(undefined).order).toEqual(['groq', 'gemini', 'anthropic']);
+    expect(parseProviderOrder('').order).toEqual(['groq', 'gemini', 'anthropic']);
+  });
+
+  it('lists every known provider exactly once in the default order', () => {
+    // The default is written out, not derived from PROVIDER_IDS, so a new provider id must be
+    // added to it by hand; this fails until it is.
+    expect([...DEFAULT_PROVIDER_ORDER].sort()).toEqual([...PROVIDER_IDS].sort());
   });
 
   it('keeps the configured order, lowercases and removes duplicates', () => {
@@ -50,7 +58,7 @@ describe('parseProviderOrder', () => {
   it('reports unknown names and falls back to the default when nothing valid is left', () => {
     const parsed = parseProviderOrder('openai, mistral');
     expect(parsed.ignored).toEqual(['openai', 'mistral']);
-    expect(parsed.order).toEqual(['anthropic', 'gemini', 'groq']);
+    expect(parsed.order).toEqual(['groq', 'gemini', 'anthropic']);
   });
 });
 
@@ -65,11 +73,17 @@ describe('getAiEnv', () => {
     expect(env.anthropicModel).toBe(DEFAULT_ANTHROPIC_MODEL);
     expect(env.geminiModel).toBe(DEFAULT_GEMINI_MODEL);
     expect(env.groqModel).toBe(DEFAULT_GROQ_MODEL);
-    expect(env.providerOrder).toEqual(['anthropic', 'gemini', 'groq']);
+    expect(env.providerOrder).toEqual(['groq', 'gemini', 'anthropic']);
   });
 
-  it('uses claude-opus-5-5 without a date suffix by default', () => {
-    expect(DEFAULT_ANTHROPIC_MODEL).toBe('claude-opus-5-5');
+  it('uses claude-haiku-5-5 without a date suffix by default', () => {
+    expect(DEFAULT_ANTHROPIC_MODEL).toBe('claude-haiku-5-5');
+  });
+
+  it('pins the free-tier models instead of following a -latest alias', () => {
+    expect(DEFAULT_GEMINI_MODEL).toBe('gemini-3.5-flash-lite');
+    expect(DEFAULT_GEMINI_MODEL).not.toMatch(/latest/);
+    expect(DEFAULT_GROQ_MODEL).toBe('openai/gpt-oss-120b');
   });
 
   it('reads keys and model overrides', () => {

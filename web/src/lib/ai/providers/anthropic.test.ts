@@ -8,6 +8,7 @@ import type { ChatRequest } from '../types';
 // typed-error mapping is exercised for real. No network is involved.
 const sdk = vi.hoisted(() => ({
   clientOptions: [] as unknown[],
+  endpoints: [] as string[],
   streamParams: [] as unknown[],
   streamOptions: [] as unknown[],
   nextStream: undefined as unknown,
@@ -15,16 +16,16 @@ const sdk = vi.hoisted(() => ({
 
 vi.mock('@anthropic-ai/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@anthropic-ai/sdk')>();
+  // Records which endpoint a call used: `messages` (standard) or `beta.messages`.
+  const record = (endpoint: string) => (params: unknown, options: unknown) => {
+    sdk.endpoints.push(endpoint);
+    sdk.streamParams.push(params);
+    sdk.streamOptions.push(options);
+    return sdk.nextStream;
+  };
   class FakeAnthropic {
-    beta = {
-      messages: {
-        stream: (params: unknown, options: unknown) => {
-          sdk.streamParams.push(params);
-          sdk.streamOptions.push(options);
-          return sdk.nextStream;
-        },
-      },
-    };
+    messages = { stream: record('messages') };
+    beta = { messages: { stream: record('beta.messages') } };
     constructor(options: unknown) {
       sdk.clientOptions.push(options);
     }
@@ -32,7 +33,7 @@ vi.mock('@anthropic-ai/sdk', async (importOriginal) => {
   return { ...actual, default: FakeAnthropic };
 });
 
-const { anthropicProvider } = await import('./anthropic');
+const { anthropicProvider, supportsServerSideFallback } = await import('./anthropic');
 const actualSdk = await vi.importActual<typeof import('@anthropic-ai/sdk')>('@anthropic-ai/sdk');
 
 const REQUEST: ChatRequest = {
@@ -83,6 +84,7 @@ async function collect(stream: AsyncIterable<string>): Promise<string[]> {
 
 beforeEach(() => {
   sdk.clientOptions.length = 0;
+  sdk.endpoints.length = 0;
   sdk.streamParams.length = 0;
   sdk.streamOptions.length = 0;
   vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-test-key');
@@ -115,27 +117,47 @@ describe('anthropicProvider', () => {
     expect(await collect(anthropicProvider.stream(REQUEST))).toEqual(['İyiyim, ', 'teşekkürler.']);
   });
 
-  it('sends the Claude Opus 5.5 request shape with the server-side refusal fallback', async () => {
+  it('sends the Claude Haiku 5.5 request on the standard endpoint, with no server-side fallback', async () => {
     sdk.nextStream = fakeStream([textDelta('ok')]);
     const controller = new AbortController();
 
     await collect(anthropicProvider.stream({ ...REQUEST, signal: controller.signal }));
 
+    expect(sdk.endpoints).toEqual(['messages']);
     const params = sdk.streamParams[0] as Record<string, unknown>;
     expect(params).toMatchObject({
-      model: 'claude-opus-5-5',
+      model: 'claude-haiku-5-5',
       system: 'You are Mira.',
       messages: REQUEST.messages,
       output_config: { effort: 'low' },
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
     });
-    // `thinking: {type: "disabled"}` is a 400 on this model: the field must be omitted.
-    expect(params).not.toHaveProperty('thinking');
+    // Haiku 5.5 has no server-side fallback ('default' does nothing, a list is a 400), and it
+    // rejects sampling parameters. Thinking stays unset: effort is the lever, not `disabled`.
+    for (const absent of ['fallbacks', 'betas', 'thinking', 'temperature', 'top_p', 'top_k']) {
+      expect(params).not.toHaveProperty(absent);
+    }
     expect(params.max_tokens).toBeGreaterThanOrEqual(1024);
     // The conversation must end with a user turn: a trailing assistant turn is a rejected prefill.
     expect((params.messages as ChatRequest['messages']).at(-1)?.role).toBe('user');
     expect(sdk.streamOptions[0]).toEqual({ signal: controller.signal });
+  });
+
+  it('keeps the server-side refusal fallback on the beta endpoint for Claude Opus 5.5', async () => {
+    vi.stubEnv('ANTHROPIC_MODEL', 'claude-opus-5-5');
+    sdk.nextStream = fakeStream([textDelta('ok')]);
+
+    await collect(anthropicProvider.stream(REQUEST));
+
+    expect(sdk.endpoints).toEqual(['beta.messages']);
+    const params = sdk.streamParams[0] as Record<string, unknown>;
+    expect(params).toMatchObject({
+      model: 'claude-opus-5-5',
+      output_config: { effort: 'low' },
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+    });
+    // `thinking: {type: "disabled"}` is a 400 on Opus 5.5: the field must be omitted.
+    expect(params).not.toHaveProperty('thinking');
   });
 
   it('creates the client with the key from the environment and SDK retries', async () => {
@@ -149,6 +171,9 @@ describe('anthropicProvider', () => {
     sdk.nextStream = fakeStream([textDelta('ok')]);
     await collect(anthropicProvider.stream(REQUEST));
     expect(sdk.streamParams[0]).toMatchObject({ model: 'claude-sonnet-5-5' });
+    // Not a model we know a server-side fallback for: standard endpoint, no beta, no fallbacks.
+    expect(sdk.endpoints).toEqual(['messages']);
+    expect(sdk.streamParams[0]).not.toHaveProperty('fallbacks');
   });
 
   it('throws a refusal error when stop_reason is refusal and nothing was produced', async () => {
@@ -195,6 +220,18 @@ describe('anthropicProvider', () => {
     sdk.nextStream = stream;
     await collect(anthropicProvider.stream(REQUEST));
     expect(stream.abort).not.toHaveBeenCalled();
+  });
+
+  describe('supportsServerSideFallback', () => {
+    it('is true for Claude Opus 5.5 only among the models we know', () => {
+      expect(supportsServerSideFallback('claude-opus-5-5')).toBe(true);
+    });
+
+    it('is false for Claude Haiku 5.5, older Haiku and unknown models', () => {
+      for (const model of ['claude-haiku-5-5', 'claude-haiku-4-5', 'not-a-model', '']) {
+        expect(supportsServerSideFallback(model)).toBe(false);
+      }
+    });
   });
 
   describe('typed SDK errors', () => {
