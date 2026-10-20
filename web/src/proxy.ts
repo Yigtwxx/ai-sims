@@ -28,6 +28,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Skip /spike (own root layout), /api, Next internals, /assets and any path with a file extension.
-  matcher: ['/((?!(?:spike|api|_next|_vercel|assets)(?:/|$)|.*\\..*).*)'],
+  // Skip /dev (own root layout), /api, Next internals, /assets and any path with a file extension.
+  matcher: ['/((?!(?:dev|api|_next|_vercel|assets)(?:/|$)|.*\\..*).*)'],
 };
