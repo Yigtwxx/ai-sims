@@ -15,9 +15,19 @@ primitive per DNA mesh; its material is named after the mesh (`head_lod0_mesh` -
   the eyes) hand their weight to the nearest live ancestor, which is exact while they rest.
   Influences beyond 4 are dropped and each vertex renormalised (the worst dropped weight is
   reported).
-- Morph targets: sparse POSITION/NORMAL deltas. Every primitive carries every target (glTF
+- Morph targets: POSITION/NORMAL deltas. Every primitive carries every target (glTF
   requires equal counts); unaffected primitives share one all-zero accessor. Names live in
   `mesh.extras.targetNames` (three.js reads them into `morphTargetDictionary`).
+- Compression (default): KHR_mesh_quantization for everything but POSITION and
+  `_DNA_POSITION` (normals and morph deltas as normalized SHORT, UVs and weights as
+  normalized UNSIGNED_SHORT; morph deltas are metres in [-1, 1], so no dequantization
+  transform is needed and inverse bind matrices stay exact for runtime rebinding), then
+  EXT_meshopt_compression on every vertex stream. Nothing is reordered: vertex indices in
+  extras (neck seams) and `_DNA_POSITION` keep their meaning.
+- UVs that all sit in one tile (the body uses u in [1, 2]) are moved to [0, 1]; the offset is
+  recorded in `extras.mh.uv_tile_offset`.
+- Textures: skins and irises come from the manifest; only teeth and eyelash maps are
+  referenced, as KTX2 (KHR_texture_basisu) files next to the GLB.
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -30,7 +40,15 @@ from numpy.typing import ArrayLike
 
 from asset_pipeline.mh.bake import MorphTarget, mesh_kind
 from asset_pipeline.mh.dna import F32, F64, I32, Descriptor, DnaFile, Mesh
-from asset_pipeline.mh.glb import ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, GlbBuilder
+from asset_pipeline.mh.glb import (
+    ARRAY_BUFFER,
+    ELEMENT_ARRAY_BUFFER,
+    QUANTIZATION,
+    GlbBuilder,
+    quantize_snorm16,
+    quantize_unorm16,
+    quantize_weights,
+)
 from asset_pipeline.mh.kinematics import (
     compose_transforms,
     euler_to_quaternion,
@@ -83,11 +101,10 @@ class Space:
 
 @dataclass(frozen=True)
 class MaterialSpec:
-    """Default glTF material of a DNA mesh kind; texture fields name map files."""
+    """Default glTF material of a DNA mesh kind; texture fields name KTX2 map files."""
 
     base_color: str | None = None
     normal: str | None = None
-    metallic_roughness: str | None = None  # SRMF: G roughness, B metallic, as glTF expects
     base_color_factor: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
     metallic: float = 0.0
     roughness: float = 1.0
@@ -98,32 +115,25 @@ class MaterialSpec:
 # Helper shells (eye occlusion, tear line, saliva, lid cartilage) need the dedicated web
 # shaders; generic viewers draw them fully transparent instead of as grey blobs.
 _HIDDEN = MaterialSpec(base_color_factor=(1.0, 1.0, 1.0, 0.0), roughness=0.1, alpha_mode="BLEND")
-_EYE = MaterialSpec(base_color="Eyes_Color.png", normal="Eyes_Normal.png", roughness=0.05)
+_SKIN_TONE = MaterialSpec(base_color_factor=(0.8, 0.62, 0.52, 1.0), roughness=0.6)
+_EYE = MaterialSpec(base_color_factor=(0.9, 0.9, 0.9, 1.0), roughness=0.05)
+# Skin and iris maps are chosen at runtime from the manifest (skins, irises).
 MATERIALS: dict[str, MaterialSpec] = {
-    "head": MaterialSpec(
-        base_color="Head_Basecolor.png",
-        normal="Head_Normal.png",
-        metallic_roughness="Head_SRMF.png",
-        metallic=1.0,
+    "head": _SKIN_TONE,
+    "teeth": MaterialSpec(
+        base_color="teeth_color.ktx2", normal="teeth_normal.ktx2", roughness=0.35
     ),
-    "teeth": MaterialSpec(base_color="Teeth_Color.png", normal="Teeth_Normal.png", roughness=0.35),
     "saliva": _HIDDEN,
     "eyeLeft": _EYE,
     "eyeRight": _EYE,
     "eyeshell": _HIDDEN,
     "eyelashes": MaterialSpec(
-        base_color="Eyelashes_Color.png", roughness=0.6, alpha_mode="BLEND", double_sided=True
+        base_color="eyelashes_color.ktx2", roughness=0.6, alpha_mode="BLEND", double_sided=True
     ),
     "eyeEdge": _HIDDEN,
     "cartilage": _HIDDEN,
-    "body": MaterialSpec(
-        base_color="Body_Basecolor.png",
-        normal="Body_Normal.png",
-        metallic_roughness="Body_SRMF.png",
-        metallic=1.0,
-    ),
+    "body": _SKIN_TONE,
 }
-_SKIN_TONE = MaterialSpec(base_color_factor=(0.8, 0.62, 0.52, 1.0), roughness=0.6)
 
 
 @dataclass(frozen=True)
@@ -141,6 +151,7 @@ class GlbStats:
     joints: int
     targets: tuple[str, ...]
     primitives: dict[str, PrimitiveStats] = field(default_factory=dict)
+    raw_size: int = 0  # uncompressed bytes of all buffer views
 
 
 def material_names(dna: DnaFile, mesh_indices: Sequence[int]) -> list[str]:
@@ -206,42 +217,50 @@ def neutral_joint_transforms(dna: DnaFile, space: Space) -> tuple[F64, F64]:
     return space.points(dna.joints.translations), space.rotations(rotations)
 
 
+def uv_tile(uvs: F32) -> tuple[int, int]:
+    """The integer UV tile every coordinate sits in, or (0, 0) when they span several."""
+    low = np.floor(uvs.min(axis=0))
+    high = np.floor(np.nextafter(uvs.max(axis=0), -np.inf))
+    if np.array_equal(low, high):
+        return int(low[0]), int(low[1])
+    return 0, 0
+
+
 class _GlbWriter:
-    def __init__(self, dna: DnaFile, space: Space, maps: Mapping[str, str]) -> None:
+    def __init__(
+        self, dna: DnaFile, space: Space, textures: Mapping[str, str], *, compress: bool
+    ) -> None:
         self.dna = dna
         self.space = space
-        self.maps = maps
-        self.builder = GlbBuilder(GENERATOR)
+        self.textures = textures
+        self.compress = compress
+        self.builder = GlbBuilder(GENERATOR, compress=compress)
         self._textures: dict[str, int] = {}
         self._sampler: int | None = None
+        self.uv_offsets: dict[str, list[int]] = {}
 
     def texture(self, file_name: str | None) -> int | None:
-        if file_name is None or file_name not in self.maps:
+        if file_name is None or file_name not in self.textures:
             return None
         if file_name not in self._textures:
             if self._sampler is None:
                 self._sampler = self.builder.add_sampler()
-            image = self.builder.add_image(self.maps[file_name])
-            self._textures[file_name] = self.builder.add_texture(image, self._sampler)
+            # No mimeType: KHR_texture_basisu marks the image as KTX2 for loaders, and
+            # the core validator only knows PNG/JPEG MIME types.
+            image = self.builder.add_image(self.textures[file_name])
+            self._textures[file_name] = self.builder.add_basisu_texture(image, self._sampler)
         return self._textures[file_name]
 
     def material(self, name: str) -> int:
         spec = MATERIALS.get(name, _SKIN_TONE)
-        base = self.texture(spec.base_color)
         pbr: dict[str, Any] = {
             "baseColorFactor": list(spec.base_color_factor),
-            "metallicFactor": spec.metallic if spec.metallic_roughness else 0.0,
+            "metallicFactor": spec.metallic,
             "roughnessFactor": spec.roughness,
         }
+        base = self.texture(spec.base_color)
         if base is not None:
             pbr["baseColorTexture"] = {"index": base}
-        elif spec.base_color is not None:
-            pbr["baseColorFactor"] = list(_SKIN_TONE.base_color_factor)
-        roughness = self.texture(spec.metallic_roughness)
-        if roughness is not None:
-            pbr["metallicRoughnessTexture"] = {"index": roughness}
-        else:
-            pbr["metallicFactor"] = 0.0
         material: dict[str, Any] = {"name": name, "pbrMetallicRoughness": pbr}
         normal = self.texture(spec.normal)
         if normal is not None:
@@ -251,6 +270,20 @@ class _GlbWriter:
         if spec.double_sided:
             material["doubleSided"] = True
         return self.builder.add_material(material)
+
+    def _vectors(self, values: F32, *, bounds: bool) -> int:
+        """Normals or morph deltas: normalized SHORT when compressing, else float."""
+        if self.compress:
+            self.builder.use_extension(QUANTIZATION)
+            return self.builder.add_accessor(
+                quantize_snorm16(values),
+                target=ARRAY_BUFFER,
+                bounds=bounds,
+                normalized=True,
+            )
+        return self.builder.add_accessor(
+            values.astype(np.float32), target=ARRAY_BUFFER, bounds=bounds
+        )
 
     def primitive(
         self,
@@ -266,6 +299,10 @@ class _GlbWriter:
         normals = space.directions(mesh.normals)[mesh.layout_normals]
         normals = (normals / np.linalg.norm(normals, axis=1, keepdims=True)).astype(np.float32)
         uvs = mesh.uvs[mesh.layout_uvs].astype(np.float32)
+        tile = uv_tile(uvs)
+        if tile != (0, 0):
+            uvs -= np.array(tile, dtype=np.float32)
+            self.uv_offsets[mesh_kind(mesh.name)] = [-tile[0], -tile[1]]
         uvs[:, 1] = np.float32(1.0) - uvs[:, 1]
         triangles = mesh.triangles
         flip = space.mirrors != (self.dna.descriptor.face_winding == "cw")
@@ -274,12 +311,26 @@ class _GlbWriter:
         dense_joints, dense_weights = mesh.skin.dense(normalize=True)
         joints, weights, dropped = merge_influences(dense_joints, dense_weights, skin_target)
 
+        in_unit_square = bool(uvs.min() >= 0.0 and uvs.max() <= 1.0)
+        if self.compress and in_unit_square:
+            builder.use_extension(QUANTIZATION)
+            texcoord = builder.add_accessor(
+                quantize_unorm16(uvs), target=ARRAY_BUFFER, normalized=True
+            )
+        else:
+            texcoord = builder.add_accessor(uvs, target=ARRAY_BUFFER)
+        if self.compress:
+            skin_weights = builder.add_accessor(
+                quantize_weights(weights[layouts]), target=ARRAY_BUFFER, normalized=True
+            )
+        else:
+            skin_weights = builder.add_accessor(weights[layouts], target=ARRAY_BUFFER)
         attributes = {
             "POSITION": builder.add_accessor(positions, target=ARRAY_BUFFER, bounds=True),
-            "NORMAL": builder.add_accessor(normals, target=ARRAY_BUFFER),
-            "TEXCOORD_0": builder.add_accessor(uvs, target=ARRAY_BUFFER),
+            "NORMAL": self._vectors(normals, bounds=False),
+            "TEXCOORD_0": texcoord,
             "JOINTS_0": builder.add_accessor(joints[layouts], target=ARRAY_BUFFER),
-            "WEIGHTS_0": builder.add_accessor(weights[layouts], target=ARRAY_BUFFER),
+            "WEIGHTS_0": skin_weights,
             DNA_POSITION_ATTRIBUTE: builder.add_accessor(
                 layouts.astype(np.float32), target=ARRAY_BUFFER
             ),
@@ -300,10 +351,14 @@ class _GlbWriter:
             if morph is not None:
                 delta_p = space.points(morph.positions)[layouts].astype(np.float32)
                 delta_n = space.directions(morph.normals)[layouts].astype(np.float32)
-                moved = np.flatnonzero(np.abs(delta_p).max(axis=1) > POSITION_EPSILON)
-                turned = np.flatnonzero(np.abs(delta_n).max(axis=1) > NORMAL_EPSILON)
-                if not len(moved) and not len(turned):
+                moved = np.abs(delta_p).max(axis=1) > POSITION_EPSILON
+                turned = np.abs(delta_n).max(axis=1) > NORMAL_EPSILON
+                if not moved.any() and not turned.any():
                     delta_p = None
+                else:
+                    # Below-threshold noise compresses badly and shades nothing.
+                    delta_p[~moved] = 0.0
+                    delta_n[~turned] = 0.0
             if delta_p is None or delta_n is None:
                 if zero is None:
                     zero = (
@@ -313,16 +368,26 @@ class _GlbWriter:
                 morphs.append({"POSITION": zero[0], "NORMAL": zero[1]})
                 continue
             with_data += 1
-            morphs.append(
-                {
-                    "POSITION": builder.add_sparse_accessor(
-                        count, moved, delta_p[moved], bounds=True
-                    ),
-                    "NORMAL": builder.add_sparse_accessor(
-                        count, turned, delta_n[turned], bounds=False
-                    ),
-                }
-            )
+            if self.compress:
+                morphs.append(
+                    {
+                        "POSITION": self._vectors(delta_p, bounds=True),
+                        "NORMAL": self._vectors(delta_n, bounds=False),
+                    }
+                )
+            else:
+                moved_index = np.flatnonzero(np.abs(delta_p).max(axis=1) > 0)
+                turned_index = np.flatnonzero(np.abs(delta_n).max(axis=1) > 0)
+                morphs.append(
+                    {
+                        "POSITION": builder.add_sparse_accessor(
+                            count, moved_index, delta_p[moved_index], bounds=True
+                        ),
+                        "NORMAL": builder.add_sparse_accessor(
+                            count, turned_index, delta_n[turned_index], bounds=False
+                        ),
+                    }
+                )
         if morphs:
             primitive["targets"] = morphs
         stats = PrimitiveStats(
@@ -341,18 +406,22 @@ def write_glb(
     *,
     targets: Sequence[MorphTarget] = (),
     live_joint: Callable[[str], bool] | None = None,
-    maps: Mapping[str, str] | None = None,
+    textures: Mapping[str, str] | None = None,
     extras: Mapping[str, Any] | None = None,
     mesh_name: str = "head",
+    compress: bool = True,
 ) -> GlbStats:
     """Write the given DNA meshes (one LOD), the full DNA skeleton and morph targets.
 
     Args:
-        maps: map file name (e.g. `Head_Basecolor.png`) -> URI relative to the GLB.
+        textures: KTX2 file name a material spec names (e.g. `teeth_color.ktx2`) -> URI
+            relative to the GLB; materials whose maps are not given stay untextured.
         extras: merged into `scene.extras.mh` (kind, preset, seams, wrinkle tables, ...).
+        compress: quantize and meshopt-compress (see the module notes); False writes plain
+            float data with sparse morph targets (debugging, tests).
     """
     space = Space.from_descriptor(dna.descriptor)
-    writer = _GlbWriter(dna, space, maps or {})
+    writer = _GlbWriter(dna, space, textures or {}, compress=compress)
     builder = writer.builder
     names = [target.name for target in targets]
     if len(set(names)) != len(names):
@@ -422,6 +491,7 @@ def write_glb(
             ],
             "merged_into_live_ancestor": not bool(live.all()),
         },
+        **({"uv_tile_offset": writer.uv_offsets} if writer.uv_offsets else {}),
         **(extras or {}),
     }
     builder.add_scene([*roots, mesh_node], extras={"mh": mh})
@@ -431,5 +501,10 @@ def write_glb(
     temporary.write_bytes(data)
     temporary.replace(path)
     return GlbStats(
-        path=path, size=len(data), joints=len(joints), targets=tuple(names), primitives=stats
+        path=path,
+        size=len(data),
+        joints=len(joints),
+        targets=tuple(names),
+        primitives=stats,
+        raw_size=builder.raw_bytes,
     )

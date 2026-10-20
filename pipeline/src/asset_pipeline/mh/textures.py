@@ -1,0 +1,836 @@
+"""Preset textures -> web KTX2 maps: skins, irises, teeth and eyelashes.
+
+Sources (per `raw/characters/<Name>`; checked on Ada, see the report of chunk 3):
+
+- `textures/face/T_Face_Basecolor.png` (8K, sRGB) is the final face albedo, and
+  `T_Face_Normal` / `T_Face_Cavity` (8K, linear) the final normal and packed cavity maps.
+  The 8K `*_Animated_CM*/WM*` and the 4K body basecolor are grey material *inputs*, so the
+  wrinkle maps, SRMF and body albedo/normal come from the DCC bakes (`dcc/<Name>/Maps`, 2K).
+- `dcc_makeup/<Name>/Maps/Head_Basecolor.png` is the 2K albedo with the preset's makeup; the
+  makeup albedo is the 4K albedo plus the (upsampled, linear) makeup difference.
+- Wrinkle masks (`dcc/<Name>/Masks/*.tga`, 256 px, identical for every preset so far) keep
+  their native size and go to a content-addressed shared folder.
+
+Conventions of the written maps (documented for the web material pass):
+
+- Colour maps are sRGB (KTX2 transfer function sRGB); everything else is linear.
+- Normal maps are tangent space in the glTF/OpenGL convention (+Y up): Unreal's DirectX
+  green channel is flipped. They are renormalised after downsampling.
+- `face_cavity` keeps the three packed channels of `T_Face_Cavity`.
+- SRMF: R specular, G roughness, B metallic (0), A the fourth Unreal mask channel.
+- UVs: glTF top-left origin, the same images Unreal samples (no vertical flip).
+"""
+
+import hashlib
+import json
+import math
+import shutil
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+import numpy as np
+from numpy.typing import NDArray
+from PIL import Image, ImageDraw
+from scipy.ndimage import distance_transform_edt, gaussian_filter
+
+from asset_pipeline.mh.dna import DnaFile
+from asset_pipeline.mh.gltf import Space
+from asset_pipeline.mh.ktx import Ktx2Settings, encode_ktx2
+from asset_pipeline.mh.seams import neck_seam
+
+Image.MAX_IMAGE_PIXELS = None
+
+# 2: normal maps flipped only when they read DirectX; 3: face albedo flap and grading.
+TEXTURES_VERSION = 3
+ALBEDO_VERSION = 1  # bump when compose_face_albedo changes its output
+COLOR = Ktx2Settings("srgb", rdo=1.0)
+NORMAL = Ktx2Settings("linear", rdo=1.5)
+DATA = Ktx2Settings("linear", rdo=3.0)
+SRMF = Ktx2Settings("linear", rdo=2.0)
+MASK = Ktx2Settings("linear", rdo=None)
+
+FACE_SIZE = 4096
+# The packed cavity map is noise-like: 18.7 MB as 4K UASTC against 4.7 MB at 2K; the 4K
+# normal map already carries the pores.
+FACE_CAVITY_SIZE = 2048
+FACE_SRMF_SIZE = 2048
+WRINKLE_SIZE = 2048
+BODY_SIZE = 2048
+EYE_SIZE = 2048
+MASK_ORDER = (
+    "head_wm1_msk_01",
+    "head_wm1_msk_02",
+    "head_wm1_msk_03",
+    "head_wm1_msk_04",
+    "head_wm2_msk_01",
+    "head_wm2_msk_02",
+    "head_wm2_msk_03",
+    "head_wm3_msk_01",
+    "head_wm3_msk_02",
+    "head_wm13_msk_01",
+)
+# Channels of each mask as exported (RGB masks have no unused alpha to carry).
+MASK_CHANNELS = {
+    name: 3 if name in ("head_wm1_msk_04", "head_wm2_msk_03") else 4 for name in MASK_ORDER
+}
+# A normal map reads OpenGL only when the other convention's curl is this much larger.
+AMBIGUOUS_CONVENTION = 1.25
+# Makeup counts when this share of texels moves by more than 1% (linear).
+MAKEUP_TEXEL_DELTA = 0.01
+MAKEUP_MIN_SHARE = 0.002
+# The head mesh's neck/chest flap: the DCC bakes paint the default top there like the body
+# albedo, the 8K synthesized map does not. These rings (about 1 cm each) from the head's
+# lower boundary take the DCC bake, feathered over FLAP_FEATHER texels at 4K.
+FLAP_RINGS = 12
+FLAP_FEATHER = 32
+# The 8K map's low frequencies are matched to the DCC bake (which the body albedo comes
+# from) with a gain blurred at this resolution and sigma (~24 texels at 4K).
+GAIN_SIZE = 1024
+GAIN_SIGMA = 6.0
+# Individual Typology Angle range mapped onto tone 0 (lightest) .. 1 (darkest).
+ITA_LIGHT = 60.0
+ITA_DARK = -60.0
+
+Kind = Literal["color", "normal", "data"]
+_SRGB_TO_LINEAR = np.where(
+    np.arange(256) / 255.0 <= 0.04045,
+    np.arange(256) / 255.0 / 12.92,
+    ((np.arange(256) / 255.0 + 0.055) / 1.055) ** 2.4,
+).astype(np.float32)
+
+
+class TextureError(RuntimeError):
+    """A source map is missing or malformed."""
+
+
+# ---------------------------------------------------------------------------- pixels
+
+
+def srgb_to_linear(pixels: NDArray[np.uint8]) -> NDArray[np.float32]:
+    return _SRGB_TO_LINEAR[pixels]
+
+
+def linear_to_srgb(values: NDArray[Any]) -> NDArray[np.uint8]:
+    v = np.clip(np.asarray(values, dtype=np.float32), 0.0, 1.0)
+    encoded = np.where(v <= 0.0031308, v * 12.92, 1.055 * np.power(v, 1 / 2.4) - 0.055)
+    return np.round(encoded * 255.0).astype(np.uint8)
+
+
+def load_image(path: Path, channels: int) -> NDArray[np.uint8]:
+    """`(H, W, channels)` uint8 pixels (RGB or RGBA; extra channels dropped)."""
+    if not path.is_file():
+        raise TextureError(f"missing texture {path}")
+    with Image.open(path) as image:
+        mode = "RGBA" if channels == 4 else "RGB"
+        return np.asarray(image.convert(mode))
+
+
+def _decode_normals(pixels: NDArray[np.uint8]) -> NDArray[np.float32]:
+    return pixels[..., :3].astype(np.float32) / 127.5 - 1.0
+
+
+def _encode_normals(vectors: NDArray[np.float32]) -> NDArray[np.uint8]:
+    length = np.linalg.norm(vectors, axis=-1, keepdims=True)
+    unit = vectors / np.where(length > 1e-6, length, 1.0)
+    unit[..., 2] = np.where(length[..., 0] > 1e-6, unit[..., 2], 1.0)
+    return np.round(np.clip(unit * 127.5 + 127.5, 0, 255)).astype(np.uint8)
+
+
+def downsample(pixels: NDArray[np.uint8], size: int, kind: Kind) -> NDArray[np.uint8]:
+    """Box-filter a square image down by an integer factor (colour in linear light, normals
+    as renormalised vectors). Processed in strips to bound memory on 8K inputs."""
+    height, width = pixels.shape[:2]
+    if height != width or height % size:
+        raise TextureError(f"cannot box-filter {width}x{height} to {size}")
+    factor = height // size
+    if factor == 1:
+        return pixels.copy()
+    channels = pixels.shape[2]
+    out = np.empty((size, size, channels), dtype=np.uint8)
+    rows = max(1, 1024 // factor)
+    for start in range(0, size, rows):
+        stop = min(size, start + rows)
+        strip = pixels[start * factor : stop * factor]
+        if kind == "color":
+            values = srgb_to_linear(strip[..., :3])
+        elif kind == "normal":
+            values = _decode_normals(strip)
+        else:
+            values = strip[..., :3].astype(np.float32) / 255.0
+        shaped = values.reshape(stop - start, factor, size, factor, 3)
+        mean = shaped.mean(axis=(1, 3))
+        if kind == "color":
+            out[start:stop, :, :3] = linear_to_srgb(mean)
+        elif kind == "normal":
+            out[start:stop, :, :3] = _encode_normals(mean)
+        else:
+            out[start:stop, :, :3] = np.round(mean * 255.0).astype(np.uint8)
+        if channels == 4:
+            alpha = strip[..., 3].astype(np.float32).reshape(stop - start, factor, size, factor)
+            out[start:stop, :, 3] = np.round(alpha.mean(axis=(1, 3))).astype(np.uint8)
+    return out
+
+
+def flip_green(pixels: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """DirectX (+Y down) normal map <-> glTF/OpenGL (+Y up)."""
+    flipped = pixels.copy()
+    flipped[..., 1] = 255 - flipped[..., 1]
+    return flipped
+
+
+def normal_convention(pixels: NDArray[np.uint8], size: int = 1024) -> tuple[str, float]:
+    """Green convention of a tangent-space normal map, read from the data.
+
+    A normal map baked from a height field is a gradient field, so its curl vanishes, but
+    only when green is read with the right sign: with `p = nx/nz`, `q = ny/nz` in image
+    rows/columns, `dp/drow + dq/dcol` vanishes for OpenGL maps (+Y up) and
+    `dp/drow - dq/dcol` for DirectX maps (+Y down). Returns the convention and how many
+    times larger the other residual is (MetaHuman skin, body, wrinkle and teeth maps read
+    DirectX at 1.6-4x; the eye map reads OpenGL at 3.6x).
+    """
+    step = max(1, pixels.shape[0] // size)
+    n = pixels[::step, ::step, :3].astype(np.float64) / 127.5 - 1.0
+    nz = np.clip(n[..., 2], 0.2, None)
+    p, q = n[..., 0] / nz, n[..., 1] / nz
+    dp_drow = np.gradient(p, axis=0)
+    dq_dcol = np.gradient(q, axis=1)
+    mask = n[..., 2] > 0.3
+    if not mask.any():
+        return "directx", 1.0
+    opengl = float(np.abs(dp_drow + dq_dcol)[mask].mean())
+    directx = float(np.abs(dp_drow - dq_dcol)[mask].mean())
+    if opengl < directx:
+        return "opengl", directx / max(opengl, 1e-12)
+    return "directx", opengl / max(directx, 1e-12)
+
+
+def prepare(path: Path, size: int | None, kind: Kind, channels: int = 3) -> NDArray[np.uint8]:
+    """Load, filter down to `size` (None keeps the native size) and bring normal maps to
+    the glTF/OpenGL green convention (flipped only when the map reads DirectX)."""
+    pixels = load_image(path, channels)
+    if size is not None and pixels.shape[0] > size:
+        pixels = downsample(pixels, size, kind)
+    if kind == "normal":
+        convention, margin = normal_convention(pixels)
+        # Ambiguous maps keep Unreal's convention (DirectX).
+        if convention == "directx" or margin < AMBIGUOUS_CONVENTION:
+            pixels = flip_green(pixels)
+    return pixels
+
+
+def resize_float(values: NDArray[np.float32], size: int) -> NDArray[np.float32]:
+    """Bicubic resize of a float image `(H, W)` or `(H, W, C)` to `size` x `size`."""
+    if values.ndim == 2:
+        image = Image.fromarray(np.ascontiguousarray(values, dtype=np.float32))
+        return np.asarray(image.resize((size, size), Image.Resampling.BICUBIC))
+    return np.stack([resize_float(values[..., c], size) for c in range(values.shape[2])], axis=-1)
+
+
+def box_mean(values: NDArray[np.float32], size: int) -> NDArray[np.float32]:
+    """Average a square float image down to `size` (integer factor)."""
+    factor = values.shape[0] // size
+    if factor <= 1:
+        return values
+    shape = (size, factor, size, factor, *values.shape[2:])
+    return values.reshape(shape).mean(axis=(1, 3))
+
+
+def flap_mask(dna: DnaFile, size: int, rings: int = FLAP_RINGS) -> NDArray[np.bool_]:
+    """UV mask (top-left origin) of the head faces within `rings` rings of the head's lower
+    open boundary, i.e. the neck and chest flap that meets the body."""
+    head = next(m for m in dna.meshes_for_lod(0) if m.name.startswith("head_"))
+    seam = neck_seam(head, Space.from_descriptor(dna.descriptor), lowest=True, rings=rings)
+    in_band = np.zeros(len(head.positions), dtype=bool)
+    in_band[seam["positions"]] = True
+    uvs = head.uvs[head.layout_uvs].astype(np.float64)
+    uvs[:, 1] = 1.0 - uvs[:, 1]
+    pixels = uvs * size
+    canvas = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(canvas)
+    for triangle in head.triangles[np.all(in_band[head.layout_positions[head.triangles]], axis=1)]:
+        draw.polygon([tuple(pixels[v]) for v in triangle], fill=255, outline=255)
+    return np.asarray(canvas) > 0
+
+
+def feathered(mask: NDArray[np.bool_], feather: float) -> NDArray[np.float32]:
+    """1 inside the mask, smoothly falling to 0 over `feather` pixels outside it."""
+    distance = distance_transform_edt(~mask)
+    t = np.clip(1.0 - distance / feather, 0.0, 1.0)
+    return (t * t * (3.0 - 2.0 * t)).astype(np.float32)
+
+
+def low_frequency_gain(
+    synth: NDArray[np.float32], reference: NDArray[np.float32], exclude: NDArray[np.bool_]
+) -> NDArray[np.float32]:
+    """Per-channel gain bringing the synth map's low frequencies to the reference bake,
+    blurred with normalized convolution so excluded texels (the flap) do not leak in."""
+    small_synth = box_mean(synth, GAIN_SIZE)
+    small_reference = box_mean(reference, GAIN_SIZE)
+    weight = 1.0 - box_mean(exclude.astype(np.float32), GAIN_SIZE)
+    gains = []
+    for c in range(3):
+        numerator = gaussian_filter(small_reference[..., c] * weight, GAIN_SIGMA)
+        denominator = gaussian_filter(small_synth[..., c] * weight, GAIN_SIGMA)
+        gains.append(np.clip(numerator / np.maximum(denominator, 1e-4), 0.5, 2.0))
+    return resize_float(np.stack(gains, axis=-1).astype(np.float32), synth.shape[0])
+
+
+@dataclass(frozen=True)
+class FaceAlbedo:
+    base: NDArray[np.uint8]
+    makeup: NDArray[np.uint8] | None
+    makeup_share: float
+
+
+def compose_face_albedo(
+    synth: NDArray[np.uint8],
+    dcc_base: NDArray[np.uint8],
+    dcc_makeup: NDArray[np.uint8] | None,
+    flap: NDArray[np.bool_],
+) -> FaceAlbedo:
+    """The face albedo: the 8K synthesized map (filtered to `synth`'s size) with its low
+    frequencies matched to the DCC bake, the DCC bake itself in the neck/chest flap
+    (feathered), and optionally the DCC makeup difference on top (the DCC makeup map in the
+    flap). All blending happens in linear light."""
+    size = synth.shape[0]
+    synth_linear = srgb_to_linear(synth[..., :3])
+    base_linear = srgb_to_linear(dcc_base[..., :3])
+    base_up = resize_float(base_linear, size)
+    weight = feathered(flap, FLAP_FEATHER * size / 4096)[..., None]
+    graded = synth_linear * low_frequency_gain(synth_linear, base_up, flap)
+    del synth_linear
+    base = linear_to_srgb(graded * (1.0 - weight) + base_up * weight)
+    if dcc_makeup is None:
+        return FaceAlbedo(base, None, 0.0)
+    makeup_linear = srgb_to_linear(dcc_makeup[..., :3])
+    delta = makeup_linear - base_linear
+    share = float((np.abs(delta).max(axis=-1) > MAKEUP_TEXEL_DELTA).mean())
+    made_up = (graded + resize_float(delta, size)) * (1.0 - weight)
+    made_up += resize_float(makeup_linear, size) * weight
+    return FaceAlbedo(base, linear_to_srgb(made_up), share)
+
+
+# ---------------------------------------------------------------------------- measurements
+
+
+def _lab(rgb_linear: NDArray[Any]) -> tuple[float, float, float]:
+    r, g, b = (float(v) for v in rgb_linear)
+    x = 0.4124 * r + 0.3576 * g + 0.1805 * b
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    z = 0.0193 * r + 0.1192 * g + 0.9505 * b
+
+    def f(t: float) -> float:
+        return t ** (1 / 3) if t > (6 / 29) ** 3 else t / (3 * (6 / 29) ** 2) + 4 / 29
+
+    fx, fy, fz = f(x / 0.95047), f(y), f(z / 1.08883)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def skin_tone(rgb_linear: NDArray[Any]) -> tuple[float, float]:
+    """(tone 0 light .. 1 dark, Individual Typology Angle in degrees) of a skin albedo."""
+    lightness, _, yellow = _lab(rgb_linear)
+    ita = math.degrees(math.atan2(lightness - 50.0, yellow))
+    tone = (ITA_LIGHT - ita) / (ITA_LIGHT - ITA_DARK)
+    return float(min(1.0, max(0.0, tone))), ita
+
+
+def hex_color(rgb_linear: NDArray[Any]) -> str:
+    srgb = linear_to_srgb(np.asarray(rgb_linear, dtype=np.float32))
+    return "#" + "".join(f"{int(v):02x}" for v in srgb.tolist())
+
+
+def cheek_uvs(dna: DnaFile) -> NDArray[np.float64]:
+    """Image-space UVs (top-left origin) of head vertices on both cheeks: 2-4 cm below each
+    eye, slightly outward, in front, facing forward. MetaHuman DNAs are cm, +Y up, +Z front."""
+    meshes = {m.name: m for m in dna.meshes_for_lod(0)}
+    head = next(m for name, m in meshes.items() if name.startswith("head_"))
+    eyes = [m for name, m in meshes.items() if name.startswith(("eyeLeft_", "eyeRight_"))]
+    if len(eyes) != 2:
+        raise TextureError("head DNA has no eye meshes to locate the cheeks")
+    positions = head.positions.astype(np.float64)
+    normals = head.normals.astype(np.float64)
+    layout_normals = np.zeros_like(positions)
+    np.add.at(layout_normals, head.layout_positions, normals[head.layout_normals])
+    layout_normals /= np.maximum(np.linalg.norm(layout_normals, axis=1, keepdims=True), 1e-9)
+    chosen = []
+    for eye in eyes:
+        center = eye.positions.astype(np.float64).mean(axis=0)
+        near = (
+            (np.abs(positions[:, 0] - 1.15 * center[0]) < 1.2)
+            & (positions[:, 1] < center[1] - 2.0)
+            & (positions[:, 1] > center[1] - 4.0)
+            & (positions[:, 2] > center[2] - 1.0)
+            & (layout_normals[:, 2] > 0.3)
+        )
+        chosen.append(np.flatnonzero(near))
+    selected = np.concatenate(chosen)
+    if len(selected) < 8:
+        raise TextureError("found too few cheek vertices")
+    is_selected = np.zeros(len(positions), dtype=bool)
+    is_selected[selected] = True
+    layouts = np.flatnonzero(is_selected[head.layout_positions])
+    uvs = head.uvs[head.layout_uvs[layouts]].astype(np.float64)
+    uvs[:, 1] = 1.0 - uvs[:, 1]
+    return uvs
+
+
+def sample_median(
+    albedo: NDArray[np.uint8], uvs: NDArray[np.float64], radius: int = 4
+) -> NDArray[np.float64]:
+    """Median linear colour of `(2r+1)^2` texel patches around each UV (pores averaged out
+    per patch, freckles and moles rejected by the median across patches)."""
+    size = albedo.shape[0]
+    centers = np.clip(np.round(uvs * size).astype(np.int64), radius, size - radius - 1)
+    offsets = np.arange(-radius, radius + 1)
+    rows = centers[:, 1, None, None] + offsets[None, :, None]
+    cols = centers[:, 0, None, None] + offsets[None, None, :]
+    patches = srgb_to_linear(albedo[rows, cols, :3])
+    return np.median(patches.reshape(len(uvs), -1, 3).mean(axis=1), axis=0)
+
+
+def iris_swatch(color: NDArray[np.uint8]) -> str:
+    """Hex colour of the iris ring of an eye texture (iris centred, pupil in the middle)."""
+    size = color.shape[0]
+    yy, xx = np.mgrid[0:size, 0:size]
+    radius = np.hypot(xx - (size - 1) / 2, yy - (size - 1) / 2) / size
+    ring = (radius > 0.06) & (radius < 0.12)
+    linear = srgb_to_linear(color[..., :3])[ring]
+    return hex_color(np.median(linear, axis=0))
+
+
+# ---------------------------------------------------------------------------- outputs
+
+
+@dataclass
+class TextureSet:
+    """Files written for one preset, keyed by role, relative to the web root."""
+
+    files: dict[str, str] = field(default_factory=dict)
+    sizes: dict[str, int] = field(default_factory=dict)
+
+    def add(self, role: str, path: Path, web_root: Path, size: int) -> None:
+        self.files[role] = path.relative_to(web_root).as_posix()
+        self.sizes[role] = size
+
+
+@dataclass(frozen=True)
+class PresetMaps:
+    """Source maps of one preset (`raw/characters/<Name>`)."""
+
+    name: str
+    unit: Path
+
+    @property
+    def dcc(self) -> Path:
+        return self.unit / "dcc" / self.name
+
+    @property
+    def maps(self) -> Path:
+        return self.dcc / "Maps"
+
+    @property
+    def face(self) -> Path:
+        return self.unit / "textures" / "face"
+
+    @property
+    def body(self) -> Path:
+        return self.unit / "textures" / "body"
+
+    @property
+    def makeup(self) -> Path:
+        return self.unit / "dcc_makeup" / self.name / "Maps" / "Head_Basecolor.png"
+
+    def masks(self) -> list[Path]:
+        masks = [self.dcc / "Masks" / f"{name}.tga" for name in MASK_ORDER]
+        missing = [m.name for m in masks if not m.is_file()]
+        if missing:
+            raise TextureError(f"{self.name}: missing wrinkle masks {missing}")
+        return masks
+
+    def check(self) -> None:
+        required = [
+            self.face / "T_Face_Basecolor.png",
+            self.face / "T_Face_Normal.png",
+            self.face / "T_Face_Cavity.png",
+            self.body / "T_Body_Body_Cavity.png",
+            *(
+                self.maps / f"{name}.png"
+                for name in (
+                    "Head_SRMF",
+                    "Head_Basecolor",
+                    "Body_Basecolor",
+                    "Body_Normal",
+                    "Body_SRMF",
+                    "Eyes_Color",
+                    "Eyes_Normal",
+                    "Teeth_Color",
+                    "Teeth_Normal",
+                    "Eyelashes_Color",
+                    *(f"Head_Basecolor_Animated_CM{i}" for i in (1, 2, 3)),
+                    *(f"Head_Normal_Animated_WM{i}" for i in (1, 2, 3)),
+                )
+            ),
+        ]
+        missing = [str(p.relative_to(self.unit)) for p in required if not p.is_file()]
+        if missing:
+            raise TextureError(f"{self.name}: missing maps {missing}")
+        with Image.open(self.face / "T_Face_Basecolor.png") as face:
+            if face.width < FACE_SIZE:
+                raise TextureError(
+                    f"{self.name}: face textures are {face.width} px, the export lacks the "
+                    "high-resolution maps"
+                )
+        self.masks()
+
+    @property
+    def complete(self) -> bool:
+        try:
+            self.check()
+        except TextureError:
+            return False
+        return True
+
+    @property
+    def has_head_maps(self) -> bool:
+        return all(
+            (self.maps / f"{source}.png").is_file() for source, *_ in MOUTH_EYE_MAPS.values()
+        )
+
+
+def write_masks(maps: PresetMaps, web_root: Path) -> list[str]:
+    """Encode the wrinkle masks once per distinct mask set; returns paths in MASK_ORDER."""
+    masks = maps.masks()
+    digest = hashlib.sha256(b"".join(m.read_bytes() for m in masks)).hexdigest()[:12]
+    folder = web_root / "skins" / "masks" / digest
+    files = []
+    for mask in masks:
+        channels = MASK_CHANNELS[mask.stem]
+        with Image.open(mask) as image:
+            if len(image.getbands()) != channels:
+                raise TextureError(
+                    f"{mask.name} has {image.mode} pixels, expected {channels} bands"
+                )
+        output = folder / f"{mask.stem}.ktx2"
+        if not output.is_file():
+            encode_ktx2(load_image(mask, channels), output, MASK)
+        files.append(output.relative_to(web_root).as_posix())
+    return files
+
+
+def estimate_tone(maps: PresetMaps, dna: DnaFile) -> float | None:
+    """Tone of whatever face albedo an incomplete export has (used to pick a stand-in skin)."""
+    path = maps.face / "T_Face_Basecolor.png"
+    if not path.is_file():
+        return None
+    albedo = load_image(path, 3)
+    return skin_tone(sample_median(albedo, cheek_uvs(dna), radius=1))[0]
+
+
+@dataclass
+class TextureCache:
+    """Per-texture build prints of one skin (`build/cache/skins/<Name>.json`), so a recipe
+    change re-encodes only the maps it affects. Measurements made on the composed albedo
+    (tone, swatch, makeup share) are cached with the albedo's print."""
+
+    path: Path
+    prints: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def load(cls, path: Path) -> "TextureCache":
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        return cls(path, data if isinstance(data, dict) else {})
+
+    def fresh(self, output: Path, print_: str) -> bool:
+        entry = self.prints.get(output.name)
+        return output.is_file() and isinstance(entry, dict) and entry.get("print") == print_
+
+    def get(self, output: Path, key: str) -> object:
+        entry = self.prints.get(output.name)
+        return entry.get(key) if isinstance(entry, dict) else None
+
+    def remember(self, output: Path, print_: str, **data: object) -> None:
+        self.prints[output.name] = {"print": print_, **data}
+        write_json(self.path, self.prints)
+
+
+def _source_key(*paths: Path) -> list[Any]:
+    """Identity of source files without hashing gigabytes: name, size, modification time."""
+    keys: list[Any] = []
+    for path in paths:
+        stat = path.stat()
+        keys.append([path.name, stat.st_size, stat.st_mtime_ns])
+    return keys
+
+
+def texture_print(recipe: Mapping[str, Any], *sources: Path) -> str:
+    digest = hashlib.sha256(
+        json.dumps({"recipe": recipe, "sources": _source_key(*sources)}, sort_keys=True).encode()
+    )
+    return digest.hexdigest()
+
+
+@dataclass(frozen=True)
+class MapJob:
+    role: str
+    file_name: str
+    source: Path
+    size: int
+    kind: Kind
+    settings: Ktx2Settings
+    channels: int = 3
+
+    def recipe(self) -> dict[str, Any]:
+        return {
+            "size": self.size,
+            "kind": self.kind,
+            "channels": self.channels,
+            "settings": self.settings.key,
+            "normals": "curl-detected-v2" if self.kind == "normal" else None,
+        }
+
+
+def skin_jobs(maps: PresetMaps) -> list[MapJob]:
+    """Every skin map but the composed face albedo."""
+    return [
+        MapJob(
+            "face_normal",
+            "face_normal.ktx2",
+            maps.face / "T_Face_Normal.png",
+            FACE_SIZE,
+            "normal",
+            NORMAL,
+        ),
+        MapJob(
+            "face_cavity",
+            "face_cavity.ktx2",
+            maps.face / "T_Face_Cavity.png",
+            FACE_CAVITY_SIZE,
+            "data",
+            DATA,
+        ),
+        MapJob(
+            "face_srmf",
+            "face_srmf.ktx2",
+            maps.maps / "Head_SRMF.png",
+            FACE_SRMF_SIZE,
+            "data",
+            SRMF,
+            4,
+        ),
+        *(
+            MapJob(
+                f"face_cm{i}",
+                f"face_cm{i}.ktx2",
+                maps.maps / f"Head_Basecolor_Animated_CM{i}.png",
+                WRINKLE_SIZE,
+                "color",
+                COLOR,
+            )
+            for i in (1, 2, 3)
+        ),
+        *(
+            MapJob(
+                f"face_wm{i}",
+                f"face_wm{i}.ktx2",
+                maps.maps / f"Head_Normal_Animated_WM{i}.png",
+                WRINKLE_SIZE,
+                "normal",
+                NORMAL,
+            )
+            for i in (1, 2, 3)
+        ),
+        MapJob(
+            "body_albedo",
+            "body_albedo.ktx2",
+            maps.maps / "Body_Basecolor.png",
+            BODY_SIZE,
+            "color",
+            COLOR,
+        ),
+        MapJob(
+            "body_normal",
+            "body_normal.ktx2",
+            maps.maps / "Body_Normal.png",
+            BODY_SIZE,
+            "normal",
+            NORMAL,
+        ),
+        MapJob(
+            "body_cavity",
+            "body_cavity.ktx2",
+            maps.body / "T_Body_Body_Cavity.png",
+            BODY_SIZE,
+            "data",
+            DATA,
+        ),
+        MapJob(
+            "body_srmf", "body_srmf.ktx2", maps.maps / "Body_SRMF.png", BODY_SIZE, "data", SRMF, 4
+        ),
+    ]
+
+
+def albedo_recipe() -> dict[str, Any]:
+    return {
+        "size": FACE_SIZE,
+        "settings": COLOR.key,
+        "flap": [FLAP_RINGS, FLAP_FEATHER],
+        "gain": [GAIN_SIZE, GAIN_SIGMA],
+        "version": ALBEDO_VERSION,
+    }
+
+
+def convert_skin(
+    maps: PresetMaps, dna: DnaFile, web_root: Path, cache: TextureCache | None = None
+) -> dict[str, Any]:
+    """Encode a preset's skin maps to `skins/<Name>/` and return its manifest skin entry
+    (plus `stats` for the report). Maps whose print matches `cache` are kept as they are."""
+    maps.check()
+    cache = cache or TextureCache.load(
+        web_root.parent / "build" / "cache" / "skins" / f"{maps.name}.json"
+    )
+    folder = web_root / "skins" / maps.name
+    textures = TextureSet()
+
+    albedo_path = folder / "face_albedo.ktx2"
+    makeup_path = folder / "face_albedo_makeup.ktx2"
+    sources = [
+        maps.face / "T_Face_Basecolor.png",
+        maps.maps / "Head_Basecolor.png",
+        maps.dcc / "head.dna",
+    ]
+    if maps.makeup.is_file():
+        sources.append(maps.makeup)
+    print_ = texture_print(albedo_recipe(), *sources)
+    measured = cache.get(albedo_path, "measurements")
+    makeup_fresh = not cache.get(albedo_path, "makeup") or cache.fresh(makeup_path, print_)
+    if cache.fresh(albedo_path, print_) and isinstance(measured, dict) and makeup_fresh:
+        textures.add("face_albedo", albedo_path, web_root, albedo_path.stat().st_size)
+        if cache.get(albedo_path, "makeup"):
+            textures.add("makeup", makeup_path, web_root, makeup_path.stat().st_size)
+        cheek = np.asarray(measured["cheek_linear"], dtype=np.float64)
+        makeup_share = float(measured["makeup_share"])
+    else:
+        albedo = compose_face_albedo(
+            prepare(maps.face / "T_Face_Basecolor.png", FACE_SIZE, "color"),
+            load_image(maps.maps / "Head_Basecolor.png", 3),
+            load_image(maps.makeup, 3) if maps.makeup.is_file() else None,
+            flap_mask(dna, FACE_SIZE),
+        )
+        textures.add(
+            "face_albedo", albedo_path, web_root, encode_ktx2(albedo.base, albedo_path, COLOR)
+        )
+        cheek = sample_median(albedo.base, cheek_uvs(dna))
+        makeup_share = albedo.makeup_share
+        has_makeup = albedo.makeup is not None and makeup_share >= MAKEUP_MIN_SHARE
+        if has_makeup and albedo.makeup is not None:
+            textures.add(
+                "makeup", makeup_path, web_root, encode_ktx2(albedo.makeup, makeup_path, COLOR)
+            )
+            cache.remember(makeup_path, print_)
+        cache.remember(
+            albedo_path,
+            print_,
+            makeup=has_makeup,
+            measurements={
+                "cheek_linear": [float(v) for v in cheek],
+                "makeup_share": makeup_share,
+            },
+        )
+        del albedo
+    tone, ita = skin_tone(cheek)
+
+    for job in skin_jobs(maps):
+        output = folder / job.file_name
+        job_print = texture_print(job.recipe(), job.source)
+        if cache.fresh(output, job_print):
+            textures.add(job.role, output, web_root, output.stat().st_size)
+            continue
+        pixels = prepare(job.source, job.size, job.kind, job.channels)
+        textures.add(job.role, output, web_root, encode_ktx2(pixels, output, job.settings))
+        cache.remember(output, job_print)
+    masks = write_masks(maps, web_root)
+
+    files = textures.files
+    entry: dict[str, Any] = {
+        "id": f"skin.{maps.name}",
+        "label": maps.name,
+        "tone": round(tone, 4),
+        "swatch": hex_color(cheek),
+        "face": {
+            "albedo": files["face_albedo"],
+            "normal": files["face_normal"],
+            "cavity": files["face_cavity"],
+            "srmf": files["face_srmf"],
+            "wrinkleColor": [files[f"face_cm{i}"] for i in (1, 2, 3)],
+            "wrinkleNormal": [files[f"face_wm{i}"] for i in (1, 2, 3)],
+            "wrinkleMasks": masks,
+        },
+        "body": {
+            "albedo": files["body_albedo"],
+            "normal": files["body_normal"],
+            "cavity": files["body_cavity"],
+            "srmf": files["body_srmf"],
+        },
+    }
+    if "makeup" in files:
+        entry["makeupAlbedo"] = files["makeup"]
+    entry["stats"] = {
+        "cheek_linear": [round(float(v), 5) for v in cheek],
+        "ita_degrees": round(ita, 2),
+        "makeup_texel_share": round(makeup_share, 4),
+        "bytes": dict(textures.sizes),
+    }
+    return entry
+
+
+def convert_iris(maps: PresetMaps, web_root: Path) -> dict[str, Any]:
+    folder = web_root / "irises" / maps.name
+    color = prepare(maps.maps / "Eyes_Color.png", EYE_SIZE, "color")
+    encode_ktx2(color, folder / "color.ktx2", COLOR)
+    encode_ktx2(
+        prepare(maps.maps / "Eyes_Normal.png", EYE_SIZE, "normal"), folder / "normal.ktx2", NORMAL
+    )
+    return {
+        "id": f"iris.{maps.name}",
+        "label": maps.name,
+        "color": (folder / "color.ktx2").relative_to(web_root).as_posix(),
+        "normal": (folder / "normal.ktx2").relative_to(web_root).as_posix(),
+        "swatch": iris_swatch(color),
+    }
+
+
+MOUTH_EYE_MAPS: dict[str, tuple[str, int, Kind, Ktx2Settings, int]] = {
+    # output file -> (DCC map, size, kind, settings, channels)
+    "teeth_color.ktx2": ("Teeth_Color", EYE_SIZE, "color", COLOR, 3),
+    "teeth_normal.ktx2": ("Teeth_Normal", EYE_SIZE, "normal", NORMAL, 3),
+    "eyelashes_color.ktx2": ("Eyelashes_Color", EYE_SIZE, "color", COLOR, 4),
+}
+
+
+def convert_head_maps(maps: PresetMaps, folder: Path) -> dict[str, int]:
+    """Teeth and eyelash maps the head GLB references, written into `folder`.
+    Returns {file name: bytes}."""
+    written = {}
+    for file_name, (source, size, kind, settings, channels) in MOUTH_EYE_MAPS.items():
+        written[file_name] = encode_ktx2(
+            prepare(maps.maps / f"{source}.png", size, kind, channels), folder / file_name, settings
+        )
+    return written
+
+
+def write_json(path: Path, data: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
+    temporary.replace(path)
+
+
+def remove_tree(path: Path, inside: Path) -> None:
+    """Delete an obsolete output folder, refusing anything outside `inside`."""
+    if path.exists() and path.resolve().is_relative_to(inside.resolve()):
+        shutil.rmtree(path)

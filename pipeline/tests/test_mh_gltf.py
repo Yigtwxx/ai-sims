@@ -1,5 +1,8 @@
 """GLB writer invariants: synthetic DNAs (no bindings needed) and Ada's converted files."""
 
+import json
+import shutil
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +11,7 @@ from scipy.spatial.transform import Rotation
 
 from asset_pipeline.mh.arkit import ARKIT_NAMES
 from asset_pipeline.mh.bake import MeshMorph, MorphTarget, ShapeSpec
-from asset_pipeline.mh.convert import boundary_loops, convert_body, convert_head, neck_seam
+from asset_pipeline.mh.convert import convert_body, convert_head
 from asset_pipeline.mh.dna import (
     Behavior,
     ConditionalTable,
@@ -21,7 +24,13 @@ from asset_pipeline.mh.dna import (
     SkinWeights,
     _triangulate,
 )
-from asset_pipeline.mh.glb import accessor_array, read_glb
+from asset_pipeline.mh.glb import (
+    MESHOPT,
+    QUANTIZATION,
+    accessor_array,
+    accessor_values,
+    read_glb,
+)
 from asset_pipeline.mh.gltf import Space, merge_influences, write_glb
 from asset_pipeline.mh.kinematics import (
     compose_transforms,
@@ -29,9 +38,12 @@ from asset_pipeline.mh.kinematics import (
     matrix_to_quaternion,
     quaternion_to_matrix,
 )
+from asset_pipeline.mh.seams import boundary_loops, neck_seam
 from asset_pipeline.mh.visemes import VISEME_NAMES
 
-ITEM_SIZE = {5121: 1, 5123: 2, 5125: 4, 5126: 4}
+ITEM_SIZE = {5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4}
+PIPELINE = Path(__file__).resolve().parents[1]
+WEB = PIPELINE.parent / "web"
 WIDTH = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
 
 
@@ -145,8 +157,21 @@ def synthetic_targets() -> list[MorphTarget]:
 
 @pytest.fixture
 def written(tmp_path):
+    """Plain float GLB with sparse morph targets (`compress=False`)."""
     dna = synthetic_dna()
     path = tmp_path / "synthetic.glb"
+    write_glb(path, dna, [0], targets=synthetic_targets(), extras={"kind": "head"}, compress=False)
+    document, binary = read_glb(path.read_bytes())
+    return dna, document, binary
+
+
+@pytest.fixture
+def compressed(tmp_path, monkeypatch):
+    """The default GLB: quantized attributes and meshopt-compressed views (every view,
+    however small, so the tiny synthetic mesh exercises the codec)."""
+    monkeypatch.setattr("asset_pipeline.mh.glb.MIN_COMPRESSED_BYTES", 0)
+    dna = synthetic_dna()
+    path = tmp_path / "compressed.glb"
     write_glb(path, dna, [0], targets=synthetic_targets(), extras={"kind": "head"})
     document, binary = read_glb(path.read_bytes())
     return dna, document, binary
@@ -155,6 +180,11 @@ def written(tmp_path):
 def primitive_array(document, binary, attribute: str, primitive: int = 0) -> np.ndarray:
     accessor = document["meshes"][0]["primitives"][primitive]["attributes"][attribute]
     return accessor_array(document, binary, accessor)
+
+
+def primitive_values(document, binary, attribute: str, primitive: int = 0) -> np.ndarray:
+    accessor = document["meshes"][0]["primitives"][primitive]["attributes"][attribute]
+    return accessor_values(document, binary, accessor)
 
 
 # ---------------------------------------------------------------------------- synthetic tests
@@ -233,7 +263,7 @@ def test_skin_binds_every_joint_at_the_neutral_pose(written):
 def test_static_joints_hand_their_weight_to_live_ancestors(tmp_path):
     dna = synthetic_dna()
     path = tmp_path / "merged.glb"
-    write_glb(path, dna, [0], live_joint=lambda name: name != "child")
+    write_glb(path, dna, [0], live_joint=lambda name: name != "child", compress=False)
     document, binary = read_glb(path.read_bytes())
     joints = primitive_array(document, binary, "JOINTS_0")
     weights = primitive_array(document, binary, "WEIGHTS_0")
@@ -250,7 +280,7 @@ def test_mirrored_dna_axes_flip_the_winding(tmp_path):
     write_glb(path, dna, [0])
     document, binary = read_glb(path.read_bytes())
     positions = primitive_array(document, binary, "POSITION")
-    normals = primitive_array(document, binary, "NORMAL")
+    normals = primitive_values(document, binary, "NORMAL")
     np.testing.assert_allclose(
         positions[:, 0], -dna.mesh(0).positions[dna.mesh(0).layout_positions][:, 0] * 0.01
     )
@@ -258,6 +288,69 @@ def test_mirrored_dna_axes_flip_the_winding(tmp_path):
     corners = positions[indices.reshape(-1, 3)]
     face = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
     assert np.all(np.einsum("ij,ij->i", face, normals[indices.reshape(-1, 3)[:, 0]]) > 0)
+
+
+def test_compressed_glb_matches_the_plain_one_within_quantization(written, compressed):
+    _, plain, plain_binary = written
+    _, packed, packed_binary = compressed
+    for attribute, tolerance in (
+        ("POSITION", 0.0),
+        ("_DNA_POSITION", 0.0),
+        ("NORMAL", 1.0 / 32767),
+        ("TEXCOORD_0", 0.5 / 65535),
+        ("WEIGHTS_0", 1.0 / 65535),
+    ):
+        expected = primitive_values(plain, plain_binary, attribute)
+        actual = primitive_values(packed, packed_binary, attribute)
+        np.testing.assert_allclose(actual, expected, atol=tolerance + 1e-7, err_msg=attribute)
+    weights = primitive_values(packed, packed_binary, "WEIGHTS_0")
+    raw = primitive_array(packed, packed_binary, "WEIGHTS_0").astype(np.int64)
+    assert np.all(raw.sum(axis=1) == 65535), "quantized weights must sum to exactly one"
+    np.testing.assert_allclose(weights.sum(axis=1), 1.0, atol=1e-9)
+    for index in range(2):
+        expected = accessor_values(
+            plain, plain_binary, plain["meshes"][0]["primitives"][0]["targets"][index]["POSITION"]
+        )
+        actual = accessor_values(
+            packed,
+            packed_binary,
+            packed["meshes"][0]["primitives"][0]["targets"][index]["POSITION"],
+        )
+        np.testing.assert_allclose(actual, expected, atol=0.5 / 32767 + 1e-9)
+
+
+def test_compressed_glb_declares_and_lays_out_its_extensions(compressed):
+    _, document, _ = compressed
+    assert {MESHOPT, QUANTIZATION} <= set(document["extensionsRequired"])
+    fallback = document["buffers"][1]
+    assert fallback["extensions"][MESHOPT] == {"fallback": True} and "uri" not in fallback
+    packed = [v for v in document["bufferViews"] if MESHOPT in v.get("extensions", {})]
+    assert packed, "vertex streams are meshopt-compressed"
+    for view in packed:
+        meshopt = view["extensions"][MESHOPT]
+        assert view["buffer"] == 1 and meshopt["buffer"] == 0
+        assert meshopt["mode"] == "ATTRIBUTES" and meshopt["byteStride"] % 4 == 0
+        assert view["byteLength"] == meshopt["count"] * meshopt["byteStride"]
+        if "byteStride" in view:
+            assert view["byteStride"] == meshopt["byteStride"]
+    normal = document["accessors"][document["meshes"][0]["primitives"][0]["attributes"]["NORMAL"]]
+    assert normal["componentType"] == 5122 and normal["normalized"] is True
+    assert document["bufferViews"][normal["bufferView"]]["byteStride"] == 8
+    indices = document["accessors"][document["meshes"][0]["primitives"][0]["indices"]]
+    assert MESHOPT not in document["bufferViews"][indices["bufferView"]].get("extensions", {})
+
+
+def test_uvs_in_one_tile_move_to_the_unit_square(tmp_path):
+    dna = synthetic_dna()
+    mesh = dna.mesh(0)
+    shifted = Mesh(**{**mesh.__dict__, "uvs": mesh.uvs + np.float32(1.0)})
+    dna = DnaFile(**{**dna.__dict__, "meshes": {0: shifted}})
+    path = tmp_path / "tile.glb"
+    write_glb(path, dna, [0])
+    document, binary = read_glb(path.read_bytes())
+    uvs = primitive_values(document, binary, "TEXCOORD_0")
+    np.testing.assert_allclose(uvs[:, 0], mesh.uvs[mesh.layout_uvs][:, 0], atol=1e-4)
+    assert document["scenes"][0]["extras"]["mh"]["uv_tile_offset"] == {"head": [-1, -1]}
 
 
 def test_merge_influences_keeps_the_four_strongest():
@@ -300,8 +393,8 @@ def test_neck_seam_walks_the_open_boundary(written):
 @pytest.fixture(scope="session")
 def ada_head_glb(bindings, archive, tmp_path_factory):
     web = tmp_path_factory.mktemp("web")
-    stats = convert_head("Ada", archive, web_root=web)
-    return stats, *read_glb(stats.path.read_bytes())
+    result = convert_head("Ada", archive, web_root=web, head_maps=False)
+    return result.stats, *read_glb(result.stats.path.read_bytes())
 
 
 def test_head_glb_follows_the_asset_contract(ada_head_glb, ada_rig):
@@ -329,6 +422,10 @@ def test_head_glb_follows_the_asset_contract(ada_head_glb, ada_rig):
         "animated_maps",
     } <= set(mh)
     assert (mh["kind"], mh["preset"], mh["lod"]) == ("head", "Ada", 0)
+    regions = mh["wrinkle_masks"]["regions"]
+    assert regions["head_wm1_blink_L"] == [0, 0] and regions["head_wm1_jawOpen"] == [2, 0]
+    maps = {name for maps in mh["animated_maps"].values() for name in maps}
+    assert {name.split(".", 1)[1] for name in maps} <= set(regions)
     assert set(mh["animated_maps"]) <= set(names) and "jawOpen" in mh["animated_maps"]
     seam = mh["neck_seam"]
     assert len(seam["vertices"]) == len(seam["weights"]) > 0
@@ -339,8 +436,8 @@ def test_head_glb_follows_the_asset_contract(ada_head_glb, ada_rig):
 def test_head_glb_geometry_is_consistent(ada_head_glb):
     _, document, binary = ada_head_glb
     head = document["meshes"][0]["primitives"][0]
-    positions = accessor_array(document, binary, head["attributes"]["POSITION"])
-    normals = accessor_array(document, binary, head["attributes"]["NORMAL"])
+    positions = accessor_values(document, binary, head["attributes"]["POSITION"])
+    normals = accessor_values(document, binary, head["attributes"]["NORMAL"])
     indices = accessor_array(document, binary, head["indices"]).reshape(-1, 3)
     corners = positions[indices]
     face = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
@@ -352,7 +449,7 @@ def test_head_glb_geometry_is_consistent(ada_head_glb):
     assert max(seam["vertices"]) < len(positions)
     assert all(0.0 < w <= 1.0 for w in seam["weights"])
     joints = accessor_array(document, binary, head["attributes"]["JOINTS_0"])
-    weights = accessor_array(document, binary, head["attributes"]["WEIGHTS_0"])
+    weights = accessor_values(document, binary, head["attributes"]["WEIGHTS_0"])
     np.testing.assert_allclose(weights.sum(axis=1), 1.0, atol=1e-6)
     live = set(document["scenes"][0]["extras"]["mh"]["skin"]["live_joints"])
     names = [document["nodes"][i]["name"] for i in document["skins"][0]["joints"]]
@@ -365,7 +462,8 @@ def female_body_glb(bindings, archive, tmp_path_factory):
     if not (archive / "raw" / "bodies" / "female" / "done.json").is_file():
         pytest.skip("no finished female body basis export")
     web = tmp_path_factory.mktemp("web")
-    stats = convert_body("female", archive, web_root=web)
+    stats, entry = convert_body("female", archive, web_root=web)
+    assert entry["glb"] == "bodies/female/body.glb" and len(entry["sliders"]) == 7
     return stats, *read_glb(stats.path.read_bytes())
 
 
@@ -379,8 +477,11 @@ def test_body_glb_has_slider_targets_and_joint_offsets(female_body_glb):
     assert "head" in mh["body_joint_deltas"]["body_height_max"], "a taller body lifts the head"
     assert mh["body_joint_deltas"]["body_height_max"]["head"][1] > 0
     body = document["meshes"][0]["primitives"][0]
-    positions = accessor_array(document, binary, body["attributes"]["POSITION"])
+    positions = accessor_values(document, binary, body["attributes"]["POSITION"])
     assert abs(positions[:, 1].min()) < 0.01, "feet stand at y = 0"
+    uvs = accessor_values(document, binary, body["attributes"]["TEXCOORD_0"])
+    assert uvs.min() >= 0.0 and uvs.max() <= 1.0, "the body UDIM 1002 tile moves to 0..1"
+    assert mh["uv_tile_offset"] == {"body": [-1, 0]}
     assert len(document["skins"][0]["joints"]) == 342
 
 
@@ -390,12 +491,38 @@ def test_head_glb_morphs_equal_the_bake(ada_head_glb, ada_rig, ada_targets, name
     names = document["meshes"][0]["extras"]["targetNames"]
     primitives = document["meshes"][0]["primitives"]
     for primitive, index in zip(primitives, ada_rig.dna.lod_meshes[0], strict=True):
-        stored = accessor_array(
+        stored = accessor_values(
             document, binary, primitive["targets"][names.index(name)]["POSITION"]
         )
         morph = ada_targets[name].meshes.get(index)
         expected = np.zeros_like(stored)
         if morph is not None:
             expected = morph.positions[ada_rig.dna.mesh(index).layout_positions] * 0.01
-        # Deltas under 0.01 mm are dropped from the sparse targets.
-        np.testing.assert_allclose(stored, expected, atol=1.1e-5)
+        # Deltas under 0.01 mm are dropped; the rest are 16-bit (0.03 mm steps).
+        np.testing.assert_allclose(stored, expected, atol=1.1e-5 + 0.5 / 32767)
+
+
+@pytest.mark.skipif(
+    shutil.which("node") is None or not (WEB / "node_modules" / "three").is_dir(),
+    reason="node or the web app's three.js is not installed",
+)
+def test_three_loads_the_compressed_head_glb(ada_head_glb):
+    stats, _, _ = ada_head_glb
+    result = subprocess.run(
+        ["node", str(PIPELINE / "scripts" / "check_glb_three.mjs"), str(WEB), str(stats.path)],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads(result.stdout.strip().splitlines()[-1])
+    materials = [mesh["material"] for mesh in report["meshes"]]
+    assert materials == [
+        "head", "teeth", "saliva", "eyeLeft", "eyeRight",
+        "eyeshell", "eyelashes", "eyeEdge", "cartilage",
+    ]  # fmt: skip
+    for mesh in report["meshes"]:
+        assert mesh["skinned"] and mesh["morphs"] == 67 and "_dna_position" in mesh["attributes"]
+        assert mesh["worstNormalLength"] < 1e-3 and mesh["worstWeightSum"] < 1e-4
+    assert report["bones"] == 870

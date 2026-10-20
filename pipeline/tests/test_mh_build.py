@@ -1,0 +1,90 @@
+"""Incremental builds: stamps, skip logic and failure reporting."""
+
+import json
+from pathlib import Path
+
+from asset_pipeline.mh.build import Builder, fab_animations
+from asset_pipeline.mh.convert import ConversionError
+from asset_pipeline.mh.stamps import Stamps, fingerprint
+
+
+def test_fingerprint_follows_file_contents(tmp_path: Path) -> None:
+    done = tmp_path / "done.json"
+    done.write_text("{}", encoding="utf-8")
+    first = fingerprint("v1", done)
+    assert fingerprint("v1", done) == first
+    assert fingerprint("v2", done) != first
+    done.write_text('{"files": 1}', encoding="utf-8")
+    assert fingerprint("v1", done) != first
+    assert fingerprint("v1", tmp_path / "missing.json") != first
+
+
+def test_stamp_is_current_only_while_outputs_exist(tmp_path: Path) -> None:
+    stamps = Stamps(tmp_path)
+    output = tmp_path / "web" / "a.bin"
+    output.parent.mkdir()
+    output.write_bytes(b"1")
+    stamps.record("faces/Ada", "abc", [output], {"face": {"id": "face.Ada"}})
+    assert stamps.is_current("faces/Ada", "abc")
+    assert not stamps.is_current("faces/Ada", "other")
+    assert stamps.info("faces/Ada") == {"face": {"id": "face.Ada"}}
+    output.unlink()
+    assert not stamps.is_current("faces/Ada", "abc")
+
+
+def test_builder_skips_current_assets_and_reports_failures(tmp_path: Path) -> None:
+    logs: list[str] = []
+    builder = Builder(tmp_path, log=logs.append)
+    output = builder.web / "x.txt"
+    calls = []
+
+    def build() -> tuple[list[Path], dict, str]:
+        calls.append(1)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("x", encoding="utf-8")
+        return [output], {"thing": 1}, "made"
+
+    assert builder.run("things/x", "p1", build).status == "built"
+    assert builder.run("things/x", "p1", build).status == "skipped"
+    assert builder.run("things/x", "p2", build).status == "built"
+    builder.force = True
+    assert builder.run("things/x", "p2", build).status == "built"
+    assert len(calls) == 3
+    assert builder.records("things") == [{"thing": 1}]
+
+    def broken() -> tuple[list[Path], dict, str]:
+        raise ConversionError("source missing")
+
+    outcome = builder.run("things/y", "p1", broken)
+    assert outcome.status == "failed" and "source missing" in outcome.detail
+    assert any("failed" in line for line in logs)
+
+
+def test_fab_clip_lists_become_idle_animations(tmp_path: Path) -> None:
+    folder = tmp_path / "animations" / "fab" / "crowd"
+    folder.mkdir(parents=True)
+    (folder / "a.glb").write_bytes(b"glb")
+    (folder / "b.glb").write_bytes(b"glb")
+    clips = [
+        {"file": "a.glb", "standing": True, "calm": True},
+        {"file": "b.glb", "standing": False, "calm": False},
+        {"file": "missing.glb", "standing": True, "calm": True},
+    ]
+    (folder / "clips.json").write_text(json.dumps({"fps": 30, "clips": clips}), encoding="utf-8")
+    entries = fab_animations(tmp_path)
+    assert entries == [
+        {
+            "id": "anim.fab.crowd.a",
+            "kind": "body",
+            "file": "animations/fab/crowd/a.glb",
+            "loop": True,
+            "tags": ["idle", "standing", "calm"],
+        },
+        {
+            "id": "anim.fab.crowd.b",
+            "kind": "body",
+            "file": "animations/fab/crowd/b.glb",
+            "loop": True,
+            "tags": ["idle"],
+        },
+    ]

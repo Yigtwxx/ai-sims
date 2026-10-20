@@ -1,0 +1,480 @@
+"""Incremental batch conversion of the MetaHuman archive, and the web manifest.
+
+`Builder` runs one converter per asset (head, skin, iris, body, animation, lighting rig,
+groom). Each run is keyed by its output folder and fingerprinted from the source units'
+`done.json` plus the converter version (`stamps.py`); an asset whose fingerprint is
+unchanged and whose outputs exist is skipped, so the batch can be re-run as new presets
+land. The manifest is assembled from the build records of every asset that exists.
+"""
+
+import json
+import time
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Literal
+
+from asset_pipeline.mh.anim import (
+    BodyTarget,
+    Clip,
+    ClipError,
+    ClipInfo,
+    FaceFitter,
+    convert_body_clip,
+    convert_face_clip,
+    describe,
+    leg_length,
+    list_clip_units,
+)
+from asset_pipeline.mh.convert import (
+    CharacterSource,
+    ConversionError,
+    bake_head,
+    body_driven_joints,
+    body_fingerprint,
+    body_live_rule,
+    convert_body,
+    convert_head,
+    convert_iris,
+    convert_skin,
+    head_fingerprint,
+    head_live_rule,
+    iris_fingerprint,
+    list_characters,
+    skin_fingerprint,
+)
+from asset_pipeline.mh.dna import read_dna
+from asset_pipeline.mh.grooms import HEADS as GROOM_HEADS
+from asset_pipeline.mh.grooms import (
+    GroomError,
+    GroomHead,
+    GroomUnit,
+    ReferenceHead,
+    convert_groom,
+    list_groom_units,
+)
+from asset_pipeline.mh.ktx import KtxEncodeError, KtxUnavailableError
+from asset_pipeline.mh.lighting import convert_level, has_lights, list_levels, manifest_entry
+from asset_pipeline.mh.manifest import assemble, write_manifest
+from asset_pipeline.mh.rig import MetaHumanRig
+from asset_pipeline.mh.stamps import Stamps, fingerprint
+from asset_pipeline.mh.textures import TextureError, write_json
+from asset_pipeline.mh.visemes import VISEME_RECIPES
+
+Status = Literal["built", "skipped", "failed"]
+EXPECTED_ERRORS = (
+    ConversionError,
+    TextureError,
+    KtxEncodeError,
+    KtxUnavailableError,
+    ClipError,
+    GroomError,
+    OSError,
+    ValueError,
+)
+FACE_REFERENCE = "Ada"  # head whose ARKit morphs face clips are fitted on
+
+
+@dataclass(frozen=True)
+class Outcome:
+    key: str
+    status: Status
+    seconds: float
+    detail: str = ""
+
+
+@dataclass
+class Builder:
+    archive: Path
+    web_root: Path | None = None
+    force: bool = False
+    compress: bool = True
+    log: Callable[[str], None] = print
+    outcomes: list[Outcome] = field(default_factory=list)
+
+    @property
+    def web(self) -> Path:
+        return self.web_root or self.archive / "web"
+
+    @property
+    def stamps(self) -> Stamps:
+        # Stamps sit beside web/ (archive/build/stamps for the real archive).
+        return Stamps(self.web.parent)
+
+    @property
+    def mapping_path(self) -> Path:
+        return self.archive / "raw" / "arkit" / "arkit_mapping.json"
+
+    def run(
+        self,
+        key: str,
+        print_: str,
+        build: Callable[[], tuple[Iterable[Path], dict[str, Any], str]],
+    ) -> Outcome:
+        """Build `key` unless its stamp is current; `build` returns (outputs, info, detail)."""
+        if not self.force and self.stamps.is_current(key, print_):
+            outcome = Outcome(key, "skipped", 0.0, "up to date")
+        else:
+            started = time.perf_counter()
+            try:
+                outputs, info, detail = build()
+            except EXPECTED_ERRORS as error:
+                outcome = Outcome(key, "failed", time.perf_counter() - started, str(error))
+            else:
+                self.stamps.record(key, print_, outputs, info)
+                outcome = Outcome(key, "built", time.perf_counter() - started, detail)
+        self.outcomes.append(outcome)
+        self.log(f"{outcome.status:7s} {key:40s} {outcome.seconds:7.1f}s  {outcome.detail}")
+        return outcome
+
+    # ------------------------------------------------------------------------ assets
+
+    def characters(self, requested: Sequence[str]) -> list[str]:
+        available = list_characters(self.archive)
+        if not requested or "all" in requested:
+            return available
+        return [name for name in requested if name in available or self._warn_missing(name)]
+
+    def _warn_missing(self, name: str) -> bool:
+        self.log(f"skip    characters/{name}: no finished export (done.json)")
+        return False
+
+    def head(self, name: str) -> Outcome:
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            result = convert_head(
+                name, self.archive, web_root=self.web_root, compress=self.compress
+            )
+            stats = result.stats
+            detail = (
+                f"{stats.size / 1e6:.1f} MB (raw {stats.raw_size / 1e6:.1f} MB), "
+                f"{len(stats.targets)} targets, gender {result.face['gender']}"
+            )
+            return result.outputs, result.info, detail
+
+        try:
+            print_ = head_fingerprint(self.archive, name, self.mapping_path, self.compress)
+        except ConversionError as error:
+            return self._fail(f"faces/{name}", error)
+        return self.run(f"faces/{name}", print_, build)
+
+    def skin(self, name: str) -> Outcome:
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            entry = convert_skin(name, self.archive, web_root=self.web_root)
+            outputs = [self.web / path for path in _entry_files(entry)]
+            stats = entry.get("stats", {})
+            total = sum(stats.get("bytes", {}).values())
+            detail = f"tone {entry['tone']:.2f} {entry['swatch']}, {total / 1e6:.1f} MB"
+            if "makeupAlbedo" in entry:
+                detail += ", makeup"
+            return outputs, {"skin": entry}, detail
+
+        try:
+            print_ = skin_fingerprint(self.archive, name)
+        except ConversionError as error:
+            return self._fail(f"skins/{name}", error)
+        return self.run(f"skins/{name}", print_, build)
+
+    def iris(self, name: str) -> Outcome:
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            entry = convert_iris(name, self.archive, web_root=self.web_root)
+            outputs = [self.web / entry["color"], self.web / entry["normal"]]
+            return outputs, {"iris": entry}, entry["swatch"]
+
+        try:
+            print_ = iris_fingerprint(self.archive, name)
+        except ConversionError as error:
+            return self._fail(f"irises/{name}", error)
+        return self.run(f"irises/{name}", print_, build)
+
+    def body(self, gender: str) -> Outcome:
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            stats, entry = convert_body(
+                gender, self.archive, web_root=self.web_root, compress=self.compress
+            )
+            detail = f"{stats.size / 1e6:.1f} MB (raw {stats.raw_size / 1e6:.1f} MB)"
+            return [stats.path], {"body": entry}, detail
+
+        unit = self.archive / "raw" / "bodies" / gender
+        if not (unit / "done.json").is_file():
+            return self._fail(f"bodies/{gender}", ConversionError(f"{unit} has no done.json"))
+        return self.run(
+            f"bodies/{gender}", body_fingerprint(self.archive, gender, self.compress), build
+        )
+
+    # ------------------------------------------------------------------------ animations
+
+    def _body_target(self) -> BodyTarget:
+        lengths = {}
+        dnas = {}
+        for gender in ("female", "male"):
+            path = self.archive / "raw" / "bodies" / gender / "neutral" / f"Body_{gender}_Body.dna"
+            if path.is_file():
+                dnas[gender] = read_dna(path, geometry=False)
+                joints = dnas[gender].joints
+                lengths[gender] = leg_length(joints.names, joints.translations) * 0.01
+        gender = "female" if "female" in dnas else next(iter(dnas), None)
+        if gender is None:
+            raise ConversionError("no body basis DNA to retarget body clips onto")
+        dna = dnas[gender]
+        live = body_live_rule(dna)
+        return BodyTarget(
+            dna=dna,
+            live=frozenset(n for n in dna.joints.names if live(n)),
+            leg_lengths=lengths,
+            gender=gender,
+            rig=MetaHumanRig(dna),
+        )
+
+    def _face_reference(self) -> str:
+        names = list_characters(self.archive)
+        if FACE_REFERENCE in names:
+            return FACE_REFERENCE
+        if not names:
+            raise ConversionError("no converted preset to fit face clips on")
+        return names[0]
+
+    def _face_fitter(self, reference: str) -> FaceFitter:
+        source = CharacterSource.find(self.archive, reference)
+        dna = read_dna(source.head_dna, lods=[0])
+        rig, targets, _ = bake_head(dna, self.mapping_path, VISEME_RECIPES)
+        return FaceFitter.from_targets(rig, targets, reference)
+
+    def animations(self, only: Sequence[str] = ()) -> None:
+        clips_root = self.archive / "raw" / "animations"
+        state: dict[str, Any] = {}
+        reference = self._face_reference()
+        reference_done = CharacterSource.find(self.archive, reference).done
+        for unit in list_clip_units(self.archive):
+            try:
+                clip = Clip.load(unit)
+            except (OSError, ValueError, KeyError) as error:
+                self._fail(f"animations/{unit.name}", ClipError(str(error)))
+                continue
+            info = describe(unit.relative_to(clips_root), clip.kind)
+            if only and info.id not in only:
+                continue
+            suffix = ".glb" if clip.kind == "body" else ".json"
+            output = self.web / "animations" / f"{info.file_stem}{suffix}"
+            entry = {
+                "id": info.id,
+                "kind": clip.kind,
+                "file": output.relative_to(self.web).as_posix(),
+                "loop": info.loop,
+                "tags": list(info.tags),
+            }
+            if clip.kind == "body":
+                print_ = fingerprint(
+                    "body-clip-v3",  # v2: twists from the body rig; v3: idle tags
+                    unit / "done.json",
+                    self.archive / "raw" / "bodies" / "female" / "done.json",
+                    self.compress,
+                )
+            else:
+                print_ = fingerprint(
+                    "face-clip-v1", unit / "done.json", reference_done, self.mapping_path
+                )
+            self.run(
+                f"animations/{info.file_stem}",
+                print_,
+                self._clip_builder(clip, info, output, entry, reference, state),
+            )
+
+    def _clip_builder(
+        self,
+        clip: Clip,
+        info: ClipInfo,
+        output: Path,
+        entry: dict[str, Any],
+        reference: str,
+        state: dict[str, Any],
+    ) -> Callable[[], tuple[Iterable[Path], dict[str, Any], str]]:
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            if clip.kind == "body":
+                if "body" not in state:
+                    state["body"] = self._body_target()
+                stats = convert_body_clip(clip, state["body"], info, output, compress=self.compress)
+                detail = (
+                    f"{stats['bytes'] / 1e3:.0f} kB, {stats['tracks']} rotation tracks, "
+                    f"lowest foot {stats['lowest_foot_y_m']:.3f} m"
+                )
+            else:
+                if "face" not in state:
+                    state["face"] = self._face_fitter(reference)
+                stats = convert_face_clip(clip, state["face"], info, output)
+                detail = (
+                    f"{stats['bytes'] / 1e3:.0f} kB, {stats['morphs']} morphs, residual "
+                    f"{stats['residual_rms_mm']:.2f} mm rms (motion "
+                    f"{stats['motion_rms_mm']:.2f} mm)"
+                )
+            return [output], {"animation": entry, "stats": stats}, detail
+
+        return build
+
+    # ------------------------------------------------------------------------ lighting
+
+    def lighting(self) -> None:
+        for level in list_levels(self.archive):
+            rig = convert_level(level)
+            if not has_lights(rig):
+                self.log(f"skip    lighting/{level.name}: no lights")
+                continue
+            output = self.web / "lighting" / f"{rig['id'].removeprefix('light.')}.json"
+            print_ = fingerprint("lighting-v1", level / "done.json", level / "lighting.json")
+            self.run(f"lighting/{level.name}", print_, self._lighting_builder(rig, output))
+
+    def _lighting_builder(
+        self, rig: dict[str, Any], output: Path
+    ) -> Callable[[], tuple[Iterable[Path], dict[str, Any], str]]:
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            write_json(output, rig)
+            entry = manifest_entry(rig, output.relative_to(self.web).as_posix())
+            return [output], {"lighting": entry}, f"{len(rig['lights'])} lights"
+
+        return build
+
+    # ------------------------------------------------------------------------ grooms
+
+    def _groom_setup(self, reference: str) -> tuple[dict[str, GroomHead], ReferenceHead]:
+        source = CharacterSource.find(self.archive, reference)
+        dna = read_dna(source.head_dna, lods=[0])
+        _, targets, _ = bake_head(dna, self.mapping_path, VISEME_RECIPES)
+        live = head_live_rule(body_driven_joints(read_dna(source.body_dna, geometry=False)))
+        head = ReferenceHead.build(
+            reference, dna, targets, {name: live(name) for name in dna.joints.names}
+        )
+        mesh = next(m for m in dna.meshes_for_lod(0) if m.name.startswith("head_"))
+        folder = self.archive / "raw" / "grooms" / "groom_head"
+        heads = {
+            name: GroomHead.load(folder / f"{name}.glb", mesh)
+            for name in GROOM_HEADS
+            if (folder / f"{name}.glb").is_file()
+        }
+        if not heads:
+            raise ConversionError(f"no groom head GLBs in {folder}")
+        return heads, head
+
+    def grooms(self, only: Sequence[str] = ()) -> None:
+        units = list_groom_units(self.archive)
+        if not units:
+            return
+        reference = self._face_reference()
+        reference_done = CharacterSource.find(self.archive, reference).done
+        head_done = self.archive / "raw" / "grooms" / "groom_head" / "done.json"
+        state: dict[str, Any] = {}
+        for unit in units:
+            try:
+                groom = GroomUnit.load(unit)
+            except (OSError, ValueError, KeyError) as error:
+                self._fail(f"grooms/{unit.name}", GroomError(str(error)))
+                continue
+            key = f"grooms/{groom.slot}/{groom.style}"
+            if only and groom.style not in only and key not in only:
+                continue
+            print_ = fingerprint(
+                "groom-v3", unit / "done.json", head_done, reference_done, self.mapping_path
+            )
+            self.run(key, print_, self._groom_builder(groom, reference, state))
+
+    def _groom_builder(
+        self, groom: GroomUnit, reference: str, state: dict[str, Any]
+    ) -> Callable[[], tuple[Iterable[Path], dict[str, Any], str]]:
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            if "setup" not in state:
+                state["setup"] = self._groom_setup(reference)
+            heads, head = state["setup"]
+            entry, outputs, stats = convert_groom(groom, heads, head, self.web)
+            lods = ", ".join(f"{lod['source']} {lod['vertices']}v" for lod in stats["lods"])
+            detail = (
+                f"{stats['bytes'] / 1e6:.1f} MB glb ({lods}), on {stats['head']}, roots "
+                f"{stats['root_distance_mm']['p95']:.1f} mm p95"
+            )
+            return outputs, {"groom": entry, "stats": stats}, detail
+
+        return build
+
+    def _fail(self, key: str, error: Exception) -> Outcome:
+        outcome = Outcome(key, "failed", 0.0, str(error))
+        self.outcomes.append(outcome)
+        self.log(f"{outcome.status:7s} {key:40s} {0.0:7.1f}s  {outcome.detail}")
+        return outcome
+
+    # ------------------------------------------------------------------------ manifest
+
+    def records(self, prefix: str) -> list[dict[str, Any]]:
+        """Build infos of every current asset under `prefix` (e.g. `skins`)."""
+        root = self.stamps.root / prefix
+        infos = []
+        if not root.is_dir():
+            return infos
+        for stamp in sorted(root.rglob("*.json")):
+            key = stamp.relative_to(self.stamps.root).with_suffix("").as_posix()
+            data = self.stamps.read(key)
+            if data and all((self.stamps.archive / o).is_file() for o in data.get("outputs", [])):
+                infos.append(data.get("info", {}))
+        return infos
+
+    def manifest(self) -> Path:
+        heads = self.records("faces")
+        manifest = assemble(
+            faces=[info["face"] for info in heads if "face" in info],
+            skins=[info["skin"] for info in self.records("skins") if "skin" in info],
+            irises=[info["iris"] for info in self.records("irises") if "iris" in info],
+            bodies=[info["body"] for info in self.records("bodies") if "body" in info],
+            animations=[
+                *(info["animation"] for info in self.records("animations") if "animation" in info),
+                *fab_animations(self.web),
+            ],
+            lighting=[info["lighting"] for info in self.records("lighting") if "lighting" in info],
+            grooms=[info["groom"] for info in self.records("grooms") if "groom" in info],
+            face_tones={
+                str(info["face"]["id"]).removeprefix("face."): info.get("tone_estimate")
+                for info in heads
+                if "face" in info
+            },
+        )
+        path = self.web / "manifest.json"
+        write_manifest(manifest, path, self.web)
+        counts = ", ".join(f"{k} {len(v)}" for k, v in manifest.items() if isinstance(v, list))
+        self.log(f"wrote   {path}  ({counts})")
+        return path
+
+
+def fab_animations(web: Path) -> list[dict[str, Any]]:
+    """Body clips retargeted by the web app (`animations/fab/<set>/clips.json`, written by
+    web/scripts/retarget-fbx.mjs): one idle per entry, tagged `standing` / `calm` as the
+    clip list says. One file serves both bodies (identical rest rotations)."""
+    entries = []
+    for listing in sorted((web / "animations" / "fab").glob("*/clips.json")):
+        try:
+            clips = json.loads(listing.read_text(encoding="utf-8")).get("clips", [])
+        except (OSError, json.JSONDecodeError, AttributeError):
+            continue
+        for clip in clips:
+            file = listing.parent / str(clip.get("file", ""))
+            if not clip.get("file") or not file.is_file():
+                continue
+            tags = ["idle"]
+            if clip.get("standing"):
+                tags.append("standing")
+            if clip.get("calm"):
+                tags.append("calm")
+            entries.append(
+                {
+                    "id": f"anim.fab.{listing.parent.name}.{file.stem}",
+                    "kind": "body",
+                    "file": file.relative_to(web).as_posix(),
+                    "loop": True,
+                    "tags": tags,
+                }
+            )
+    return entries
+
+
+def _entry_files(entry: dict[str, Any]) -> list[str]:
+    files: list[str] = []
+    for value in (*entry["face"].values(), *entry["body"].values(), entry.get("makeupAlbedo")):
+        if isinstance(value, str):
+            files.append(value)
+        elif isinstance(value, list):
+            files.extend(value)
+    return files

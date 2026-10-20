@@ -39,6 +39,7 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import ArrayLike
+from scipy.sparse import csr_matrix
 
 from asset_pipeline.mh.dna import (
     F32,
@@ -169,6 +170,8 @@ class MetaHumanRig:
                 self._ambiguous.add(key)
             self._loose[key] = i
         self._skin_cache: dict[int, tuple[I32, F32]] = {}
+        self._blend_cache: dict[int, csr_matrix] = {}
+        self._weight_cache: dict[int, tuple[csr_matrix, np.ndarray]] = {}
 
     @classmethod
     def from_path(cls, path: Path | str, *, lods: Iterable[int] | None = None) -> "MetaHumanRig":
@@ -269,6 +272,39 @@ class MetaHumanRig:
             self._skin_cache[mesh.index] = mesh.skin.dense(normalize=True)
         return self._skin_cache[mesh.index]
 
+    def _weight_matrix(self, mesh: Mesh) -> tuple[csr_matrix, np.ndarray]:
+        """`(P, J)` sparse skin weights and the mask of positions without influences."""
+        if mesh.index not in self._weight_cache:
+            joints, weights = self._dense_skin(mesh)
+            rows = np.repeat(np.arange(len(joints)), joints.shape[1])
+            matrix = csr_matrix(
+                (weights.astype(np.float64).ravel(), (rows, joints.ravel().astype(np.int64))),
+                shape=(len(joints), len(self.dna.joints.names)),
+            )
+            self._weight_cache[mesh.index] = (matrix, weights.sum(axis=1) == 0)
+        return self._weight_cache[mesh.index]
+
+    def _blend_matrix(self, mesh: Mesh, channels: int) -> csr_matrix:
+        """`(3P, channels)` sparse blend shape deltas (row `3 * position + axis`)."""
+        if mesh.index not in self._blend_cache:
+            rows, cols, values = [], [], []
+            for target in mesh.blend_shapes:
+                vertices = target.vertices.astype(np.int64)
+                for axis in range(3):
+                    rows.append(vertices * 3 + axis)
+                    cols.append(np.full(len(vertices), target.channel, dtype=np.int64))
+                    values.append(target.deltas[:, axis].astype(np.float64))
+            size = 3 * len(mesh.positions)
+            if rows:
+                matrix = csr_matrix(
+                    (np.concatenate(values), (np.concatenate(rows), np.concatenate(cols))),
+                    shape=(size, channels),
+                )
+            else:
+                matrix = csr_matrix((size, channels))
+            self._blend_cache[mesh.index] = matrix
+        return self._blend_cache[mesh.index]
+
     def deform(
         self,
         mesh: int | str,
@@ -294,19 +330,17 @@ class MetaHumanRig:
                 f"evaluated at LOD {output.lod}"
             )
         positions = data.positions.astype(np.float64)
-        if blend_shapes:
-            for target in data.blend_shapes:
-                weight = output.blend_shape_weights[target.channel]
-                if weight != 0.0:
-                    np.add.at(positions, target.vertices, weight * target.deltas.astype(np.float64))
+        if blend_shapes and data.blend_shapes:
+            weights_bs = np.asarray(output.blend_shape_weights, dtype=np.float64)
+            matrix = self._blend_matrix(data, len(weights_bs))
+            positions += (matrix @ weights_bs).reshape(-1, 3)
         if not skinning:
             return positions
 
-        joints, weights = self._dense_skin(data)
-        skin = self.skinning_matrices(output)[:, :3, :]  # (J, 3, 4)
-        blended = np.einsum("pm,pmij->pij", weights.astype(np.float64), skin[joints])
+        weights, unweighted = self._weight_matrix(data)
+        skin = self.skinning_matrices(output)[:, :3, :].reshape(-1, 12)  # (J, 3x4)
+        blended = (weights @ skin).reshape(-1, 3, 4)  # per-position weighted matrix
         skinned = np.einsum("pij,pj->pi", blended[:, :, :3], positions) + blended[:, :, 3]
-        unweighted = weights.sum(axis=1) == 0
         skinned[unweighted] = positions[unweighted]
         return skinned
 
