@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { Camera } from 'three';
 
 import type { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import type { MhManifest } from '@/lib/assets/manifest';
@@ -106,7 +107,8 @@ export function MhStage({
     input.current = { mode: lifeMode, speech };
   }, [lifeMode, speech]);
   const onFrame = useCallback(
-    (handle: MhCharacterHandle, delta: number) => life.step(handle, delta, input.current),
+    (handle: MhCharacterHandle, delta: number, camera: Camera) =>
+      life.step(handle, delta, { ...input.current, viewer: camera.position }),
     [life],
   );
 

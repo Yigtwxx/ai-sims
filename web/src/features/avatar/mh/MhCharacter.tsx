@@ -2,7 +2,7 @@
 
 import { useFrame, useThree } from '@react-three/fiber';
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo } from 'react';
-import type { Material, Mesh, Object3D } from 'three';
+import type { Camera, Material, Mesh, Object3D } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
@@ -63,7 +63,7 @@ export interface MhCharacterProps {
   /** How much of the body the idle clips drive; the procedural layer does the rest. */
   idleLayer?: MocapLayer;
   /** Called every frame after the mixer and before rendering (life, lip-sync). */
-  onFrame?: (handle: MhCharacterHandle, delta: number) => void;
+  onFrame?: (handle: MhCharacterHandle, delta: number, camera: Camera) => void;
 }
 
 /**
@@ -199,8 +199,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     applyBodySliders(assembled.handle.body, sliders ?? {});
   }, [assembled, sliders]);
 
-  useFrame((_, delta) => {
-    onFrame?.(assembled.handle, delta);
+  useFrame(({ camera }, delta) => {
+    onFrame?.(assembled.handle, delta, camera);
     // Wrinkles follow whatever the face morphs ended up as this frame.
     const wrinkles = assembled.wrinkles;
     if (wrinkles?.uniforms.wrinkleMasks.value) {
