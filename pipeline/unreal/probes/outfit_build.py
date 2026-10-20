@@ -38,7 +38,11 @@ with ue.editing(character):
     params.absolute_build_path = BUILD
     params.common_folder_path = f"{BUILD}/Common"
     params.enable_wardrobe_item_validation = False
-    sub.build_meta_human(character=character, params=params)
+    try:
+        sub.build_meta_human(character=character, params=params)
+        report["build_error"] = None
+    except Exception as exc:  # control rig copy warnings surface as exceptions
+        report["build_error"] = str(exc)[:2000]
 unreal.EditorAssetLibrary.save_loaded_asset(character, False)
 inventory.scan((BUILD,))
 report["built_assets"] = {

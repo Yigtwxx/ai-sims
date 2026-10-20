@@ -9,6 +9,7 @@ tracks and body tracks into glTF animations.
 
 from __future__ import annotations
 
+import struct
 from pathlib import Path
 from typing import Any
 
@@ -37,15 +38,21 @@ def transform_record(transform: unreal.Transform) -> list[float]:
     return [t.x, t.y, t.z, q.x, q.y, q.z, q.w, s.x, s.y, s.z]
 
 
-def sample_bones(anim: unreal.AnimSequence, frames: int) -> dict[str, Any]:
-    names = list(unreal.AnimationLibrary.get_animation_track_names(anim))
+def sample_bones(anim: unreal.AnimSequence, frames: int, out: Path) -> dict[str, Any]:
+    """Local bone transforms per frame, written as little-endian float32 to `out`.
+
+    Layout: frames x bones x 10 ([tx, ty, tz, qx, qy, qz, qw, sx, sy, sz], Unreal
+    units). JSON lists of millions of floats made a 10 s clip take minutes.
+    """
+    names = [str(n) for n in unreal.AnimationLibrary.get_animation_track_names(anim)]
     if not names:
-        return {"bones": [], "frames": []}
-    samples = []
-    for frame in range(frames):
-        poses = unreal.AnimationLibrary.get_bone_poses_for_frame(anim, names, frame, False)
-        samples.append([transform_record(pose) for pose in poses])
-    return {"bones": [str(n) for n in names], "frames": samples}
+        return {"bones": [], "file": None}
+    with out.open("wb") as handle:
+        for frame in range(frames):
+            poses = unreal.AnimationLibrary.get_bone_poses_for_frame(anim, names, frame, False)
+            values = [v for pose in poses for v in transform_record(pose)]
+            handle.write(struct.pack(f"<{len(values)}f", *values))
+    return {"bones": names, "file": out.name, "layout": "frames x bones x [t3 q4 s3] float32 LE"}
 
 
 def sample_curves(
@@ -97,8 +104,15 @@ def export_clip(path: str, work: Path) -> dict[str, Any]:
     frames = int(unreal.AnimationLibrary.get_num_frames(anim))
     length = float(unreal.AnimationLibrary.get_sequence_length(anim))
     skeleton = anim.get_editor_property("skeleton")
-    bones = sample_bones(anim, frames)
     curves, curve_names = sample_curves(anim, frames)
+    # Face clips carry rig controls; RigLogic rebuilds the ~870 facial joints from
+    # them, so their baked bone tracks are skipped.
+    has_controls = any(name.lower().startswith("ctrl_") for name in curves)
+    bones = (
+        {"bones": [], "file": None}
+        if has_controls
+        else sample_bones(anim, frames, work / "bones.f32")
+    )
     meta = {
         "asset": path,
         "frames": frames,
@@ -106,6 +120,7 @@ def export_clip(path: str, work: Path) -> dict[str, Any]:
         "fps": (frames - 1) / length if length > 0 and frames > 1 else 0.0,
         "skeleton": skeleton.get_path_name() if skeleton else None,
         "bone_count": len(bones["bones"]),
+        "bones_skipped_for_controls": has_controls,
         "curve_count": len(curves),
         "all_curve_names": curve_names,
         "properties": ue.dump_properties(
