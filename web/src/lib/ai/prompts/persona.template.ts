@@ -9,24 +9,24 @@ import type { ChatLocale } from '../types';
  * - 1: first version.
  * - 2: added the persistence rule (Claude Haiku 5.5 chatbot hardening: the rules above
  *   must survive arguments, sympathetic reasons, partial requests and claimed approvals).
+ * - 3: the anime style is gone; every character is a photorealistic (MetaHuman) person.
  */
-export const PERSONA_PROMPT_VERSION = 2;
+export const PERSONA_PROMPT_VERSION = 3;
 
 export interface PersonaPromptVars {
   /** Sanitized display name; undefined for the default companion. */
   name: string | undefined;
   base: 'male' | 'female' | undefined;
-  style: 'anime' | 'realistic' | undefined;
+  style: 'realistic' | undefined;
   /** UI locale; used only to pick the reply language when the user's own is unclear. */
   locale: ChatLocale;
 }
 
 const LANGUAGE_NAME: Record<ChatLocale, string> = { tr: 'Turkish', en: 'English' };
 
-const STYLE_PHRASE = { anime: 'anime-style', realistic: 'realistic' } as const;
+const STYLE_PHRASE = { realistic: 'photorealistic' } as const;
 
 const STYLE_TONE = {
-  anime: 'Your tone is a little playful and expressive.',
   realistic: 'Your tone is calm, natural and down to earth.',
 } as const;
 

@@ -1,6 +1,7 @@
 import 'server-only';
 import { Binary, ObjectId } from 'mongodb';
 import { z } from 'zod';
+import { migrateConfig } from '@/lib/character/migrations';
 import {
   CharacterConfigSchema,
   type CharacterBase,
@@ -90,18 +91,19 @@ function toObjectId(id: string): ObjectId | null {
   return OBJECT_ID_PATTERN.test(id) ? new ObjectId(id) : null;
 }
 
+/** Stored configs are migrated on read; older documents are rewritten on the next save. */
 function toCharacter(doc: CharacterDoc): Character {
-  const parsed = CharacterConfigSchema.safeParse(doc.config);
-  if (!parsed.success) throw new InvalidCharacterConfigError(doc._id.toHexString());
+  const config = migrateConfig(doc.config);
+  if (!config) throw new InvalidCharacterConfigError(doc._id.toHexString());
 
   return {
     id: doc._id.toHexString(),
     userId: doc.userId,
     name: doc.name,
-    style: parsed.data.style,
-    base: parsed.data.base,
-    config: parsed.data,
-    schemaVersion: parsed.data.schemaVersion,
+    style: config.style,
+    base: config.base,
+    config,
+    schemaVersion: config.schemaVersion,
     status: doc.status,
     hasThumbnail: doc.hasThumbnail,
     createdAt: doc.createdAt,
@@ -113,7 +115,17 @@ function toCharacter(doc: CharacterDoc): Character {
 export async function listCharacters(userId: string): Promise<Character[]> {
   const { characters } = await getCollections();
   const docs = await characters.find({ userId }).sort({ updatedAt: -1 }).toArray();
-  return docs.map(toCharacter);
+  const list: Character[] = [];
+  for (const doc of docs) {
+    try {
+      list.push(toCharacter(doc));
+    } catch (error) {
+      // One unreadable document must not hide the user's other characters.
+      if (!(error instanceof InvalidCharacterConfigError)) throw error;
+      console.warn('[characters] skipping unreadable config', { id: doc._id.toHexString() });
+    }
+  }
+  return list;
 }
 
 /** Returns null when the character does not exist or belongs to someone else. */

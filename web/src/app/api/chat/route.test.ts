@@ -131,7 +131,7 @@ describe('POST /api/chat', () => {
 
   describe('character persona', () => {
     it('loads the character scoped to the signed-in user and uses it in the system prompt', async () => {
-      mocks.getCharacter.mockResolvedValue({ name: 'Mira', base: 'female', style: 'anime' });
+      mocks.getCharacter.mockResolvedValue({ name: 'Mira', base: 'female', style: 'realistic' });
       const p = provider('anthropic', () => chunks('Merhaba!'));
       mocks.getOrderedProviders.mockReturnValue([p]);
 
@@ -141,7 +141,7 @@ describe('POST /api/chat', () => {
       expect(mocks.getCharacter).toHaveBeenCalledWith('user-1', 'char-1');
       const received = p.stream.mock.calls[0]![0] as ChatRequest;
       expect(received.system).toContain('You are Mira');
-      expect(received.system).toContain('female anime-style');
+      expect(received.system).toContain('female photorealistic');
     });
 
     it('answers 404 for a character that is missing or belongs to someone else', async () => {

@@ -21,8 +21,6 @@
     "@google/genai": "^2.30.0",
     "@gsap/react": "^2.1.2",
     "@phosphor-icons/react": "^2.1.10",
-    "@pixiv/three-vrm": "^3.5.5",
-    "@pixiv/three-vrm-animation": "^3.5.5",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@react-three/postprocessing": "^3.2.0",

@@ -279,7 +279,8 @@
       "tagline": "The stage is yours.",
       "start": "Start talking",
       "edit": "Back to editing"
-    }
+    },
+    "preparing": "The creator is being prepared for the new MetaHuman characters."
   },
   "Common": {
     "save": "Save",

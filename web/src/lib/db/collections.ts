@@ -1,6 +1,6 @@
 import 'server-only';
 import type { Binary, Collection, ObjectId } from 'mongodb';
-import type { CharacterBase, CharacterConfig, CharacterStyle } from '@/lib/character/schema';
+import type { CharacterBase, CharacterStyle } from '@/lib/character/schema';
 import { getDb } from './mongo';
 
 export type CharacterStatus = 'draft' | 'finalized';
@@ -10,9 +10,11 @@ export type CharacterDoc = {
   /** Better Auth user id. Every query must filter on it (replaces Postgres RLS). */
   userId: string;
   name: string;
-  style: CharacterStyle;
+  /** v1 documents still say 'anime' until they are saved again. */
+  style: CharacterStyle | 'anime';
   base: CharacterBase;
-  config: CharacterConfig;
+  /** Any schema version; read through migrateConfig(). */
+  config: unknown;
   schemaVersion: number;
   status: CharacterStatus;
   hasThumbnail: boolean;

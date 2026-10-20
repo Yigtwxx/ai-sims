@@ -1,71 +1,113 @@
 import { z } from 'zod';
 
-/** Bump when the config shape changes and add a migration. */
-export const CURRENT_SCHEMA_VERSION = 1 as const;
+/** Bump when the config shape changes and add a step to ./migrations.ts. */
+export const CURRENT_SCHEMA_VERSION = 2 as const;
 
 export const CHARACTER_BASES = ['male', 'female'] as const;
 
-/** Anime is the main style; realistic is a side option the user can pick. */
-export const CHARACTER_STYLES = ['anime', 'realistic'] as const;
+/**
+ * Stored documents keep a `style` field. Every v2 character is photoreal
+ * (MetaHuman); 'anime' only appears on v1 documents before migration.
+ */
+export const CHARACTER_STYLES = ['realistic'] as const;
 
+/** Body sliders exported from the MetaHuman parametric body (pipeline bodies job). */
+export const BODY_SLIDERS = [
+  'height',
+  'weight',
+  'muscle',
+  'chest',
+  'waist',
+  'hips',
+  'shoulders',
+] as const;
+
+/** Named starting points; each is a slider vector in the manifest. */
+export const BODY_PRESETS = ['slim', 'average', 'athletic', 'curvy'] as const;
+
+export const HAIR_PATTERNS = ['none', 'ombre', 'roots', 'highlights', 'underlayer'] as const;
+
+const Id = z.string().min(1).max(120);
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Expected a #RRGGBB hex color');
 const UnitIntervalSchema = z.number().min(0).max(1);
+const SignedUnitSchema = z.number().min(-1).max(1);
 
-export const BODY_BUILDS = ['slim', 'average', 'athletic', 'curvy'] as const;
-
-/** Height multiplier range shared with the renderer's body shaping. */
-export const HEIGHT_MIN = 0.92;
-export const HEIGHT_MAX = 1.08;
-
-/** Sentinel ids: keep the base model's own part, or wear nothing in that slot. */
-export const OWN_PART = 'base';
-export const NO_PART = 'none';
-
-/** A wearable referencing a manifest id, optionally tinted. */
+/** A wearable referencing a manifest outfit id, with optional colour parameters. */
 const OutfitItemSchema = z.object({
-  id: z.string().min(1),
-  color: HexColorSchema.optional(),
+  id: Id,
+  /** Tint preset id from the manifest item, or null for the authored colours. */
+  tint: Id.nullable().default(null),
+  /** Outfit colour parameters (MetaHuman instance parameter name -> colour). */
+  colors: z.record(z.string(), HexColorSchema).default({}),
+});
+
+const HairColorSchema = z.object({
+  /** MetaHuman hair model: melanin (0 blond .. 1 black) and redness. */
+  melanin: UnitIntervalSchema,
+  redness: UnitIntervalSchema,
+  /** Artificial dye over the natural colour, or null. */
+  dye: HexColorSchema.nullable(),
 });
 
 /**
- * Render-independent character description. It only references manifest ids,
- * never meshes or textures, so the renderer can change without data migrations.
- * For the anime style, colours are multiplicative tints where #ffffff keeps the
- * authored colour, and `skin.tone` picks a position on the tone ramp.
+ * Render-independent character description. It only references manifest ids
+ * (MetaHuman faces, skins, grooms, outfits), never meshes or textures, so the
+ * renderer can change without data migrations.
  */
 export const CharacterConfigSchema = z.object({
   schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
   style: z.enum(CHARACTER_STYLES),
   base: z.enum(CHARACTER_BASES),
   face: z.object({
-    preset: z.string().min(1),
-    /** Morph blend weights between face presets, keyed by preset id. */
+    preset: Id,
+    /** Morph blend weights towards other face presets, keyed by face id. */
     blend: z.record(z.string(), UnitIntervalSchema),
   }),
-  skin: z.object({
-    /** Position along the melanin ramp, 0..1. */
-    tone: UnitIntervalSchema,
-  }),
-  eyes: z.object({ color: HexColorSchema }),
-  hair: z.object({ style: z.string().min(1), color: HexColorSchema }),
-  facialHair: z.object({ style: z.string().min(1).nullable(), color: HexColorSchema }),
-  outfit: z.object({
-    top: OutfitItemSchema,
-    bottom: OutfitItemSchema,
-    shoes: OutfitItemSchema,
-  }),
   body: z.object({
-    build: z.enum(BODY_BUILDS),
-    height: z.number().min(HEIGHT_MIN).max(HEIGHT_MAX),
+    preset: z.enum(BODY_PRESETS),
+    /** Slider values in -1..1 around the neutral body (0). */
+    sliders: z.partialRecord(z.enum(BODY_SLIDERS), SignedUnitSchema),
+  }),
+  skin: z.object({
+    /** Skin texture set id (any preset's skin can be worn by any face). */
+    set: Id,
+    /** Fine adjustment of the skin tone, -1 lighter .. 1 darker. */
+    tone: SignedUnitSchema,
+    /** Use the preset's makeup-baked face albedo when it has one. */
+    makeup: z.boolean(),
+  }),
+  eyes: z.object({ iris: Id.nullable(), color: HexColorSchema.nullable() }),
+  hair: z.object({
+    style: Id.nullable(),
+    color: HairColorSchema,
+    pattern: z.object({
+      type: z.enum(HAIR_PATTERNS),
+      color: HexColorSchema,
+      amount: UnitIntervalSchema,
+    }),
+  }),
+  /** Facial hair grooms share the hair colour. */
+  eyebrows: z.object({ style: Id.nullable() }),
+  beard: z.object({ style: Id.nullable() }),
+  mustache: z.object({ style: Id.nullable() }),
+  outfit: z.object({
+    top: OutfitItemSchema.nullable(),
+    bottom: OutfitItemSchema.nullable(),
+    shoes: OutfitItemSchema.nullable(),
+    /** One-piece outfits (e.g. a costume) replace top and bottom. */
+    full: OutfitItemSchema.nullable(),
   }),
   /** Jewellery and accessory ids, worn together. */
-  accessories: z.array(z.string().min(1)).max(8),
-  /** Tattoo designs placed on body regions. */
-  tattoos: z.array(z.object({ design: z.string().min(1), placement: z.string().min(1) })).max(4),
+  accessories: z.array(Id).max(8),
+  /** Small tattoo designs placed on body regions. */
+  tattoos: z.array(z.object({ design: Id, placement: Id })).max(4),
+  voice: z.object({ gender: z.enum(['female', 'male']) }),
 });
 
 export type CharacterConfig = z.infer<typeof CharacterConfigSchema>;
 export type CharacterBase = CharacterConfig['base'];
 export type CharacterStyle = CharacterConfig['style'];
 export type OutfitItem = z.infer<typeof OutfitItemSchema>;
-export type BodyBuild = CharacterConfig['body']['build'];
+export type BodySlider = (typeof BODY_SLIDERS)[number];
+export type BodyPreset = (typeof BODY_PRESETS)[number];
+export type HairPattern = (typeof HAIR_PATTERNS)[number];

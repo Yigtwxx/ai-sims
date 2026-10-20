@@ -4,7 +4,7 @@ import { hasLocale } from 'next-intl';
 import { redirect } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
 import { requireUserId } from '@/lib/auth/session';
-import { CHARACTER_BASES, CHARACTER_STYLES } from '@/lib/character/schema';
+import { CHARACTER_BASES } from '@/lib/character/schema';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import { createCharacter } from '@/lib/characters/repository';
 import { z } from 'zod';
@@ -13,7 +13,6 @@ export type CreateCharacterState = { error: 'invalid' | 'failed' } | null;
 
 const FormSchema = z.object({
   name: z.string().trim().min(1).max(40),
-  style: z.enum(CHARACTER_STYLES),
   base: z.enum(CHARACTER_BASES),
 });
 
@@ -27,14 +26,13 @@ export async function createCharacterAction(
   const locale = formData.get('locale');
   const parsed = FormSchema.safeParse({
     name: formData.get('name'),
-    style: formData.get('style'),
     base: formData.get('base'),
   });
   if (!parsed.success) return { error: 'invalid' };
 
   try {
-    const { name, style, base } = parsed.data;
-    await createCharacter(userId, { name, config: createDefaultConfig(style, base) });
+    const { name, base } = parsed.data;
+    await createCharacter(userId, { name, config: createDefaultConfig(base) });
   } catch {
     return { error: 'failed' };
   }

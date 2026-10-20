@@ -1,5 +1,6 @@
 // @vitest-environment node
 import net from 'node:net';
+import { ObjectId } from 'mongodb';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 
@@ -30,7 +31,7 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
 
   const userA = 'user-a';
   const userB = 'user-b';
-  const config = () => createDefaultConfig('anime', 'female');
+  const config = () => createDefaultConfig('female');
 
   beforeAll(async () => {
     vi.stubEnv('MONGODB_URI', TEST_URI);
@@ -48,12 +49,12 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
   it('creates a character and derives style, base and schemaVersion from config', async () => {
     const created = await repo.createCharacter(userA, {
       name: '  Mika  ',
-      config: createDefaultConfig('realistic', 'male'),
+      config: createDefaultConfig('male'),
     });
     expect(created.name).toBe('Mika');
     expect(created.style).toBe('realistic');
     expect(created.base).toBe('male');
-    expect(created.schemaVersion).toBe(1);
+    expect(created.schemaVersion).toBe(2);
     expect(created.status).toBe('draft');
     expect(created.hasThumbnail).toBe(false);
   });
@@ -76,7 +77,7 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
     const updated = await repo.updateCharacter(userA, created.id, {
       name: 'crud-2',
       status: 'finalized',
-      config: createDefaultConfig('realistic', 'male'),
+      config: createDefaultConfig('male'),
     });
     expect(updated).toMatchObject({
       name: 'crud-2',
@@ -114,7 +115,7 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
   });
 
   it('rejects an invalid config and invalid names on create and update', async () => {
-    const bad = { ...config(), skin: { tone: 5 } };
+    const bad = { ...config(), skin: { set: 'Ada', tone: 5, makeup: false } };
     await expect(repo.createCharacter(userA, { name: 'bad', config: bad })).rejects.toThrow(
       repo.InvalidCharacterInputError,
     );
@@ -130,6 +131,65 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
       repo.InvalidCharacterInputError,
     );
     expect((await repo.getCharacter(userA, ok.id))?.config.skin.tone).toBe(config().skin.tone);
+  });
+
+  it('reads v1 documents through the migration and skips unreadable ones in lists', async () => {
+    const { getCollections } = await import('@/lib/db/collections');
+    const { characters } = await getCollections();
+    const legacy = {
+      schemaVersion: 1,
+      style: 'anime',
+      base: 'male',
+      face: { preset: 'masc_vroid__base', blend: {} },
+      skin: { tone: 0 },
+      eyes: { color: '#ffffff' },
+      hair: { style: 'masc_vroid__hair', color: '#ffffff' },
+      facialHair: { style: null, color: '#ffffff' },
+      outfit: {
+        top: { id: 'none', color: '#ffffff' },
+        bottom: { id: 'none', color: '#ffffff' },
+        shoes: { id: 'none', color: '#ffffff' },
+      },
+      body: { build: 'athletic', height: 1 },
+      accessories: [],
+      tattoos: [],
+    };
+    const now = new Date();
+    const base = { userId: 'user-legacy', status: 'draft' as const, hasThumbnail: false };
+    const legacyId = new ObjectId();
+    await characters.insertMany([
+      {
+        _id: legacyId,
+        ...base,
+        name: 'old',
+        style: 'anime',
+        base: 'male',
+        config: legacy,
+        schemaVersion: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        _id: new ObjectId(),
+        ...base,
+        name: 'broken',
+        style: 'anime',
+        base: 'male',
+        config: { nope: true },
+        schemaVersion: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const list = await repo.listCharacters('user-legacy');
+    expect(list.map((c) => c.name)).toEqual(['old']);
+    expect(list[0]?.schemaVersion).toBe(2);
+    expect(list[0]?.config.body.preset).toBe('athletic');
+    expect((await repo.getCharacter('user-legacy', legacyId.toHexString()))?.style).toBe(
+      'realistic',
+    );
   });
 
   it('stores thumbnails, enforces the size limit and removes them on delete', async () => {

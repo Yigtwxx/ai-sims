@@ -1,85 +1,85 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultConfig } from './defaults';
-import { CharacterConfigSchema } from './schema';
 
-describe('CharacterConfigSchema', () => {
-  it.each([
-    ['anime', 'male'],
-    ['anime', 'female'],
-    ['realistic', 'male'],
-    ['realistic', 'female'],
-  ] as const)('accepts the default %s %s config', (style, base) => {
-    const config = createDefaultConfig(style, base);
-    expect(config.style).toBe(style);
-    expect(config.base).toBe(base);
+import { createDefaultConfig } from './defaults';
+import { migrateConfig } from './migrations';
+import { CharacterConfigSchema, CURRENT_SCHEMA_VERSION } from './schema';
+
+const V1_ANIME = {
+  schemaVersion: 1,
+  style: 'anime',
+  base: 'female',
+  face: { preset: 'fem_vroid__base', blend: {} },
+  skin: { tone: 0 },
+  eyes: { color: '#ffffff' },
+  hair: { style: 'AvatarSample_B__hair', color: '#ffffff' },
+  facialHair: { style: null, color: '#ffffff' },
+  outfit: {
+    top: { id: 'AvatarSample_B__top', color: '#ffffff' },
+    bottom: { id: 'AvatarSample_B__bottom', color: '#ffffff' },
+    shoes: { id: 'AvatarSample_B__shoes', color: '#ffffff' },
+  },
+  body: { build: 'curvy', height: 1.04 },
+  accessories: ['earring_hoop'],
+  tattoos: [{ design: 'rose', placement: 'wrist' }],
+};
+
+describe('CharacterConfigSchema v2', () => {
+  it.each(['male', 'female'] as const)('accepts the default %s config', (base) => {
+    const config = createDefaultConfig(base);
+    expect(config.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(config.voice.gender).toBe(base);
     expect(CharacterConfigSchema.safeParse(config).success).toBe(true);
   });
 
   it('returns independent copies from createDefaultConfig', () => {
-    const a = createDefaultConfig('anime', 'male');
-    a.hair.color = '#123456';
+    const a = createDefaultConfig('male');
     a.accessories.push('earring_hoop');
-    const b = createDefaultConfig('anime', 'male');
-    expect(b.hair.color).not.toBe('#123456');
+    a.body.sliders.height = 0.5;
+    const b = createDefaultConfig('male');
     expect(b.accessories).toEqual([]);
+    expect(b.body.sliders).toEqual({});
   });
 
-  it('rejects a height outside the supported range', () => {
-    for (const height of [0.5, 1.5]) {
-      const config = createDefaultConfig('anime', 'female');
-      config.body.height = height;
-      expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
-    }
-  });
-
-  it('rejects an unknown body build', () => {
-    const config = createDefaultConfig('anime', 'female');
-    (config.body as { build: string }).build = 'giant';
+  it('rejects body sliders outside -1..1 and unknown sliders', () => {
+    const config = createDefaultConfig('female');
+    config.body.sliders.weight = 1.5;
     expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
+    const unknown = createDefaultConfig('female') as unknown as { body: { sliders: object } };
+    unknown.body.sliders = { tail: 0.2 };
+    expect(CharacterConfigSchema.safeParse(unknown).success).toBe(false);
   });
 
-  it('limits the number of tattoos', () => {
-    const config = createDefaultConfig('anime', 'female');
-    config.tattoos = Array.from({ length: 5 }, (_, i) => ({ design: `d${i}`, placement: 'arm' }));
+  it('rejects an unknown hair pattern and malformed colours', () => {
+    const config = createDefaultConfig('female');
+    (config.hair.pattern as { type: string }).type = 'rainbow';
     expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
+    const colour = createDefaultConfig('female');
+    colour.hair.color.dye = 'red';
+    expect(CharacterConfigSchema.safeParse(colour).success).toBe(false);
+  });
+});
+
+describe('migrateConfig', () => {
+  it('passes a current config through unchanged', () => {
+    const config = createDefaultConfig('male');
+    expect(migrateConfig(config)).toEqual(config);
   });
 
-  it('rejects an invalid hex color', () => {
-    const config = createDefaultConfig('anime', 'male');
-    config.eyes.color = 'blue';
-    expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
-
-    const outfit = createDefaultConfig('anime', 'female');
-    outfit.outfit.top.color = '#12345';
-    expect(CharacterConfigSchema.safeParse(outfit).success).toBe(false);
+  it('turns a v1 anime config into a valid v2 config keeping what carries over', () => {
+    const migrated = migrateConfig(V1_ANIME);
+    expect(migrated).not.toBeNull();
+    expect(CharacterConfigSchema.safeParse(migrated).success).toBe(true);
+    expect(migrated!.base).toBe('female');
+    expect(migrated!.style).toBe('realistic');
+    expect(migrated!.body.preset).toBe('curvy');
+    expect(migrated!.body.sliders.height).toBeCloseTo(0.5);
+    expect(migrated!.accessories).toEqual(['earring_hoop']);
+    expect(migrated!.tattoos).toEqual([{ design: 'rose', placement: 'wrist' }]);
   });
 
-  it('rejects an out-of-range skin tone', () => {
-    for (const tone of [-0.1, 1.1]) {
-      const config = createDefaultConfig('anime', 'male');
-      config.skin.tone = tone;
-      expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
-    }
-  });
-
-  it('rejects out-of-range face blend weights', () => {
-    const config = createDefaultConfig('anime', 'male');
-    config.face.blend = { face_m_02: 1.5 };
-    expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
-  });
-
-  it('rejects a wrong schemaVersion', () => {
-    const config = { ...createDefaultConfig('anime', 'male'), schemaVersion: 2 };
-    expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
-  });
-
-  it('rejects an unknown style', () => {
-    const config = { ...createDefaultConfig('anime', 'male'), style: 'cartoon' };
-    expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
-  });
-
-  it('rejects an unknown base', () => {
-    const config = { ...createDefaultConfig('anime', 'male'), base: 'other' };
-    expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
+  it('returns null for values that are no config at all', () => {
+    expect(migrateConfig(null)).toBeNull();
+    expect(migrateConfig({ schemaVersion: 1, base: 'robot' })).toBeNull();
+    expect(migrateConfig({ schemaVersion: 99 })).toBeNull();
   });
 });

@@ -279,7 +279,8 @@
       "tagline": "Sahne senin.",
       "start": "Sohbete başla",
       "edit": "Düzenlemeye dön"
-    }
+    },
+    "preparing": "Oluşturucu yeni MetaHuman karakterleri için hazırlanıyor."
   },
   "Common": {
     "save": "Kaydet",
