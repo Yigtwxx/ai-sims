@@ -50,3 +50,9 @@ pipeline/source/metahuman/
 # Impeccable local state (keep surface briefs)
 .impeccable/hook.cache.json
 .impeccable/questions/
+
+# Build-from-source dependencies and their binaries (OpenRigLogic, tools)
+pipeline/vendor-src/
+pipeline/vendor/
+# Web-ready MetaHuman assets: tens of GB, copied in from the archive, never committed
+web/public/assets/mh/

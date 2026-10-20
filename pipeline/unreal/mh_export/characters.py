@@ -82,11 +82,19 @@ def has_high_resolution_textures(character: unreal.MetaHumanCharacter) -> bool:
     return bool(value() if callable(value) else value)
 
 
+def joints_and_blend_shapes() -> unreal.MetaHumanRigType:
+    """EMetaHumanRigType::JointsAndBlendShapes as Python exposes it."""
+    for name in ("JOINTS_AND_BLEND_SHAPES", "JOINTS_AND_BLENDSHAPES"):
+        if hasattr(unreal.MetaHumanRigType, name):
+            return getattr(unreal.MetaHumanRigType, name)
+    raise RuntimeError(f"No joints + blend shapes rig type in {dir(unreal.MetaHumanRigType)}")
+
+
 def rig(character: unreal.MetaHumanCharacter) -> None:
     params = unreal.MetaHumanCharacterAutoRiggingRequestParams()
     params.blocking = True
     params.report_progress = False
-    params.rig_type = unreal.MetaHumanRigType.JOINTS_AND_BLENDSHAPES
+    params.rig_type = joints_and_blend_shapes()
     ue.subsystem().request_auto_rigging(character, params)
 
 
