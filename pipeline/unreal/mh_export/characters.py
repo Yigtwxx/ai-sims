@@ -42,10 +42,10 @@ MATERIALS_ROOT = "/Game/MHExport/Materials"
 FACE_FIELDS = ("face_albedo", "face_normal", "face_cavity", "face_animated_maps")
 BODY_FIELDS = ("body_albedo", "body_normal", "body_cavity", "body_masks")
 RESOLUTIONS = {"res2k": "Res2k", "res4k": "Res4k", "res8k": "Res8k"}
-# Epic's texture service intermittently answers "Server Error"; the export then
-# silently lacks maps, so every unit is checked and the request retried.
-TEXTURE_ATTEMPTS = 3
-RETRY_PAUSE_SECONDS = 45
+# Epic's rig and texture services intermittently answer "Server Error"; the
+# export then silently lacks maps, so every unit is checked and retried.
+CLOUD_ATTEMPTS = 3
+RETRY_PAUSE_SECONDS = 120
 REQUIRED_DCC_FILES = (
     "head.dna",
     "body.dna",
@@ -195,19 +195,25 @@ def export_character(source: str, work: Path, face_res: str, body_res: str) -> d
     character = ue.duplicate(source, f"{WORK_ROOT}/{name}.{name}")
     with ue.editing(character):
         request_resolution(character, face_res, body_res)
-        rig(character)
-        missing: list[str] = []
-        for attempt in range(1, TEXTURE_ATTEMPTS + 1):
+        missing: list[str] = ["not attempted"]
+        for attempt in range(1, CLOUD_ATTEMPTS + 1):
+            # Both cloud steps fail now and then with "Server Error"; DCC export
+            # refuses an unrigged character, so a failed rig shows up as missing files.
+            rig(character)
             download_textures(character)
-            export_dcc(character, work / "dcc", bake_makeup=False)
-            missing = missing_dcc_files(work / "dcc" / name)
+            shutil.rmtree(work / "dcc", ignore_errors=True)
+            try:
+                export_dcc(character, work / "dcc", bake_makeup=False)
+                missing = missing_dcc_files(work / "dcc" / name)
+            except RuntimeError as exc:
+                missing = [str(exc)]
             if not missing:
                 break
-            unreal.log_warning(f"[mh_export] {name}: attempt {attempt} missing {missing}; retrying")
-            shutil.rmtree(work / "dcc", ignore_errors=True)
-            time.sleep(RETRY_PAUSE_SECONDS)
+            unreal.log_warning(f"[mh_export] {name}: attempt {attempt} incomplete {missing}")
+            if attempt < CLOUD_ATTEMPTS:
+                time.sleep(RETRY_PAUSE_SECONDS)
         if missing:
-            raise RuntimeError(f"Textures unavailable after {TEXTURE_ATTEMPTS} attempts: {missing}")
+            raise RuntimeError(f"Cloud rig/textures failed {CLOUD_ATTEMPTS} times: {missing}")
         export_dcc(character, work / "dcc_makeup", bake_makeup=True)
         dropped = drop_shared_files(work / "dcc", work / "dcc_makeup")
         if (work / "dcc_makeup").exists() and not any((work / "dcc_makeup").iterdir()):
