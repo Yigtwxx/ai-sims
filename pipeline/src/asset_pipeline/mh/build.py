@@ -48,6 +48,7 @@ from asset_pipeline.mh.convert import (
     skin_fingerprint,
 )
 from asset_pipeline.mh.dna import read_dna
+from asset_pipeline.mh.groom_labels import with_label
 from asset_pipeline.mh.grooms import HEADS as GROOM_HEADS
 from asset_pipeline.mh.grooms import (
     GroomError,
@@ -525,9 +526,11 @@ class Builder:
             ],
             lighting=[info["lighting"] for info in self.records("lighting") if "lighting" in info],
             grooms=[
-                with_compat(
-                    with_thumbnail(
-                        info["groom"], "glb" if "glb" in info["groom"] else "painted", self.web
+                with_label(
+                    with_compat(
+                        with_thumbnail(
+                            info["groom"], "glb" if "glb" in info["groom"] else "painted", self.web
+                        )
                     )
                 )
                 for info in self.records("grooms")

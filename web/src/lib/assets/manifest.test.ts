@@ -4,6 +4,7 @@ import {
   applyCuration,
   assetUrl,
   CurationSchema,
+  GroomSchema,
   labelFor,
   MhManifestSchema,
   type MhManifest,
@@ -108,5 +109,29 @@ describe('helpers', () => {
   it('picks a localized label', () => {
     expect(labelFor({ tr: 'Kot', en: 'Jeans' }, 'tr')).toBe('Kot');
     expect(labelFor('Ada', 'en')).toBe('Ada');
+  });
+});
+
+describe('groom labels', () => {
+  const pixie = {
+    id: 'groom.hair.Hair_S_Pixie',
+    slot: 'hair',
+    glb: 'grooms/hair/Hair_S_Pixie/cards.glb',
+  };
+
+  it('accepts a bilingual label from groom_labels.json and a plain converter label', () => {
+    const bilingual = GroomSchema.parse({ ...pixie, label: { tr: 'Kısa pixie', en: 'Pixie cut' } });
+    expect(bilingual.label).toEqual({ tr: 'Kısa pixie', en: 'Pixie cut' });
+    expect(GroomSchema.parse({ ...pixie, label: 'Short Pixie' }).label).toBe('Short Pixie');
+  });
+
+  it('refuses a label missing a language', () => {
+    expect(GroomSchema.safeParse({ ...pixie, label: { tr: 'Kısa pixie' } }).success).toBe(false);
+  });
+
+  it('shows the label of the active locale', () => {
+    const label = GroomSchema.parse({ ...pixie, label: { tr: 'Topuz', en: 'Bun' } }).label;
+    expect(labelFor(label, 'tr')).toBe('Topuz');
+    expect(labelFor(label, 'en')).toBe('Bun');
   });
 });

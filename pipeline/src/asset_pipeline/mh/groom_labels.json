@@ -1,0 +1,354 @@
+{
+  "Beard_L_Full": {
+    "en": "Long full beard",
+    "tr": "Uzun gür sakal"
+  },
+  "Beard_L_Messy": {
+    "en": "Long messy beard",
+    "tr": "Uzun dağınık sakal"
+  },
+  "Beard_M_Curly": {
+    "en": "Medium curly beard",
+    "tr": "Orta boy kıvırcık sakal"
+  },
+  "Beard_M_MuttonChops": {
+    "en": "Mutton chops",
+    "tr": "Favori sakal"
+  },
+  "Beard_M_Stubble": {
+    "en": "Medium stubble",
+    "tr": "Orta boy kirli sakal"
+  },
+  "Beard_S_Curly": {
+    "en": "Short curly beard",
+    "tr": "Kısa kıvırcık sakal"
+  },
+  "Beard_S_Full": {
+    "en": "Short full beard",
+    "tr": "Kısa gür sakal"
+  },
+  "Beard_S_PencilThin": {
+    "en": "Pencil-thin beard",
+    "tr": "İnce hat sakal"
+  },
+  "Beard_S_Stubble": {
+    "en": "Short stubble",
+    "tr": "Kısa kirli sakal"
+  },
+  "Beard_S_Uneven": {
+    "en": "Short uneven beard",
+    "tr": "Kısa düzensiz sakal"
+  },
+  "Eyebrows_L_Shaded": {
+    "en": "Shaded thick brows",
+    "tr": "Gölgeli kalın kaş"
+  },
+  "Eyebrows_M_Dense": {
+    "en": "Dense brows",
+    "tr": "Yoğun kaş"
+  },
+  "Eyebrows_M_Fine": {
+    "en": "Fine brows",
+    "tr": "İnce telli kaş"
+  },
+  "Eyebrows_M_FlatThick": {
+    "en": "Flat thick brows",
+    "tr": "Düz kalın kaş"
+  },
+  "Eyebrows_M_Full": {
+    "en": "Full brows",
+    "tr": "Dolgun kaş"
+  },
+  "Eyebrows_M_Messy": {
+    "en": "Messy brows",
+    "tr": "Dağınık kaş"
+  },
+  "Eyebrows_M_Natural": {
+    "en": "Natural brows",
+    "tr": "Doğal kaş"
+  },
+  "Eyebrows_M_Scraggly": {
+    "en": "Scraggly brows",
+    "tr": "Seyrek kaş"
+  },
+  "Eyebrows_M_Shaded": {
+    "en": "Shaded brows",
+    "tr": "Gölgeli kaş"
+  },
+  "Eyebrows_M_SlightArch": {
+    "en": "Slightly arched brows",
+    "tr": "Hafif kavisli kaş"
+  },
+  "Eyebrows_M_Slit": {
+    "en": "Slit brows",
+    "tr": "Kesikli kaş"
+  },
+  "Eyebrows_M_Swept": {
+    "en": "Swept brows",
+    "tr": "Taranmış kaş"
+  },
+  "Eyebrows_M_Thick": {
+    "en": "Thick brows",
+    "tr": "Kalın kaş"
+  },
+  "Eyebrows_M_Thin": {
+    "en": "Thin brows",
+    "tr": "İnce kaş"
+  },
+  "Eyebrows_M_Unruly": {
+    "en": "Unruly brows",
+    "tr": "Düzensiz kaş"
+  },
+  "Eyebrows_M_Wide": {
+    "en": "Wide brows",
+    "tr": "Geniş kaş"
+  },
+  "Eyebrows_S_FlatThin": {
+    "en": "Flat thin brows",
+    "tr": "Düz ince kaş"
+  },
+  "Eyebrows_S_Shaded": {
+    "en": "Shaded thin brows",
+    "tr": "Gölgeli ince kaş"
+  },
+  "Goatee_L_Scraggly": {
+    "en": "Long scraggly goatee",
+    "tr": "Uzun seyrek keçi sakal"
+  },
+  "Goatee_L_Wavy": {
+    "en": "Long wavy goatee",
+    "tr": "Uzun dalgalı keçi sakal"
+  },
+  "Goatee_M_Pointed": {
+    "en": "Medium pointed goatee",
+    "tr": "Orta boy sivri keçi sakal"
+  },
+  "Goatee_M_Soulpatch": {
+    "en": "Medium soul patch goatee",
+    "tr": "Orta boy dudak altı sakal"
+  },
+  "Goatee_S_ChinStrap": {
+    "en": "Chin strap goatee",
+    "tr": "Çene hattı keçi sakal"
+  },
+  "Goatee_S_SoulpatchStrip": {
+    "en": "Short soul patch strip",
+    "tr": "Kısa ince dudak altı sakal"
+  },
+  "Hair_L_AfroCurly": {
+    "en": "Long afro",
+    "tr": "Uzun afro"
+  },
+  "Hair_L_MessyClumps": {
+    "en": "Long messy",
+    "tr": "Uzun dağınık"
+  },
+  "Hair_L_Straight": {
+    "en": "Long straight",
+    "tr": "Uzun düz"
+  },
+  "Hair_L_StraightBangs": {
+    "en": "Long straight with bangs",
+    "tr": "Uzun düz kâküllü"
+  },
+  "Hair_M_BobBangs": {
+    "en": "Medium bob with bangs",
+    "tr": "Orta boy kâküllü bob"
+  },
+  "Hair_M_BobCurly": {
+    "en": "Medium curly bob",
+    "tr": "Orta boy kıvırcık bob"
+  },
+  "Hair_M_BobMessy": {
+    "en": "Medium messy bob",
+    "tr": "Orta boy dağınık bob"
+  },
+  "Hair_M_BobSlick": {
+    "en": "Medium sleek bob",
+    "tr": "Orta boy taralı bob"
+  },
+  "Hair_M_BobStraight": {
+    "en": "Medium straight bob",
+    "tr": "Orta boy düz bob"
+  },
+  "Hair_M_FauxMohawk": {
+    "en": "Medium faux hawk",
+    "tr": "Orta boy yumuşak mohikan"
+  },
+  "Hair_M_Layered": {
+    "en": "Medium layered",
+    "tr": "Orta boy katlı kesim"
+  },
+  "Hair_M_Mohawk": {
+    "en": "Medium mohawk",
+    "tr": "Orta boy mohikan"
+  },
+  "Hair_M_SideSweptFringe": {
+    "en": "Medium side-swept fringe",
+    "tr": "Orta boy yan kâküllü"
+  },
+  "Hair_M_TwistedBraids": {
+    "en": "Medium twisted braids",
+    "tr": "Orta boy burgu örgü"
+  },
+  "Hair_S_360Waves": {
+    "en": "360 waves",
+    "tr": "360 dalga"
+  },
+  "Hair_S_AfroFade": {
+    "en": "Short afro fade",
+    "tr": "Kısa geçişli afro"
+  },
+  "Hair_S_BaldingStubble": {
+    "en": "Balding stubble",
+    "tr": "Kelleşmiş tıraş"
+  },
+  "Hair_S_BobLayered": {
+    "en": "Short layered bob",
+    "tr": "Kısa katlı bob"
+  },
+  "Hair_S_BrushCut": {
+    "en": "Brush cut",
+    "tr": "Kirpi kesim"
+  },
+  "Hair_S_BuzzCut": {
+    "en": "Buzz cut",
+    "tr": "Asker tıraşı"
+  },
+  "Hair_S_Casual": {
+    "en": "Short casual",
+    "tr": "Kısa günlük kesim"
+  },
+  "Hair_S_Clean": {
+    "en": "Short clean cut",
+    "tr": "Kısa düzgün kesim"
+  },
+  "Hair_S_Coil": {
+    "en": "Short coils",
+    "tr": "Kısa sıkı kıvırcık"
+  },
+  "Hair_S_CoilBuzzCut": {
+    "en": "Coily buzz cut",
+    "tr": "Kıvırcık asker tıraşı"
+  },
+  "Hair_S_Cornrows": {
+    "en": "Short cornrows",
+    "tr": "Kısa mısır örgüsü"
+  },
+  "Hair_S_CurlyFade": {
+    "en": "Short curly fade",
+    "tr": "Kısa geçişli kıvırcık"
+  },
+  "Hair_S_HairLoss": {
+    "en": "Short receding",
+    "tr": "Kısa, alnı açık"
+  },
+  "Hair_S_LowPonytail": {
+    "en": "Low ponytail",
+    "tr": "Alçak at kuyruğu"
+  },
+  "Hair_S_Messy": {
+    "en": "Short messy",
+    "tr": "Kısa dağınık"
+  },
+  "Hair_S_Pixie": {
+    "en": "Pixie cut",
+    "tr": "Kısa pixie"
+  },
+  "Hair_S_PulledBack": {
+    "en": "Short pulled back",
+    "tr": "Kısa geriye toplanmış"
+  },
+  "Hair_S_RecedeMessy": {
+    "en": "Messy receding",
+    "tr": "Dağınık, alnı açık"
+  },
+  "Hair_S_SideSweptFringe": {
+    "en": "Short side-swept fringe",
+    "tr": "Kısa yan kâküllü"
+  },
+  "Hair_S_SlickBack": {
+    "en": "Short slicked back",
+    "tr": "Kısa geriye taralı"
+  },
+  "Hair_S_SweptUp": {
+    "en": "Short swept up",
+    "tr": "Kısa yukarı taralı"
+  },
+  "Hair_S_Updo": {
+    "en": "Bun",
+    "tr": "Topuz"
+  },
+  "Hair_S_UpdoBraids": {
+    "en": "Braided updo",
+    "tr": "Örgülü topuz"
+  },
+  "Hair_S_UpdoBuns": {
+    "en": "Double buns",
+    "tr": "Çift topuz"
+  },
+  "Mustache_L_Full": {
+    "en": "Long full mustache",
+    "tr": "Uzun gür bıyık"
+  },
+  "Mustache_L_Handlebar": {
+    "en": "Long handlebar mustache",
+    "tr": "Uzun burma bıyık"
+  },
+  "Mustache_L_Messy": {
+    "en": "Long messy mustache",
+    "tr": "Uzun dağınık bıyık"
+  },
+  "Mustache_L_Scraggly": {
+    "en": "Long scraggly mustache",
+    "tr": "Uzun seyrek bıyık"
+  },
+  "Mustache_L_Stubble": {
+    "en": "Long stubble mustache",
+    "tr": "Uzun kirli bıyık"
+  },
+  "Mustache_L_Wavy": {
+    "en": "Long wavy mustache",
+    "tr": "Uzun dalgalı bıyık"
+  },
+  "Mustache_M_Curly": {
+    "en": "Medium curly mustache",
+    "tr": "Orta boy kıvırcık bıyık"
+  },
+  "Mustache_M_Gunslinger": {
+    "en": "Medium gunslinger mustache",
+    "tr": "Orta boy kovboy bıyığı"
+  },
+  "Mustache_M_Stubble": {
+    "en": "Medium stubble mustache",
+    "tr": "Orta boy kirli bıyık"
+  },
+  "Mustache_S_ChinStrap": {
+    "en": "Chin strap mustache",
+    "tr": "Çene hattı bıyık"
+  },
+  "Mustache_S_Curly": {
+    "en": "Short curly mustache",
+    "tr": "Kısa kıvırcık bıyık"
+  },
+  "Mustache_S_Full": {
+    "en": "Short full mustache",
+    "tr": "Kısa gür bıyık"
+  },
+  "Mustache_S_Horseshoe": {
+    "en": "Short horseshoe mustache",
+    "tr": "Kısa at nalı bıyık"
+  },
+  "Mustache_S_PencilThin": {
+    "en": "Pencil mustache",
+    "tr": "Kalem bıyık"
+  },
+  "Mustache_S_Stubble": {
+    "en": "Short stubble mustache",
+    "tr": "Kısa kirli bıyık"
+  },
+  "Mustache_S_Uneven": {
+    "en": "Short uneven mustache",
+    "tr": "Kısa düzensiz bıyık"
+  }
+}
