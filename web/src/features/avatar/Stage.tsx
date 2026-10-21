@@ -13,6 +13,10 @@ import { PostEffects, type RenderLook } from './PostEffects';
 import { StudioLighting } from './StudioLighting';
 import { Turntable } from './Turntable';
 import { ViewInset } from './ViewInset';
+import { applySmoothShadowFilter } from './shadowFilter';
+
+// Before the first material compiles (see ./shadowFilter.ts).
+applySmoothShadowFilter();
 
 interface StageProps {
   children: ReactNode;
