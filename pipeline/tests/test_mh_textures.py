@@ -11,16 +11,22 @@ from PIL import Image
 from asset_pipeline.mh import ktx
 from asset_pipeline.mh.textures import (
     TextureCache,
+    bare_body_albedo,
     compose_face_albedo,
     downsample,
     feathered,
+    fill_texels,
+    find_straps,
     flip_green,
     hex_color,
     iris_swatch,
     linear_to_srgb,
     normal_convention,
+    push_pull_fill,
     skin_tone,
     srgb_to_linear,
+    strap_mask,
+    underwear_texels,
 )
 
 
@@ -179,3 +185,83 @@ def test_texture_cache_keeps_maps_whose_print_matches(tmp_path: Path) -> None:
     assert reloaded.get(output, "measurements") == {"tone": 0.5}
     output.unlink()
     assert not reloaded.fresh(output, "a"), "a deleted output is rebuilt"
+
+
+def _skin_with_underwear(size: int = 64) -> tuple[np.ndarray, np.ndarray]:
+    """Skin-coloured albedo with a grey cloth square; the mask covers the square and a skin
+    strip beside it (a man's chest under the mask's top channel)."""
+    albedo = np.empty((size, size, 3), dtype=np.uint8)
+    albedo[:] = (150, 100, 80)
+    albedo[16:32, 16:32] = (125, 125, 125)
+    mask = np.zeros((size, size, 2), dtype=np.float32)
+    mask[16:32, 16:32, 0] = 1.0
+    mask[16:32, 40:48, 0] = 1.0
+    return albedo, mask
+
+
+def test_underwear_texels_take_the_grey_cloth_not_skin_under_the_mask() -> None:
+    albedo, mask = _skin_with_underwear()
+    texels = underwear_texels(albedo, mask)
+    assert texels[16:32, 16:32].all(), "the grey cloth is underwear"
+    assert texels[15, 20] and texels[20, 34], "a few texels past the hem go too"
+    assert not texels[16:32, 40:48].any(), "skin under the mask stays"
+    assert not texels[50:, 50:].any()
+
+
+def test_push_pull_fill_takes_the_colour_around_the_hole() -> None:
+    image = np.full((64, 64, 3), (150.0, 100.0, 80.0), dtype=np.float32)
+    hole = np.zeros((64, 64), dtype=bool)
+    hole[10:40, 10:40] = True
+    image[hole] = 0.0
+    filled = push_pull_fill(image, hole)
+    np.testing.assert_allclose(filled[hole], np.tile([150.0, 100.0, 80.0], (900, 1)), atol=0.5)
+    np.testing.assert_array_equal(filled[~hole], image[~hole])
+
+
+def test_fill_texels_ignores_padding_off_the_uv_islands() -> None:
+    # A strap reaches the island's edge; the light padding past it must not tint the fill.
+    image = np.full((64, 64, 3), (90, 55, 40), dtype=np.uint8)
+    island = np.ones((64, 64), dtype=bool)
+    island[48:] = False
+    image[~island] = (200, 190, 180)
+    hole = np.zeros((64, 64), dtype=bool)
+    hole[30:52, 20:30] = True
+    filled = fill_texels(image, hole, island)
+    worst = np.abs(filled[hole & island].astype(int) - (90, 55, 40)).max()
+    assert worst <= 1, f"fill strays {worst} from the skin around the hole"
+    np.testing.assert_array_equal(filled[~hole], image[~hole])
+
+
+def test_bare_body_albedo_removes_the_cloth() -> None:
+    albedo, mask = _skin_with_underwear()
+    bare = bare_body_albedo(albedo, mask)
+    np.testing.assert_allclose(bare[20, 20], (150, 100, 80), atol=1)
+    np.testing.assert_array_equal(bare[16:32, 40:48], albedo[16:32, 40:48])
+
+
+def test_find_straps_takes_grey_cloth_in_the_flap_only() -> None:
+    albedo = np.empty((64, 64, 3), dtype=np.uint8)
+    albedo[:] = (150, 100, 80)
+    albedo[50:56, 10:20] = (128, 128, 128)  # a strap in the flap
+    albedo[5:10, 10:20] = (128, 128, 128)  # grey outside the flap (not underwear)
+    flap = np.zeros((64, 64), dtype=bool)
+    flap[44:, :] = True
+    straps = find_straps(albedo, flap)
+    assert straps is not None
+    assert straps.texels[50:56, 10:20].all()
+    assert not straps.texels[5:10, 10:20].any()
+    np.testing.assert_allclose(
+        straps.color, srgb_to_linear(np.array([128, 128, 128]))[0], atol=1e-3
+    )
+    albedo[50:56, 10:20] = (150, 100, 80)
+    assert find_straps(albedo, flap) is None
+
+
+def test_strap_mask_averages_down_to_soft_edges() -> None:
+    texels = np.zeros((8, 8), dtype=bool)
+    texels[0:2, 0:2] = True
+    texels[0:2, 2:3] = True
+    mask = strap_mask(texels, 4)
+    assert mask.shape == (4, 4, 3)
+    assert mask[0, 0, 0] == 255 and mask[0, 1, 0] == 128 and mask[2, 2, 0] == 0
+    assert not mask[..., 1:].any()

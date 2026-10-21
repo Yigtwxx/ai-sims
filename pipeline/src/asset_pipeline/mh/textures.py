@@ -6,6 +6,16 @@ Sources (per `raw/characters/<Name>`; checked on Ada, see the report of chunk 3)
   `T_Face_Normal` / `T_Face_Cavity` (8K, linear) the final normal and packed cavity maps.
   The 8K `*_Animated_CM*/WM*` and the 4K body basecolor are grey material *inputs*, so the
   wrinkle maps, SRMF and body albedo/normal come from the DCC bakes (`dcc/<Name>/Maps`, 2K).
+- The DCC body albedo has the default underwear baked in (neutral grey). `body_albedo` is that
+  map with the underwear filled from the skin around it; the underwear comes back in the web
+  shader from `T_Body_Body_Underwear_Mask` (R top, G briefs; B, a longer leg, is unused) and
+  `T_Body_Body_Underwear_Basecolor`, identical for every preset and written once, so a top or
+  trousers can take it off and a neckline never shows a band of it. The DCC body normal
+  has the underwear's seams too, so `body_normal` comes from the bare
+  `T_Body_Body_Normal` and the shared `T_Body_Body_Underwear_Normal` goes with the cloth.
+  The head reaches the shoulders, and its DCC bake (used in the neck/chest flap) has the
+  top's straps: they are filled the same way, and `face_underwear` (a small mask) plus the
+  straps' colour let the shader draw them with the body's top.
 - `dcc_makeup/<Name>/Maps/Head_Basecolor.png` is the 2K albedo with the preset's makeup; the
   makeup albedo is the 4K albedo plus the (upsampled, linear) makeup difference.
 - Wrinkle masks (`dcc/<Name>/Masks/*.tga`, 256 px, identical for every preset so far) keep
@@ -35,7 +45,7 @@ from numpy.typing import NDArray
 from PIL import Image, ImageDraw
 from scipy.ndimage import distance_transform_edt, gaussian_filter
 
-from asset_pipeline.mh.dna import DnaFile
+from asset_pipeline.mh.dna import DnaFile, Mesh
 from asset_pipeline.mh.gltf import Space
 from asset_pipeline.mh.ktx import Ktx2Settings, encode_ktx2
 from asset_pipeline.mh.seams import neck_seam
@@ -44,7 +54,7 @@ Image.MAX_IMAGE_PIXELS = None
 
 # 2: normal maps flipped only when they read DirectX; 3: face albedo flap and grading.
 TEXTURES_VERSION = 3
-ALBEDO_VERSION = 1  # bump when compose_face_albedo changes its output
+ALBEDO_VERSION = 3  # bump when the face albedo changes (3: straps filled on the island)
 COLOR = Ktx2Settings("srgb", rdo=1.0)
 NORMAL = Ktx2Settings("linear", rdo=1.5)
 DATA = Ktx2Settings("linear", rdo=3.0)
@@ -58,6 +68,17 @@ FACE_CAVITY_SIZE = 2048
 FACE_SRMF_SIZE = 2048
 WRINKLE_SIZE = 2048
 BODY_SIZE = 2048
+
+# Underwear (see the module docstring).
+UNDERWEAR_VERSION = 1  # bump when the bare body albedo or the shared underwear maps change
+UNDERWEAR_MASK = "T_Body_Body_Underwear_Mask.png"
+UNDERWEAR_ALBEDO = "T_Body_Body_Underwear_Basecolor.png"
+UNDERWEAR_NORMAL = "T_Body_Body_Underwear_Normal.png"
+BARE_BODY_NORMAL = "T_Body_Body_Normal.png"
+STRAP_MASK_SIZE = 1024  # face_underwear: the straps are a few centimetres wide
+UNDERWEAR_COVER = 0.25  # mask level from which a texel can be underwear
+UNDERWEAR_GREY = 0.08  # chroma / value below which a texel is the grey cloth, not skin
+UNDERWEAR_DILATE = 3.0  # texels filled past the cloth (antialiased hems mix in skin)
 EYE_SIZE = 2048
 MASK_ORDER = (
     "head_wm1_msk_01",
@@ -244,12 +265,23 @@ def flap_mask(dna: DnaFile, size: int, rings: int = FLAP_RINGS) -> NDArray[np.bo
     seam = neck_seam(head, Space.from_descriptor(dna.descriptor), lowest=True, rings=rings)
     in_band = np.zeros(len(head.positions), dtype=bool)
     in_band[seam["positions"]] = True
+    band = np.all(in_band[head.layout_positions[head.triangles]], axis=1)
+    return _uv_coverage(head, head.triangles[band], size)
+
+
+def island_mask(dna: DnaFile, size: int) -> NDArray[np.bool_]:
+    """UV mask (top-left origin) of every head face; texels off it are padding."""
+    head = next(m for m in dna.meshes_for_lod(0) if m.name.startswith("head_"))
+    return _uv_coverage(head, head.triangles, size)
+
+
+def _uv_coverage(head: Mesh, triangles: NDArray[np.int64], size: int) -> NDArray[np.bool_]:
     uvs = head.uvs[head.layout_uvs].astype(np.float64)
     uvs[:, 1] = 1.0 - uvs[:, 1]
     pixels = uvs * size
     canvas = Image.new("L", (size, size), 0)
     draw = ImageDraw.Draw(canvas)
-    for triangle in head.triangles[np.all(in_band[head.layout_positions[head.triangles]], axis=1)]:
+    for triangle in triangles:
         draw.polygon([tuple(pixels[v]) for v in triangle], fill=255, outline=255)
     return np.asarray(canvas) > 0
 
@@ -499,6 +531,137 @@ class PresetMaps:
         )
 
 
+def underwear_texels(albedo: NDArray[np.uint8], mask: NDArray[np.float32]) -> NDArray[np.bool_]:
+    """Texels of a baked body albedo that show the grey underwear: inside the underwear
+    `mask` (H, W, C) and nearly colourless, plus a few texels around them. Skin inside the
+    mask stays (a man's albedo has no top, though the mask has one)."""
+    rgb = albedo[..., :3].astype(np.float32)
+    peak = rgb.max(axis=-1)
+    chroma = (peak - rgb.min(axis=-1)) / np.maximum(peak, 1.0)
+    cloth = (mask.max(axis=-1) > UNDERWEAR_COVER) & (chroma < UNDERWEAR_GREY)
+    if not cloth.any():
+        return cloth
+    reach = np.asarray(distance_transform_edt(~cloth))
+    return reach <= UNDERWEAR_DILATE
+
+
+def push_pull_fill(image: NDArray[np.float32], hole: NDArray[np.bool_]) -> NDArray[np.float32]:
+    """Fill the `hole` texels of a square (H, W, C) image from the texels around them: a
+    pyramid of the known texels' mean colour, then every level filled from the coarser one
+    (push-pull). Known texels keep their exact values."""
+    weight = (~hole).astype(np.float32)
+    color = image * weight[..., None]
+    pyramid: list[tuple[NDArray[np.float32], NDArray[np.float32]]] = []
+    while True:
+        pyramid.append((color, weight))
+        size = weight.shape[0]
+        if size <= 1:
+            break
+        half = size // 2
+        color = color[: half * 2, : half * 2].reshape(half, 2, half, 2, -1).sum(axis=(1, 3))
+        weight = weight[: half * 2, : half * 2].reshape(half, 2, half, 2).sum(axis=(1, 3))
+    color, weight = pyramid[-1]
+    filled = color / np.maximum(weight, 1e-6)[..., None]
+    for color, weight in reversed(pyramid[:-1]):
+        coarse = resize_float(filled, weight.shape[0])
+        known = color / np.maximum(weight, 1e-6)[..., None]
+        alpha = np.clip(weight, 0.0, 1.0)[..., None]
+        filled = known * alpha + coarse * (1.0 - alpha)
+    return np.where(hole[..., None], filled, image).astype(np.float32)
+
+
+def bare_body_albedo(albedo: NDArray[np.uint8], mask: NDArray[np.float32]) -> NDArray[np.uint8]:
+    """The DCC body albedo with its baked underwear filled from the skin around it."""
+    hole = underwear_texels(albedo, mask)
+    if not hole.any():
+        return albedo
+    filled = push_pull_fill(albedo[..., :3].astype(np.float32), hole)
+    return np.clip(np.round(filled), 0, 255).astype(np.uint8)
+
+
+@dataclass(frozen=True)
+class Straps:
+    """The underwear top's straps found on a face albedo."""
+
+    texels: NDArray[np.bool_]
+    color: NDArray[np.float32]  # linear RGB of the cloth
+
+
+def find_straps(albedo: NDArray[np.uint8], flap: NDArray[np.bool_]) -> Straps | None:
+    """Grey cloth in the neck/chest flap of a face albedo (the only part from the DCC bake,
+    which shows the default top's straps), or None when there is none (a man's head)."""
+    region = feathered(flap, FLAP_FEATHER * flap.shape[0] / 4096)[..., None]
+    texels = underwear_texels(albedo, region)
+    if not texels.any():
+        return None
+    rgb = albedo[..., :3].astype(np.float32)
+    peak = rgb.max(axis=-1)
+    cloth = texels & ((peak - rgb.min(axis=-1)) / np.maximum(peak, 1.0) < UNDERWEAR_GREY)
+    color = srgb_to_linear(albedo[cloth][:, :3]).mean(axis=0)
+    return Straps(texels=texels, color=color.astype(np.float32))
+
+
+def fill_texels(
+    image: NDArray[np.uint8], hole: NDArray[np.bool_], island: NDArray[np.bool_] | None = None
+) -> NDArray[np.uint8]:
+    """Fill the `hole` texels from the skin around them. Texels off the `island` (UV padding,
+    often light) are not sources: a strap that reaches an island's edge would turn pale."""
+    unknown = hole if island is None else hole | ~island
+    filled = push_pull_fill(image[..., :3].astype(np.float32), unknown)
+    filled = np.where(hole[..., None], filled, image[..., :3])
+    return np.clip(np.round(filled), 0, 255).astype(np.uint8)
+
+
+def strap_mask(texels: NDArray[np.bool_], size: int) -> NDArray[np.uint8]:
+    """The strap texels as an RGB mask (R) at `size`, averaged down (soft edges)."""
+    coverage = box_mean(texels.astype(np.float32), size)
+    mask = np.zeros((size, size, 3), dtype=np.uint8)
+    mask[..., 0] = np.round(np.clip(coverage, 0.0, 1.0) * 255.0).astype(np.uint8)
+    return mask
+
+
+def underwear_mask(maps: PresetMaps, size: int) -> NDArray[np.float32] | None:
+    """The underwear mask's top and briefs channels (0..1) at `size`, if exported."""
+    path = maps.body / UNDERWEAR_MASK
+    if not path.is_file():
+        return None
+    pixels = load_image(path, 3)[..., :2].astype(np.float32) / 255.0
+    return resize_float(pixels, size) if pixels.shape[0] != size else pixels
+
+
+def write_underwear(maps: PresetMaps, web_root: Path) -> dict[str, str] | None:
+    """Encode the shared underwear mask (RG), cloth albedo and normal once per distinct set."""
+    sources = [
+        maps.body / UNDERWEAR_MASK,
+        maps.body / UNDERWEAR_ALBEDO,
+        maps.body / UNDERWEAR_NORMAL,
+    ]
+    if not all(path.is_file() for path in sources):
+        return None
+    digest = hashlib.sha256(
+        b"".join(path.read_bytes() for path in sources) + f"v{UNDERWEAR_VERSION}".encode()
+    ).hexdigest()[:12]
+    folder = web_root / "skins" / "underwear" / digest
+    mask_path = folder / "mask.ktx2"
+    albedo_path = folder / "albedo.ktx2"
+    normal_path = folder / "normal.ktx2"
+    if not mask_path.is_file():
+        mask = load_image(sources[0], 3)
+        if mask.shape[0] > BODY_SIZE:
+            mask = downsample(mask, BODY_SIZE, "data")
+        mask[..., 2] = 0
+        encode_ktx2(mask, mask_path, MASK)
+    if not albedo_path.is_file():
+        encode_ktx2(prepare(sources[1], BODY_SIZE, "color"), albedo_path, COLOR)
+    if not normal_path.is_file():
+        encode_ktx2(prepare(sources[2], BODY_SIZE, "normal"), normal_path, NORMAL)
+    return {
+        "mask": mask_path.relative_to(web_root).as_posix(),
+        "albedo": albedo_path.relative_to(web_root).as_posix(),
+        "normal": normal_path.relative_to(web_root).as_posix(),
+    }
+
+
 def write_masks(maps: PresetMaps, web_root: Path) -> list[str]:
     """Encode the wrinkle masks once per distinct mask set; returns paths in MASK_ORDER."""
     masks = maps.masks()
@@ -645,17 +808,12 @@ def skin_jobs(maps: PresetMaps) -> list[MapJob]:
             for i in (1, 2, 3)
         ),
         MapJob(
-            "body_albedo",
-            "body_albedo.ktx2",
-            maps.maps / "Body_Basecolor.png",
-            BODY_SIZE,
-            "color",
-            COLOR,
-        ),
-        MapJob(
             "body_normal",
             "body_normal.ktx2",
-            maps.maps / "Body_Normal.png",
+            # Bare skin; the DCC bake has the underwear's seams (see the module docstring).
+            maps.body / BARE_BODY_NORMAL
+            if (maps.body / BARE_BODY_NORMAL).is_file()
+            else maps.maps / "Body_Normal.png",
             BODY_SIZE,
             "normal",
             NORMAL,
@@ -684,6 +842,30 @@ def albedo_recipe() -> dict[str, Any]:
     }
 
 
+def convert_body_albedo(
+    maps: PresetMaps, folder: Path, web_root: Path, cache: TextureCache, textures: TextureSet
+) -> None:
+    """`body_albedo.ktx2`: the DCC body albedo without its baked underwear."""
+    output = folder / "body_albedo.ktx2"
+    source = maps.maps / "Body_Basecolor.png"
+    mask_source = maps.body / UNDERWEAR_MASK
+    sources = [source, *([mask_source] if mask_source.is_file() else [])]
+    recipe = {
+        "size": BODY_SIZE,
+        "settings": COLOR.key,
+        "underwear": [UNDERWEAR_VERSION, UNDERWEAR_COVER, UNDERWEAR_GREY, UNDERWEAR_DILATE],
+    }
+    print_ = texture_print(recipe, *sources)
+    if not cache.fresh(output, print_):
+        albedo = prepare(source, BODY_SIZE, "color")
+        mask = underwear_mask(maps, albedo.shape[0])
+        if mask is not None:
+            albedo = bare_body_albedo(albedo, mask)
+        encode_ktx2(albedo, output, COLOR)
+        cache.remember(output, print_)
+    textures.add("body_albedo", output, web_root, output.stat().st_size)
+
+
 def convert_skin(
     maps: PresetMaps, dna: DnaFile, web_root: Path, cache: TextureCache | None = None
 ) -> dict[str, Any]:
@@ -698,6 +880,7 @@ def convert_skin(
 
     albedo_path = folder / "face_albedo.ktx2"
     makeup_path = folder / "face_albedo_makeup.ktx2"
+    strap_path = folder / "face_underwear.ktx2"
     sources = [
         maps.face / "T_Face_Basecolor.png",
         maps.maps / "Head_Basecolor.png",
@@ -714,24 +897,34 @@ def convert_skin(
             textures.add("makeup", makeup_path, web_root, makeup_path.stat().st_size)
         cheek = np.asarray(measured["cheek_linear"], dtype=np.float64)
         makeup_share = float(measured["makeup_share"])
+        strap_color = measured.get("strap_color")
     else:
+        flap = flap_mask(dna, FACE_SIZE)
         albedo = compose_face_albedo(
             prepare(maps.face / "T_Face_Basecolor.png", FACE_SIZE, "color"),
             load_image(maps.maps / "Head_Basecolor.png", 3),
             load_image(maps.makeup, 3) if maps.makeup.is_file() else None,
-            flap_mask(dna, FACE_SIZE),
+            flap,
         )
-        textures.add(
-            "face_albedo", albedo_path, web_root, encode_ktx2(albedo.base, albedo_path, COLOR)
-        )
-        cheek = sample_median(albedo.base, cheek_uvs(dna))
+        straps = find_straps(albedo.base, flap)
+        island = island_mask(dna, FACE_SIZE) if straps is not None else None
+        base = albedo.base if straps is None else fill_texels(albedo.base, straps.texels, island)
+        textures.add("face_albedo", albedo_path, web_root, encode_ktx2(base, albedo_path, COLOR))
+        cheek = sample_median(base, cheek_uvs(dna))
         makeup_share = albedo.makeup_share
         has_makeup = albedo.makeup is not None and makeup_share >= MAKEUP_MIN_SHARE
         if has_makeup and albedo.makeup is not None:
-            textures.add(
-                "makeup", makeup_path, web_root, encode_ktx2(albedo.makeup, makeup_path, COLOR)
+            made_up = (
+                albedo.makeup
+                if straps is None
+                else fill_texels(albedo.makeup, straps.texels, island)
             )
+            textures.add("makeup", makeup_path, web_root, encode_ktx2(made_up, makeup_path, COLOR))
             cache.remember(makeup_path, print_)
+        strap_color = None
+        if straps is not None:
+            encode_ktx2(strap_mask(straps.texels, STRAP_MASK_SIZE), strap_path, MASK)
+            strap_color = hex_color(straps.color)
         cache.remember(
             albedo_path,
             print_,
@@ -739,9 +932,10 @@ def convert_skin(
             measurements={
                 "cheek_linear": [float(v) for v in cheek],
                 "makeup_share": makeup_share,
+                "strap_color": strap_color,
             },
         )
-        del albedo
+        del albedo, base
     tone, ita = skin_tone(cheek)
 
     for job in skin_jobs(maps):
@@ -753,7 +947,9 @@ def convert_skin(
         pixels = prepare(job.source, job.size, job.kind, job.channels)
         textures.add(job.role, output, web_root, encode_ktx2(pixels, output, job.settings))
         cache.remember(output, job_print)
+    convert_body_albedo(maps, folder, web_root, cache, textures)
     masks = write_masks(maps, web_root)
+    underwear = write_underwear(maps, web_root)
 
     files = textures.files
     entry: dict[str, Any] = {
@@ -769,12 +965,23 @@ def convert_skin(
             "wrinkleColor": [files[f"face_cm{i}"] for i in (1, 2, 3)],
             "wrinkleNormal": [files[f"face_wm{i}"] for i in (1, 2, 3)],
             "wrinkleMasks": masks,
+            **(
+                {
+                    "underwear": {
+                        "mask": strap_path.relative_to(web_root).as_posix(),
+                        "color": strap_color,
+                    }
+                }
+                if isinstance(strap_color, str) and strap_path.is_file()
+                else {}
+            ),
         },
         "body": {
             "albedo": files["body_albedo"],
             "normal": files["body_normal"],
             "cavity": files["body_cavity"],
             "srmf": files["body_srmf"],
+            **({"underwear": underwear} if underwear else {}),
         },
     }
     if "makeup" in files:
