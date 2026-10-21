@@ -6,7 +6,7 @@ import { createDefaultConfig } from '@/lib/character/defaults';
 import type { BodyPreset, CharacterBase, CharacterConfig } from '@/lib/character/schema';
 
 import { randomConfig, type Random } from './randomize';
-import { presetSliders, reconcileConfig, startingConfig } from './reconcile';
+import { presetSliders, reconcileConfig, reconcilePreset, startingConfig } from './reconcile';
 
 export const MAX_NAME_LENGTH = 40;
 
@@ -79,9 +79,9 @@ export const useCreatorStore = create<CreatorState>()(
         set((state) => {
           if (state.config.base === base) return state;
           const fresh = startingConfig(base, manifest);
-          // Keep choices that are not gendered.
-          fresh.body = { preset: state.config.body.preset, sliders: {} };
-          fresh.body.sliders = presetSliders(manifest, base, fresh.body.preset);
+          // Keep choices that are not gendered; the body preset only if the new body has it.
+          const preset = reconcilePreset(manifest, base, state.config.body.preset);
+          fresh.body = { preset, sliders: presetSliders(manifest, base, preset) };
           fresh.eyes = state.config.eyes;
           fresh.hair.color = state.config.hair.color;
           fresh.hair.pattern = state.config.hair.pattern;

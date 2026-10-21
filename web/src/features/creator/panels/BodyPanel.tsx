@@ -4,9 +4,9 @@ import { useTranslations } from 'next-intl';
 import { memo, useCallback } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { BODY_PRESETS, BODY_SLIDERS, type BodySlider } from '@/lib/character/schema';
+import { BODY_SLIDERS, type BodySlider } from '@/lib/character/schema';
 
-import { bodyFor, presetSliders } from '../reconcile';
+import { bodyFor, presetsFor, presetSliders } from '../reconcile';
 import { useCreatorStore } from '../store';
 import { Hint, LabeledSlider, Section, Segmented } from '../ui/controls';
 
@@ -17,7 +17,7 @@ export function BodyPanel({ manifest }: PanelProps) {
   const { config } = useConfig();
   const setBodyPreset = useCreatorStore((state) => state.setBodyPreset);
   const body = bodyFor(manifest, config.base);
-  const presets = BODY_PRESETS.filter((preset) => !body || preset in body.presets);
+  const presets = presetsFor(manifest, config.base);
 
   const expected = presetSliders(manifest, config.base, config.body.preset);
   const custom = BODY_SLIDERS.some(

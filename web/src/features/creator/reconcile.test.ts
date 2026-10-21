@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { MhManifest } from '@/lib/assets/manifest';
 import { CharacterConfigSchema } from '@/lib/character/schema';
 import { createDefaultConfig } from '@/lib/character/defaults';
 
@@ -9,6 +10,7 @@ import {
   facesFor,
   groomsFor,
   outfitsFor,
+  presetsFor,
   presetSliders,
   reconcileAccessories,
   reconcileConfig,
@@ -17,6 +19,19 @@ import {
 } from './reconcile';
 
 const manifest = fixtureManifest();
+
+/** The fixture with a male body that has no curvy preset, as the pipeline exports it. */
+function withoutMaleCurvy(source: MhManifest): MhManifest {
+  const bodies = source.bodies.map((body) => {
+    if (body.gender !== 'male') return body;
+    const presets = { ...body.presets };
+    delete presets.curvy;
+    return { ...body, presets };
+  });
+  return { ...source, bodies };
+}
+
+const noMaleCurvy = withoutMaleCurvy(manifest);
 
 /** Deterministic pseudo random sequence for repeatable tests. */
 function seeded(seed: number) {
@@ -47,6 +62,11 @@ describe('manifest queries', () => {
     expect(Object.keys(sliders)).toHaveLength(7);
     expect(sliders.muscle).toBeCloseTo(0.75);
     expect(sliders.height).toBe(0);
+  });
+
+  it('lists the body presets the base offers', () => {
+    expect(presetsFor(noMaleCurvy, 'male')).toEqual(['slim', 'average', 'athletic']);
+    expect(presetsFor(noMaleCurvy, 'female')).toEqual(['slim', 'average', 'athletic', 'curvy']);
   });
 });
 
@@ -114,6 +134,19 @@ describe('reconcileConfig', () => {
     config.skin = { set: 'Bruce', tone: 0, makeup: true };
     expect(reconcileConfig(config, manifest).skin.makeup).toBe(false);
   });
+
+  it('turns a body preset the body does not offer into average, keeping the sliders', () => {
+    const male = createDefaultConfig('male');
+    male.body = { preset: 'curvy', sliders: { weight: 0.2 } };
+    expect(reconcileConfig(male, noMaleCurvy).body).toEqual({
+      preset: 'average',
+      sliders: { weight: 0.2 },
+    });
+
+    const female = createDefaultConfig('female');
+    female.body.preset = 'curvy';
+    expect(reconcileConfig(female, noMaleCurvy).body.preset).toBe('curvy');
+  });
 });
 
 describe('startingConfig', () => {
@@ -148,5 +181,15 @@ describe('randomConfig', () => {
       expect(reconcileConfig(next, manifest)).toEqual(next);
       expect(next.base).toBe(base);
     }
+  });
+
+  it('only picks body presets the body offers', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 60; seed += 1) {
+      const next = randomConfig(createDefaultConfig('male'), noMaleCurvy, seeded(seed));
+      seen.add(next.body.preset);
+      expect(reconcileConfig(next, noMaleCurvy)).toEqual(next);
+    }
+    expect([...seen].sort()).toEqual(['athletic', 'average', 'slim']);
   });
 });

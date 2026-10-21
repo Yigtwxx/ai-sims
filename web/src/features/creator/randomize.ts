@@ -4,13 +4,14 @@
  * manifest offers for that base, so the result never needs reconciling.
  */
 import type { MhManifest } from '@/lib/assets/manifest';
-import { BODY_PRESETS, type CharacterConfig, type OutfitItem } from '@/lib/character/schema';
+import type { CharacterConfig, OutfitItem } from '@/lib/character/schema';
 
 import {
   ACCESSORY_IDS,
   facesFor,
   groomsFor,
   outfitsFor,
+  presetsFor,
   presetSliders,
   reconcileAccessories,
   type OutfitSlot,
@@ -59,7 +60,7 @@ export function randomConfig(
     }
   }
 
-  const preset = pick(BODY_PRESETS, random) ?? 'average';
+  const preset = pick(presetsFor(manifest, base), random) ?? 'average';
   next.body = { preset, sliders: presetSliders(manifest, base, preset) };
   const height = next.body.sliders.height;
   if (height !== undefined) {

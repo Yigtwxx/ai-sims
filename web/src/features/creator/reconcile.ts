@@ -17,6 +17,7 @@ import type {
 } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import {
+  BODY_PRESETS,
   BODY_SLIDERS,
   type BodyPreset,
   type BodySlider,
@@ -68,6 +69,21 @@ export function outfitsFor(
 
 export function bodyFor(manifest: MhManifest, base: CharacterBase): MhBody | undefined {
   return manifest.bodies.find((body) => body.gender === base) ?? manifest.bodies[0];
+}
+
+/** Body presets the base's body offers, in schema order (curvy is female only). */
+export function presetsFor(manifest: MhManifest, base: CharacterBase): BodyPreset[] {
+  const body = bodyFor(manifest, base);
+  return BODY_PRESETS.filter((preset) => !body || preset in body.presets);
+}
+
+/** `preset` if the base's body offers it, else average. */
+export function reconcilePreset(
+  manifest: MhManifest,
+  base: CharacterBase,
+  preset: BodyPreset,
+): BodyPreset {
+  return presetsFor(manifest, base).includes(preset) ? preset : 'average';
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -176,6 +192,8 @@ export function reconcileConfig(config: CharacterConfig, manifest: MhManifest): 
   next.beard.style = reconcileGroom(next.beard.style, manifest, 'beard', base);
   next.mustache.style = reconcileGroom(next.mustache.style, manifest, 'mustache', base);
 
+  // Only the preset name changes: the sliders are what renders, and they stay as set.
+  next.body.preset = reconcilePreset(manifest, base, next.body.preset);
   const body = bodyFor(manifest, base);
   if (body) {
     const sliders: Partial<Record<BodySlider, number>> = {};
