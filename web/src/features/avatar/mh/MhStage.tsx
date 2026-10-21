@@ -19,6 +19,7 @@ import type { CharacterConfig } from '@/lib/character/schema';
 import type { CameraFocus } from '../cameraFocus';
 import { Stage } from '../Stage';
 import { CharacterLife, type LifeInput } from './characterLife';
+import { loadFaceClip } from './faceClips';
 import type { LifeMode } from './idle';
 import { MhCharacter, type MhCharacterHandle } from './MhCharacter';
 import { MhLighting } from './MhLighting';
@@ -111,6 +112,25 @@ export function MhStage({
       life.step(handle, delta, { ...input.current, viewer: camera.position }),
     [life],
   );
+
+  const idleFace = resolved?.faceClips.idle ?? null;
+  const smileFace = resolved?.faceClips.smile ?? null;
+  useEffect(() => {
+    let live = true;
+    const load = (url: string | null) =>
+      url
+        ? loadFaceClip(url).catch((error: unknown) => {
+            console.warn('[mh] face clip failed to load', url, error);
+            return undefined;
+          })
+        : Promise.resolve(undefined);
+    void Promise.all([load(idleFace), load(smileFace)]).then(([idle, smile]) => {
+      if (live) life.faceLayers = { idle, smile };
+    });
+    return () => {
+      live = false;
+    };
+  }, [life, idleFace, smileFace]);
 
   return (
     <div ref={container} className={className}>

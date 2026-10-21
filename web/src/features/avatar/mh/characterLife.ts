@@ -9,6 +9,7 @@ import type { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import { Quaternion, Vector3, type Object3D } from 'three';
 
 import { stepBlink, type BlinkState } from '../life';
+import { addFaceClip, type FaceClip } from './faceClips';
 import {
   createGaze,
   eyeLookMorphs,
@@ -34,6 +35,25 @@ const HEAD_FOLLOW: Record<LifeMode, number> = {
   thinking: 0.2,
 };
 const HEAD_LIMIT = { yaw: 20 * DEG, pitch: 12 * DEG };
+/** Weight of the MetaHuman face idle loop (squints, brows, dimples between blinks). */
+const FACE_IDLE_WEIGHT = 0.3;
+/** Mouth and jaw of the face layers while lip-sync speaks: visemes lead. */
+const FACE_MOUTH_WHILE_SPEAKING = 0.25;
+/** A faint, slowly breathing smile by mode (expression happy loop weight). */
+const SMILE: Record<LifeMode, number> = {
+  idle: 0.04,
+  listening: 0.12,
+  speaking: 0.08,
+  thinking: 0,
+};
+/** Seconds for the smile to settle into a new mode. */
+const SMILE_EASE = 1.5;
+
+/** Face loops the life layer plays under blinks, gaze and lip-sync. */
+export interface FaceLayers {
+  idle?: FaceClip;
+  smile?: FaceClip;
+}
 
 export interface LifeInput {
   mode: LifeMode;
@@ -53,6 +73,11 @@ export class CharacterLife {
   private mouth = createMouthState();
   private rig: PoseRig | undefined;
   private rigFor: MhCharacterHandle | undefined;
+  private smile = 0;
+  private readonly face = new Map<string, number>();
+  private faceDriven = new Set<string>();
+  /** Set when the stage has loaded them; the character lives without them too. */
+  faceLayers: FaceLayers = {};
 
   constructor(private readonly random: () => number = Math.random) {}
 
@@ -98,6 +123,9 @@ export class CharacterLife {
       { bone: 'head', axis: [1, 0, 0], angle: -pitch * 0.6 },
     ]);
 
+    // Face loops first; gaze, blinks and the jaw below write over or add to them.
+    this.stepFace(handle, delta, lifeMode, speaking);
+
     // ...and the eyes do the rest, with the saccade offsets around the viewer.
     this.gaze = stepGaze(this.gaze, delta, lifeMode, this.random);
     const aim = aimAtViewer(handle.body.root, rig, viewer);
@@ -125,7 +153,31 @@ export class CharacterLife {
     applyMouthToMorphs(handle.faceMeshes, this.mouth);
     // Loud open vowels drop the jaw a little further than the viseme shape alone.
     const open = this.mouth.aa + 0.6 * this.mouth.O + 0.4 * this.mouth.E + 0.2 * this.mouth.I;
-    handle.setFaceMorph('jawOpen', Math.min(0.35, open * loudness * 0.35));
+    handle.setFaceMorph(
+      'jawOpen',
+      Math.min(0.35, open * loudness * 0.35) + (this.face.get('jawOpen') ?? 0),
+    );
+  }
+
+  /** Face idle plus a faint smile; channels a layer stops driving go back to rest. */
+  private stepFace(
+    handle: MhCharacterHandle,
+    delta: number,
+    mode: LifeMode,
+    speaking: boolean,
+  ): void {
+    this.smile += (SMILE[mode] - this.smile) * Math.min(1, delta / SMILE_EASE);
+    const face = this.face;
+    face.clear();
+    const mouth = speaking ? FACE_MOUTH_WHILE_SPEAKING : 1;
+    const { idle, smile } = this.faceLayers;
+    if (idle) addFaceClip(idle, this.t, FACE_IDLE_WEIGHT, face, mouth);
+    // The smile breathes (comes and goes over ~30 s) rather than holding.
+    const breathing = 0.6 + 0.4 * Math.sin(this.t * 0.21);
+    if (smile) addFaceClip(smile, this.t, this.smile * breathing, face, mouth);
+    for (const name of this.faceDriven) if (!face.has(name)) handle.setFaceMorph(name, 0);
+    for (const [name, weight] of face) handle.setFaceMorph(name, Math.min(1, weight));
+    this.faceDriven = new Set(face.keys());
   }
 }
 

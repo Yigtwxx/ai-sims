@@ -29,6 +29,8 @@ export interface ResolvedCharacter {
   idleLayer: MocapLayer;
   /** Hair, eyebrows, beard and mustache the manifest has, with their colour. */
   grooms: GroomWear[];
+  /** Face loops under the live face: the idle loop and a happy loop for the smile. */
+  faceClips: { idle: string | null; smile: string | null };
   /** Approximate standing height (m), for camera framing. */
   height: number;
 }
@@ -68,7 +70,19 @@ export function resolveCharacter(
       null,
     ...idleSet(manifest),
     grooms: groomWears(config, manifest),
+    faceClips: faceClipSet(manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
+  };
+}
+
+/** The face idle loop and the first happy expression loop, by manifest tags. */
+export function faceClipSet(manifest: MhManifest): ResolvedCharacter['faceClips'] {
+  const face = manifest.animations.filter((a) => a.kind === 'face');
+  const idle = face.find((a) => a.tags.includes('idle'));
+  const smile = face.find((a) => a.tags.includes('expression') && a.tags.includes('happy'));
+  return {
+    idle: idle ? assetUrl(idle.file) : null,
+    smile: smile ? assetUrl(smile.file) : null,
   };
 }
 
