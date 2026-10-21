@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { fixtureManifest } from '@/features/creator/fixtures/manifest';
+import { startingConfig } from '@/features/creator/reconcile';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import { CharacterConfigSchema } from '@/lib/character/schema';
 
@@ -15,20 +16,28 @@ const target = (id: string) => {
 };
 
 describe('thumbConfig', () => {
-  it('shows a face with its own skin and iris, a natural brow and no hair', () => {
+  it('shows a face with its own skin and iris, a natural brow and the starting cut', () => {
     const face = manifest.faces.find((entry) => entry.gender === 'male')!;
     const config = thumbConfig(manifest, target(face.id));
     expect(config).toMatchObject({
       base: 'male',
       face: { preset: face.id, blend: {} },
       skin: { set: face.defaultSkin },
-      hair: { style: null },
+      hair: { style: startingConfig('male', manifest).hair.style },
       eyebrows: { style: 'Brows_Natural' },
       beard: { style: null },
     });
+    expect(config?.hair.style).not.toBeNull();
     expect(config?.eyes.iris).toBe(irisFor(manifest, face));
     expect(config?.eyes.iris).not.toBeNull();
     expect(CharacterConfigSchema.safeParse(config).success).toBe(true);
+  });
+
+  it("shows a woman's face with the starting cut", () => {
+    const face = manifest.faces.find((entry) => entry.gender === 'female')!;
+    const config = thumbConfig(manifest, target(face.id));
+    expect(config?.hair.style).toBe(startingConfig('female', manifest).hair.style);
+    expect(config?.hair.style).not.toBeNull();
   });
 
   it('wears a beard on the first male face', () => {

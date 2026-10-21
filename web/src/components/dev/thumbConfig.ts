@@ -71,7 +71,8 @@ function outfitConfig(manifest: MhManifest, outfit: MhOutfit): CharacterConfig |
 }
 
 /**
- * Faces: the face with its default skin and iris and a natural brow, no hair.
+ * Faces: the face with its default skin and iris, a natural brow and the
+ * starting cut of its base (a bald head hides how the face reads with hair).
  * Grooms: worn on a model face of a compatible gender (facial hair on a male
  * face unless it is female-only). Outfits: worn alone, first colourway, on the
  * default face of their base, no hair. Null when the manifest has no such face.
@@ -79,7 +80,10 @@ function outfitConfig(manifest: MhManifest, outfit: MhOutfit): CharacterConfig |
 export function thumbConfig(manifest: MhManifest, target: ThumbTarget): CharacterConfig | null {
   if (target.kind === 'face') {
     const face = manifest.faces.find((entry) => entry.id === target.id);
-    return face ? reconcileConfig(wearing(manifest, face), manifest) : null;
+    if (!face) return null;
+    const config = wearing(manifest, face);
+    config.hair.style = startingConfig(face.gender, manifest).hair.style;
+    return reconcileConfig(config, manifest);
   }
   if (target.kind === 'outfit') {
     const outfit = manifest.outfits.find((entry) => entry.id === target.id);

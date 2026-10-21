@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Stage } from '@/features/avatar/Stage';
@@ -92,7 +93,8 @@ const ALL_MORPHS = [...ARKIT, ...VISEMES.map((v) => `viseme_${v}`)];
  * sweep and the Turkish speech sample driving the visemes. Dev only.
  */
 export function DevMhViewer() {
-  const [face, setFace] = useState<(typeof FACES)[number]>('Ada');
+  // `?face=Etta` opens any converted preset, not only the ones in the picker.
+  const [face, setFace] = useState<string>(useSearchParams().get('face') ?? 'Ada');
   const [gender, setGender] = useState<'female' | 'male'>('female');
   const [focus, setFocus] = useState<CameraFocus>('face');
   const [sliders, setSliders] = useState<Partial<Record<BodySliderId, number>>>({});
@@ -178,8 +180,8 @@ export function DevMhViewer() {
       <aside className="bg-backstage/90 absolute top-3 left-3 flex max-h-[95vh] w-72 flex-col gap-2 overflow-y-auto rounded-lg p-3 text-xs">
         <label className="flex gap-2">
           face
-          <select value={face} onChange={(e) => setFace(e.target.value as (typeof FACES)[number])}>
-            {FACES.map((f) => (
+          <select value={face} onChange={(e) => setFace(e.target.value)}>
+            {[...new Set([...FACES, face])].map((f) => (
               <option key={f}>{f}</option>
             ))}
           </select>
