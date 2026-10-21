@@ -165,3 +165,43 @@ describe('groomWears', () => {
     for (const channel of brows!.look.dye!) expect(channel).toBeCloseTo(1);
   });
 });
+
+describe('iris fallback', () => {
+  const base = {
+    version: 2,
+    generatedAt: 'test',
+    bodies: manifest.bodies,
+    skins: [
+      {
+        id: 'skin.Aoi',
+        label: 'Aoi',
+        tone: 0.4,
+        swatch: '#8a5a44',
+        face: { albedo: 'a.ktx2', normal: 'n.ktx2' },
+        body: { albedo: 'b.ktx2', normal: 'bn.ktx2' },
+      },
+    ],
+    irises: [
+      { id: 'iris.Ada', label: 'Ada', color: 'ia.ktx2', swatch: '#241706' },
+      { id: 'iris.Aoi', label: 'Aoi', color: 'io.ktx2', swatch: '#3a2a18' },
+    ],
+  };
+
+  it("borrows the skin preset's iris for a face exported without eyes", () => {
+    const withBruce = MhManifestSchema.parse({
+      ...base,
+      faces: [
+        {
+          id: 'face.Bruce',
+          label: 'Bruce',
+          gender: 'female',
+          head: 'faces/Bruce/head.glb',
+          defaultSkin: 'skin.Aoi',
+        },
+      ],
+    });
+    const config = createDefaultConfig('female');
+    config.face.preset = 'face.Bruce';
+    expect(resolveCharacter(config, withBruce)?.iris?.id).toBe('iris.Aoi');
+  });
+});

@@ -52,21 +52,26 @@ export function resolveCharacter(
     manifest.faces.find((f) => f.gender === gender);
   if (!body || !face) return null;
   const sliders = config.body.sliders;
+  const skin =
+    manifest.skins.find((s) => s.id === config.skin.set) ??
+    manifest.skins.find((s) => s.id === face.defaultSkin) ??
+    null;
   return {
     gender,
     faceId: face.id,
     headUrl: assetUrl(face.head),
     bodyUrl: assetUrl(body.glb),
     sliders,
-    skin:
-      manifest.skins.find((s) => s.id === config.skin.set) ??
-      manifest.skins.find((s) => s.id === face.defaultSkin) ??
-      null,
+    skin,
     makeup: config.skin.makeup,
+    // Faces exported without eyes of their own borrow the iris of the preset
+    // their skin comes from, so they never render with white eyes.
     iris:
       manifest.irises.find((i) => i.id === config.eyes.iris) ??
       manifest.irises.find((i) => i.id === face.defaultIris) ??
-      manifest.irises.find((i) => i.id === face.id) ??
+      manifest.irises.find((i) => presetOf(i.id) === presetOf(face.id)) ??
+      (skin && manifest.irises.find((i) => presetOf(i.id) === presetOf(skin.id))) ??
+      manifest.irises[0] ??
       null,
     ...idleSet(manifest),
     grooms: groomWears(config, manifest),
@@ -85,6 +90,9 @@ export function faceClipSet(manifest: MhManifest): ResolvedCharacter['faceClips'
     smile: smile ? assetUrl(smile.file) : null,
   };
 }
+
+/** Preset name of a manifest id ("face.Ada", "iris.Ada" and "Ada" are all "Ada"). */
+const presetOf = (id: string) => id.slice(id.indexOf('.') + 1);
 
 /** sRGB hex as a linear colour (three converts on parse). */
 function linear(hex: string): Rgb {

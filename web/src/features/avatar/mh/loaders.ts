@@ -22,6 +22,16 @@ export function ktx2LoaderFor(renderer: WebGLRenderer): KTX2Loader {
   return loader;
 }
 
+/**
+ * Terminates the renderer's KTX2 transcoder workers. Call when its canvas goes
+ * away: the pool otherwise outlives the renderer, and pages that mount many
+ * stages (thumbnails, curation previews) pile up workers until loads time out.
+ */
+export function releaseKtx2Loader(renderer: WebGLRenderer): void {
+  ktx2ByRenderer.get(renderer)?.dispose();
+  ktx2ByRenderer.delete(renderer);
+}
+
 /** Configures a GLTFLoader for MetaHuman assets: KTX2 textures and meshopt geometry. */
 export function configureLoader(loader: GLTFLoader, renderer: WebGLRenderer): void {
   loader.setKTX2Loader(ktx2LoaderFor(renderer));

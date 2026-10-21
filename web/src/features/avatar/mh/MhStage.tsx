@@ -1,6 +1,6 @@
 'use client';
 
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import {
   Suspense,
   useCallback,
@@ -23,6 +23,7 @@ import { CharacterLife, type LifeInput } from './characterLife';
 import { loadFaceClip } from './faceClips';
 import type { LifeMode } from './idle';
 import { MhCharacter, type MhCharacterHandle } from './MhCharacter';
+import { releaseKtx2Loader } from './loaders';
 import { MhLighting } from './MhLighting';
 import { resolveCharacter } from './resolve';
 
@@ -60,6 +61,11 @@ export interface MhStageProps {
   insetRight?: number;
   /** Fired once the character is assembled and the first frame is on screen. */
   onReady?: () => void;
+  /**
+   * Fired once skin, eyes and grooms are on and drawn (after onReady, and again
+   * after every change that reloads them). Thumbnails capture on this.
+   */
+  onSettled?: () => void;
   /** Render tier (default auto: starts high, steps down while frames drop). */
   quality?: QualityPreference;
   className?: string;
@@ -82,6 +88,7 @@ export function MhStage({
   insetLeft = 0,
   insetRight = 0,
   onReady,
+  onSettled,
   className,
   quality,
 }: MhStageProps) {
@@ -116,9 +123,11 @@ export function MhStage({
   // the talk close-up follows it so a swaying speaker stays framed.
   const follow = useRef<Vector3 | null>(null);
   const followRest = useRef<{ handle: MhCharacterHandle; head: Vector3 } | null>(null);
+  // Thumbnails are stills: life holds its first pose (no blink, no glance).
+  const frozen = mode === 'thumbnail';
   const onFrame = useCallback(
     (handle: MhCharacterHandle, delta: number, camera: Camera) => {
-      life.step(handle, delta, { ...input.current, viewer: camera.position });
+      life.step(handle, frozen ? 0 : delta, { ...input.current, viewer: camera.position });
       const head = handle.body.bones.get('head');
       if (!head) return;
       head.getWorldPosition(headWorld);
@@ -129,8 +138,16 @@ export function MhStage({
         .copy(headWorld)
         .sub(followRest.current.head);
     },
-    [life],
+    [life, frozen],
   );
+  const latestOnSettled = useRef(onSettled);
+  useLayoutEffect(() => {
+    latestOnSettled.current = onSettled;
+  }, [onSettled]);
+  // Two frames later the settled character has been drawn, not just bound.
+  const handleSettled = useCallback(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => latestOnSettled.current?.()));
+  }, []);
 
   const idleFace = resolved?.faceClips.idle ?? null;
   const smileFace = resolved?.faceClips.smile ?? null;
@@ -181,14 +198,23 @@ export function MhStage({
                 idleLayer={resolved.idleLayer}
                 grooms={resolved.grooms}
                 onFrame={onFrame}
+                onSettled={handleSettled}
               />
               <FirstFrame onReady={onReady} />
+              <ReleaseTranscoder />
             </>
           )}
         </Suspense>
       </Stage>
     </div>
   );
+}
+
+/** Frees the renderer's KTX2 transcoder workers when the stage unmounts. */
+function ReleaseTranscoder() {
+  const gl = useThree((state) => state.gl);
+  useEffect(() => () => releaseKtx2Loader(gl), [gl]);
+  return null;
 }
 
 /** Calls `onReady` on the first rendered frame after the character mounted. */

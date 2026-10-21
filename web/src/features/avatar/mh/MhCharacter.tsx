@@ -3,6 +3,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
@@ -83,6 +84,11 @@ export interface MhCharacterProps {
   grooms?: readonly GroomWear[];
   /** Called every frame after the mixer and before rendering (life, lip-sync). */
   onFrame?: (handle: MhCharacterHandle, delta: number, camera: Camera) => void;
+  /**
+   * Called once the skin, eyes and grooms of the current props are on (or
+   * failed and were skipped); again after every change that reloads them.
+   */
+  onSettled?: () => void;
 }
 
 /**
@@ -102,10 +108,22 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     idleLayer = 'full',
     grooms = NO_GROOMS,
     onFrame,
+    onSettled,
   },
   ref,
 ) {
   const gl = useThree((state) => state.gl);
+  // The first frame can show a character whose skin and hair are still
+  // loading; thumbnails and the premiere wait for both parts to settle.
+  const settled = useRef({ skin: false, grooms: false });
+  const latestOnSettled = useRef(onSettled);
+  useLayoutEffect(() => {
+    latestOnSettled.current = onSettled;
+  }, [onSettled]);
+  const settle = useCallback((part: 'skin' | 'grooms') => {
+    settled.current[part] = true;
+    if (settled.current.skin && settled.current.grooms) latestOnSettled.current?.();
+  }, []);
   const bodyGltf = useMhGltf(bodyUrl);
   const headGltf = useMhGltf(headUrl);
 
@@ -153,7 +171,11 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   }, [bodyGltf, headGltf]);
 
   useEffect(() => {
-    if (!skin && !iris) return;
+    settled.current.skin = false;
+    if (!skin && !iris) {
+      settle('skin');
+      return;
+    }
     let live = true;
     // A converted head has no maps of its own: hide it rather than show it white.
     if (skin && !hasMaps(assembled.skins)) setVisible(assembled.root, false);
@@ -172,12 +194,14 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         // Missing files must not take the character down with them.
         if (result.status === 'rejected') console.warn('[mh] texture set failed', result.reason);
       }
-      if (live) setVisible(assembled.root, true);
+      if (!live) return;
+      setVisible(assembled.root, true);
+      settle('skin');
     });
     return () => {
       live = false;
     };
-  }, [assembled, gl, skin, makeup, iris]);
+  }, [assembled, gl, skin, makeup, iris, settle]);
 
   useEffect(() => {
     let live = true;
@@ -227,12 +251,16 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   const { hairLod } = useQuality();
   useEffect(() => {
     const head = assembled.headSkin;
-    if (!groomKey || !head) return;
+    settled.current.grooms = false;
+    if (!groomKey || !head) {
+      settle('grooms');
+      return;
+    }
     let live = true;
     const wearing = worn.current;
     const mine: WornGroom[] = [];
     const wears = latestGrooms.current;
-    void Promise.allSettled(wears.map((wear) => wearGroom(gl, wear, head, hairLod))).then(
+    const fitted = Promise.allSettled(wears.map((wear) => wearGroom(gl, wear, head, hairLod))).then(
       (results) => {
         results.forEach((result, i) => {
           if (result.status === 'rejected') {
@@ -256,8 +284,9 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     // Hair growing from the skin: the grooms' density darkens the scalp and brows.
     let density: WebGLRenderTarget | null = null;
     const files = densityFiles(wears);
+    let tinted: Promise<void> = Promise.resolve();
     if (files.some(Boolean)) {
-      void Promise.all(
+      tinted = Promise.all(
         files.map((file) => (file ? loadAssetTexture(gl, file, 'data') : null)),
       ).then(
         (layers) => {
@@ -269,6 +298,9 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         (error: unknown) => console.warn('[mh] groom density failed to load', error),
       );
     }
+    void Promise.all([fitted, tinted]).then(() => {
+      if (live) settle('grooms');
+    });
     return () => {
       live = false;
       for (const groom of mine) {
@@ -278,7 +310,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       setGroomDensity(assembled.skins, null, [], undefined);
       density?.dispose();
     };
-  }, [assembled, gl, groomKey, hairLod]);
+  }, [assembled, gl, groomKey, hairLod, settle]);
 
   useEffect(() => {
     for (const wear of grooms) {
