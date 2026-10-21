@@ -163,8 +163,27 @@ const GROOM_DENSITY = /* glsl */ `
   vec4 groomLayers = texture2D( skinGroomDensity, vMapUv );
   float groomCover = saturate( dot( groomLayers, skinGroomStrength ) );
   diffuseColor.rgb *= mix( vec3( 1.0 ), skinGroomTint, groomCover );
+  // Under painted hair the scalp between strands is shaded as in Unreal's
+  // hair mask (a coarse mip of the coverage): half saturation, multiplied by
+  // (0.864, 0.872, 0.9) ("Basecolor Hair Mask Hair Saturation/Multiply").
+  float groomRegion = saturate( dot( texture2D( skinGroomDensity, vMapUv, 4.0 ), skinGroomPaint ) );
+  vec3 groomScalp = mix( vec3( dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) ), diffuseColor.rgb, 0.5 );
+  diffuseColor.rgb = mix( diffuseColor.rgb, groomScalp * vec3( 0.864, 0.872, 0.9 ), groomRegion );
   float groomPaint = saturate( dot( groomLayers, skinGroomPaint ) );
   diffuseColor.rgb = mix( diffuseColor.rgb, skinGroomColor, groomPaint );
+#endif
+`;
+// Painted strands are hair, not oily scalp: Unreal's baked groom textures
+// shade them at roughness 0.45-0.75 and specular 0.3-0.6 (0.5 is skin's
+// default; BakedGroomTexturesRough*, *Spec*). Mid roughness, low specular.
+const GROOM_ROUGHNESS = /* glsl */ `
+#if defined( MH_GROOM_DENSITY ) && defined( USE_MAP )
+  roughnessFactor = mix( roughnessFactor, 0.6, groomPaint );
+#endif
+`;
+const GROOM_SPECULAR = /* glsl */ `
+#if defined( MH_GROOM_DENSITY ) && defined( USE_MAP )
+  specularIntensityFactor *= mix( 1.0, 0.6, groomPaint );
 #endif
 `;
 
@@ -371,6 +390,10 @@ ${BODY_HIDE_FRAGMENT}`,
         ].join('\n'),
       )
       .replace('#include <map_fragment>', `#include <map_fragment>\n${GROOM_DENSITY}\n${UNDERWEAR}`)
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>\n${GROOM_ROUGHNESS}`,
+      )
       // After the normal map uniforms it reads (normalScale, vNormalMapUv).
       .replace(
         '#include <normalmap_pars_fragment>',
@@ -383,7 +406,7 @@ ${BODY_HIDE_FRAGMENT}`,
       .replace(
         '#include <lights_physical_fragment>',
         ShaderChunk.lights_physical_fragment
-          .replace(SPECULAR_MAP_LINE, SPECULAR_FROM_RED)
+          .replace(SPECULAR_MAP_LINE, `${SPECULAR_FROM_RED}${GROOM_SPECULAR}`)
           .replace(F90_LINE, F90_CLAMPED),
       )
       .replace(
@@ -395,7 +418,7 @@ ${BODY_HIDE_FRAGMENT}`,
       );
   };
   material.customProgramCacheKey = () =>
-    `mh-skin-v6${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}${tuning.bodyHide ? '-hide' : ''}${tuning.underwear ? `-underwear-${tuning.underwear}` : ''}`;
+    `mh-skin-v8${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}${tuning.bodyHide ? '-hide' : ''}${tuning.underwear ? `-underwear-${tuning.underwear}` : ''}`;
   return material;
 }
 

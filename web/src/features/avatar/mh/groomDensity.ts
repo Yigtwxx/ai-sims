@@ -42,8 +42,13 @@ export const DENSITY_SLOTS = ['hair', 'eyebrows', 'beard', 'mustache'] as const;
 /** How strongly full density tints the skin, per slot (hair .. mustache). */
 export const DENSITY_STRENGTH = new Vector4(0.85, 0.45, 0.6, 0.6);
 
-/** How opaque a painted groom's strands are on the skin, per slot (no painted brows). */
-export const PAINT_STRENGTH = new Vector4(1, 0, 0.95, 0.95);
+/**
+ * Gain on a painted groom's coverage, per slot (no painted brows). The baked
+ * strand maps average about 0.37 where hair grows, which left a buzz cut
+ * reading as a bald scalp on dark skin; the gain brings dense areas to full
+ * cover while the gaps between strands stay skin.
+ */
+export const PAINT_STRENGTH = new Vector4(2, 0, 1.6, 1.6);
 
 /** Pack size: card grooms only need the smooth cover; painted strands need detail. */
 const DENSITY_SIZE = 1024;
