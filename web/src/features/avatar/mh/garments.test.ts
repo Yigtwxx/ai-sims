@@ -17,6 +17,7 @@ import {
   bindGarment,
   decodeHideBitset,
   fitGarmentOverHead,
+  layerGarments,
   skinGarmentToHead,
   syncGarmentMorphs,
 } from './garments';
@@ -293,5 +294,82 @@ describe('fitGarmentOverHead', () => {
     const before = Float32Array.from(garment.geometry.getAttribute('position').array);
     expect(fitGarmentOverHead(garment, seam)).toBe(0);
     expect(Float32Array.from(garment.geometry.getAttribute('position').array)).toEqual(before);
+  });
+});
+
+describe('layerGarments', () => {
+  /** Rings of garment vertices at (radius, height) around the body, skinned to the spine. */
+  function garmentOf(rig: ReturnType<typeof neckRig>['rig'], rings: [number, number][]) {
+    const points = rings.flatMap(([r, y]) =>
+      Array.from({ length: 16 }, (_, i) => {
+        const angle = (i / 16) * Math.PI * 2;
+        return [Math.cos(angle) * r, y, Math.sin(angle) * r];
+      }).flat(),
+    );
+    const garment = skinned([bone('spine_05')], new Array<number>(points.length / 3).fill(0));
+    garment.geometry.setAttribute('position', new BufferAttribute(Float32Array.from(points), 3));
+    bindGarment(garment, rig);
+    return garment;
+  }
+  const radius = (garment: SkinnedMesh, v: number) =>
+    Math.hypot(
+      garment.geometry.getAttribute('position').getX(v),
+      garment.geometry.getAttribute('position').getZ(v),
+    );
+  /** A shirt (7.5 cm) and the waistband of trousers that stands out through it (8 cm). */
+  function shirtOverWaistband() {
+    const { rig } = neckRig();
+    const shirt = garmentOf(rig, [
+      [0.075, 0.8],
+      [0.075, 0.81],
+      [0.075, 0.95],
+    ]);
+    const trousers = garmentOf(rig, [
+      [0.08, 0.8],
+      [0.08, 0.81],
+    ]);
+    return { rig, shirt, trousers };
+  }
+
+  it('moves the outer garment over the inner one where that comes through it', () => {
+    const { rig, shirt, trousers } = shirtOverWaistband();
+    expect(layerGarments([shirt], [trousers], rig.mesh)).toBeGreaterThan(0);
+    expect(radius(shirt, 0)).toBeGreaterThanOrEqual(0.0839);
+    expect(radius(shirt, 16)).toBeGreaterThanOrEqual(0.0839);
+    expect(radius(shirt, 32)).toBeCloseTo(0.075, 6);
+  });
+
+  it('starts from the unlayered garment every time', () => {
+    const { rig, shirt, trousers } = shirtOverWaistband();
+    const before = Float32Array.from(shirt.geometry.getAttribute('position').array);
+    layerGarments([shirt], [trousers], rig.mesh);
+    const once = Float32Array.from(shirt.geometry.getAttribute('position').array);
+    layerGarments([shirt], [trousers], rig.mesh);
+    expect(Float32Array.from(shirt.geometry.getAttribute('position').array)).toEqual(once);
+    expect(layerGarments([shirt], [], rig.mesh)).toBe(0);
+    expect(Float32Array.from(shirt.geometry.getAttribute('position').array)).toEqual(before);
+  });
+
+  it('moves both faces of an outer hem alike, so the lining stays inside', () => {
+    const { rig } = neckRig();
+    const hem = garmentOf(rig, [
+      [0.075, 0.8],
+      [0.078, 0.8],
+    ]);
+    const trousers = garmentOf(rig, [
+      [0.08, 0.8],
+      [0.08, 0.81],
+    ]);
+    layerGarments([hem], [trousers], rig.mesh);
+    expect(radius(hem, 0)).toBeGreaterThanOrEqual(0.0839);
+    expect(radius(hem, 16) - radius(hem, 0)).toBeCloseTo(0.003, 4);
+  });
+
+  it('leaves an outer garment alone where the inner one stays under it', () => {
+    const { rig } = neckRig();
+    const shirt = garmentOf(rig, [[0.09, 0.8]]);
+    const trousers = garmentOf(rig, [[0.07, 0.8]]);
+    expect(layerGarments([shirt], [trousers], rig.mesh)).toBe(0);
+    expect(radius(shirt, 0)).toBeCloseTo(0.09, 6);
   });
 });

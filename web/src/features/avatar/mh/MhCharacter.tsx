@@ -44,7 +44,13 @@ import { takeOffGroom, wearGroom, type GroomWear, type WornGroom } from './hair'
 import { setHairLook } from './hairMaterial';
 import { meshoptDecoder, useMhGltf } from './loaders';
 import { MotionPlayer, type MocapLayer, type MotionClip } from './motion';
-import { setOutfitColors, wearOutfit, type OutfitWear, type WornOutfit } from './outfits';
+import {
+  layerOutfits,
+  setOutfitColors,
+  wearOutfit,
+  type OutfitWear,
+  type WornOutfit,
+} from './outfits';
 import {
   applySkinMaterials,
   loadSkinDetail,
@@ -484,8 +490,9 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         for (const mesh of worn.meshes) (body.mesh.parent ?? assembled.root).add(mesh);
         body.garments.push(...worn.meshes);
       }
-      presetSkinnedBounds(assembled.root);
       wornOutfits.current = next;
+      layerOutfits(next, body);
+      presetSkinnedBounds(assembled.root);
       applyBodyHide(
         body.mesh,
         next.flatMap((worn) => (worn.hide ? [worn.hide] : [])),
@@ -553,6 +560,14 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   useLayoutEffect(() => {
     applyBodySliders(assembled.handle.body, sliders ?? {});
   }, [assembled, sliders]);
+  // Layering walks every vertex of the clothes: it waits for the sliders to rest.
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => layerOutfits(wornOutfits.current, assembled.handle.body),
+      LAYER_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [assembled, sliders]);
 
   useFrame(({ camera }, delta) => {
     onFrame?.(assembled.handle, delta, camera);
@@ -571,6 +586,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   return <primitive object={assembled.root} />;
 });
 
+/** Quiet period (ms) after the last slider change before the clothes are layered again. */
+const LAYER_DELAY_MS = 150;
 const NO_CLIPS: readonly string[] = [];
 const NO_GROOMS: readonly GroomWear[] = [];
 const NO_OUTFITS: readonly OutfitWear[] = [];

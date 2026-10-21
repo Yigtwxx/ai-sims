@@ -24,6 +24,7 @@ import {
   bindGarment,
   decodeHideBitset,
   fitGarmentOverHead,
+  layerGarments,
   skinGarmentToHead,
   syncGarmentMorphs,
 } from './garments';
@@ -188,6 +189,16 @@ export async function wearOutfit(
 }
 
 /** Recolours a worn outfit (creator colour change, no reload). */
+/**
+ * Tops go over bottoms where the two overlap (see `layerGarments`). Call after
+ * every change of what is worn and once the body sliders come to rest.
+ */
+export function layerOutfits(worn: readonly WornOutfit[], body: BodyRig): number {
+  const meshesOf = (category: OutfitCategory) =>
+    worn.filter((outfit) => outfit.category === category).flatMap((outfit) => outfit.meshes);
+  return layerGarments(meshesOf('top'), meshesOf('bottom'), body.mesh);
+}
+
 export function setOutfitColors(worn: WornOutfit, colors: Readonly<Record<string, Rgb>>): void {
   const byMaterial = colorsByMaterial(colors, [...worn.fabrics.keys()]);
   for (const [name, fabric] of worn.fabrics) setFabricColors(fabric, byMaterial.get(name) ?? {});

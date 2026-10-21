@@ -694,3 +694,217 @@ export function fitGarmentOverHead(garment: SkinnedMesh, seam: NeckSeamBinding):
   }
   return moved;
 }
+/** Outer garment vertices this far (m) from the garment under them can move off it. */
+const LAYER_REACH = 0.03;
+/** Inner garment points one outer vertex is compared with. */
+const LAYER_NEIGHBOURS = 8;
+/** Clearance (m) an outer garment keeps over the one under it. */
+const LAYER_CLEARANCE = 0.004;
+/** Largest move (m): deeper than this, the two pieces are not meant to overlap there. */
+const LAYER_MAX_PUSH = 0.03;
+/** Body skin farther than this (m) from a garment vertex gives it no outward direction. */
+const BODY_REACH = 0.15;
+
+interface BodyFrame {
+  signature: number;
+  tree: PointTree;
+  /** Outward unit normal of each body point (the tree's point order). */
+  normals: Float32Array;
+}
+
+const bodyFrames = new WeakMap<SkinnedMesh, BodyFrame>();
+
+/** The body's skin in its bind frame (sliders applied), with outward normals. */
+function bodyFrame(body: SkinnedMesh): BodyFrame {
+  const signature = bindSignature(body);
+  const cached = bodyFrames.get(body);
+  if (cached?.signature === signature) return cached;
+  const position = body.geometry.getAttribute('position') as Attribute;
+  const normal = body.geometry.getAttribute('normal') as Attribute;
+  const morphs = activeMorphs(body);
+  const points = new Float32Array(position.count * 3);
+  const normals = new Float32Array(position.count * 3);
+  const point = new Float32Array(3);
+  const e = body.bindMatrix.elements;
+  for (let v = 0; v < position.count; v += 1) {
+    bindPoint(body, morphs, v, point);
+    points.set(point, v * 3);
+    const nx = normal.getX(v);
+    const ny = normal.getY(v);
+    const nz = normal.getZ(v);
+    const x = e[0]! * nx + e[4]! * ny + e[8]! * nz;
+    const y = e[1]! * nx + e[5]! * ny + e[9]! * nz;
+    const z = e[2]! * nx + e[6]! * ny + e[10]! * nz;
+    const length = Math.hypot(x, y, z) || 1;
+    normals[v * 3] = x / length;
+    normals[v * 3 + 1] = y / length;
+    normals[v * 3 + 2] = z / length;
+  }
+  const frame = { signature, tree: buildTree(points), normals };
+  bodyFrames.set(body, frame);
+  return frame;
+}
+
+/**
+ * Puts a garment back where it was before any layering (its positions as worn,
+ * collar fit included), keeping that copy on first use.
+ */
+function restoreLayerBase(garment: SkinnedMesh): void {
+  const position = garment.geometry.getAttribute('position') as Attribute;
+  const base = garment.userData.mhLayerBase as typeof position.array | undefined;
+  if (!base) {
+    garment.userData.mhLayerBase = position.array.slice();
+    return;
+  }
+  position.array.set(base);
+  position.needsUpdate = true;
+  garment.geometry.boundingSphere = null;
+  garment.geometry.boundingBox = null;
+}
+
+/**
+ * Layering of garments worn together: moves the outer ones off the inner ones
+ * where those come through them.
+ *
+ * Every garment is fitted to the bare body on its own, so where two overlap (a
+ * T-shirt over the waistband of jeans) the inner one often lies outside the
+ * outer one and shows through it. Each inner point an outer vertex comes near
+ * asks for the push, along the body's outward normal, that takes the outer
+ * garment over it with LAYER_CLEARANCE to spare; each outer vertex then moves
+ * by a blend of what its nearest inner points ask for, faded out towards
+ * LAYER_REACH. Both faces of an outer hem take the same push, so they keep
+ * their order. Bind frame (sliders applied). Starts from the outer garments'
+ * unlayered positions every time, so calling it again after a slider change or
+ * with other inner garments does not add up; with no inner garments it only
+ * restores them. Returns how many outer vertices moved.
+ */
+export function layerGarments(
+  outer: readonly SkinnedMesh[],
+  inner: readonly SkinnedMesh[],
+  body: SkinnedMesh,
+): number {
+  for (const garment of outer) restoreLayerBase(garment);
+  if (outer.length === 0 || inner.length === 0) return 0;
+
+  let total = 0;
+  for (const garment of inner) total += garment.geometry.getAttribute('position').count;
+  const innerPoints = new Float32Array(total * 3);
+  const lo: Vec3Array = [Infinity, Infinity, Infinity];
+  const hi: Vec3Array = [-Infinity, -Infinity, -Infinity];
+  const point = new Float32Array(3);
+  let offset = 0;
+  for (const garment of inner) {
+    const morphs = activeMorphs(garment);
+    const count = garment.geometry.getAttribute('position').count;
+    for (let v = 0; v < count; v += 1) {
+      bindPoint(garment, morphs, v, point);
+      innerPoints.set(point, offset * 3);
+      for (let a = 0; a < 3; a += 1) {
+        lo[a] = Math.min(lo[a], point[a]!);
+        hi[a] = Math.max(hi[a], point[a]!);
+      }
+      offset += 1;
+    }
+  }
+  const innerTree = buildTree(innerPoints);
+  const skin = bodyFrame(body);
+
+  const want = new Float32Array(total);
+  const nearIndex = new Int32Array(LAYER_NEIGHBOURS);
+  const nearDistance = new Float64Array(LAYER_NEIGHBOURS);
+  const bodyIndex = new Int32Array(1);
+  const bodyDistance = new Float64Array(1);
+  const near: {
+    garment: SkinnedMesh;
+    v: number;
+    index: Int32Array;
+    distance: Float64Array;
+    normal: number;
+  }[] = [];
+
+  // What each inner point asks for: enough to clear it under every outer vertex near it.
+  for (const garment of outer) {
+    const morphs = activeMorphs(garment);
+    const count = garment.geometry.getAttribute('position').count;
+    for (let v = 0; v < count; v += 1) {
+      bindPoint(garment, morphs, v, point);
+      if (!withinBox(point, lo, hi, LAYER_REACH)) continue;
+      const x = point[0]!;
+      const y = point[1]!;
+      const z = point[2]!;
+      const found = nearestPoints(
+        innerTree,
+        x,
+        y,
+        z,
+        LAYER_NEIGHBOURS,
+        LAYER_REACH,
+        nearIndex,
+        nearDistance,
+      );
+      if (found === 0) continue;
+      if (nearestPoints(skin.tree, x, y, z, 1, BODY_REACH, bodyIndex, bodyDistance) === 0) continue;
+      const b = bodyIndex[0]!;
+      const nx = skin.normals[b * 3]!;
+      const ny = skin.normals[b * 3 + 1]!;
+      const nz = skin.normals[b * 3 + 2]!;
+      // Distances along the skin, not through it: both faces of a hem (a few
+      // mm apart along the normal) then weigh their inner points alike and
+      // move alike, so the lining never comes out past the outside.
+      const lateral = new Float64Array(found);
+      for (let n = 0; n < found; n += 1) {
+        const h = nearIndex[n]!;
+        const along =
+          (innerTree.points[h * 3]! - x) * nx +
+          (innerTree.points[h * 3 + 1]! - y) * ny +
+          (innerTree.points[h * 3 + 2]! - z) * nz;
+        lateral[n] = Math.sqrt(Math.max(0, nearDistance[n]! ** 2 - along * along));
+        const depth = along + LAYER_CLEARANCE;
+        if (depth <= LAYER_MAX_PUSH) want[h] = Math.max(want[h]!, depth);
+      }
+      near.push({ garment, v, index: nearIndex.slice(0, found), distance: lateral, normal: b });
+    }
+  }
+
+  // Every outer vertex near an inner garment: the blended push of its inner points.
+  const touched = new Set<SkinnedMesh>();
+  let moved = 0;
+  for (const { garment, v, index, distance, normal } of near) {
+    let push = 0;
+    let weights = 0;
+    let strongest = 0;
+    let closest = Infinity;
+    for (let n = 0; n < index.length; n += 1) {
+      const w = 1 / Math.max(distance[n]!, 1e-3);
+      push += w * want[index[n]!]!;
+      weights += w;
+      strongest = Math.max(strongest, want[index[n]!]!);
+      closest = Math.min(closest, distance[n]!);
+    }
+    const t = Math.min(1, Math.max(0, (LAYER_REACH - closest) / (LAYER_REACH / 2)));
+    // Close to the inner garment the strongest ask wins (no vertex is left
+    // short of clearing it); farther away the blend fades the move out.
+    const blend = push / weights;
+    const shift = (blend + (strongest - blend) * t) * t * t * (3 - 2 * t);
+    if (shift <= 0) continue;
+    const dx = skin.normals[normal * 3]! * shift;
+    const dy = skin.normals[normal * 3 + 1]! * shift;
+    const dz = skin.normals[normal * 3 + 2]! * shift;
+    const e = garment.bindMatrixInverse.elements;
+    const position = garment.geometry.getAttribute('position') as Attribute;
+    position.setXYZ(
+      v,
+      position.getX(v) + e[0]! * dx + e[4]! * dy + e[8]! * dz,
+      position.getY(v) + e[1]! * dx + e[5]! * dy + e[9]! * dz,
+      position.getZ(v) + e[2]! * dx + e[6]! * dy + e[10]! * dz,
+    );
+    touched.add(garment);
+    moved += 1;
+  }
+  for (const garment of touched) {
+    garment.geometry.getAttribute('position').needsUpdate = true;
+    garment.geometry.boundingSphere = null;
+    garment.geometry.boundingBox = null;
+  }
+  return moved;
+}
