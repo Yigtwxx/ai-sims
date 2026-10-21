@@ -5,7 +5,7 @@ import { startingConfig } from '@/features/creator/reconcile';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import { CharacterConfigSchema } from '@/lib/character/schema';
 
-import { irisFor, outfitBase, thumbConfig, thumbFocus } from './thumbConfig';
+import { irisFor, outfitBase, thumbConfig, thumbShot } from './thumbConfig';
 import { thumbnailTargets, type ThumbTarget } from './thumbTargets';
 
 const manifest = fixtureManifest();
@@ -57,6 +57,13 @@ describe('thumbConfig', () => {
     )!;
     const config = thumbConfig(manifest, target(hair.id));
     expect(config).toMatchObject({ base: 'female', hair: { style: hair.id } });
+  });
+
+  it('shows faces and grooms undressed, though new characters start dressed', () => {
+    const face = manifest.faces[0];
+    const bare = { top: null, bottom: null, shoes: null, full: null };
+    expect(thumbConfig(manifest, target(face.id))?.outfit).toEqual(bare);
+    expect(thumbConfig(manifest, target('Beard_Full'))?.outfit).toEqual(bare);
   });
 });
 
@@ -125,23 +132,24 @@ describe('thumbConfig for outfits', () => {
   });
 });
 
-describe('thumbFocus', () => {
+describe('thumbShot', () => {
   const of = (kind: ThumbTarget['kind'], category?: ThumbTarget['category']) =>
-    thumbFocus({ id: 'x', kind, category, file: 'x/thumbnail.webp', inManifest: false });
+    thumbShot({ kind, category });
 
-  it('frames faces and hair head and shoulders, brows and facial hair close up', () => {
-    expect(of('face')).toBe('face');
-    expect(of('hair')).toBe('face');
+  it('frames faces and hair as one bust, brows and facial hair close up', () => {
+    expect(of('face')).toBe('bust');
+    expect(of('hair')).toBe('bust');
     expect(of('eyebrows')).toBe('brows');
-    expect(of('beard')).toBe('mouth');
-    expect(of('mustache')).toBe('mouth');
+    expect(of('beard')).toBe('beard');
+    expect(of('mustache')).toBe('mustache');
   });
 
   it('frames an outfit on the part of the body it covers', () => {
     expect(of('outfit', 'top')).toBe('top');
-    expect(of('outfit', 'bottom')).toBe('legs');
+    expect(of('outfit', 'bottom')).toBe('bottom');
     expect(of('outfit', 'shoes')).toBe('shoes');
-    expect(of('outfit', 'full')).toBe('body');
+    expect(of('outfit', 'full')).toBe('full');
+    expect(of('outfit')).toBe('full');
   });
 });
 

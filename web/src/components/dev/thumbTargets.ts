@@ -14,6 +14,8 @@ export interface ThumbTarget {
   kind: ThumbKind;
   /** Outfits only: what the garment covers, which sets its framing. */
   category?: OutfitCategory;
+  /** Grooms only: painted on the skin (no cards), so no mesh of its own shows it is on. */
+  painted?: boolean;
   /** Manifest-relative path of the image (POSIX separators). */
   file: string;
   /** False when the manifest has no thumbnail entry and the path is derived from the asset's folder. */
@@ -46,6 +48,7 @@ export function thumbnailTargets(manifest: MhManifest): ThumbTarget[] {
     .map((groom) => ({
       id: groom.id,
       kind: groom.slot,
+      painted: !groom.glb,
       file: groom.thumbnail ?? besides((groom.glb ?? groom.painted)!),
       inManifest: groom.thumbnail !== undefined,
     }));

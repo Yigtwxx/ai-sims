@@ -2,9 +2,8 @@
  * Neutral characters for thumbnails: one item on an otherwise bare figure, so
  * every image in a grid reads the same way.
  */
-import type { CameraFocus } from '@/features/avatar/cameraFocus';
 import { reconcileConfig, startingConfig } from '@/features/creator/reconcile';
-import type { MhFace, MhManifest, MhOutfit, OutfitCategory } from '@/lib/assets/manifest';
+import type { MhFace, MhManifest, MhOutfit } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import type { CharacterBase, CharacterConfig } from '@/lib/character/schema';
 
@@ -36,6 +35,8 @@ function wearing(manifest: MhManifest, face: MhFace): CharacterConfig {
   config.hair.style = null;
   config.beard.style = null;
   config.mustache.style = null;
+  // New characters start dressed; a thumbnail shows its one item on underwear.
+  config.outfit = { top: null, bottom: null, shoes: null, full: null };
   return config;
 }
 
@@ -64,7 +65,6 @@ function outfitConfig(manifest: MhManifest, outfit: MhOutfit): CharacterConfig |
   if (outfit.category === 'full') {
     config.hair.style = startingConfig(base, manifest).hair.style;
   }
-  config.outfit = { top: null, bottom: null, shoes: null, full: null };
   config.outfit[outfit.category] = {
     id: outfit.id,
     tint: outfit.tintPresets[0]?.id ?? null,
@@ -112,27 +112,27 @@ export function thumbConfig(manifest: MhManifest, target: ThumbTarget): Characte
   return reconcileConfig(config, manifest);
 }
 
-const OUTFIT_FOCUS: Record<OutfitCategory, CameraFocus> = {
-  top: 'top',
-  bottom: 'legs',
-  shoes: 'shoes',
-  full: 'body',
-};
-
 /**
- * Framing per kind: faces and hair head and shoulders, brows and facial hair
- * a close-up of their part of the face, outfits the part of the body they cover.
+ * How a thumbnail is cut (see app/dev/thumbs/framing.ts): faces and hair as
+ * a head-and-shoulders bust with room above the crown, brows and facial hair
+ * as close-ups of their part of the head, outfits the part of the body they
+ * cover (a top chin to hips, a bottom hips to soles, shoes the feet, a
+ * one-piece head to toe).
  */
-export function thumbFocus(target: ThumbTarget): CameraFocus {
+export type ThumbShot =
+  'bust' | 'brows' | 'beard' | 'mustache' | 'top' | 'bottom' | 'shoes' | 'full';
+
+export function thumbShot(target: Pick<ThumbTarget, 'kind' | 'category'>): ThumbShot {
   switch (target.kind) {
     case 'eyebrows':
       return 'brows';
     case 'beard':
+      return 'beard';
     case 'mustache':
-      return 'mouth';
+      return 'mustache';
     case 'outfit':
-      return OUTFIT_FOCUS[target.category ?? 'full'];
+      return target.category ?? 'full';
     default:
-      return 'face';
+      return 'bust';
   }
 }

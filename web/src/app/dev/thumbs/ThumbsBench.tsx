@@ -4,7 +4,7 @@ import { ArrowClockwiseIcon, ImageIcon, PlayIcon, StopIcon } from '@phosphor-ico
 import { NextIntlClientProvider, useTranslations, type AbstractIntlMessages } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { thumbConfig, thumbFocus } from '@/components/dev/thumbConfig';
+import { thumbConfig, thumbShot } from '@/components/dev/thumbConfig';
 import { type ThumbKind, type ThumbTarget } from '@/components/dev/thumbTargets';
 import { StageBoundary } from '@/components/stage/StageBoundary';
 import { Button } from '@/components/ui/button';
@@ -13,14 +13,25 @@ import { useMhManifest } from '@/features/creator/useMhManifest';
 import { assetUrl, labelFor, type MhManifest } from '@/lib/assets/manifest';
 import { cn } from '@/lib/utils';
 
+import { cameraFor, poseDistance, shotBox, squareFov, type CameraPose } from './framing';
+import {
+  aimCamera,
+  cameraPosition,
+  jointsMoved,
+  measureJoints,
+  measureLandmarks,
+  onStage,
+  viewOf,
+} from './sceneProbe';
 import { GRID, lumaOf, SETTLE_RULE, settleBlocker, type SettleBlocker } from './settle';
-import { onStage } from './sceneProbe';
 
 /** Output size and quality of every thumbnail. */
 const THUMB_PX = 512;
 const QUALITY = 0.85;
 /** How often the settling stage is sampled (see settle.ts). */
 const SAMPLE_MS = 400;
+/** A joint or the camera moving more than this (m) since the last framing re-frames the shot. */
+const REFRAME_M = 0.002;
 /** A stage that does not settle in this time counts as failed (and is retried once). */
 const READY_TIMEOUT_MS = 60_000;
 /**
@@ -47,6 +58,14 @@ function takeSavedBatch(): SavedBatch | null {
     return raw ? (JSON.parse(raw) as SavedBatch) : null;
   } catch {
     return null;
+  }
+}
+
+function clearBatch(): void {
+  try {
+    window.sessionStorage.removeItem(BATCH_KEY);
+  } catch {
+    // Storage unavailable: nothing to clear.
   }
 }
 
@@ -188,6 +207,15 @@ function Bench() {
     },
     [retried],
   );
+
+  // The running batch lives in the session too, so an unplanned reload (a
+  // dev-server full refresh) resumes it instead of dropping it. Only once the
+  // list has loaded: before that the saved batch has not been taken yet.
+  useEffect(() => {
+    if (!items) return;
+    if (queue.length > 0) saveBatch({ queue, states, retried, kinds: [...kinds] });
+    else clearBatch();
+  }, [items, queue, states, retried, kinds]);
 
   // Between jobs, after CHUNK renders, hand the rest of the batch to a fresh page.
   const recycle = queue.length > 0 && sinceLoad >= CHUNK;
@@ -526,7 +554,14 @@ function RenderJob({
   }, [config, finish]);
 
   // What the settle loop is still waiting for, reported on a timeout.
-  const blocker = useRef<SettleBlocker | 'character' | 'groom' | 'outfit' | 'ready'>('ready');
+  const blocker = useRef<
+    SettleBlocker | 'settled' | 'character' | 'groom' | 'outfit' | 'pose' | 'framing' | 'ready'
+  >('ready');
+  // Skin, iris and groom textures bound and outfits fitted (MhStage onSettled).
+  const settled = useRef(false);
+  const onSettled = useCallback(() => {
+    settled.current = true;
+  }, []);
   // Asset responses (textures, grooms) keep arriving after the first frame.
   const lastAsset = useRef(0);
   useEffect(() => {
@@ -541,29 +576,79 @@ function RenderJob({
   }, []);
 
   const onReady = useCallback(() => {
-    void settleThenCapture();
+    // A probe that throws fails the job instead of leaving it to time out.
+    settleThenCapture().catch((error: unknown) => {
+      console.warn('[thumbs] settle failed', error);
+      finish({ ok: false, error: 'stage', code: 'probe' });
+    });
 
     async function settleThenCapture() {
       let calm = 0;
       let previous: Float32Array | null = null;
+      // The pose and camera the shot was last framed for.
+      let framedJoints: ReturnType<typeof measureJoints> = null;
+      let aimed: CameraPose | null = null;
+      const shot = thumbShot(target);
       while (alive.current && calm < SETTLE_RULE.calmSamples) {
         await sleep(SAMPLE_MS);
         const canvas = box.current?.querySelector('canvas');
-        const luma = canvas ? sampleLuma(canvas) : null;
-        if (!canvas || !luma) continue;
+        if (!canvas) continue;
+        const wait = (why: typeof blocker.current) => {
+          blocker.current = why;
+          calm = 0;
+          previous = null;
+        };
+        // Skin, iris and groom textures (KTX2) bound, grooms and outfits fitted.
+        if (!settled.current) {
+          wait('settled');
+          continue;
+        }
         // The picture alone cannot tell a bald head from one whose hair is
         // still being fitted: wait until the item is actually in the scene.
         if (!onStage(canvas, target)) {
-          blocker.current =
-            target.kind === 'face' ? 'character' : target.kind === 'outfit' ? 'outfit' : 'groom';
-          calm = 0;
+          wait(
+            target.kind === 'face' ? 'character' : target.kind === 'outfit' ? 'outfit' : 'groom',
+          );
           continue;
         }
-        const why = settleBlocker({
-          luma,
-          previous,
-          sinceAssetMs: performance.now() - lastAsset.current,
-        });
+        // Idle clips and details still streaming in would change the pose or the look.
+        const sinceAssetMs = performance.now() - lastAsset.current;
+        if (sinceAssetMs < SETTLE_RULE.quietMs) {
+          wait('assets');
+          continue;
+        }
+        // Frame on the figure, again whenever the pose or the camera moved.
+        const joints = measureJoints(canvas);
+        if (!joints) {
+          wait('pose');
+          continue;
+        }
+        const at = cameraPosition(canvas);
+        const drifted =
+          !aimed || !at || poseDistance({ position: at, target: aimed.target }, aimed) > REFRAME_M;
+        if (!framedJoints || jointsMoved(framedJoints, joints) > REFRAME_M || drifted) {
+          const marks = measureLandmarks(canvas, joints);
+          const view = viewOf(canvas);
+          if (!marks || !view) {
+            wait('pose');
+            continue;
+          }
+          const pose = cameraFor(
+            shotBox(shot, marks),
+            squareFov(view.fov, view.width, view.height),
+          );
+          if (!aimCamera(canvas, pose)) {
+            wait('framing');
+            continue;
+          }
+          framedJoints = joints;
+          aimed = pose;
+          wait('framing');
+          continue;
+        }
+        const luma = sampleLuma(canvas);
+        if (!luma) continue;
+        const why = settleBlocker({ luma, previous, sinceAssetMs });
         blocker.current = why ?? blocker.current;
         calm = why === null ? calm + 1 : 0;
         previous = luma;
@@ -609,8 +694,14 @@ function RenderJob({
           config={config}
           manifest={manifest}
           mode="thumbnail"
-          focus={thumbFocus(target)}
+          // The bench aims the camera itself once the figure is measured
+          // (framing.ts); any framing that is not a close-up leaves it alone.
+          focus="body"
+          // A fixed tier: the auto tier would step resolution and hair detail
+          // down mid-batch and make thumbnails differ.
+          quality="high"
           onReady={onReady}
+          onSettled={onSettled}
           className="size-full"
         />
       </StageBoundary>

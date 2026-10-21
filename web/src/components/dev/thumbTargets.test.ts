@@ -72,6 +72,24 @@ describe('thumbnailTargets', () => {
         .every((t) => isSafeThumbnailPath(t.file)),
     ).toBe(true);
   });
+
+  it('marks grooms painted on the skin, whose image goes beside their map', () => {
+    const [cards] = manifest.grooms.filter((groom) => groom.slot === 'hair');
+    const painted = {
+      ...cards,
+      id: 'groom.hair.BuzzCut',
+      glb: undefined,
+      painted: 'grooms/hair/BuzzCut/baked.ktx2',
+      thumbnail: undefined,
+    };
+    const targets = thumbnailTargets({ ...manifest, grooms: [cards, painted] });
+    expect(targets.find((target) => target.id === cards.id)?.painted).toBe(false);
+    expect(targets.find((target) => target.id === painted.id)).toMatchObject({
+      kind: 'hair',
+      painted: true,
+      file: 'grooms/hair/BuzzCut/thumbnail.webp',
+    });
+  });
 });
 
 describe('isSafeThumbnailPath', () => {
