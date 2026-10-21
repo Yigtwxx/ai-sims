@@ -55,6 +55,11 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
   // Stable callback: the memoised stage must not re-render as replies stream in.
   const [stageShown, setStageShown] = useState(false);
   const markStageShown = useCallback(() => setStageShown(true), []);
+  // A retry mounts the stage afresh: the loading caption returns until it settles.
+  const retryStage = (retry: () => void) => {
+    setStageShown(false);
+    retry();
+  };
 
   const talk = useTalk({
     characterId: character.id,
@@ -90,7 +95,7 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
           <StageBoundary
             fallback={(retry) => (
               <>
-                <StageFailed retry={retry} insetRight={panelWidth} />
+                <StageFailed retry={() => retryStage(retry)} insetRight={panelWidth} />
                 <OnMount run={markStageShown} />
               </>
             )}
