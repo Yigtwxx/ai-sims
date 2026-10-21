@@ -181,48 +181,103 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 
 ## Mac'e taşıma
 
-1. Mac ile PC aynı ağda olmalı. Mac'te ~50 GB boş yer gerekir.
-2. PC'de sunucuyu aç:
+Prova 2026-10-21'de bu PC'de yapıldı (sunucu + Windows'ta Python 3.9 istemci, WSL'de Linux istemci): yarıda öldürülen dosya Range ile kaldığı yerden sürdü, bozuk dosya sha256'da yakalanıp yeniden indi, `raw/` ikizleri hard link, `web/` ikizleri ayrı kopya oldu, ikinci çalıştırmada her şey atlandı.
 
-   ```bash
-   cd pipeline && uv run asset-pipeline serve-slim --archive C:/Users/Asus/MetaHumanArchive
-   ```
+### PC'den ayrılmadan önce
 
-   - Bayraklar: `--archive` (varsayılan `$MH_ARCHIVE`, yoksa `~/MetaHumanArchive`), `--include` (virgüllü klasör listesi), `--everything` (dönüştürücünün okumadığı dosyaları da sun), `--bind` (varsayılan PC'nin LAN adresi), `--port` (varsayılan 8765).
-   - Varsayılan klasörler: `web`, `raw`, `fab_anims`, `gestures`, `logs`. Diskte **~48 GB** (web 3.0 GB, raw 45 GB, fab_anims 140 MB, gestures 216 MB, logs 1.3 MB).
-   - **Okunmayan kaynaklar sunulmaz** (`UNUSED_SOURCES`, `transfer.py`), toplam ~11 GB. Liste, tam bir Ada dönüşümü ile her slottan bir groom, gövdeler, animasyonlar ve ışığın dosya açma izinden (audit hook) çıkarıldı. Kapsam: preset'lerin 8K `*_Animated_*` girdileri, göğüs haritaları ve 4K gövde albedo'su, groom FBX'leri, Creator'ın deri bölge maskeleri. Bunlar olmadan Mac her web varlığını yeniden üretebilir.
-   - **Aynı içerik bir kez iner.** Kıyafet dokuları iki cinsiyette ve iç çamaşırı haritaları 29 preset'te aynı; ~16 GB tekrar. `fetch_slim.py` her içeriği bir kez indirir. Kopyaları Mac'te `raw/` altında hard link, `web/` altında gerçek kopya olarak üretir; dönüştürücü web dosyalarını yerinde yeniden yazar. İndirilecek toplam **~25 GB**.
-   - Fab `.mhpkg`'leri (`fab`, 16 GB) yalnız Unreal'da işe yarar; istenirse `--include web,raw,fab_anims,gestures,logs,fab` ver.
-   - İlk açılışta her dosyanın sha256'sı hesaplanır ve arşiv köküne `.transfer-index.json` olarak önbelleğe alınır; ilk açılış uzun sürer.
-   - Windows güvenlik duvarı sorarsa **"Özel ağ: İzin ver"**.
-   - Komut, Mac'te çalıştırılacak komutu token'ıyla birlikte yazar. Token istek loguna yazılmaz.
-3. Mac'te, repo kökünde (yalnız standart kütüphane, `uv` gerekmez):
+1. **Prune ve dönüştürme bitmiş olmalı.** Sunucu açılışta dosya listesini ve hash'leri bir kez çıkarır. Sonradan silinen ya da yeniden yazılan dosya Mac'te `FAILED ... changed on the PC` verir. Arşivde bir şey değiştiyse sunucuyu kapatıp yeniden aç (yeni token yazar).
+2. **Git temiz olmalı:** `git status` boş, her şey `main`'e push'lanmış. PC'de kalan commit'lenmemiş iş kaybolur.
+3. **`web/.env.local`** git'te yok. Dosyayı kendin taşı (USB bellek ya da şifre yöneticisi); git'e, sohbete, maile koyma. Kaybolursa anahtarlar sağlayıcı panellerinden yeniden alınır (`docs/setup-accounts.md`), `BETTER_AUTH_SECRET` için `openssl rand -base64 32`.
+4. PC'nin dev veritabanı (`.data/mongo`) taşınmaz. İçindeki karakterler PC tarayıcısındaki anonim oturumlara bağlı; Mac'te boş DB ile başlanır.
+5. **Ağ hızı:** PC şu an **USB Fast Ethernet adaptöründe (100 Mbit/s, ~11 MB/s)**; 20 GB ~30 dk sürer. Kabloyu laptopun kendi Gigabit portuna takmak (ya da Wi-Fi 6E'ye bağlanmak) bunu ~5-15 dk'ya indirir. Adres değişirse sunucu yenisini yazar.
+6. PC şarjda kalsın, kapağı açık (şarjda uyku kapalı; pilde 5 dk sonra uyur).
 
-   ```bash
-   python3 pipeline/scripts/fetch_slim.py --url http://<pc>:8765 --token <token> --dest ~/MetaHumanArchive
-   ```
+### PC: sunucu
 
-   - Bayraklar: `--url`, `--token`, `--dest` zorunlu; `--jobs` paralel indirme (varsayılan 6); `--only <önek>` yalnız o yolla başlayan dosyalar (tekrarlanabilir).
-   - Önce yalnız web varlıkları için `--only web/` eklenebilir. Kalanı için sonra `--only` olmadan aynı komut; bitmiş dosyalar atlanır.
-   - Dosyalar `<dosya>.part`'a iner, Range ile kaldığı yerden sürer, her biri sha256 ile doğrulanır. Yarıda kalırsa aynı komut yeniden çalıştırılır.
-   - "all files verified" yazınca PC'de Ctrl+C.
+PowerShell ya da Git Bash, iki satır:
+
+```bash
+cd C:/Users/Asus/Desktop/ai-sims/pipeline
+uv run asset-pipeline serve-slim --archive C:/Users/Asus/MetaHumanArchive
+```
+
+- Çıktı şöyle biter (prune sonrası ölçüm: 5076 dosya, 27.1 GB, **20.1 GB indirilecek**; adres ve token her açılışta kendi değerleri):
+
+  ```text
+  serving 5076 files, 27.1 GB (20.1 GB to download, identical files once) on http://192.168.1.104:8765
+  on the Mac (same network), from the repo root (caffeinate keeps it awake):
+    caffeinate -i python3 pipeline/scripts/fetch_slim.py --url http://192.168.1.104:8765 --token 0123456789abcdef --dest ~/MetaHumanArchive
+  ```
+
+  Son satırı Mac'te aynen yaz. Token 16 haneli küçük harf hex; sunucu kapanınca geçersizdir.
+- Hash'ler arşiv kökündeki `.transfer-index.json`'da önbellekte; değişmeyen dosya yeniden hash'lenmez, açılış ~1 dk.
+- Bayraklar: `--archive` (varsayılan `$MH_ARCHIVE`, yoksa `~/MetaHumanArchive`), `--include` (virgüllü klasör listesi), `--everything` (dönüştürücünün okumadığı dosyaları da sun), `--bind` (varsayılan PC'nin LAN adresi), `--port` (varsayılan 8765).
+- Varsayılan klasörler: `web`, `raw`, `fab_anims`, `gestures`, `logs`. Fab `.mhpkg`'leri (`fab`) yalnız Unreal'da işe yarar; istenirse `--include web,raw,fab_anims,gestures,logs,fab`.
+- **Okunmayan kaynaklar sunulmaz** (`UNUSED_SOURCES`, `transfer.py`). Liste, tam bir Ada dönüşümü ile her slottan bir groom, gövdeler, animasyonlar ve ışığın dosya açma izinden (audit hook) çıkarıldı: preset'lerin 8K `*_Animated_*` girdileri, göğüs haritaları ve 4K gövde albedo'su, groom ve kıyafet FBX'leri, KhaosMDF322'nin kullanılmayan UDIM karoları, Creator'ın deri bölge maskeleri. Bunlar olmadan Mac her web varlığını yeniden üretebilir.
+- **Aynı içerik bir kez iner.** `fetch_slim.py` kopyaları Mac'te `raw/` altında hard link, `web/` altında gerçek kopya olarak üretir; dönüştürücü web dosyalarını yerinde yeniden yazar.
+- Token istek loguna yazılmaz. Bitince **Ctrl+C** (ya da pencereyi kapat).
+
+### Windows güvenlik duvarı
+
+- Bu PC'de uv'nin Python 3.13.14'ü için **"Genel" ağda gelen bağlantıya izin veren kural zaten var** ve PC'nin ağı "Genel". Yani büyük ihtimalle **hiç soru çıkmaz.** WSL'den (ayrı alt ağ, güvenlik duvarından geçer) denendi: tokensız 401, token'la 200.
+- **Soru çıkarsa** (başka ağa geçince ya da uv Python'u güncelleyince): "Windows Güvenlik Duvarı bu uygulamanın bazı özelliklerini engelledi", uygulama **python.exe**. Listelenen ağ türlerinin (Özel ve Genel) ikisini de işaretle, **"Erişime izin ver"**. Yönetici onayı isteyebilir.
+- **Soru çıkmadı ama Mac bağlanamıyorsa:** Başlat → "Güvenlik duvarı üzerinden uygulamaya izin ver" → "Ayarları değiştir" → yolu `...\uv\python\cpython-3.13...` olan `python.exe` satırlarında **Özel** ve **Genel** kutularını işaretle → Tamam. Satır yoksa "Başka bir uygulamaya izin ver" ile `C:\Users\Asus\AppData\Roaming\uv\python\cpython-3.13.14-windows-x86_64-none\python.exe`'yi ekle.
+- Mac'ten hızlı test: `curl -s -o /dev/null -w "%{http_code}\n" http://<pc>:8765/files.json` → **401** ulaşılıyor demek. Zaman aşımı: güvenlik duvarı, ya da Mac misafir ağında / router'da istemci yalıtımı açık (ikisi aynı ağda olmalı).
+
+### Mac: indirme
+
+Önce aşağıdaki "Mac kurulumu"nun 1-2. adımları (Homebrew ve repo). Sonra repo kökünde, sunucunun yazdığı satır:
+
+```bash
+cd ~/ai-sims
+caffeinate -i python3 pipeline/scripts/fetch_slim.py --url http://<pc>:8765 --token <token> --dest ~/MetaHumanArchive
+```
+
+- Yalnız standart kütüphane; macOS'un `python3`'ü (Xcode araçlarıyla gelen 3.9) yeter, `uv` gerekmez. Python 3.9 ile prova edildi.
+- `caffeinate -i` Mac'i indirme boyunca uyutmaz. Mac de şarjda ve kapağı açık kalsın.
+- İlk satır indirilecek toplamı yazar (`... GB to download (+N identical copies made here)`), sonra her dosya için yüzde ve MB/s.
+- Bayraklar: `--jobs` paralel indirme (varsayılan 6); `--only <önek>` yalnız o yolla başlayan dosyalar (tekrarlanabilir). Önce `--only web/` ile web varlıkları (~3 GB) alınabilir, kalanı için sonra aynı komut `--only` olmadan.
+- Dosyalar `<dosya>.part`'a iner, Range ile kaldığı yerden sürer, her biri sha256 ile doğrulanır. **Yarıda kalırsa (Wi-Fi koptu, Ctrl+C) aynı komutu yeniden çalıştır**; bitmiş dosyalar doğrulanıp atlanır.
+- `FAILED ... changed on the PC since serve-slim started` görürsen: PC'de sunucuyu kapatıp aç, yeni token'la aynı komut.
+- Süre ≈ GB ÷ MB/s: 20 GB, 11 MB/s'de ~30 dk, 40 MB/s'de ~9 dk.
+- **"all files verified"** yazınca PC'de Ctrl+C.
 
 ## Mac kurulumu
 
-Repo kökünde:
+Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 
-```bash
-git pull                                              # ya da: git clone https://github.com/Yigtwxx/ai-sims
-ln -s ~/MetaHumanArchive/web web/public/assets/mh     # web sahnesi buradan okur (gitignore'da)
-cd web && pnpm install
-pnpm db:start                                         # mongod 127.0.0.1:27018, veri .data/mongo
-pnpm dev                                              # http://localhost:3000
-```
+1. **Homebrew** ([brew.sh](https://brew.sh)); Xcode komut satırı araçlarını (git, python3, clang) da kurar. Bitince yazdığı `eval "$(/opt/homebrew/bin/brew shellenv)"` satırlarını çalıştır. Sonra:
 
-- **Araçlar:** Node 22+, pnpm 12 (`packageManager: pnpm@12.4.2`), MongoDB Community Server.
-  - `pnpm db:start` `.data/mongo`'yu kendisi açar. `mongod`'u PATH'te ya da `MONGOD_BIN`'de arar.
-  - Ayrı bir mongod servisi başlatmaya gerek yok; dev DB'yi `pnpm db:start` açar. Kullanıcının kendi mongod'una (27017) dokunulmaz.
-- **`web/.env.local`:** Mac'te varsa aşağıdaki adlarla karşılaştır; yoksa `cp .env.example web/.env.local`. Değerler hiçbir zaman loglanmaz ve commit edilmez. Anahtar alma adımları: `docs/setup-accounts.md`.
+   ```bash
+   brew install gh node@22 uv cmake
+   brew tap mongodb/brew && brew install mongodb-community
+   echo 'export PATH="/opt/homebrew/opt/node@22/bin:$PATH"' >> ~/.zprofile && source ~/.zprofile
+   npm install -g pnpm@12.4.2
+   ```
+
+   - `node@22` keg-only olduğu için PATH satırı gerekir. `node -v` 22.x, `pnpm -v` 12.x vermeli.
+   - `brew services start mongodb-community` **çalıştırma**: o 27017'de ayrı bir servis açar. Dev DB'yi `pnpm db:start` açar; Homebrew'un `mongod`'unu PATH'ten bulur (ya da `MONGOD_BIN`).
+2. **Repo** (özel repo, önce GitHub girişi). iCloud'la eşitlenebilen Masaüstü/Belgeler yerine ev klasörüne:
+
+   ```bash
+   gh auth login                        # GitHub.com, HTTPS, tarayıcıyla giriş
+   gh repo clone Yigtwxx/ai-sims ~/ai-sims
+   ```
+
+3. **Arşiv:** yukarıdaki "Mac: indirme". `~/MetaHumanArchive` da iCloud dışında kalır.
+4. **Web**, repo kökünde (`~/ai-sims`):
+
+   ```bash
+   ln -s ~/MetaHumanArchive/web web/public/assets/mh     # web sahnesi buradan okur (gitignore'da)
+   cp .env.example web/.env.local                        # ya da PC'den getirdiğin dosyayı buraya koy
+   cd web && pnpm install
+   pnpm db:start                                         # mongod 127.0.0.1:27018, veri .data/mongo
+   pnpm dev                                              # http://localhost:3000
+   ```
+
+   - Bağlantı sembolik link; Next dev ve `/api/dev/thumbnails` onun içinden okur ve yazar. PC'deki junction Node'a da sembolik link olarak görünür, yani aynı yol PC'de zaten çalışıyor. Kontrol: `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/assets/mh/manifest.json` → 200.
+   - `pnpm db:start` `.data/mongo`'yu kendisi açar. Kullanıcının kendi mongod'una (27017) dokunulmaz.
+- **`web/.env.local`:** PC'den getirdiğin dosyayı aşağıdaki adlarla karşılaştır; yoksa `.env.example`'dan doldur. Değerler hiçbir zaman loglanmaz ve commit edilmez. Anahtar alma adımları: `docs/setup-accounts.md`.
   - Veri ve oturum: `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`.
   - AI: `GROQ_API_KEY`, `GROQ_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_PROVIDER_ORDER`.
   - TTS: `TTS_PROVIDER_ORDER`, `TTS_ENABLE_EDGE`, `GEMINI_TTS_MODEL`, `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`, `AZURE_TTS_VOICE_TR_FEMALE`, `AZURE_TTS_VOICE_TR_MALE`, `AZURE_TTS_VOICE_EN_FEMALE`, `AZURE_TTS_VOICE_EN_MALE`.
@@ -238,8 +293,13 @@ pnpm dev                                              # http://localhost:3000
 
   - **Mac'te artımlılık yok:** damgalar (`build/stamps/`) kaynak `done.json`'ların mutlak yolunu içerir ve `build/` aktarılmaz. Mac'teki ilk `mh-convert` istenen her birimi baştan çevirir (yüz başına ~4-5 dk). `--all` yerine yalnız gereken bayrakları ver (`--outfits`, `--grooms`, `--character <ad>`, `--parts`).
 
-  - OpenRigLogic modülleri platforma özgü ve gitignore'da (`vendor/openriglogic/<platform_tag>/`). PC'deki `win_amd64-cp313` Mac'te çalışmaz; Mac'te ilk kez derlenecek. Gerekenler: Xcode command line tools, CMake (Homebrew ya da PyPI); SWIG `uv sync` ile gelir.
-  - KTX-Software 4.4.2 gerekir: `$KTX_TOOLS`, PATH ya da `~/tools/ktx/4.4.2/bin`.
+  - OpenRigLogic modülleri platforma özgü ve gitignore'da (`vendor/openriglogic/<platform_tag>/`). PC'deki `win_amd64-cp313` Mac'te çalışmaz; Mac'te ilk kez derlenecek. Gerekenler: Xcode command line tools (Homebrew ile geldi), CMake (`brew install cmake`); SWIG `uv sync` ile, Python 3.13 `uv` ile gelir.
+  - KTX-Software 4.4.2 gerekir (`$KTX_TOOLS`, PATH ya da `~/tools/ktx/4.4.2/bin`). Mac'te resmi paket `ktx`'i PATH'e kurar; `curl` ile inen dosyaya Gatekeeper takılmaz:
+
+    ```bash
+    curl -LO https://github.com/KhronosGroup/KTX-Software/releases/download/v4.4.2/KTX-Software-4.4.2-Darwin-arm64.pkg
+    sudo installer -pkg KTX-Software-4.4.2-Darwin-arm64.pkg -target / && ktx --version
+    ```
   - Manifest yazılınca web'in zod şemasıyla kontrol edilir; bunun için önce `web/`'de `pnpm install` yapılmış olmalı.
 - **Donanım farkı:**
   - Web çalışma zamanı WebGL2'dir; CUDA ya da MPS'e bağlı değildir. Repoda torch kodu yok.

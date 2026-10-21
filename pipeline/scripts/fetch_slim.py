@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import shutil
@@ -34,6 +35,8 @@ from urllib.parse import quote
 
 CHUNK = 1 << 20
 ATTEMPTS = 5
+GONE = 410
+"""serve-slim's answer for a file deleted or rewritten on the PC after it started."""
 COPIED = ("web/",)
 """Path prefixes copied instead of hard-linked when either side of a duplicate is under one
 (see the docstring)."""
@@ -104,6 +107,11 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
+class ChangedOnServer(Exception):
+    def __init__(self, path: str) -> None:
+        super().__init__(f"changed on the PC since serve-slim started: {path}")
+
+
 class Client:
     def __init__(self, url: str, token: str, timeout: float = 60) -> None:
         self.url = url.rstrip("/")
@@ -140,7 +148,8 @@ class Client:
                 if start > remote.size:
                     part.unlink()
                     start = 0
-                if start < remote.size:
+                # An empty file still needs one request to create its `.part`.
+                if start < remote.size or not part.is_file():
                     route = "/f/" + quote(remote.path)
                     with urllib.request.urlopen(
                         self._request(route, start), timeout=self.timeout
@@ -155,7 +164,10 @@ class Client:
                     raise OSError(f"sha256 mismatch for {remote.path}")
                 part.replace(target)
                 return "downloaded"
-            except (OSError, urllib.error.URLError) as error:
+            except (OSError, http.client.HTTPException) as error:
+                if isinstance(error, urllib.error.HTTPError) and error.code == GONE:
+                    # Retrying cannot help; a restarted (re-indexed) server can.
+                    raise ChangedOnServer(remote.path) from None
                 if attempt == ATTEMPTS:
                     raise
                 print(f"retry {attempt}/{ATTEMPTS - 1} {remote.path}: {error}", file=sys.stderr)
@@ -184,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     done_bytes = 0
     failures: list[str] = []
+    changed = 0
     started = time.monotonic()
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(client.fetch, f, dest): f for f in unique}
@@ -192,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 outcome = future.result()
             except Exception as error:
+                changed += isinstance(error, ChangedOnServer)
                 failures.append(remote.path)
                 print(f"FAILED {remote.path}: {error}", file=sys.stderr, flush=True)
                 continue
@@ -213,6 +227,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"FAILED {twin.path}: {error}", file=sys.stderr, flush=True)
     if failures:
         print(f"{len(failures)} files failed; run the same command again to resume.")
+        print(
+            f"{changed} of them changed on the PC after serve-slim started. If files keep failing, "
+            "restart serve-slim there (it re-indexes) and rerun with the new token."
+        )
         return 1
     print("all files verified")
     return 0

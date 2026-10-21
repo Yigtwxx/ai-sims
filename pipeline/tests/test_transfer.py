@@ -1,16 +1,25 @@
 """LAN transfer: the token-guarded Range server and the resuming, verifying client."""
 
+import _thread
 import importlib.util
 import json
 import os
 import sys
+import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 import pytest
 
-from asset_pipeline.transfer import UNUSED_SOURCES, build_index, parse_range, start_server
+from asset_pipeline.transfer import (
+    UNUSED_SOURCES,
+    build_index,
+    parse_range,
+    start_server,
+    wait_for_interrupt,
+)
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "fetch_slim.py"
 spec = importlib.util.spec_from_file_location("fetch_slim", SCRIPT)
@@ -216,3 +225,51 @@ def test_fetch_drops_a_part_file_that_is_a_hard_link(server, tmp_path: Path):
     os.link(source, part)
     assert client.fetch(remote, dest) == "downloaded"
     assert source.read_bytes() == b"keep me", "the linked source must stay untouched"
+
+
+def test_fetch_main_creates_empty_files(tmp_path: Path):
+    root = tmp_path / "archive"
+    (root / "logs").mkdir(parents=True)
+    (root / "logs" / "empty.log").write_bytes(b"")
+    instance, _ = start_server(root, ("logs",), "127.0.0.1", 0, TOKEN)
+    try:
+        dest = tmp_path / "mac"
+        args = ["--url", url_of(instance), "--token", TOKEN, "--dest", str(dest)]
+        assert fetch_slim.main(args) == 0, "an empty file must not fail the transfer"
+    finally:
+        instance.shutdown()
+        instance.server_close()
+    assert (dest / "logs" / "empty.log").read_bytes() == b""
+
+
+def test_wait_for_interrupt_stops_on_ctrl_c():
+    release = threading.Event()
+    worker = threading.Thread(target=release.wait, daemon=True)
+    worker.start()
+    # Ends the wait anyway after 10 s, so a regression fails instead of hanging.
+    threading.Timer(10, release.set).start()
+    threading.Timer(0.2, _thread.interrupt_main).start()
+    started = time.monotonic()
+    with pytest.raises(KeyboardInterrupt):
+        wait_for_interrupt(worker, poll=0.1)
+    release.set()
+    elapsed = time.monotonic() - started
+    assert elapsed < 3, f"Ctrl+C took {elapsed:.1f} s to stop the wait"
+
+
+@pytest.mark.parametrize("change", ["deleted", "rewritten"])
+def test_fetch_gives_up_at_once_on_a_file_changed_after_indexing(
+    server, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str
+):
+    client = fetch_slim.Client(url_of(server), TOKEN)
+    remote = next(f for f in client.files() if f.path.endswith("head.glb"))
+    source = server.root / remote.path
+    if change == "deleted":
+        source.unlink()
+    else:
+        source.write_bytes(b"reconverted")
+    sleeps: list[float] = []
+    monkeypatch.setattr(fetch_slim.time, "sleep", sleeps.append)
+    with pytest.raises(fetch_slim.ChangedOnServer):
+        client.fetch(remote, tmp_path / "mac")
+    assert sleeps == [], "a file gone from the index must not be retried"

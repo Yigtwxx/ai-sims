@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import BinaryIO
 from urllib.parse import parse_qs, unquote, urlsplit
 
 INDEX_CACHE = ".transfer-index.json"
@@ -203,7 +204,21 @@ class TransferHandler(BaseHTTPRequestHandler):
         if not route.startswith("/f/") or entry is None:
             self._fail(HTTPStatus.NOT_FOUND)
             return
-        path = self.server.root / entry.path
+        try:
+            stream = (self.server.root / entry.path).open("rb")
+        except OSError:
+            stream = None
+        if stream is None or os.fstat(stream.fileno()).st_size != entry.size:
+            # Deleted or rewritten on the PC after indexing (a prune or a conversion run
+            # while serving): the indexed hash no longer describes it.
+            if stream:
+                stream.close()
+            self._fail(HTTPStatus.GONE)
+            return
+        with stream:
+            self._send_file(stream, entry, body=body)
+
+    def _send_file(self, stream: BinaryIO, entry: IndexedFile, *, body: bool) -> None:
         try:
             span = parse_range(self.headers.get("Range"), entry.size)
         except ValueError:
@@ -223,15 +238,14 @@ class TransferHandler(BaseHTTPRequestHandler):
         self.end_headers()
         if not body or length == 0:
             return
-        with path.open("rb") as stream:
-            stream.seek(first)
-            remaining = length
-            while remaining > 0:
-                chunk = stream.read(min(CHUNK, remaining))
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
-                remaining -= len(chunk)
+        stream.seek(first)
+        remaining = length
+        while remaining > 0:
+            chunk = stream.read(min(CHUNK, remaining))
+            if not chunk:
+                break
+            self.wfile.write(chunk)
+            remaining -= len(chunk)
 
 
 def start_server(
@@ -244,7 +258,9 @@ def start_server(
 ) -> tuple[TransferServer, threading.Thread]:
     """Indexes and starts serving in a background thread (tests, `serve`)."""
     files = build_index(root, include, exclude)
-    server = TransferServer((host, port), root, files, token or secrets.token_urlsafe(24))
+    # 64 random bits as lowercase hex: typed by hand on the Mac, so no 0/O or l/I mix-ups,
+    # and far beyond guessing over a LAN while the transfer runs.
+    server = TransferServer((host, port), root, files, token or secrets.token_hex(8))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, thread
@@ -265,17 +281,25 @@ def serve(
         f"serving {len(server.files)} files, {total / 1e9:.1f} GB "
         f"({unique / 1e9:.1f} GB to download, identical files once) on http://{host}:{actual_port}"
     )
-    print("on the Mac (same network), from the repo root:")
+    print("on the Mac (same network), from the repo root (caffeinate keeps it awake):")
     print(
-        f"  python3 pipeline/scripts/fetch_slim.py --url http://{host}:{actual_port} "
+        f"  caffeinate -i python3 pipeline/scripts/fetch_slim.py --url http://{host}:{actual_port} "
         f"--token {server.token} --dest ~/MetaHumanArchive"
     )
     print("Ctrl+C stops the server once the Mac reports 'all files verified'.", flush=True)
     try:
-        thread.join()
+        wait_for_interrupt(thread)
     except KeyboardInterrupt:
         server.shutdown()
+        print("server stopped")
     return 0
+
+
+def wait_for_interrupt(thread: threading.Thread, poll: float = 0.5) -> None:
+    """Blocks while `thread` runs. Joins in short slices: on Windows an untimed join
+    is not interrupted by Ctrl+C, so the server would never stop."""
+    while thread.is_alive():
+        thread.join(poll)
 
 
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:

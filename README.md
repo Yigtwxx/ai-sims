@@ -43,6 +43,8 @@ Prerequisites: Node 22+, pnpm 12, MongoDB Community Server (`mongod` on PATH, or
 
 ### macOS
 
+On a fresh Mac, after installing [Homebrew](https://brew.sh): `brew install gh node@22 uv cmake`, `brew tap mongodb/brew && brew install mongodb-community` (don't start it as a service), put `/opt/homebrew/opt/node@22/bin` on PATH, `npm install -g pnpm@12.4.2`, then `gh repo clone Yigtwxx/ai-sims ~/ai-sims` (private repo; `gh auth login` first). Full steps: [`docs/handoff.md`](docs/handoff.md), "Mac kurulumu".
+
 ```bash
 ln -s ~/MetaHumanArchive/web web/public/assets/mh   # the converted MetaHuman assets
 cp .env.example web/.env.local                      # then fill in; see docs/setup-accounts.md
