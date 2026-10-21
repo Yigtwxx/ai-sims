@@ -59,6 +59,11 @@ function outfitConfig(manifest: MhManifest, outfit: MhOutfit): CharacterConfig |
   const face = manifest.faces.find((entry) => entry.id === preset);
   if (!face) return null;
   const config = wearing(manifest, face);
+  // A one-piece is framed head to toe: give it the base's starting cut. The
+  // other framings leave the head out (a top is cropped at the chin).
+  if (outfit.category === 'full') {
+    config.hair.style = startingConfig(base, manifest).hair.style;
+  }
   config.outfit = { top: null, bottom: null, shoes: null, full: null };
   config.outfit[outfit.category] = {
     id: outfit.id,
@@ -75,7 +80,8 @@ function outfitConfig(manifest: MhManifest, outfit: MhOutfit): CharacterConfig |
  * starting cut of its base (a bald head hides how the face reads with hair).
  * Grooms: worn on a model face of a compatible gender (facial hair on a male
  * face unless it is female-only). Outfits: worn alone, first colourway, on the
- * default face of their base, no hair. Null when the manifest has no such face.
+ * default face of their base, bald unless a one-piece frames the head too.
+ * Null when the manifest has no such face.
  */
 export function thumbConfig(manifest: MhManifest, target: ThumbTarget): CharacterConfig | null {
   if (target.kind === 'face') {
@@ -107,9 +113,9 @@ export function thumbConfig(manifest: MhManifest, target: ThumbTarget): Characte
 }
 
 const OUTFIT_FOCUS: Record<OutfitCategory, CameraFocus> = {
-  top: 'torso',
+  top: 'top',
   bottom: 'legs',
-  shoes: 'feet',
+  shoes: 'shoes',
   full: 'body',
 };
 

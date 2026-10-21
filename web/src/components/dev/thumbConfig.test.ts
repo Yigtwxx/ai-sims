@@ -138,9 +138,9 @@ describe('thumbFocus', () => {
   });
 
   it('frames an outfit on the part of the body it covers', () => {
-    expect(of('outfit', 'top')).toBe('torso');
+    expect(of('outfit', 'top')).toBe('top');
     expect(of('outfit', 'bottom')).toBe('legs');
-    expect(of('outfit', 'shoes')).toBe('feet');
+    expect(of('outfit', 'shoes')).toBe('shoes');
     expect(of('outfit', 'full')).toBe('body');
   });
 });

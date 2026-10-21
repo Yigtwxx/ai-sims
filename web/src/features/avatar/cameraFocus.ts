@@ -5,7 +5,7 @@
  */
 
 export type CameraFocus =
-  'body' | 'face' | 'torso' | 'legs' | 'feet' | 'premiere' | 'brows' | 'mouth';
+  'body' | 'face' | 'torso' | 'legs' | 'feet' | 'premiere' | 'brows' | 'mouth' | 'top' | 'shoes';
 
 type Vec3 = readonly [number, number, number];
 
@@ -48,6 +48,10 @@ const REFERENCE_POSES: Record<CameraFocus, CameraPose> = {
   torso: { position: [0, 1.42, 2.6], target: [0, 1.36, 0] },
   legs: { position: [0, 0.75, 3.0], target: [0, 0.6, 0] },
   feet: { position: [0.1, 0.55, 1.7], target: [0, 0.1, 0] },
+  // Item thumbnails: a top from the chin to the hips, slightly from the side so
+  // the cloth reads in depth; both shoes low and close, three quarters front.
+  top: { position: [0.32, 1.3, 2.15], target: [0, 1.21, 0] },
+  shoes: { position: [0.42, 0.3, 1.05], target: [0, 0.07, 0.04] },
   // Smaller and higher in frame, leaving the lower third for the title card.
   premiere: { position: [0, 0.78, 7.6], target: [0, 0.5, 0] },
   brows: around(REFERENCE_EYES, CLOSE_UP_OFFSETS.brows, 1),
