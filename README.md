@@ -23,20 +23,20 @@ A photorealistic, customizable 3D character creator that runs in the browser. Af
 | State | zustand + zundo |
 | i18n | next-intl |
 | Data / auth | MongoDB (official driver) + Better Auth (anonymous plugin) |
-| Asset pipeline | Python + Blender (headless `bpy`), MPFB2, glTF-Transform |
+| Asset pipeline | Unreal Engine (MetaHuman export), Python (uv), OpenRigLogic, KTX-Software |
 | Tests | Vitest, Playwright, pytest |
 
 ## Repository layout
 
 ```
 web/        Next.js app (UI, 3D renderer, route handlers)
-pipeline/   Python scripts that build and optimize character assets with Blender
+pipeline/   MetaHuman export (Unreal) and conversion to web GLB/KTX2 assets
 docs/       Design specs and spike reports
 ```
 
 ## Getting started
 
-Prerequisites: Node 22+, pnpm, Python 3.12+ with [uv](https://docs.astral.sh/uv/), Blender 4.2+ (asset pipeline only), Git LFS, and a local `mongod` (MongoDB Community Server).
+Prerequisites: Node 22+, pnpm, Python 3.13+ with [uv](https://docs.astral.sh/uv/) (asset pipeline only), Git LFS, and a local `mongod` (MongoDB Community Server).
 
 ```bash
 git lfs install
@@ -66,7 +66,7 @@ Asset pipeline:
 ```bash
 cd pipeline
 uv sync
-uv run asset-pipeline base          # runs Blender headless (MPFB), writes GLBs to pipeline/out
+uv run asset-pipeline mh-convert --help   # MetaHuman exports -> web assets; see docs/handoff.md
 ```
 
 ## Quality checks

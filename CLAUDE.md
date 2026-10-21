@@ -15,7 +15,7 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 - `web/`: Next.js App Router, React 19, TypeScript `strict`, Tailwind v4, shadcn/ui, Motion, GSAP, next-intl (`/tr`, `/en`), zustand + zundo.
 - 3D: three.js, @react-three/fiber, drei, postprocessing. Render tarayıcıda (WebGL2).
 - Veri: MongoDB (resmi `mongodb` driver) + Better Auth (`anonymous` plugin). Geliştirmede yerel mongod: `127.0.0.1:27018`, veri `.data/mongo` (gitignored). Compass: `mongodb://localhost:27018`.
-- `pipeline/`: Python (uv) + headless Blender (`bpy`) + MPFB2. Çıktı `web/public/assets/` + `manifest.json`.
+- `pipeline/`: Python (uv). Unreal'dan MetaHuman dışa aktarımı (`pipeline/unreal/`) ve web'e çevirme (`asset_pipeline/mh/`). Çıktı arşivin `web/` klasörü (`web/public/assets/mh` bağlantısı) + `manifest.json`.
 - Ayrı backend yok. Sunucu işleri Next.js route handler'larında. AI için resmi SDK'lar: `@anthropic-ai/sdk` (Claude), `@google/genai` (Gemini), `groq-sdk` (Groq); TTS için `microsoft-cognitiveservices-speech-sdk`. Vercel AI SDK kullanılmaz.
 
 ## Mimari kuralları

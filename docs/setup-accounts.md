@@ -164,22 +164,7 @@ Tarayıcıda denemek için `web/src/app/spike/ChatPanel.tsx` bileşenini `SpikeS
 - **Doğrula:** health çıktısında `"azure":true`; yukarıdaki ses komutunda `viseme` sayısı sıfırdan büyük.
 - **İpucu:** Standart seslerde görülen 429'ların çoğu kota aşımı değil, seçili bölgede o sesin geçici kapasite sınırıdır (Microsoft notu). Uygulama hızlı geçici hatalarda (429, bağlantı ve servis hatası) iki kez yeniden dener (300 ms ve 900 ms bekleyerek); yine olmazsa `502 tts_unavailable` döner ve sohbet metin olarak devam eder. Sürekli oluyorsa sesin yerel bölgesini ya da yaygın bir sesi seç.
 
-## 5. pixiv / VRoid Hub (resmi AvatarSample modelleri)
-
-- **Ne için:** Anime stilinin temel VRM modelleri. Asset pipeline'ı kaynak dosyaları `pipeline/source/vroid/` klasöründe bekler. Bu klasör `.gitignore` içindedir, dosyalar repoya girmez.
-- **Kayıt:** pixiv hesabı aç, https://hub.vroid.com/ adresine pixiv hesabınla giriş yap. VRM indirmek için VRoid Hub Kullanım Şartları'nı kabul etmen gerekir.
-- **Resmi model sayfaları** (VRoid yardım merkezi, "VRoidPreset_A - Z" makalesi, 2026-10-13 güncel):
-  - AvatarSample_A: https://hub.vroid.com/en/characters/2843975675147313744/models/5644550979324015604
-  - AvatarSample_B: https://hub.vroid.com/en/characters/7939147878897061040/models/2292219474373673889
-  - AvatarSample_C: https://hub.vroid.com/en/characters/1248981995540129234/models/8640547963669442173
-- **İndirme:**
-  1. Yukarıdaki sayfalardan birini aç (giriş yapmış olarak). Başka kullanıcıların yeniden yüklediği kopyaları değil, bu resmi sayfaları kullan.
-  2. Model sayfasındaki indirme seçeneğiyle VRM dosyasını indir.
-  3. Dosyayı `pipeline/source/vroid/` altına koy, örn. `pipeline/source/vroid/AvatarSample_B.vrm`.
-  - Alternatif: VRoid Studio içindeki örnek modelleri (`VRoidPreset_A - Z`) açıp VRM olarak dışa aktarabilirsin.
-- **Lisans riski (kabul edilen):** Bu modellerin lisansı CC0 değildir. Resmi koşullar ticari kullanıma, düzenlemeye ve yeniden dağıtıma izin verir; ancak şu davranışı yasaklar: *"Development of a character creation service using data contained in the sample model, or diversion of data contained in the sample model to an existing character creation service."* VRoid parçalarını birleştiren bu proje bu maddeye girebilir. İç demo için risk senin tarafından kabul edildi (bkz. `docs/specs/2026-10-20-character-creator-design.md`). **Halka açık yayından önce** pixiv'den lisans alınmalı ya da parçalar değiştirilmeli. Ayrıca VRM'leri "CC0" olarak yeniden dağıtmak ve ücret karşılığı dağıtmak yasaktır. Koşullar değişebilir ("Conditions of use may be subject to change"); dosyaları kullanmadan önce makaleyi tekrar oku.
-
-## 6. MongoDB Atlas (isteğe bağlı, demoyu paylaşmak için)
+## 5. MongoDB Atlas (isteğe bağlı, demoyu paylaşmak için)
 
 - **Ne için:** Yerel `mongod` (127.0.0.1:27018) yerine buluttaki ortak veritabanı. Yalnızca demoyu başkalarıyla paylaşacaksan gerekir.
 - **Kayıt:** https://www.mongodb.com/cloud/atlas/register
