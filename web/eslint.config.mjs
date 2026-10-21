@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     'next-env.d.ts',
     // Vendored KTX2 (Basis) transcoder copied from three/examples.
     'public/basis/**',
+    // Playwright output (traces and attachments of the last e2e run).
+    'test-results/**',
+    'playwright-report/**',
   ]),
 ]);
 
