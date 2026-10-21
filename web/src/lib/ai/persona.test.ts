@@ -47,11 +47,17 @@ describe('buildSystemPrompt', () => {
 
   it('asks for short spoken replies with no markup, because the output goes to TTS', () => {
     const prompt = buildSystemPrompt({ locale: 'tr' });
-    expect(prompt).toContain('read aloud by a text-to-speech voice');
+    expect(prompt).toContain('spoken in your voice exactly as written');
     expect(prompt).toContain('one to four short sentences');
     for (const banned of ['markdown', 'lists', 'emojis', 'URLs']) {
       expect(prompt).toContain(banned);
     }
+  });
+
+  it('knows it speaks out loud and never claims to answer only in text', () => {
+    const prompt = buildSystemPrompt({ character: MIRA, locale: 'tr' });
+    expect(prompt).toContain('You talk out loud');
+    expect(prompt).toContain('Never say that you can only write or answer in text');
   });
 
   it('asks for numbers written as words, with a Turkish and an English example', () => {

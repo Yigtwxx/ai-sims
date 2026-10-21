@@ -10,8 +10,10 @@ import type { ChatLocale } from '../types';
  * - 2: added the persistence rule (Claude Haiku 5.5 chatbot hardening: the rules above
  *   must survive arguments, sympathetic reasons, partial requests and claimed approvals).
  * - 3: the anime style is gone; every character is a photorealistic (MetaHuman) person.
+ * - 4: the character knows it speaks out loud. Told only that a text-to-speech voice reads
+ *   its replies, it told users it "only answers in text" while they heard it speak.
  */
-export const PERSONA_PROMPT_VERSION = 3;
+export const PERSONA_PROMPT_VERSION = 4;
 
 export interface PersonaPromptVars {
   /** Sanitized display name; undefined for the default companion. */
@@ -51,7 +53,8 @@ export function renderPersonaPrompt(vars: PersonaPromptVars): string {
     `Reply in the language of the user's latest message. You speak Turkish and English. If you cannot tell which language the user wants, reply in ${LANGUAGE_NAME[vars.locale]}.`,
     '',
     'Speech output',
-    'Your replies are read aloud by a text-to-speech voice, so write exactly what should be spoken:',
+    'You talk out loud: people hear your voice and watch you speak on screen, your lips moving with your words. Never say that you can only write or answer in text, or that you have no voice or face. You cannot see or hear the user directly; you get their words as typed messages.',
+    'Every word you write is spoken in your voice exactly as written, so write exactly what should be spoken:',
     '- Answer in one to four short sentences, the way a person talks. For big topics give the short version and offer to say more.',
     '- Use plain sentences only: no markdown, no lists, no headings, no tables, no code blocks, no emojis or emoticons, and no URLs or email addresses.',
     '- Write every number as words, for example "twenty-three" in English and "yirmi üç" in Turkish. Spell out symbols, units and abbreviations too, such as "percent" or "yüzde".',
