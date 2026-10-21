@@ -16,6 +16,7 @@ import {
   BODY_HIDDEN,
   bindGarment,
   decodeHideBitset,
+  fitGarmentOverHead,
   skinGarmentToHead,
   syncGarmentMorphs,
 } from './garments';
@@ -110,17 +111,20 @@ describe('body hide', () => {
   });
 });
 
-/** A cylinder of skin points (radius 6 cm), every vertex fully on one joint. */
+/** A cylinder of skin points (radius 6 cm, normals outward), every vertex fully on one joint. */
 function cylinder(bottom: number, top: number, bones: Bone[], joint: number): SkinnedMesh {
   const points: number[] = [];
+  const normals: number[] = [];
   for (let y = bottom; y <= top + 1e-9; y += 0.01) {
     for (let i = 0; i < 16; i += 1) {
       const angle = (i / 16) * Math.PI * 2;
       points.push(Math.cos(angle) * 0.06, y, Math.sin(angle) * 0.06);
+      normals.push(Math.cos(angle), 0, Math.sin(angle));
     }
   }
   const mesh = skinned(bones, new Array<number>(points.length / 3).fill(joint));
   mesh.geometry.setAttribute('position', new BufferAttribute(Float32Array.from(points), 3));
+  mesh.geometry.setAttribute('normal', new BufferAttribute(Float32Array.from(normals), 3));
   return mesh;
 }
 
@@ -239,5 +243,55 @@ describe('a garment through a body rebind', () => {
     const skin = worldOf(body, 0);
     expect(skin.x).toBeCloseTo(0.05);
     expect(worldOf(garment, 0).distanceTo(skin)).toBeLessThan(1e-6);
+  });
+});
+
+describe('fitGarmentOverHead', () => {
+  /** Garment vertices at (radius, height) on the +X side of the neck, skinned to the clavicle. */
+  function garmentAt(points: [number, number][]) {
+    const { rig, seam } = neckRig();
+    const garment = skinned(
+      [bone('clavicle_l')],
+      points.map(() => 0),
+    );
+    garment.geometry.setAttribute(
+      'position',
+      new BufferAttribute(Float32Array.from(points.flatMap(([r, y]) => [r, y, 0])), 3),
+    );
+    garment.geometry.morphTargetsRelative = true;
+    bindGarment(garment, rig);
+    return { garment, seam };
+  }
+  const radius = (garment: SkinnedMesh, v: number) =>
+    Math.hypot(
+      garment.geometry.getAttribute('position').getX(v),
+      garment.geometry.getAttribute('position').getZ(v),
+    );
+
+  it('moves a collar the neck skin stands through out past the skin', () => {
+    const { garment, seam } = garmentAt([[0.055, 1.1]]);
+    expect(fitGarmentOverHead(garment, seam)).toBe(1);
+    expect(radius(garment, 0)).toBeGreaterThanOrEqual(0.06 + 0.0029);
+    expect(garment.geometry.getAttribute('position').getY(0)).toBeCloseTo(1.1, 6);
+  });
+
+  it('keeps an inner band under the outer one', () => {
+    const { garment, seam } = garmentAt([
+      [0.055, 1.1],
+      [0.058, 1.1],
+    ]);
+    fitGarmentOverHead(garment, seam);
+    expect(radius(garment, 0)).toBeGreaterThanOrEqual(0.0629);
+    expect(radius(garment, 1) - radius(garment, 0)).toBeCloseTo(0.003, 4);
+  });
+
+  it('leaves a collar clear of the skin and a garment away from the head as they are', () => {
+    const { garment, seam } = garmentAt([
+      [0.075, 1.1],
+      [0.065, 0.8],
+    ]);
+    const before = Float32Array.from(garment.geometry.getAttribute('position').array);
+    expect(fitGarmentOverHead(garment, seam)).toBe(0);
+    expect(Float32Array.from(garment.geometry.getAttribute('position').array)).toEqual(before);
   });
 });

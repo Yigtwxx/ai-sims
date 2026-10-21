@@ -94,6 +94,8 @@ const HEAD_NEIGHBOURS = 4;
 const HEAD_BAND = 0.015;
 /** Points per k-d tree leaf. */
 const LEAF = 8;
+/** Clearance (m) a garment keeps over the head skin under it (see fitGarmentOverHead). */
+const HEAD_CLEARANCE = 0.003;
 
 type Vec3Array = [number, number, number];
 
@@ -315,6 +317,8 @@ interface SkinSpace {
   /** Head skeleton slot -> body joint, -1 when it has none. */
   jointOf: Int32Array;
   headTree: PointTree;
+  /** Outward unit normal of each head skin point (the tree's point order), or null. */
+  headNormals: Float32Array | null;
   bodyTree: PointTree;
   lo: Vec3Array;
   hi: Vec3Array;
@@ -361,9 +365,11 @@ function skinSpace(seam: NeckSeamBinding): SkinSpace {
   });
 
   const headPosition = head.geometry.getAttribute('position') as Attribute;
+  const headNormal = head.geometry.getAttribute('normal') as Attribute | undefined;
   const headIndex = head.geometry.getAttribute('skinIndex') as Attribute;
   const headWeight = head.geometry.getAttribute('skinWeight') as Attribute;
   const headPoints = new Float32Array(headPosition.count * 3);
+  const headNormals = headNormal ? new Float32Array(headPosition.count * 3) : null;
   const lo: Vec3Array = [Infinity, Infinity, Infinity];
   const hi: Vec3Array = [-Infinity, -Infinity, -Infinity];
   for (let v = 0; v < headPosition.count; v += 1) {
@@ -378,7 +384,19 @@ function skinSpace(seam: NeckSeamBinding): SkinSpace {
       headPoints[v * 3]! += w * (e[0]! * px + e[4]! * py + e[8]! * pz + e[12]!);
       headPoints[v * 3 + 1]! += w * (e[1]! * px + e[5]! * py + e[9]! * pz + e[13]!);
       headPoints[v * 3 + 2]! += w * (e[2]! * px + e[6]! * py + e[10]! * pz + e[14]!);
+      if (headNormals && headNormal) {
+        const nx = headNormal.getX(v);
+        const ny = headNormal.getY(v);
+        const nz = headNormal.getZ(v);
+        headNormals[v * 3]! += w * (e[0]! * nx + e[4]! * ny + e[8]! * nz);
+        headNormals[v * 3 + 1]! += w * (e[1]! * nx + e[5]! * ny + e[9]! * nz);
+        headNormals[v * 3 + 2]! += w * (e[2]! * nx + e[6]! * ny + e[10]! * nz);
+      }
       total += w;
+    }
+    if (headNormals) {
+      const n = Math.hypot(headNormals[v * 3]!, headNormals[v * 3 + 1]!, headNormals[v * 3 + 2]!);
+      for (let a = 0; a < 3; a += 1) headNormals[v * 3 + a]! /= n || 1;
     }
     for (let a = 0; a < 3; a += 1) {
       if (total > 0) headPoints[v * 3 + a]! /= total;
@@ -405,6 +423,7 @@ function skinSpace(seam: NeckSeamBinding): SkinSpace {
     signature,
     jointOf,
     headTree: buildTree(headPoints),
+    headNormals,
     bodyTree: buildTree(bodyPoints.slice(0, kept * 3)),
     lo,
     hi,
@@ -569,4 +588,109 @@ export function skinGarmentToHead(garment: SkinnedMesh, seam: NeckSeamBinding): 
     garment.geometry.setAttribute('skinWeight', new BufferAttribute(outWeight, 4));
   }
   return changed;
+}
+
+/**
+ * Collar fit: moves the garment off head skin that comes through it.
+ *
+ * Garments are fitted to the neutral body, but the neck above the body's edge
+ * belongs to the head, and heads differ: a fuller or more forward neck (Isaiah,
+ * Cameron) stood up to 1.5 cm in front of a crew neck and showed through it as
+ * a skin-coloured hole, in every pose. Each head skin point the garment comes
+ * within HEAD_CLEARANCE of (or passes behind) asks for the push that clears it
+ * along its normal; every garment vertex near the head then moves by the
+ * inverse-distance blend of what its nearest head points ask for, faded out
+ * towards HEAD_REACH. Layers of one collar (an inner band under the outer one)
+ * take the same push, so they keep their order. Bind frame, like
+ * `skinGarmentToHead`; call after it. Returns how many vertices moved.
+ */
+export function fitGarmentOverHead(garment: SkinnedMesh, seam: NeckSeamBinding): number {
+  if (garment.skeleton !== seam.body.skeleton) return 0;
+  if ((seam.head.geometry.getAttribute('position') as Attribute).count === 0) return 0;
+  const geometry = garment.geometry;
+  // Relative morphs ride on the moved base positions; absolute ones would not.
+  if ((geometry.morphAttributes.position?.length ?? 0) > 0 && !geometry.morphTargetsRelative) {
+    return 0;
+  }
+  const { headTree, headNormals, lo, hi } = skinSpace(seam);
+  if (!headNormals) return 0;
+
+  const position = geometry.getAttribute('position') as Attribute;
+  const morphs = activeMorphs(garment);
+  const point = new Float32Array(3);
+  const nearIndex = new Int32Array(HEAD_NEIGHBOURS);
+  const nearDistance = new Float64Array(HEAD_NEIGHBOURS);
+  const want = new Float32Array(headNormals.length / 3);
+  const near: { v: number; index: Int32Array; distance: Float64Array }[] = [];
+
+  // What each head point asks for: enough to clear the deepest garment vertex over it.
+  for (let v = 0; v < position.count; v += 1) {
+    bindPoint(garment, morphs, v, point);
+    if (!withinBox(point, lo, hi, HEAD_REACH)) continue;
+    const x = point[0]!;
+    const y = point[1]!;
+    const z = point[2]!;
+    // Head skin under the body's edge counts too: near the seam both skins are close.
+    const found = nearestPoints(
+      headTree,
+      x,
+      y,
+      z,
+      HEAD_NEIGHBOURS,
+      HEAD_REACH,
+      nearIndex,
+      nearDistance,
+    );
+    if (found === 0) continue;
+    near.push({ v, index: nearIndex.slice(0, found), distance: nearDistance.slice(0, found) });
+    const h = nearIndex[0]!;
+    const out =
+      (x - headTree.points[h * 3]!) * headNormals[h * 3]! +
+      (y - headTree.points[h * 3 + 1]!) * headNormals[h * 3 + 1]! +
+      (z - headTree.points[h * 3 + 2]!) * headNormals[h * 3 + 2]!;
+    want[h] = Math.max(want[h]!, HEAD_CLEARANCE - out);
+  }
+
+  // Every garment vertex near the head: the blended push of its head points.
+  const e = garment.bindMatrixInverse.elements;
+  let moved = 0;
+  for (const { v, index, distance } of near) {
+    let push = 0;
+    let total = 0;
+    let nx = 0;
+    let ny = 0;
+    let nz = 0;
+    for (let n = 0; n < index.length; n += 1) {
+      const h = index[n]!;
+      const w = 1 / Math.max(distance[n]!, 1e-5);
+      push += w * want[h]!;
+      nx += w * headNormals[h * 3]!;
+      ny += w * headNormals[h * 3 + 1]!;
+      nz += w * headNormals[h * 3 + 2]!;
+      total += w;
+    }
+    const t = Math.min(1, Math.max(0, (HEAD_REACH - distance[0]!) / (HEAD_REACH / 2)));
+    // At least what its own nearest head point asks for: a blend with points
+    // nothing comes near would leave the deepest vertices short of clearing.
+    const shift = Math.max(want[index[0]!]!, push / total) * t * t * (3 - 2 * t);
+    const length = Math.hypot(nx, ny, nz);
+    if (shift <= 0 || length === 0) continue;
+    // Bind-frame direction back into the garment's own frame.
+    const dx = (nx / length) * shift;
+    const dy = (ny / length) * shift;
+    const dz = (nz / length) * shift;
+    position.setXYZ(
+      v,
+      position.getX(v) + e[0]! * dx + e[4]! * dy + e[8]! * dz,
+      position.getY(v) + e[1]! * dx + e[5]! * dy + e[9]! * dz,
+      position.getZ(v) + e[2]! * dx + e[6]! * dy + e[10]! * dz,
+    );
+    moved += 1;
+  }
+  if (moved > 0) {
+    position.needsUpdate = true;
+    geometry.boundingSphere = null;
+    geometry.boundingBox = null;
+  }
+  return moved;
 }
