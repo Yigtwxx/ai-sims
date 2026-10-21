@@ -11,25 +11,31 @@ const BASIS_PATH = '/basis/';
 
 // One KTX2Loader per renderer: it owns a transcoder worker pool and detects the
 // GPU's compressed formats (ASTC/BC7/ETC2) once.
-const ktx2ByRenderer = new WeakMap<WebGLRenderer, KTX2Loader>();
+const ktx2ByRenderer = new Map<WebGLRenderer, KTX2Loader>();
+
+/**
+ * Terminates the transcoder workers of renderers whose canvas has left the
+ * page. The pool otherwise outlives its renderer, and pages that mount many
+ * stages in turn (thumbnails, curation previews) pile up workers until loads
+ * time out. Cleaning up when the next renderer arrives, rather than on unmount,
+ * keeps React's development double mount from killing a pool in use.
+ */
+function releaseDetachedLoaders(): void {
+  for (const [renderer, loader] of ktx2ByRenderer) {
+    if (renderer.domElement.isConnected) continue;
+    loader.dispose();
+    ktx2ByRenderer.delete(renderer);
+  }
+}
 
 export function ktx2LoaderFor(renderer: WebGLRenderer): KTX2Loader {
   let loader = ktx2ByRenderer.get(renderer);
   if (!loader) {
+    releaseDetachedLoaders();
     loader = new KTX2Loader().setTranscoderPath(BASIS_PATH).detectSupport(renderer);
     ktx2ByRenderer.set(renderer, loader);
   }
   return loader;
-}
-
-/**
- * Terminates the renderer's KTX2 transcoder workers. Call when its canvas goes
- * away: the pool otherwise outlives the renderer, and pages that mount many
- * stages (thumbnails, curation previews) pile up workers until loads time out.
- */
-export function releaseKtx2Loader(renderer: WebGLRenderer): void {
-  ktx2ByRenderer.get(renderer)?.dispose();
-  ktx2ByRenderer.delete(renderer);
 }
 
 /** Configures a GLTFLoader for MetaHuman assets: KTX2 textures and meshopt geometry. */

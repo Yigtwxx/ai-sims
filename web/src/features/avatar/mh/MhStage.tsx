@@ -1,6 +1,6 @@
 'use client';
 
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import {
   Suspense,
   useCallback,
@@ -23,7 +23,6 @@ import { CharacterLife, type LifeInput } from './characterLife';
 import { loadFaceClip } from './faceClips';
 import type { LifeMode } from './idle';
 import { MhCharacter, type MhCharacterHandle } from './MhCharacter';
-import { releaseKtx2Loader } from './loaders';
 import { MhLighting } from './MhLighting';
 import { resolveCharacter } from './resolve';
 
@@ -201,20 +200,12 @@ export function MhStage({
                 onSettled={handleSettled}
               />
               <FirstFrame onReady={onReady} />
-              <ReleaseTranscoder />
             </>
           )}
         </Suspense>
       </Stage>
     </div>
   );
-}
-
-/** Frees the renderer's KTX2 transcoder workers when the stage unmounts. */
-function ReleaseTranscoder() {
-  const gl = useThree((state) => state.gl);
-  useEffect(() => () => releaseKtx2Loader(gl), [gl]);
-  return null;
 }
 
 /** Calls `onReady` on the first rendered frame after the character mounted. */
