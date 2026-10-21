@@ -20,7 +20,7 @@ import {
   type FabricMaterial,
   type FabricTextures,
 } from './fabricMaterial';
-import { bindGarment, decodeHideBitset, syncGarmentMorphs } from './garments';
+import { bindGarment, decodeHideBitset, skinGarmentToHead, syncGarmentMorphs } from './garments';
 import type { Rgb } from './hairColor';
 import { configureLoader } from './loaders';
 import { loadAssetTexture } from './skinTextures';
@@ -157,6 +157,8 @@ export async function wearOutfit(
     mesh.receiveShadow = true;
     mesh.name = `${wear.outfit.category}_${mesh.name}`;
     syncGarmentMorphs(mesh, body);
+    // Collars that reach over the head's neck skin follow that skin, not the body's.
+    if (body.seam) skinGarmentToHead(mesh, body.seam);
   }
 
   const bitset = typeof extras.body_hide === 'string' ? extras.body_hide : null;

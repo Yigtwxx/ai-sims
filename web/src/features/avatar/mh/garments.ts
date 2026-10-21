@@ -1,6 +1,12 @@
-import { BufferAttribute, type InterleavedBufferAttribute, type SkinnedMesh } from 'three';
+import {
+  BufferAttribute,
+  Matrix4,
+  type Bone,
+  type InterleavedBufferAttribute,
+  type SkinnedMesh,
+} from 'three';
 
-import type { BodyRig } from './assembly';
+import type { BodyRig, NeckSeamBinding } from './assembly';
 
 /**
  * Outfit garments on a body (contract: docs/specs/2026-10-20-metahuman-web-assets.md,
@@ -74,4 +80,493 @@ export function applyBodyHide(body: SkinnedMesh, masks: readonly Uint8Array[]): 
     for (let v = 0; v < count; v += 1) if (mask[v]) hidden[v] = 1;
   }
   body.geometry.setAttribute(BODY_HIDDEN, new BufferAttribute(hidden, 1));
+}
+
+/** Garment vertices farther than this (m) from the head skin keep their weights. */
+const HEAD_REACH = 0.03;
+/** Head vertices whose skin is blended into one garment vertex. */
+const HEAD_NEIGHBOURS = 4;
+/**
+ * Width (m) of the blend: a garment vertex takes the head's skin fully once it
+ * is this much closer to the head skin than to the body skin, and none at all
+ * while the body skin is at least as close.
+ */
+const HEAD_BAND = 0.015;
+/** Points per k-d tree leaf. */
+const LEAF = 8;
+
+type Vec3Array = [number, number, number];
+
+/**
+ * Implicit k-d tree: node [lo, hi) splits at its median slot m = (lo + hi) >> 1
+ * on `axis[m]`; ranges of at most LEAF points are leaves.
+ */
+interface PointTree {
+  points: Float32Array;
+  order: Int32Array;
+  axis: Uint8Array;
+}
+
+/** Reorders order[lo, hi) so that slot m holds its median along `axis`. */
+function selectMedian(
+  points: Float32Array,
+  order: Int32Array,
+  lo: number,
+  hi: number,
+  m: number,
+  axis: number,
+) {
+  let left = lo;
+  let right = hi - 1;
+  while (left < right) {
+    const pivot = points[order[(left + right) >> 1]! * 3 + axis]!;
+    let i = left;
+    let j = right;
+    while (i <= j) {
+      while (points[order[i]! * 3 + axis]! < pivot) i += 1;
+      while (points[order[j]! * 3 + axis]! > pivot) j -= 1;
+      if (i <= j) {
+        const swap = order[i]!;
+        order[i] = order[j]!;
+        order[j] = swap;
+        i += 1;
+        j -= 1;
+      }
+    }
+    if (m <= j) right = j;
+    else if (m >= i) left = i;
+    else return;
+  }
+}
+
+function buildTree(points: Float32Array): PointTree {
+  const count = points.length / 3;
+  const order = new Int32Array(count);
+  for (let p = 0; p < count; p += 1) order[p] = p;
+  const axis = new Uint8Array(count);
+  const split = (lo: number, hi: number) => {
+    if (hi - lo <= LEAF) return;
+    // Split along the widest extent of the range.
+    const low = [Infinity, Infinity, Infinity];
+    const high = [-Infinity, -Infinity, -Infinity];
+    for (let s = lo; s < hi; s += 1) {
+      for (let a = 0; a < 3; a += 1) {
+        const value = points[order[s]! * 3 + a]!;
+        if (value < low[a]!) low[a] = value;
+        if (value > high[a]!) high[a] = value;
+      }
+    }
+    const spans = [0, 1, 2].map((a) => high[a]! - low[a]!);
+    const a = spans[0]! >= spans[1]! && spans[0]! >= spans[2]! ? 0 : spans[1]! >= spans[2]! ? 1 : 2;
+    const m = (lo + hi) >> 1;
+    selectMedian(points, order, lo, hi, m, a);
+    axis[m] = a;
+    split(lo, m);
+    split(m + 1, hi);
+  };
+  split(0, count);
+  return { points, order, axis };
+}
+
+/** Tree walk stack: (lo, hi, lower bound of the squared distance) per pending range. */
+const walk = new Float64Array(3 * 256);
+
+/** Inserts squared distance d of point p into the sorted k best; returns the new count. */
+function insertNearest(
+  d: number,
+  p: number,
+  k: number,
+  found: number,
+  outIndex: Int32Array,
+  outDistance: Float64Array,
+): number {
+  let at = found === k ? k - 1 : found;
+  while (at > 0 && outDistance[at - 1]! > d) {
+    outDistance[at] = outDistance[at - 1]!;
+    outIndex[at] = outIndex[at - 1]!;
+    at -= 1;
+  }
+  outDistance[at] = d;
+  outIndex[at] = p;
+  return found === k ? k : found + 1;
+}
+
+/**
+ * The k nearest tree points within `reach` of (x, y, z), nearest first, in
+ * `outIndex`/`outDistance`; returns how many were found.
+ */
+function nearestPoints(
+  tree: PointTree,
+  x: number,
+  y: number,
+  z: number,
+  k: number,
+  reach: number,
+  outIndex: Int32Array,
+  outDistance: Float64Array,
+): number {
+  const { points, order, axis } = tree;
+  const limit = reach * reach;
+  let found = 0;
+  let worst = limit;
+  let top = 0;
+  if (order.length > 0) {
+    walk[0] = 0;
+    walk[1] = order.length;
+    walk[2] = 0;
+    top = 1;
+  }
+  while (top > 0) {
+    top -= 1;
+    const lo = walk[top * 3]!;
+    const hi = walk[top * 3 + 1]!;
+    const bound = walk[top * 3 + 2]!;
+    if (bound > worst) continue;
+    const leaf = hi - lo <= LEAF;
+    const m = (lo + hi) >> 1;
+    // A leaf checks all its points; a node its median, then queues both halves.
+    for (let s = leaf ? lo : m; s < (leaf ? hi : m + 1); s += 1) {
+      const p = order[s]!;
+      const dx = points[p * 3]! - x;
+      const dy = points[p * 3 + 1]! - y;
+      const dz = points[p * 3 + 2]! - z;
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d > worst) continue;
+      found = insertNearest(d, p, k, found, outIndex, outDistance);
+      if (found === k) worst = Math.min(limit, outDistance[k - 1]!);
+    }
+    if (leaf) continue;
+    const a = axis[m]!;
+    const offset = (a === 0 ? x : a === 1 ? y : z) - points[order[m]! * 3 + a]!;
+    const far = Math.max(bound, offset * offset);
+    // Far half below the near one on the stack, so the near half is walked first.
+    const nearLo = offset < 0 ? lo : m + 1;
+    const nearHi = offset < 0 ? m : hi;
+    const farLo = offset < 0 ? m + 1 : lo;
+    const farHi = offset < 0 ? hi : m;
+    if (farLo < farHi) {
+      walk[top * 3] = farLo;
+      walk[top * 3 + 1] = farHi;
+      walk[top * 3 + 2] = far;
+      top += 1;
+    }
+    if (nearLo < nearHi) {
+      walk[top * 3] = nearLo;
+      walk[top * 3 + 1] = nearHi;
+      walk[top * 3 + 2] = bound;
+      top += 1;
+    }
+  }
+  for (let n = 0; n < found; n += 1) outDistance[n] = Math.sqrt(outDistance[n]!);
+  return found;
+}
+
+interface ActiveMorph {
+  morph: Attribute;
+  weight: number;
+}
+
+/** A mesh's nonzero morphs, to place its vertices as the sliders have them. */
+function activeMorphs(mesh: SkinnedMesh): ActiveMorph[] {
+  const morphs = mesh.geometry.morphAttributes.position ?? [];
+  const influences = mesh.morphTargetInfluences ?? [];
+  return morphs.flatMap((morph, m) => {
+    const weight = influences[m] ?? 0;
+    return weight !== 0 ? [{ morph: morph as Attribute, weight }] : [];
+  });
+}
+
+/** Bind-frame position of vertex v (morphs applied), written to out[0..2]. */
+function bindPoint(
+  mesh: SkinnedMesh,
+  morphs: readonly ActiveMorph[],
+  v: number,
+  out: Float32Array,
+): void {
+  const position = mesh.geometry.getAttribute('position') as Attribute;
+  const bx = position.getX(v);
+  const by = position.getY(v);
+  const bz = position.getZ(v);
+  let x = bx;
+  let y = by;
+  let z = bz;
+  const relative = mesh.geometry.morphTargetsRelative;
+  for (const { morph, weight } of morphs) {
+    x += weight * (morph.getX(v) - (relative ? 0 : bx));
+    y += weight * (morph.getY(v) - (relative ? 0 : by));
+    z += weight * (morph.getZ(v) - (relative ? 0 : bz));
+  }
+  const e = mesh.bindMatrix.elements;
+  out[0] = e[0]! * x + e[4]! * y + e[8]! * z + e[12]!;
+  out[1] = e[1]! * x + e[5]! * y + e[9]! * z + e[13]!;
+  out[2] = e[2]! * x + e[6]! * y + e[10]! * z + e[14]!;
+}
+
+function withinBox(point: Float32Array, lo: Vec3Array, hi: Vec3Array, margin: number): boolean {
+  for (let a = 0; a < 3; a += 1)
+    if (point[a]! < lo[a] - margin || point[a]! > hi[a] + margin) return false;
+  return true;
+}
+
+/** Head and body skin of one character in the body's bind frame, ready to search. */
+interface SkinSpace {
+  /** Changes whenever the body is rebound or its slider morphs move. */
+  signature: number;
+  /** Head skeleton slot -> body joint, -1 when it has none. */
+  jointOf: Int32Array;
+  headTree: PointTree;
+  bodyTree: PointTree;
+  lo: Vec3Array;
+  hi: Vec3Array;
+}
+
+/** One per character (its seam), reused by every outfit it puts on until the sliders move. */
+const skinSpaces = new WeakMap<NeckSeamBinding, SkinSpace>();
+
+function bindSignature(body: SkinnedMesh): number {
+  let signature = 0;
+  body.skeleton.boneInverses.forEach((inverse, i) => {
+    const e = inverse.elements;
+    signature += (i + 1) * (e[12]! + 3 * e[13]! + 7 * e[14]! + e[0]! + e[5]! + e[10]!);
+  });
+  for (const e of body.bindMatrix.elements) signature = signature * 1.000001 + e;
+  for (const w of body.morphTargetInfluences ?? []) signature = signature * 1.000003 + w;
+  return signature;
+}
+
+function skinSpace(seam: NeckSeamBinding): SkinSpace {
+  const { head, body } = seam;
+  const signature = bindSignature(body);
+  const cached = skinSpaces.get(seam);
+  if (cached && cached.signature === signature) return cached;
+
+  // Head skeleton slot -> body joint and its bind-frame skin matrix. Face bones
+  // the body lacks skin with the body bone they hang under, offset from it as
+  // they are now.
+  const bodyJoint = new Map(body.skeleton.bones.map((bone, joint) => [bone, joint]));
+  const headBones = head.skeleton.bones;
+  const jointOf = new Int32Array(headBones.length).fill(-1);
+  const bindOf: (Matrix4 | undefined)[] = new Array<Matrix4 | undefined>(headBones.length);
+  const relative = new Matrix4();
+  headBones.forEach((bone, slot) => {
+    let node: Bone | null = bone;
+    while (node && !bodyJoint.has(node)) node = node.parent as Bone | null;
+    if (!node) return;
+    const joint = bodyJoint.get(node)!;
+    const matrix = new Matrix4().copy(body.skeleton.boneInverses[joint]!).invert();
+    if (node !== bone)
+      matrix.multiply(relative.copy(node.matrixWorld).invert().multiply(bone.matrixWorld));
+    bindOf[slot] = matrix.multiply(head.skeleton.boneInverses[slot]!).multiply(head.bindMatrix);
+    jointOf[slot] = joint;
+  });
+
+  const headPosition = head.geometry.getAttribute('position') as Attribute;
+  const headIndex = head.geometry.getAttribute('skinIndex') as Attribute;
+  const headWeight = head.geometry.getAttribute('skinWeight') as Attribute;
+  const headPoints = new Float32Array(headPosition.count * 3);
+  const lo: Vec3Array = [Infinity, Infinity, Infinity];
+  const hi: Vec3Array = [-Infinity, -Infinity, -Infinity];
+  for (let v = 0; v < headPosition.count; v += 1) {
+    const px = headPosition.getX(v);
+    const py = headPosition.getY(v);
+    const pz = headPosition.getZ(v);
+    let total = 0;
+    for (let c = 0; c < 4; c += 1) {
+      const w = headWeight.getComponent(v, c);
+      const e = w > 0 ? bindOf[headIndex.getComponent(v, c)]?.elements : undefined;
+      if (!e) continue;
+      headPoints[v * 3]! += w * (e[0]! * px + e[4]! * py + e[8]! * pz + e[12]!);
+      headPoints[v * 3 + 1]! += w * (e[1]! * px + e[5]! * py + e[9]! * pz + e[13]!);
+      headPoints[v * 3 + 2]! += w * (e[2]! * px + e[6]! * py + e[10]! * pz + e[14]!);
+      total += w;
+    }
+    for (let a = 0; a < 3; a += 1) {
+      if (total > 0) headPoints[v * 3 + a]! /= total;
+      lo[a] = Math.min(lo[a], headPoints[v * 3 + a]!);
+      hi[a] = Math.max(hi[a], headPoints[v * 3 + a]!);
+    }
+  }
+
+  // Body skin up to HEAD_REACH from any candidate (candidates: HEAD_REACH from the head).
+  const margin = 2 * HEAD_REACH;
+  const morphs = activeMorphs(body);
+  const bodyCount = (body.geometry.getAttribute('position') as Attribute).count;
+  const bodyPoints = new Float32Array(bodyCount * 3);
+  const point = new Float32Array(3);
+  let kept = 0;
+  for (let v = 0; v < bodyCount; v += 1) {
+    bindPoint(body, morphs, v, point);
+    if (!withinBox(point, lo, hi, margin)) continue;
+    bodyPoints.set(point, kept * 3);
+    kept += 1;
+  }
+
+  const space: SkinSpace = {
+    signature,
+    jointOf,
+    headTree: buildTree(headPoints),
+    bodyTree: buildTree(bodyPoints.slice(0, kept * 3)),
+    lo,
+    hi,
+  };
+  skinSpaces.set(seam, space);
+  return space;
+}
+
+/** Skin being mixed for one vertex: joint and weight pairs, joints unique. */
+class SkinMix {
+  readonly joints = new Int32Array(24);
+  readonly weights = new Float64Array(24);
+  size = 0;
+
+  add(joint: number, weight: number): void {
+    for (let i = 0; i < this.size; i += 1) {
+      if (this.joints[i] === joint) {
+        this.weights[i]! += weight;
+        return;
+      }
+    }
+    if (this.size === this.joints.length) return;
+    this.joints[this.size] = joint;
+    this.weights[this.size] = weight;
+    this.size += 1;
+  }
+
+  /** Keeps the 4 heaviest joints, heaviest first, renormalised; false when empty. */
+  top4(): boolean {
+    const n = Math.min(4, this.size);
+    for (let i = 0; i < n; i += 1) {
+      let best = i;
+      for (let j = i + 1; j < this.size; j += 1)
+        if (this.weights[j]! > this.weights[best]!) best = j;
+      const joint = this.joints[i]!;
+      const weight = this.weights[i]!;
+      this.joints[i] = this.joints[best]!;
+      this.weights[i] = this.weights[best]!;
+      this.joints[best] = joint;
+      this.weights[best] = weight;
+    }
+    this.size = n;
+    let total = 0;
+    for (let i = 0; i < n; i += 1) total += this.weights[i]!;
+    if (total <= 0) return false;
+    for (let i = 0; i < n; i += 1) this.weights[i]! /= total;
+    return true;
+  }
+}
+
+/**
+ * Collar fix: re-skins the garment vertices that lie over the head's neck skin
+ * from that skin instead of the body's.
+ *
+ * The converter transfers garment weights from the body only. A collar that
+ * rises above the body's neck edge (crop tops, shirts) therefore carries the
+ * clavicle and upper arm share of the nearest body vertex, while the head skin
+ * right under it carries much less: when the arms move, collar and neck part
+ * ways and the skin pokes through. Each such vertex takes the inverse-distance
+ * blend of its nearest head vertices' skin instead, faded in over a small band
+ * past the body edge so the weights stay continuous. Positions are compared in
+ * the body's bind frame (slider morphs applied), so the pose playing right now
+ * does not matter.
+ *
+ * Call after `bindGarment` and `syncGarmentMorphs` (the garment shares the body
+ * skeleton). A garment that does not reach over the head skin keeps its
+ * attributes as they are. Returns how many vertices changed.
+ */
+export function skinGarmentToHead(garment: SkinnedMesh, seam: NeckSeamBinding): number {
+  if (garment.skeleton !== seam.body.skeleton) return 0;
+  const { head } = seam;
+  if ((head.geometry.getAttribute('position') as Attribute).count === 0) return 0;
+  const { jointOf, headTree, bodyTree, lo, hi } = skinSpace(seam);
+  const headIndex = head.geometry.getAttribute('skinIndex') as Attribute;
+  const headWeight = head.geometry.getAttribute('skinWeight') as Attribute;
+
+  const index = garment.geometry.getAttribute('skinIndex') as Attribute;
+  const weight = garment.geometry.getAttribute('skinWeight') as Attribute;
+  const morphs = activeMorphs(garment);
+  const point = new Float32Array(3);
+  const nearIndex = new Int32Array(HEAD_NEIGHBOURS);
+  const nearDistance = new Float64Array(HEAD_NEIGHBOURS);
+  const bodyNear = new Int32Array(1);
+  const bodyDistance = new Float64Array(1);
+  const fromHead = new SkinMix();
+  const mixed = new SkinMix();
+  let outIndex: Uint16Array | undefined;
+  let outWeight: Float32Array | undefined;
+  let changed = 0;
+
+  for (let v = 0; v < index.count; v += 1) {
+    bindPoint(garment, morphs, v, point);
+    if (!withinBox(point, lo, hi, HEAD_REACH)) continue;
+    const x = point[0]!;
+    const y = point[1]!;
+    const z = point[2]!;
+    // Nearest body skin first; then only head skin nearer than that counts.
+    const toBody = nearestPoints(bodyTree, x, y, z, 1, HEAD_REACH, bodyNear, bodyDistance)
+      ? bodyDistance[0]!
+      : HEAD_REACH;
+    const found = nearestPoints(
+      headTree,
+      x,
+      y,
+      z,
+      HEAD_NEIGHBOURS,
+      toBody,
+      nearIndex,
+      nearDistance,
+    );
+    if (found === 0) continue;
+    const t = Math.min(1, Math.max(0, (toBody - nearDistance[0]!) / HEAD_BAND));
+    if (t === 0) continue;
+    const blend = t * t * (3 - 2 * t);
+
+    // Inverse-distance blend of the nearest head vertices' skin, in body joints.
+    fromHead.size = 0;
+    let headTotal = 0;
+    for (let n = 0; n < found; n += 1) {
+      const inverse = 1 / Math.max(nearDistance[n]!, 1e-5);
+      const vertex = nearIndex[n]!;
+      for (let c = 0; c < 4; c += 1) {
+        const w = headWeight.getComponent(vertex, c);
+        const joint = w > 0 ? jointOf[headIndex.getComponent(vertex, c)]! : -1;
+        if (joint < 0) continue;
+        fromHead.add(joint, inverse * w);
+        headTotal += inverse * w;
+      }
+    }
+    if (headTotal <= 0) continue;
+    mixed.size = 0;
+    let ownTotal = 0;
+    for (let c = 0; c < 4; c += 1) ownTotal += Math.max(0, weight.getComponent(v, c));
+    for (let c = 0; c < 4; c += 1) {
+      const w = weight.getComponent(v, c);
+      if (w > 0) mixed.add(index.getComponent(v, c), ((1 - blend) * w) / ownTotal);
+    }
+    for (let i = 0; i < fromHead.size; i += 1)
+      mixed.add(fromHead.joints[i]!, (blend * fromHead.weights[i]!) / headTotal);
+    if (!mixed.top4()) continue;
+
+    if (!outIndex || !outWeight) {
+      outIndex = new Uint16Array(index.count * 4);
+      outWeight = new Float32Array(index.count * 4);
+      for (let u = 0; u < index.count; u += 1) {
+        for (let c = 0; c < 4; c += 1) {
+          outIndex[u * 4 + c] = index.getComponent(u, c);
+          outWeight[u * 4 + c] = weight.getComponent(u, c);
+        }
+      }
+    }
+    for (let c = 0; c < 4; c += 1) {
+      outIndex[v * 4 + c] = c < mixed.size ? mixed.joints[c]! : 0;
+      outWeight[v * 4 + c] = c < mixed.size ? mixed.weights[c]! : 0;
+    }
+    changed += 1;
+  }
+
+  if (outIndex && outWeight) {
+    // Fresh attributes: never write into arrays another garment instance may share.
+    garment.geometry.setAttribute('skinIndex', new BufferAttribute(outIndex, 4));
+    garment.geometry.setAttribute('skinWeight', new BufferAttribute(outWeight, 4));
+  }
+  return changed;
 }
