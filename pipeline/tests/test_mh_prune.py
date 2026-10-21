@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -80,6 +81,15 @@ def _archive(root: Path) -> Path:
     return root
 
 
+def _unconverted_outfit(archive: Path, name: str, package: str) -> None:
+    """An outfit exported from a Fab package but not converted yet: units, no stamps."""
+    for gender in ("female", "male"):
+        unit = archive / "raw" / "outfits" / gender / f"WI_{name}"
+        _write(unit / "done.json", "{}")
+        _write(unit / "outfit.json", json.dumps({"item": f"/Game/Fab/{package}/{name}.x"}))
+        _write(unit / f"OutfitBase_{gender}_Outfits.glb")
+
+
 def test_prunes_a_preset_only_when_face_and_skin_go(tmp_path: Path) -> None:
     archive = _archive(tmp_path)
     face_only = plan_prune(archive, {"face.Bo"})
@@ -114,6 +124,11 @@ def test_fab_package_goes_with_its_last_item(tmp_path: Path) -> None:
     assert both.packages == ("fab/oa_jeans.mhpkg",)
     assert "web/outfits/shared/denim.ktx2" in both.files
 
+    # A shared preset export pruned in the same plan does not change what the package keeps.
+    mixed = plan_prune(archive, {"face.Bo", "outfit.Jeans"})
+    assert mixed.packages == (), f"oa_jeans would go: {mixed.packages}"
+    assert dict(mixed.kept)["fab/oa_jeans"] == "outfit.Jeansakn came from it"
+
     groom = plan_prune(archive, {"groom.hair.Hair_L_Pony"})
     assert groom.sources == ("raw/grooms/Hair/Hair_L_Pony",)
     assert groom.packages == ("fab/hair_pony.mhpkg", "raw/fab_import/hair_pony")
@@ -124,7 +139,9 @@ def test_apply_deletes_records_and_hides_from_the_converter(tmp_path: Path) -> N
     plan = plan_prune(archive, {"groom.hair.Hair_L_Pony", "anim.fab.crowd.c02", "face.Nobody"})
     assert plan.unknown == ("face.Nobody",)
     assert plan.files == ("web/animations/fab/crowd/c02.glb",)
-    assert apply_plan(plan) > 0
+    applied = apply_plan(plan)
+    assert applied.freed > 0
+    assert applied.failed == ()
     assert not (archive / "raw" / "grooms" / "Hair" / "Hair_L_Pony").exists()
     assert not (archive / "fab" / "hair_pony.mhpkg").exists()
     assert not (archive / "web" / "animations" / "fab" / "crowd" / "c02.glb").exists()
@@ -167,6 +184,51 @@ def test_no_package_counts_as_unused_while_an_export_unit_is_missing(tmp_path: P
     assert plan.unresolved == ("outfit.Jeans",)
 
 
+def test_export_units_not_converted_yet_keep_their_fab_package(tmp_path: Path) -> None:
+    archive = _archive(tmp_path)
+    _unconverted_outfit(archive, "Jacket", "oa_jacket")
+    _write(archive / "fab" / "oa_jacket.mhpkg")
+    plan = plan_prune(archive, set(), unused=True)
+    assert plan.unused == (), f"an exported unit's package counted as unused: {plan.unused}"
+    assert plan.packages == (), f"an exported unit's package would go: {plan.packages}"
+
+    # Pruning every converted item of a package keeps it while an unconverted unit needs it.
+    _unconverted_outfit(archive, "Jeanscut", "oa_jeans")
+    both = plan_prune(archive, {"outfit.Jeans", "outfit.Jeansakn"})
+    assert both.packages == (), f"oa_jeans would go: {both.packages}"
+    assert dict(both.kept)["fab/oa_jeans"] == "outfit.Jeanscut came from it"
+
+
+def test_units_of_pruned_items_do_not_keep_their_fab_package(tmp_path: Path) -> None:
+    archive = _archive(tmp_path)
+    # Jeansakn's male unit was never converted: on disk, but no stamp names it.
+    (Stamps(archive).root / "outfits" / "Jeansakn" / "male.json").unlink()
+    plan = plan_prune(archive, {"outfit.Jeans", "outfit.Jeansakn"})
+    assert plan.packages == ("fab/oa_jeans.mhpkg",), f"unexpected packages: {plan.packages}"
+
+    # An item pruned earlier whose unit is still on disk is skipped by the converter.
+    _unconverted_outfit(archive, "Jacket", "oa_jacket")
+    _write(archive / "fab" / "oa_jacket.mhpkg")
+    _write(archive / "raw" / "pruned.json", json.dumps({"ids": ["outfit.Jacket"]}))
+    assert plan_prune(archive, set()).unused == ("fab/oa_jacket.mhpkg",)
+
+
+def _lock(monkeypatch: pytest.MonkeyPatch, archive: Path, name: str) -> list[set[str]]:
+    """Make deleting any file called `name` fail the way a file another program holds open
+    does on Windows; returns the ids already recorded as pruned at each failed attempt."""
+    unlink = os.unlink
+    seen: list[set[str]] = []
+
+    def locked(path: str | os.PathLike[str], *, dir_fd: int | None = None) -> None:
+        if Path(path).name == name:
+            seen.append(read_pruned(archive))
+            raise PermissionError(13, "in use by another process", str(path))
+        unlink(path, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "unlink", locked)
+    return seen
+
+
 def test_apply_needs_the_digest_of_the_reviewed_plan(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -189,3 +251,44 @@ def test_apply_needs_the_digest_of_the_reviewed_plan(
     assert clip.is_file()
     assert run(apply=True, plan=digest) == 0
     assert not clip.exists()
+
+
+def test_apply_records_the_ids_first_and_reports_a_locked_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = _archive(tmp_path)
+    ids = {"groom.hair.Hair_L_Pony", "anim.fab.crowd.c02"}
+    plan = plan_prune(archive, ids)
+    seen = _lock(monkeypatch, archive, "cards.json")
+    applied = apply_plan(plan)
+    assert seen == [ids], f"ids recorded before the deletion: {seen}"
+    failed = [path for path, _ in applied.failed]
+    assert failed == ["raw/grooms/Hair/Hair_L_Pony/cards.json"], f"failed: {applied.failed}"
+    # Everything else still goes, and the converter skips the ids from now on.
+    assert not (archive / "raw" / "grooms" / "Hair" / "Hair_L_Pony" / "done.json").exists()
+    assert not (archive / "fab" / "hair_pony.mhpkg").exists()
+    assert not (archive / "web" / "animations" / "fab" / "crowd" / "c02.glb").exists()
+    assert read_pruned(archive) == ids
+    # The stamps stay, so a rerun still lists what is left.
+    assert Stamps(archive).read("grooms/hair/Hair_L_Pony") is not None
+
+
+def test_apply_rebuilds_the_manifest_and_fails_when_anything_stays(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = _archive(tmp_path)
+    _write(archive / "web" / "curation.json", json.dumps({"hidden": ["groom.hair.Hair_L_Pony"]}))
+    rebuilt: list[bool] = []
+
+    def manifest(self: Builder) -> Path:
+        rebuilt.append(True)
+        return archive / "web" / "manifest.json"
+
+    monkeypatch.setattr(Builder, "manifest", manifest)
+    _lock(monkeypatch, archive, "cards.json")
+    digest = plan_prune(archive, {"groom.hair.Hair_L_Pony"}).digest
+    options = {"archive": archive, "apply": True, "plan": digest, "unused_packages": False}
+    status = prune_run(argparse.Namespace(**options, verbose=False))
+    assert status == 1, f"exit status {status} after a failed deletion"
+    assert rebuilt == [True], "the manifest was not rebuilt"
+    assert "raw/grooms/Hair/Hair_L_Pony/cards.json" in capsys.readouterr().err

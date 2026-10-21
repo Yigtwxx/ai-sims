@@ -22,6 +22,7 @@ from asset_pipeline.mh.similar import (
     shape,
     shape_distance,
     surface_distance,
+    user_hidden,
 )
 
 
@@ -55,6 +56,24 @@ def test_clusters_need_every_member_close_and_keep_the_richest() -> None:
     pairs = [Pair("a", "b", 0.1), Pair("b", "c", 0.2), Pair("a", "c", 9.0)]
     assert propose(items, pairs, 1.0, "g") == [Proposal("a", "b", 0.1, "g")]
     assert propose(items, pairs, 0.05, "g") == []
+
+
+def test_clusters_keep_a_member_the_user_has_not_hidden() -> None:
+    items = [Item("a", "g", 1.0), Item("b", "g", 5.0), Item("c", "g", 2.0)]
+    pairs = [Pair("a", "b", 0.1), Pair("b", "c", 0.2), Pair("a", "c", 0.3)]
+    # The richest member "b" is already hidden by the user: "c" represents the cluster,
+    # and "b" stays a user hide rather than becoming a pre-pass pick.
+    proposals = propose(items, pairs, 1.0, "g", hidden={"b"})
+    assert proposals == [Proposal("a", "c", 0.3, "g")], f"unexpected proposals: {proposals}"
+    everything = propose(items, pairs, 1.0, "g", hidden={"a", "b", "c"})
+    assert everything == [], f"a fully hidden cluster proposed {everything}"
+
+
+def test_user_hides_leave_out_the_earlier_pre_pass_picks() -> None:
+    pick = {"keep": "k", "keepLabel": "K", "distance": 0.1, "unit": "mm"}
+    curation = {"hidden": ["user.hidden", "old.pick"], "auto": {"old.pick": pick}}
+    assert user_hidden(curation) == {"user.hidden"}
+    assert user_hidden({"hidden": ["x"]}) == {"x"}
 
 
 def _thumbnail(path: Path, brow: int) -> Path:

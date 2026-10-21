@@ -11,7 +11,7 @@ listed.
 
 import json
 import time
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -616,10 +616,18 @@ def _ids(info: dict[str, Any]) -> list[str]:
 
 
 def _entry_files(entry: dict[str, Any]) -> list[str]:
-    files: list[str] = []
-    for value in (*entry["face"].values(), *entry["body"].values(), entry.get("makeupAlbedo")):
+    """Web files a skin entry names, nested maps (the underwear's) included. Only paths
+    count: the strap colour beside the strap mask is a hex string, not a file."""
+
+    def walk(value: object) -> Iterator[str]:
         if isinstance(value, str):
-            files.append(value)
+            if "/" in value:
+                yield value
+        elif isinstance(value, dict):
+            for item in value.values():
+                yield from walk(item)
         elif isinstance(value, list):
-            files.extend(value)
-    return files
+            for item in value:
+                yield from walk(item)
+
+    return list(walk([entry["face"], entry["body"], entry.get("makeupAlbedo")]))

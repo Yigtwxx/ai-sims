@@ -7,21 +7,25 @@ Pruning deletes everything only those assets use:
   asset's own folder (thumbnail and bench leftovers included) once no kept asset has a
   file in it,
 - the Unreal export units they were converted from,
-- the Fab packages (and their import records) that nothing kept came from,
+- the Fab packages (and their import records) that nothing kept came from, where an
+  export unit on disk that is not converted yet counts as kept unless its item is pruned,
 - their build stamps.
 
-The ids are added to `raw/pruned.json`; the converter skips them from then on (raw/
-travels to the Mac, so the list does too), and the manifest is rebuilt without them.
+The ids are added to `raw/pruned.json` before anything is deleted; the converter skips
+them from then on (raw/ travels to the Mac, so the list does too), and the manifest is
+rebuilt without them even when a deletion fails. A path that cannot be deleted (a file
+another program holds open on Windows) is reported, the build stamps then stay so a
+rerun still lists what is left, and the command exits non-zero.
 
 Shared sources stay while anything kept uses them: a preset's export serves its face,
 its skin and its iris, so it goes only when both the face and the skin are pruned (the
 iris then goes with them unless a kept face wears it). The reference head grooms and
 face clips are fitted on, and presets whose maps kept faces borrow, always stay.
 
-Fab packages no catalogue asset came from (e.g. cardless hair, a skipped character) are
-listed too, and deleted only with `--unused-packages`. That list needs every groom and
-outfit's export unit on disk (the package is read from it): while any is missing (an
-export in progress moves it aside), no package counts as unused.
+Fab packages neither a catalogue asset nor an export unit on disk came from (e.g. a
+skipped character) are listed too, and deleted only with `--unused-packages`. That list
+needs every groom and outfit's export unit on disk (the package is read from it): while
+any is missing (an export in progress moves it aside), no package counts as unused.
 
 The default is a dry run that prints the plan, the space it frees and a plan digest;
 `--apply --plan <digest>` deletes, and only if the plan is still exactly the one shown.
@@ -41,7 +45,7 @@ from pathlib import Path
 from asset_pipeline.mh.anim import Clip, describe, list_clip_units
 from asset_pipeline.mh.build import FACE_REFERENCE, PRUNED_FILE, Builder, read_pruned
 from asset_pipeline.mh.convert import archive_root
-from asset_pipeline.mh.grooms import list_groom_units
+from asset_pipeline.mh.grooms import SLOTS, list_groom_units
 from asset_pipeline.mh.manifest import LISTS, ManifestError
 from asset_pipeline.mh.outfits import list_outfit_units
 from asset_pipeline.mh.stamps import Stamps
@@ -97,6 +101,12 @@ class Plan:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()[:10]
 
 
+@dataclass(frozen=True)
+class Applied:
+    freed: int  # bytes
+    failed: tuple[tuple[str, str], ...] = ()  # (archive-relative path, error) left on disk
+
+
 # ---------------------------------------------------------------------------- inputs
 
 
@@ -127,6 +137,19 @@ def _manifest_files(value: object) -> Iterator[str]:
     elif isinstance(value, list):
         for item in value:
             yield from _manifest_files(item)
+
+
+def unit_packages(archive: Path) -> dict[str, set[str]]:
+    """Fab packages of every groom and outfit export unit on disk, by the id it converts
+    to, whether it is converted yet or not."""
+    found: dict[str, set[str]] = {}
+    for unit in list_groom_units(archive):
+        identifier = f"groom.{SLOTS[unit.parent.name]}.{unit.name}"
+        found.setdefault(identifier, set()).update(_packages_in(unit.glob("*.json")))
+    for outfit in list_outfit_units(archive):
+        packages = _packages_in([outfit.folder / "outfit.json"])
+        found.setdefault(f"outfit.{outfit.name}", set()).update(packages)
+    return found
 
 
 def catalogue(archive: Path) -> dict[str, Asset]:
@@ -245,11 +268,14 @@ def _package_paths(archive: Path, names: Iterable[str]) -> list[str]:
     )
 
 
-def unused_packages(archive: Path, assets: Mapping[str, Asset]) -> set[str]:
-    """Packages in fab/ no asset came from; none while any asset's package is unknown."""
+def unused_packages(
+    archive: Path, assets: Mapping[str, Asset], exported: Iterable[str] = ()
+) -> set[str]:
+    """Packages in fab/ neither an asset nor an `exported` unit came from; none while any
+    asset's package is unknown."""
     if any(a.unresolved for a in assets.values()):
         return set()
-    used = {p for a in assets.values() for p in a.packages}
+    used = {p for a in assets.values() for p in a.packages} | set(exported)
     folder = archive / "fab"
     names = {p.name.removesuffix(".mhpkg") for p in folder.iterdir()} if folder.is_dir() else set()
     return names - used
@@ -272,7 +298,14 @@ def plan_prune(archive: Path, hidden: Iterable[str], *, unused: bool = False) ->
     kept = [a for i, a in assets.items() if i not in pruned]
     kept_files = {f for a in kept for f in a.files}
     kept_sources = {s for a in kept for s in a.sources}
-    kept_packages = {p for a in kept for p in a.packages}
+    # An export unit not converted yet has no stamp, so only the unit names its package;
+    # it still needs it (Unreal may be gone before it converts) unless its item is pruned.
+    gone = pruned | read_pruned(archive)
+    exported = {i: p for i, p in unit_packages(archive).items() if i not in gone}
+    came_from: dict[str, set[str]] = {}
+    for identifier, names in [*((a.id, a.packages) for a in kept), *exported.items()]:
+        for package in names:
+            came_from.setdefault(package, set()).add(identifier)
     notes: dict[str, str] = {}
 
     protected = {f"raw/characters/{FACE_REFERENCE}": "reference head for grooms and face clips"}
@@ -298,14 +331,13 @@ def plan_prune(archive: Path, hidden: Iterable[str], *, unused: bool = False) ->
             else:
                 sources.add(source)
         for package in entry.packages:
-            if package in kept_packages:
-                users = sorted(a.id for a in kept if package in a.packages)
-                notes[f"fab/{package}"] = f"{', '.join(users)} came from it"
+            if package in came_from:
+                notes[f"fab/{package}"] = f"{', '.join(sorted(came_from[package]))} came from it"
             else:
                 packages.add(package)
 
     files = {f for f in files if not any(_inside(f, d) for d in folders)}
-    spare = unused_packages(archive, assets)
+    spare = unused_packages(archive, assets, (p for names in exported.values() for p in names))
     if unused:
         packages |= spare
     plan = Plan(
@@ -354,30 +386,49 @@ def size_of(path: Path) -> int:
     return total
 
 
-def apply_plan(plan: Plan) -> int:
-    """Deletes what the plan lists and records its ids; returns the bytes freed."""
+def apply_plan(plan: Plan) -> Applied:
+    """Records the plan's ids, then deletes what it lists.
+
+    The ids go to `raw/pruned.json` first, so an interrupted run still keeps the converter
+    off them. A path that cannot be deleted does not stop the rest: it is collected in
+    `failed`, and the plan's build stamps then stay so a rerun still lists what is left."""
     archive = plan.archive
-    freed = 0
     for relative in plan.paths:
         _check_target(archive, relative)
-        target = archive / relative
-        if not target.exists():
-            continue
-        freed += size_of(target)
-        if target.is_dir():
-            shutil.rmtree(target)
-        else:
-            target.unlink()
-    stamps = Stamps(archive)
-    for key in plan.stamps:
-        stamps.root.joinpath(f"{key}.json").unlink(missing_ok=True)
     record = archive / PRUNED_FILE
     ids = sorted(read_pruned(archive) | set(plan.ids))
     record.parent.mkdir(parents=True, exist_ok=True)
     temporary = record.with_suffix(".json.tmp")
     temporary.write_text(json.dumps({"ids": ids}, indent=2) + "\n", encoding="utf-8")
     temporary.replace(record)
-    return freed
+
+    failed: list[tuple[str, str]] = []
+
+    def note(_function: object, path: str | Path, error: BaseException) -> None:
+        relative = Path(path).relative_to(archive).as_posix()
+        # A folder that keeps a file it could not delete fails too; the file says why.
+        if not any(_inside(f, relative) for f, _ in failed):
+            failed.append((relative, str(error)))
+
+    freed = 0
+    for relative in plan.paths:
+        target = archive / relative
+        if not target.exists():
+            continue
+        size = size_of(target)
+        if target.is_dir():
+            shutil.rmtree(target, onexc=note)
+        else:
+            try:
+                target.unlink()
+            except OSError as error:
+                note(None, target, error)
+        freed += size - (size_of(target) if target.exists() else 0)
+    if not failed:
+        stamps = Stamps(archive)
+        for key in plan.stamps:
+            stamps.root.joinpath(f"{key}.json").unlink(missing_ok=True)
+    return Applied(freed, tuple(failed))
 
 
 # ---------------------------------------------------------------------------- report
@@ -461,15 +512,33 @@ def run(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    freed = apply_plan(plan)
-    print(f"deleted {len(plan.paths)} paths, freed {freed / 1e9:.2f} GB")
+    applied = Applied(0)
+    try:
+        applied = apply_plan(plan)
+        print(f"deleted {len(plan.paths)} paths, freed {applied.freed / 1e9:.2f} GB")
+        for path, error in applied.failed:
+            print(f"not deleted: {path} ({error})", file=sys.stderr)
+        if applied.failed:
+            print(
+                f"{len(applied.failed)} files or folders not deleted (in use?); the build "
+                "stamps stay: close what holds them and rerun mh-prune",
+                file=sys.stderr,
+            )
+    finally:
+        # The ids are recorded before anything is deleted, so the manifest drops them
+        # even when the deletion stopped halfway.
+        rebuilt = _rebuild_manifest(archive)
+    return 0 if rebuilt and not applied.failed else 1
+
+
+def _rebuild_manifest(archive: Path) -> bool:
     try:
         path = Builder(archive).manifest()
     except ManifestError as error:
         print(f"manifest not rebuilt: {error}", file=sys.stderr)
-        return 1
+        return False
     print(f"manifest rebuilt: {path}")
-    return 0
+    return True
 
 
 def main(argv: Sequence[str] | None = None) -> int:

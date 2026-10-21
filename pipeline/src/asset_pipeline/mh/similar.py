@@ -23,8 +23,9 @@ pair also needs its thumbnails, rendered in one fixed pose, to match pixel for p
 (LOOK_LIMIT); a pair without both thumbnails is never proposed.
 
 Pairs under a category's threshold are clustered with complete linkage (every
-member is close to every other member). Each cluster keeps its richest member
-(most geometry, longest clip) and proposes the others; proposals are written to
+member is close to every other member). Each cluster keeps its richest member the
+user has not hidden (most geometry, longest clip) and proposes the others the user
+has not hidden either; proposals are written to
 curation.json under `auto` and added to `hidden`, where the curation screen shows
 them as pre-pass picks the user can restore. Nothing is deleted here.
 """
@@ -34,7 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -374,10 +375,17 @@ def _close(pair: Pair, threshold: float, group: str) -> bool:
 
 
 def propose(
-    items: Sequence[Item], pairs: Iterable[Pair], threshold: float, group: str
+    items: Sequence[Item],
+    pairs: Iterable[Pair],
+    threshold: float,
+    group: str,
+    hidden: Collection[str] = frozenset(),
 ) -> list[Proposal]:
     """Complete-linkage clusters of close pairs (under `threshold`, and for grooms and
-    outfits matching thumbnails); each keeps its richest member."""
+    outfits matching thumbnails); each keeps its richest member the user has not hidden.
+    Members in `hidden` (the user's own hides) are neither kept nor proposed: a kept one
+    would leave the whole cluster hidden, and a user hide must not turn into a pre-pass
+    pick that a later pass could restore. A cluster the user hid entirely proposes nothing."""
     close = [p for p in pairs if _close(p, threshold, group)]
     lookup = {(p.a, p.b): p.distance for p in close} | {(p.b, p.a): p.distance for p in close}
     rank = {item.id: (-item.richness, item.id) for item in items}
@@ -395,8 +403,11 @@ def propose(
             clusters = [c for c in clusters if c is not home_a and c is not home_b] + [merged]
     proposals = []
     for members in clusters:
-        keep = min(members, key=rank.__getitem__)
-        for member in sorted(members):
+        visible = [member for member in members if member not in hidden]
+        if not visible:
+            continue
+        keep = min(visible, key=rank.__getitem__)
+        for member in sorted(visible):
             if member != keep:
                 proposals.append(Proposal(member, keep, lookup[(member, keep)], group))
     return proposals
@@ -533,14 +544,8 @@ def _result(
     threshold = THRESHOLDS[group]
     if thumbnails is not None:
         pairs = judge_looks(pairs, threshold, thumbnails)
-    return GroupResult(
-        group,
-        threshold,
-        UNITS.get(group, "mm"),
-        items,
-        pairs,
-        propose(items, pairs, threshold, group),
-    )
+    # Proposals come later, once the user's hides are known (see `run`).
+    return GroupResult(group, threshold, UNITS.get(group, "mm"), items, pairs)
 
 
 GROUPS: dict[str, Callable[[Path, Mapping[str, Any], Callable[[str], None]], list[GroupResult]]] = {
@@ -565,6 +570,12 @@ def read_curation(web: Path) -> dict[str, Any]:
     if not isinstance(data, dict) or not isinstance(data.get("hidden", []), list):
         raise SimilarError(f"{path} is not a curation file")
     return data
+
+
+def user_hidden(curation: Mapping[str, Any]) -> set[str]:
+    """Ids the user hid: `hidden` without the earlier pre-pass picks (listed in `auto`)."""
+    auto = curation.get("auto") or {}
+    return {str(item) for item in curation.get("hidden", []) if item not in auto}
 
 
 def apply_proposals(
@@ -655,9 +666,14 @@ def run(args: argparse.Namespace) -> int:
     archive = args.archive or archive_root()
     try:
         manifest = _manifest(archive)
+        hidden = user_hidden(read_curation(archive / "web"))
         results: list[GroupResult] = []
         for name in args.only or sorted(GROUPS):
             results.extend(GROUPS[name](archive, manifest, print))
+        for result in results:
+            result.proposals = propose(
+                result.items, result.pairs, result.threshold, result.group, hidden
+            )
         print("\n".join(report(results)))
         print(f"report: {write_report(archive, results)}")
         if args.apply:

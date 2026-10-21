@@ -3,7 +3,13 @@
 import json
 from pathlib import Path
 
-from asset_pipeline.mh.build import Builder, fab_animations, with_compat, with_thumbnail
+from asset_pipeline.mh.build import (
+    Builder,
+    _entry_files,
+    fab_animations,
+    with_compat,
+    with_thumbnail,
+)
 from asset_pipeline.mh.convert import ConversionError
 from asset_pipeline.mh.stamps import Stamps, fingerprint
 
@@ -128,3 +134,33 @@ def test_grooms_take_the_curated_gender_or_keep_their_own() -> None:
     beard = {"id": "groom.beard.Beard_M_Curly", "slot": "beard", "compat": "male"}
     assert with_compat(pixie)["compat"] == "female"
     assert with_compat(beard) == beard
+
+
+def test_skin_outputs_include_the_nested_underwear_maps_but_not_the_strap_colour() -> None:
+    entry = {
+        "face": {
+            "albedo": "skins/Ada/face_albedo.ktx2",
+            "wrinkleMasks": ["skins/masks/m/wm1.ktx2"],
+            "underwear": {"mask": "skins/Ada/face_underwear.ktx2", "color": "#7a7a7a"},
+        },
+        "body": {
+            "albedo": "skins/Ada/body_albedo.ktx2",
+            "underwear": {
+                "mask": "skins/underwear/u/mask.ktx2",
+                "albedo": "skins/underwear/u/albedo.ktx2",
+                "normal": "skins/underwear/u/normal.ktx2",
+            },
+        },
+        "makeupAlbedo": "skins/Ada/face_albedo_makeup.ktx2",
+    }
+    files = sorted(_entry_files(entry))
+    assert files == [
+        "skins/Ada/body_albedo.ktx2",
+        "skins/Ada/face_albedo.ktx2",
+        "skins/Ada/face_albedo_makeup.ktx2",
+        "skins/Ada/face_underwear.ktx2",
+        "skins/masks/m/wm1.ktx2",
+        "skins/underwear/u/albedo.ktx2",
+        "skins/underwear/u/mask.ktx2",
+        "skins/underwear/u/normal.ktx2",
+    ], f"unexpected skin outputs: {files}"
