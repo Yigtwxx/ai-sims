@@ -33,9 +33,6 @@ __pycache__/
 # Local MongoDB data for development
 .data/
 
-# MetaHuman exports (DNA, textures, FBX) are many GB; moved by disk/Drive, not git (see docs/handoff.md)
-pipeline/source/metahuman/
-
 # Impeccable local state (keep surface briefs)
 .impeccable/hook.cache.json
 .impeccable/questions/

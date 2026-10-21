@@ -15,8 +15,8 @@ This file is the contract between the Windows export (`pipeline/unreal/`), the c
     - Other units: `grooms/<slot>/<style>/`, `statics/...`, `animations/...`, `lighting/<Level>/`, `materials/...`, `wardrobe/<slot>/`, `fab_import/<package>/`, `outfits/...`.
     - `arkit/arkit_mapping.json`, `inventory.json`.
   - `web/`: converter output, laid out exactly as it is served (see below).
-  - `slim/`: what goes to the Mac. It is `web/` plus compact sources (DNA, JSON dumps, card and outfit GLBs, 4K source textures).
-- **Web:** `web/public/assets/mh/` is gitignored. It is a copy of `MetaHumanArchive/web/`, and the browser loads it from `/assets/mh/...`.
+  - Transfer to the Mac (updated 2026-10-21): there is no separate `slim/` copy. `asset-pipeline serve-slim` (`pipeline/src/asset_pipeline/transfer.py`) serves archive folders over the LAN (default `web`, `raw`, `fab_anims`, `gestures`, `logs`), leaving out exported files the converter never reads (`UNUSED_SOURCES`; `--everything` serves them too). `pipeline/scripts/fetch_slim.py` pulls them onto the Mac and downloads byte-identical files once.
+- **Web:** `web/public/assets/mh/` is gitignored. It is a link to `MetaHumanArchive/web/` (updated 2026-10-21: a link, not a copy), and the browser loads it from `/assets/mh/...`.
 
 ## GLB conventions
 
@@ -47,7 +47,7 @@ The manifest lives at `/assets/mh/manifest.json` and is validated by the zod sch
 - **`skins[]`:** `{ id, label, tone, swatch, face: { albedo, normal, cavity, srmf, cm1..3, wm1..3, masks[] }, body: { albedo, normal, cavity, srmf } }`.
   - Every preset's skin can be put on any face, because UVs are shared.
   - `tone` is a 0..1 melanin estimate; the creator sorts skins by it.
-- **`bodies[]`:** `{ gender, glb, sliders: [{ id, min, max, default }], presets: { slim, average, athletic, curvy } }`. Each preset is a slider vector.
+- **`bodies[]`:** `{ gender, glb, sliders: [{ id, min, max, default }], presets: { slim, average, athletic, curvy } }`. Each preset is a slider vector. `curvy` is female only (updated 2026-10-21): the male body has `slim`, `average` and `athletic`.
 - **`grooms[]`:** `{ id, slot: hair|eyebrows|beard|mustache|eyelashes|peachfuzz, label, thumbnail, glb, textures, params }`.
   - `params` holds the MetaHuman groom parameters (melanin, redness, dye, …) and their defaults.
 - **`outfits[]`:** `{ id, category: top|bottom|shoes|full, label, thumbnail, files: { female, male }, params, tintPresets[], hidesBodyRegions[] }`.
@@ -71,4 +71,4 @@ The manifest lives at `/assets/mh/manifest.json` and is validated by the zod sch
 
 - The curation screen (`/[locale]/curate`) writes `curation.json`, which looks like `{ hidden: string[] }`.
 - The creator never shows a hidden id.
-- `asset-pipeline prune` deletes hidden files from the Mac copy. It asks for confirmation and supports a dry run.
+- `asset-pipeline mh-prune` (`pipeline/src/asset_pipeline/mh/prune.py`; updated 2026-10-21) deletes the hidden assets from the archive on the machine it runs on: their web outputs, the Unreal export units and Fab packages only they use, and their build stamps. The ids go into `raw/pruned.json`, so the converter skips them, and the manifest is rebuilt. The default is a dry run that prints the plan and a digest; `--apply --plan <digest>` deletes, and only if the plan is still the one shown.

@@ -32,7 +32,7 @@ Success for this phase: management sees a polished, believable flow in one sitti
 ## Capabilities and Constraints
 
 - **Creator options** (all in a left panel, character on the right):
-  - Name, base (male / female), face (MetaHuman presets plus blending between them), body type (slim / average / athletic / curvy) and height.
+  - Name, base (male / female), face (MetaHuman presets plus blending between them), body type (slim / average / athletic, plus curvy for the female body) and height.
   - Skin (preset skin sets sorted by tone), eyes (iris and colour).
   - Hair style, colour (melanin / redness / dye) and dye patterns (ombre, roots, highlights, underlayer); eyebrows, eyelashes, beard and moustache.
   - Top, bottom and shoes with colours; small jewellery and piercings; small, minimal tattoos.

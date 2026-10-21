@@ -1,20 +1,21 @@
 # Hesap ve API anahtarı kurulumu
 
-Sohbet ve ses için gereken servislerin hesaplarını açıp anahtarları `web/.env.local` içine koyma rehberi. Bilgiler 2026-10-20 tarihinde resmi dokümanlardan doğrulandı; limitler ve arayüz zamanla değişebilir, tarihli notlara dikkat et.
+Sohbet ve ses için gereken servislerin hesaplarını açıp anahtarları `web/.env.local` içine koyma rehberi. Bilgiler 2026-10-20 tarihinde resmi dokümanlardan doğrulandı; limitler ve arayüz zamanla değişebilir, tarihli notlara dikkat et. Ses zinciri (Azure, Edge, Gemini TTS) 2026-10-21'de koda göre güncellendi.
 
 ## Önce bilmen gerekenler
 
-- **Hepsi isteğe bağlı.** Anahtar yoksa uygulama yine çalışır: `/api/chat` `503 {"error":"ai_not_configured"}`, `/api/tts` `503 {"error":"tts_not_configured"}` döner. Sohbet için tek bir AI anahtarı yeter; sesli konuşma için Azure gerekir.
+- **Hepsi isteğe bağlı.** Anahtar yoksa uygulama yine çalışır: `/api/chat` `503 {"error":"ai_not_configured"}`, `/api/tts` `503 {"error":"tts_not_configured"}` döner. Sohbet için tek bir AI anahtarı yeter. Ses için Azure şart değil: Azure, Edge (anahtarsız) ve Gemini TTS'ten biri yeter.
 - **Anahtarlar yalnızca `web/.env.local` içinde durur.** Bu dosya git'e girmez (`.env*` yok sayılır). Sunucu hiçbir anahtarı log'lamaz ve `/api/health` değer değil yalnızca `true/false` döner.
 - **Değişkenleri kaydettikten sonra `pnpm dev`'i yeniden başlat.** Next.js env dosyalarını başlangıçta okur.
 - **Sağlayıcı sırası:** Groq, Gemini, Anthropic (`AI_PROVIDER_ORDER` ile değişir). Önce iki ücretsiz sağlayıcı denenir; ücretli Claude (Haiku) yalnızca ikisi de hata verirse devreye girer. Bir sağlayıcı ilk kelimeyi üretmeden önce hata verirse (anahtar hatalı, 429, 5xx, ağ sorunu, ret, boş cevap, 25 saniye sessizlik) sıradakine geçilir. Cevap yazılmaya başladıktan sonra sağlayıcı asla değişmez.
+- **Ses sırası:** Azure, Edge, Gemini (`TTS_PROVIDER_ORDER` ile değişir, varsayılan `azure,edge,gemini`). Yapılandırılmamış sağlayıcı atlanır, listedeki tanınmayan adlar yok sayılır. Bir sağlayıcı kendi yeniden denemelerinden sonra da hata verirse sıradakine geçilir; hepsi başarısız olursa `502 tts_unavailable` döner. Sağlayıcılar dudak senkronu için farklı veri verir: Azure viseme olayları, Edge yalnızca kelime zamanları, Gemini hiç zaman bilgisi vermez (ayrıntılar 4-6. bölümlerde).
 - `web/.env.local` içinde bu değişkenlerin boş satırları hazır. `.env.example` ise örnek şablondur.
 
 | Değişken | Servis | Zorunlu mu | Varsayılan |
 | --- | --- | --- | --- |
 | `GROQ_API_KEY` | Groq | Hayır | yok |
 | `GROQ_MODEL` | Groq | Hayır | `openai/gpt-oss-120b` |
-| `GEMINI_API_KEY` | Google AI Studio | Hayır | yok |
+| `GEMINI_API_KEY` | Google AI Studio (sohbet ve Gemini TTS) | Hayır | yok |
 | `GEMINI_MODEL` | Google AI Studio | Hayır | `gemini-3.5-flash-lite` |
 | `ANTHROPIC_API_KEY` | Anthropic | Hayır | yok |
 | `ANTHROPIC_MODEL` | Anthropic | Hayır | `claude-haiku-5-5` |
@@ -25,6 +26,9 @@ Sohbet ve ses için gereken servislerin hesaplarını açıp anahtarları `web/.
 | `AZURE_TTS_VOICE_TR_MALE` | Azure Speech | Hayır | `tr-TR-AhmetNeural` |
 | `AZURE_TTS_VOICE_EN_FEMALE` | Azure Speech | Hayır | `en-US-AvaNeural` |
 | `AZURE_TTS_VOICE_EN_MALE` | Azure Speech | Hayır | `en-US-AndrewNeural` |
+| `TTS_PROVIDER_ORDER` | Ses sırası | Hayır | `azure,edge,gemini` |
+| `TTS_ENABLE_EDGE` | Edge sesleri | Hayır | kapalı (`1` açar) |
+| `GEMINI_TTS_MODEL` | Gemini TTS | Hayır | `gemini-3.8-flash-tts` |
 
 ## Varsayılan modeller nasıl seçildi
 
@@ -57,7 +61,7 @@ curl -s localhost:3000/api/health
 # {"db":true,"auth":true,"ai":{"anthropic":true,"gemini":false,"groq":false},"tts":{"azure":false}}
 ```
 
-`ai.*` ve `tts.azure` yalnızca anahtarın **tanımlı** olduğunu söyler, anahtarın **geçerli** olduğunu söylemez. Geçerliliği aşağıdaki gerçek çağrılar gösterir.
+`ai.*` ve `tts.azure` yalnızca anahtarın **tanımlı** olduğunu söyler, anahtarın **geçerli** olduğunu söylemez. Geçerliliği aşağıdaki gerçek çağrılar gösterir. `tts` yalnızca Azure'u gösterir; Edge ve Gemini TTS health'te yoktur, onları 3. komuttaki `x-tts-provider` başlığından görürsün.
 
 **2. Sohbet gerçekten çalışıyor mu?** Önce anonim oturum aç (çerez dosyaya yazılır), sonra mesaj gönder:
 
@@ -72,16 +76,25 @@ curl -N -i -b /tmp/ai-sims.cookies -X POST localhost:3000/api/chat \
 
 Yanıtın başlığındaki `x-ai-provider` cevabı hangi sağlayıcının verdiğini gösterir; gövde akarak gelen düz metindir. `502 {"error":"ai_unavailable"}` alırsan tüm sağlayıcılar başarısız olmuştur: nedenini `pnpm dev` çıktısındaki `[ai] provider failed ...` satırlarında bulursun (yalnızca sağlayıcı adı, hata türü ve durum kodu yazılır, anahtar ve ham cevap yazılmaz).
 
-**3. Ses çalışıyor mu?** (Azure kurulduktan sonra)
+**3. Ses çalışıyor mu?** (en az bir ses sağlayıcısı kurulduktan sonra)
 
 ```bash
 curl -s -b /tmp/ai-sims.cookies -X POST localhost:3000/api/tts \
   -H 'Content-Type: application/json' \
   -d '{"text":"Merhaba dünya.","voice":"female","locale":"tr"}' \
-| python3 -c "import sys,json; d=json.load(sys.stdin); print('viseme:', len(d['visemes']), 'kelime:', len(d['words']), 'ses (base64 karakter):', len(d['audio']))"
+| python3 -c "import sys,json; d=json.load(sys.stdin); print('mime:', d['mime'], 'viseme:', len(d['visemes']), 'kelime:', len(d['words']), 'ses (base64 karakter):', len(d['audio']))"
 ```
 
-Türkçe için `viseme` sayısı sıfırdan büyük çıkmalıdır. Sesi dinlemek için: aynı komutta çıktıyı `python3 -c "import sys,json,base64; open('/tmp/tr.mp3','wb').write(base64.b64decode(json.load(sys.stdin)['audio']))"` ile dosyaya yazıp `open /tmp/tr.mp3` çalıştır.
+Cevabı hangi sağlayıcının verdiğini başlık söyler:
+
+```bash
+curl -s -o /dev/null -D - -b /tmp/ai-sims.cookies -X POST localhost:3000/api/tts \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Merhaba dünya.","voice":"female","locale":"tr"}' | grep -i x-tts-provider
+# x-tts-provider: azure
+```
+
+Beklenen sayılar sağlayıcıya göre değişir: Azure'da Türkçe için `viseme` sıfırdan büyük çıkmalıdır; Edge'de `viseme` 0, `kelime` sıfırdan büyüktür; Gemini'de ikisi de 0'dır ve bu normaldir. Sesi dinlemek için: aynı komutta çıktıyı `python3 -c "import sys,json,base64; open('/tmp/tr.mp3','wb').write(base64.b64decode(json.load(sys.stdin)['audio']))"` ile dosyaya yazıp `open /tmp/tr.mp3` çalıştır. Azure ve Edge MP3 (`audio/mpeg`), Gemini WAV (`audio/wav`) döner; Gemini için dosya adını `/tmp/tr.wav` yap.
 
 Tarayıcıda denemek için `web/src/app/spike/ChatPanel.tsx` bileşenini `SpikeScene`'e eklediğinde `/spike` sayfasında yazıp konuşabilirsin.
 
@@ -142,7 +155,7 @@ Tarayıcıda denemek için `web/src/app/spike/ChatPanel.tsx` bileşenini `SpikeS
 
 ## 4. Azure Speech (seslendirme)
 
-- **Ne için:** Karakterin sesi. Her cümle için MP3 ses, kelime zamanları ve viseme olayları döner; dudak senkronu bunlarla sürülür.
+- **Ne için:** Ses zincirinin ilk sağlayıcısı ve en iyi dudak senkronu: her cümle için MP3 ses, kelime zamanları ve viseme olayları döner; dudak senkronu bunlarla sürülür.
   - **tr-TR viseme destekler.** Microsoft'un "Visemes" tablosunda `tr-TR` için "Viseme ID" yazar (blend shapes yok). Biz viseme ID'leri kullanıyoruz.
   - Varsayılan sesler (standart neural): `tr-TR-EmelNeural` (kadın), `tr-TR-AhmetNeural` (erkek), `en-US-AvaNeural` (kadın), `en-US-AndrewNeural` (erkek). Ses listesi: https://learn.microsoft.com/azure/ai-services/speech-service/language-support?tabs=tts
 - **Kayıt:** Azure hesabı ve aboneliği gerekir: https://azure.microsoft.com/free (kart doğrulaması istenebilir).
@@ -162,9 +175,28 @@ Tarayıcıda denemek için `web/src/app/spike/ChatPanel.tsx` bileşenini `SpikeS
   ```
   Bölge küçük harfle, boşluksuz yazılır. Ses değiştirmek için `AZURE_TTS_VOICE_TR_FEMALE`, `AZURE_TTS_VOICE_TR_MALE`, `AZURE_TTS_VOICE_EN_FEMALE`, `AZURE_TTS_VOICE_EN_MALE` değişkenlerini kullan.
 - **Doğrula:** health çıktısında `"azure":true`; yukarıdaki ses komutunda `viseme` sayısı sıfırdan büyük.
-- **İpucu:** Standart seslerde görülen 429'ların çoğu kota aşımı değil, seçili bölgede o sesin geçici kapasite sınırıdır (Microsoft notu). Uygulama hızlı geçici hatalarda (429, bağlantı ve servis hatası) iki kez yeniden dener (300 ms ve 900 ms bekleyerek); yine olmazsa `502 tts_unavailable` döner ve sohbet metin olarak devam eder. Sürekli oluyorsa sesin yerel bölgesini ya da yaygın bir sesi seç.
+- **İpucu:** Standart seslerde görülen 429'ların çoğu kota aşımı değil, seçili bölgede o sesin geçici kapasite sınırıdır (Microsoft notu). Uygulama hızlı geçici hatalarda (429, bağlantı ve servis hatası) iki kez yeniden dener (yaklaşık 300 ms ve 900 ms bekleyerek; eşzamanlı istekler aynı anda denemesin diye süreler %20'ye kadar oynar). Anahtar ve bölge hatası (`auth`), geçersiz ses adı (`bad_request`) ve zaman aşımı (deneme başına 20 sn) yeniden denenmez. Yine olmazsa sıradaki sağlayıcıya (Edge, sonra Gemini) geçilir; hepsi başarısız olursa `502 tts_unavailable` döner ve sohbet metin olarak devam eder. Sürekli oluyorsa sesin yerel bölgesini ya da yaygın bir sesi seç.
 
-## 5. MongoDB Atlas (isteğe bağlı, demoyu paylaşmak için)
+## 5. Edge sesleri (anahtarsız, kelime zamanlı)
+
+- **Ne için:** Zincirdeki ikinci sağlayıcı. Microsoft Edge'in "Sesli oku" sesleri, `msedge-tts` paketiyle (MIT). Azure'daki neural seslerin aynısıdır (`tr-TR-EmelNeural` vb.), ama anahtar istemez.
+- **Uyarı:** Resmi olmayan bir uç noktadır; anahtarı da kullanım sözleşmesi de yoktur. Bu yüzden varsayılan olarak kapalıdır ve yalnızca demo içindir.
+- **Açma:** `web/.env.local` içinde `TTS_ENABLE_EDGE=1`. Başka her değer (boş dahil) kapalı demektir.
+- **Dudak senkronu:** Kelime zamanları döner, viseme olayı dönmez. İstemci her kelimeyi Türkçe kurallarla viseme'lere açıp o kelimenin süresine yayar (`web/src/features/lipsync/wordAlign.ts`). Ses MP3'tür.
+- **Sesler:** Azure yapılandırılmışsa (`AZURE_SPEECH_KEY` ve `AZURE_SPEECH_REGION`) `AZURE_TTS_VOICE_*` seçimini kullanır; değilse varsayılan sesler (`tr-TR-EmelNeural`, `tr-TR-AhmetNeural`, `en-US-AvaNeural`, `en-US-AndrewNeural`). Yani Azure anahtarı yokken `AZURE_TTS_VOICE_*` Edge'i etkilemez.
+- **Yeniden deneme:** Kopan bağlantıda ve boş ses gelince iki kez yeniden dener (Azure ile aynı bekleme süreleri). Zaman aşımı (deneme başına 20 sn) yeniden denenmez. Olmazsa Gemini'ye geçilir.
+- **Doğrula:** health'te görünmez. Tek başına denemek için geçici olarak `TTS_PROVIDER_ORDER=edge` yap; ses komutunda `x-tts-provider: edge` ve sıfırdan büyük `kelime` sayısı görmelisin.
+
+## 6. Gemini TTS (son yedek)
+
+- **Ne için:** Zincirin sonundaki yedek. Ses doğaldır, ama zaman bilgisi yoktur: ne viseme ne kelime zamanı döner. Dudak senkronu metnin sesteki konuşma bölgelerine hizalanmasıyla tahmin edilir; üç sağlayıcı içinde en kaba sonuç budur.
+- **Anahtar:** Ayrı anahtar gerekmez, sohbetteki `GEMINI_API_KEY` kullanılır (2. bölüm). Anahtar tanımlıysa Gemini TTS varsayılan sırada kendiliğinden açıktır. Sesi Gemini'ye hiç düşürmek istemiyorsan `TTS_PROVIDER_ORDER=azure,edge` yaz.
+- **Model:** `GEMINI_TTS_MODEL`, varsayılan `gemini-3.8-flash-tts`. Sesler kodda sabittir: kadın `Kore`, erkek `Charon` (`web/src/lib/tts/gemini.ts`). `AZURE_TTS_VOICE_*` burada geçerli değildir.
+- **Kota ve gizlilik:** Ücretsiz günlük kota küçüktür; kendi limitlerini https://aistudio.google.com/rate-limit adresinde gör. 2. bölümdeki ücretsiz katman gizlilik uyarısı burada da geçerlidir.
+- **Yeniden deneme yok:** 429 dahil her hata ya da 25 saniyelik zaman aşımı doğrudan başarısızlık sayılır. Gemini zincirin sonunda olduğu için o cümlede `502 tts_unavailable` alırsın.
+- **Doğrula:** health'te görünmez. Geçici olarak `TTS_PROVIDER_ORDER=gemini` yap; ses komutunda `x-tts-provider: gemini` ve `mime: audio/wav` görmelisin.
+
+## 7. MongoDB Atlas (isteğe bağlı, demoyu paylaşmak için)
 
 - **Ne için:** Yerel `mongod` (127.0.0.1:27018) yerine buluttaki ortak veritabanı. Yalnızca demoyu başkalarıyla paylaşacaksan gerekir.
 - **Kayıt:** https://www.mongodb.com/cloud/atlas/register
@@ -191,10 +223,10 @@ Tarayıcıda denemek için `web/src/app/spike/ChatPanel.tsx` bileşenini `SpikeS
 | Belirti | Olası neden ve çözüm |
 | --- | --- |
 | `/api/chat` `503 ai_not_configured` | Hiçbir AI anahtarı yok ya da `AI_PROVIDER_ORDER` anahtarı olan sağlayıcıyı içermiyor. `.env.local`'ı doldur, `pnpm dev`'i yeniden başlat. |
-| `/api/tts` `503 tts_not_configured` | `AZURE_SPEECH_KEY` veya `AZURE_SPEECH_REGION` eksik ya da bölge biçimi hatalı (küçük harf, boşluksuz). |
+| `/api/tts` `503 tts_not_configured` | Kullanılabilir ses sağlayıcısı yok: Azure için `AZURE_SPEECH_KEY` veya `AZURE_SPEECH_REGION` eksik ya da bölge biçimi hatalı (küçük harf, boşluksuz), `TTS_ENABLE_EDGE` `1` değil ve `GEMINI_API_KEY` yok. Ya da `TTS_PROVIDER_ORDER` yalnızca yapılandırılmamış sağlayıcıları listeliyor. |
 | `401 unauthenticated` | Oturum çerezi yok. Önce anonim oturum aç (yukarıdaki sohbet komutunun ilk adımı) ya da tarayıcıda ana sayfada **Giriş**'e bas. |
 | `502 ai_unavailable` | Tüm sağlayıcılar ilk kelimeden önce başarısız oldu. `pnpm dev` çıktısında `[ai] provider failed` satırlarına bak: `auth` anahtar hatası (Gemini geçersiz anahtara 400 verdiği için orada `bad_request` görünür), `rate_limit` kota, `server`/`network` sağlayıcı ya da bağlantı sorunu, `refusal` Claude'un güvenlik reddi. |
 | Azure girişinde `AADSTS50058` veya `AADSTS50020` (`user account from identity provider 'live.com' does not exist in tenant 'Microsoft Services'`) | Kişisel Microsoft hesabının Azure aboneliği ve dizini yok. Önce https://signup.azure.com/signup?offer=ms-azr-0044p adresinden ücretsiz kaydı tamamla (portal.azure.com'dan değil). Kayıt aynı hatayla düşerse https://signup.live.com ile yeni bir outlook.com hesabı aç ve onunla kaydol. |
-| `502 tts_unavailable` | Azure çağrısı başarısız. `pnpm dev` çıktısında `[api/tts] synthesis failed` satırındaki tür: `auth` anahtar/bölge uyuşmazlığı, `rate_limit` F0 sınırı, `bad_request` bölgede olmayan ses adı. |
+| `502 tts_unavailable` | Sıradaki tüm ses sağlayıcıları başarısız oldu. `pnpm dev` çıktısında her başarısız sağlayıcı için bir `[tts] provider failed` satırı (sağlayıcı ve tür), en sonda `[api/tts] synthesis failed` (son hatanın türü) çıkar. Türler: `auth` anahtar/bölge uyuşmazlığı, `rate_limit` kota (Azure F0 sınırı, Gemini günlük kotası), `bad_request` bölgede olmayan ses adı ya da geçersiz model, `network`/`service` bağlantı ya da servis sorunu, `timeout` süre aşımı. |
 | Cevap yarıda kesiliyor | Sağlayıcı bağlantısı cevap yazılırken koptu. Uygulama bu noktada başka sağlayıcıya geçmez; mesajı tekrar gönder. |
 | `/api/health` `404` | Production build çalışıyor. Bu uç nokta yalnızca `pnpm dev`'de vardır. |
