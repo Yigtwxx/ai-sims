@@ -11,7 +11,9 @@
  * is scaled by the ratio of hip heights. This is the FK part of what Unreal's
  * IK Retargeter does, sufficient for idles and gestures (no foot IK).
  *
- * Usage: node scripts/retarget-fbx.mjs --target <body.glb> --out <dir> <clip.fbx>...
+ * Usage: node scripts/retarget-fbx.mjs --target <body.glb> --out <dir> [--role idle|talk|listen] <clip.fbx>...
+ * The role (default idle) is what the character uses the clips for: idling,
+ * gesturing while it speaks, or listening.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -22,16 +24,22 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 // Textures are irrelevant here; keep the loader away from a DOM.
 ImageLoader.prototype.load = () => ({});
 
+const ROLES = ['idle', 'talk', 'listen'];
+
 function parseArgs(argv) {
   const args = { files: [] };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--target') args.target = argv[++i];
     else if (argv[i] === '--out') args.out = argv[++i];
     else if (argv[i] === '--fps') args.fps = Number(argv[++i]);
+    else if (argv[i] === '--role') args.role = argv[++i];
     else args.files.push(argv[i]);
   }
-  if (!args.target || !args.out || args.files.length === 0) {
-    console.error('usage: retarget-fbx.mjs --target body.glb --out dir [--fps 30] clip.fbx...');
+  args.role ??= 'idle';
+  if (!args.target || !args.out || args.files.length === 0 || !ROLES.includes(args.role)) {
+    console.error(
+      'usage: retarget-fbx.mjs --target body.glb --out dir [--fps 30] [--role idle|talk|listen] clip.fbx...',
+    );
     process.exit(2);
   }
   return args;
@@ -78,10 +86,34 @@ function loadSource(path) {
   const named = (map) => map.has('pelvis') || map.has('Hips');
   const byName = named(bones) ? bones : collect((node) => node !== object);
   // HumanIK (Maya/MotionBuilder) names: look the same joints up by UE names.
-  for (const [hik, ue] of HIK_NAMES) {
+  for (const [hik, ue] of [...HIK_NAMES, ...MIXAMO_NAMES]) {
     if (byName.has(hik) && !byName.has(ue)) byName.set(ue, byName.get(hik));
   }
-  return { object, byName, clip: object.animations[0] };
+  return { object, byName, clip: mainClip(object.animations) };
+}
+
+/**
+ * The take that actually moves. ActorCore exports put a static reference-pose
+ * take (e.g. "0_Open A_UE5") before the motion itself.
+ */
+function mainClip(clips) {
+  const motion = (clip) =>
+    clip.tracks
+      .filter((track) => track.name.endsWith('.quaternion'))
+      .reduce((sum, { values }) => {
+        let range = 0;
+        for (let c = 0; c < 4; c += 1) {
+          let lo = Infinity;
+          let hi = -Infinity;
+          for (let i = c; i < values.length; i += 4) {
+            lo = Math.min(lo, values[i]);
+            hi = Math.max(hi, values[i]);
+          }
+          range = Math.max(range, hi - lo);
+        }
+        return sum + range;
+      }, 0);
+  return clips.reduce((best, clip) => (motion(clip) > motion(best) ? clip : best), clips[0]);
 }
 
 /** HumanIK joint names -> UE5 Mannequin / MetaHuman names. */
@@ -125,6 +157,17 @@ const HIK_NAMES = (() => {
   }
   return names;
 })();
+
+/**
+ * Mixamo-style names: HumanIK limbs under a capitalised three-bone spine,
+ * spread over MetaHuman's five (the joints between inherit the bend).
+ */
+const MIXAMO_NAMES = new Map([
+  ['Root', 'root'],
+  ['Spine', 'spine_01'],
+  ['Spine1', 'spine_03'],
+  ['Spine2', 'spine_05'],
+]);
 
 /** Joints the rest-frame alignment and the pelvis scale need on both skeletons. */
 const REQUIRED_JOINTS = ['pelvis', 'head', 'upperarm_l', 'upperarm_r'];
@@ -564,6 +607,7 @@ for (const file of args.files) {
     lean <= MAX_LEAN;
   summary.push({
     file: basename(out),
+    role: args.role,
     duration: round(duration, 2),
     bones: result.rotations.size,
     trimmedStart: round(start, 2),

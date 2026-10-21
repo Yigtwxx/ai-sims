@@ -89,6 +89,7 @@ EXPECTED_ERRORS = (
 )
 FACE_REFERENCE = "Ada"  # head whose ARKit morphs face clips are fitted on
 PRUNED_FILE = Path("raw") / "pruned.json"  # ids curated out and deleted (prune.py)
+CLIP_ROLES = frozenset({"idle", "talk", "listen"})  # roles retarget-fbx.mjs writes per clip
 
 
 def read_pruned(archive: Path) -> frozenset[str]:
@@ -576,8 +577,9 @@ def with_thumbnail(entry: dict[str, Any], file_key: str, web: Path) -> dict[str,
 
 def fab_animations(web: Path) -> list[dict[str, Any]]:
     """Body clips retargeted by the web app (`animations/fab/<set>/clips.json`, written by
-    web/scripts/retarget-fbx.mjs): one idle per entry, tagged `standing` / `calm` as the
-    clip list says. One file serves both bodies (identical rest rotations)."""
+    web/scripts/retarget-fbx.mjs): one entry per clip, tagged first with its role (`idle`,
+    `talk` or `listen`; no role means idle, any other role skips the clip), then `standing` /
+    `calm` as the clip list says. One file serves both bodies (identical rest rotations)."""
     entries = []
     for listing in sorted((web / "animations" / "fab").glob("*/clips.json")):
         try:
@@ -588,7 +590,10 @@ def fab_animations(web: Path) -> list[dict[str, Any]]:
             file = listing.parent / str(clip.get("file", ""))
             if not clip.get("file") or not file.is_file():
                 continue
-            tags = ["idle"]
+            role = clip.get("role", "idle")
+            if not isinstance(role, str) or role not in CLIP_ROLES:
+                continue
+            tags = [role]
             if clip.get("standing"):
                 tags.append("standing")
             if clip.get("calm"):

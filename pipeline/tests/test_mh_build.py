@@ -90,6 +90,29 @@ def test_fab_clip_lists_become_idle_animations(tmp_path: Path) -> None:
     ]
 
 
+def test_fab_clip_roles_lead_the_tags_and_unknown_roles_are_skipped(tmp_path: Path) -> None:
+    folder = tmp_path / "animations" / "fab" / "crowd"
+    folder.mkdir(parents=True)
+    for name in ("talk", "listen", "idle", "legacy", "dance", "broken"):
+        (folder / f"{name}.glb").write_bytes(b"glb")
+    clips = [
+        {"file": "talk.glb", "role": "talk", "standing": True, "calm": False},
+        {"file": "listen.glb", "role": "listen", "standing": True, "calm": True},
+        {"file": "idle.glb", "role": "idle", "standing": False, "calm": True},
+        {"file": "legacy.glb", "standing": True, "calm": False},  # written before roles existed
+        {"file": "dance.glb", "role": "dance", "standing": True, "calm": True},
+        {"file": "broken.glb", "role": ["talk"], "standing": True, "calm": True},
+    ]
+    (folder / "clips.json").write_text(json.dumps({"fps": 30, "clips": clips}), encoding="utf-8")
+    tags = {entry["id"]: entry["tags"] for entry in fab_animations(tmp_path)}
+    assert tags == {
+        "anim.fab.crowd.talk": ["talk", "standing"],
+        "anim.fab.crowd.listen": ["listen", "standing", "calm"],
+        "anim.fab.crowd.idle": ["idle", "calm"],
+        "anim.fab.crowd.legacy": ["idle", "standing"],
+    }, "unknown or malformed roles skip the clip, a missing role means idle"
+
+
 def test_thumbnails_are_listed_exactly_when_the_file_exists(tmp_path: Path) -> None:
     (tmp_path / "faces" / "Ada").mkdir(parents=True)
     (tmp_path / "faces" / "Ada" / "thumbnail.webp").write_bytes(b"webp")
