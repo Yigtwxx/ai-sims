@@ -95,7 +95,7 @@ export function ActionBar({
   onDone,
 }: ActionBarProps) {
   return (
-    <footer className="border-hairline bg-backstage flex items-center gap-2.5 border-t px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <footer className="border-hairline bg-backstage flex items-center gap-2.5 border-t px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:pt-4 lg:pb-[max(1rem,env(safe-area-inset-bottom))]">
       {/* Undo and redo read as one control: a shared frame split by a hairline. */}
       <div className="rounded-control border-hairline bg-backstage-raised flex shrink-0 items-center border shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
         <IconAction
@@ -133,7 +133,7 @@ export function ActionBar({
         onClick={onDone}
         disabled={saving || disabled}
         aria-busy={saving || undefined}
-        className="group/done font-display ml-1.5 h-13 min-w-0 flex-1 text-[1.375rem]"
+        className="group/done font-display ml-1.5 h-12 min-w-0 flex-1 text-[1.375rem] lg:h-13"
       >
         {saving ? (
           <>

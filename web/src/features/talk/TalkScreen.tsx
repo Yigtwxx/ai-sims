@@ -16,6 +16,7 @@ import {
   PencilSimpleIcon,
 } from '@phosphor-icons/react';
 import { useLocale, useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { StageLoading } from '@/components/shell/StageLoading';
@@ -61,6 +62,17 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
     retry();
   };
 
+  // Next keeps visited pages alive (Activity). A new visit to a kept talk page
+  // (a push; back and forward keep bfcacheId) gets a fresh stage: the kept one
+  // would hold the character it showed last time on screen until the edited
+  // one had assembled behind it, so the old look would show first.
+  const { bfcacheId } = useRouter();
+  const [stageVisit, setStageVisit] = useState(bfcacheId);
+  if (stageVisit !== bfcacheId) {
+    setStageVisit(bfcacheId);
+    setStageShown(false);
+  }
+
   const talk = useTalk({
     characterId: character.id,
     locale,
@@ -93,6 +105,7 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
       >
         {manifest ? (
           <StageBoundary
+            key={bfcacheId}
             fallback={(retry) => (
               <>
                 <StageFailed retry={() => retryStage(retry)} insetRight={panelWidth} />
@@ -132,12 +145,13 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
         )}
         style={panelWidth ? { right: panelWidth } : undefined}
       >
+        {/* Lower left of the stage, as on the creator: clear of the character and the zoom. */}
         <StageLoading
           show={
             !stageShown && manifestState.status !== 'missing' && manifestState.status !== 'error'
           }
           label={t('loadingCharacter')}
-          className="absolute inset-x-0 top-1/2 -translate-y-1/2 lg:top-auto lg:bottom-[16%] lg:translate-y-0"
+          className="absolute bottom-4 left-4 max-w-[calc(100%-6rem)] md:bottom-10 md:left-8"
         />
 
         <div className="pointer-events-auto flex items-start justify-between gap-4 px-5 pt-5 md:px-8">

@@ -484,7 +484,7 @@
       "saving": "Kaydediliyor…"
     },
     "autosave": {
-      "needsName": "İsim verdiğinde taslak otomatik kaydedilir.",
+      "needsName": "İsim verince taslak kendini kaydeder.",
       "pending": "Kaydedilecek…",
       "saving": "Taslak kaydediliyor…",
       "saved": "Taslak kaydedildi",
@@ -534,7 +534,8 @@
       "wine": "Şarap",
       "stone": "Taş"
     },
-    "loadingCharacter": "Karakter sahneye hazırlanıyor"
+    "loadingCharacter": "Karakter sahneye hazırlanıyor",
+    "updatingCharacter": "Değişiklik sahneye geliyor"
   },
   "Talk": {
     "back": "Karakterlerim",

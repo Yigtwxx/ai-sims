@@ -86,7 +86,12 @@ export function OptionGrid({
     if (!picked || !scroller) return;
     const view = scroller.getBoundingClientRect();
     const tile = picked.getBoundingClientRect();
-    if (tile.bottom <= view.bottom - 48) return;
+    // Only a pick below the fold: one in the first row, or one that already
+    // peeks in, stays put. On a short panel (phones) centring it would scroll
+    // the controls above the grid (the outfit slots) out of view.
+    const first = grid.current?.querySelector<HTMLElement>('[role="radio"]');
+    const firstRow = !!first && Math.abs(first.getBoundingClientRect().top - tile.top) < 1;
+    if (firstRow || tile.top <= view.bottom - 40) return;
     scroller.scrollTop += tile.top - view.top - (view.height - tile.height) / 2;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only, by design
   }, []);

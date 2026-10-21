@@ -59,3 +59,28 @@ describe('close-ups', () => {
     expect(getCameraPose('torso')).toEqual({ position: [0, 1.42, 2.6], target: [0, 1.36, 0] });
   });
 });
+
+describe('creator framings', () => {
+  /** Heights (m) the frame spans at the reference height (vertical FOV 24°, see Stage). */
+  const span = (focus: Parameters<typeof getCameraPose>[0]) => {
+    const { position, target } = getCameraPose(focus);
+    const distance = Math.hypot(...position.map((value, i) => value - target[i]!));
+    const half = distance * Math.tan((12 * Math.PI) / 180);
+    return { bottom: target[1] - half, top: target[1] + half };
+  };
+
+  it('keep tall hair and both shoulders in the head framing', () => {
+    expect(span('head').top).toBeGreaterThan(2);
+    expect(span('head').bottom).toBeLessThan(1.3);
+  });
+
+  it('show a top from mid-thigh to above the head', () => {
+    expect(span('upper').top).toBeGreaterThan(1.95);
+    expect(span('upper').bottom).toBeLessThan(0.75);
+  });
+
+  it('show the bottoms from the feet to the waist', () => {
+    expect(span('legs').bottom).toBeLessThan(0);
+    expect(span('legs').top).toBeGreaterThan(1.15);
+  });
+});

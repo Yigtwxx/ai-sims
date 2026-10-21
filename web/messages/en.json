@@ -484,7 +484,7 @@
       "saving": "Saving…"
     },
     "autosave": {
-      "needsName": "Give it a name and the draft saves automatically.",
+      "needsName": "Name it and the draft saves itself.",
       "pending": "Saving shortly…",
       "saving": "Saving draft…",
       "saved": "Draft saved",
@@ -534,7 +534,8 @@
       "wine": "Wine",
       "stone": "Stone"
     },
-    "loadingCharacter": "Bringing your character on stage"
+    "loadingCharacter": "Bringing your character on stage",
+    "updatingCharacter": "Bringing your change on stage"
   },
   "Talk": {
     "back": "My characters",

@@ -5,7 +5,18 @@
  */
 
 export type CameraFocus =
-  'body' | 'face' | 'torso' | 'legs' | 'feet' | 'premiere' | 'brows' | 'mouth' | 'top' | 'shoes';
+  | 'body'
+  | 'face'
+  | 'head'
+  | 'torso'
+  | 'upper'
+  | 'legs'
+  | 'feet'
+  | 'premiere'
+  | 'brows'
+  | 'mouth'
+  | 'top'
+  | 'shoes';
 
 type Vec3 = readonly [number, number, number];
 
@@ -46,7 +57,14 @@ const REFERENCE_POSES: Record<CameraFocus, CameraPose> = {
   body: { position: [0, 1.02, 5.9], target: [0, 0.9, 0] },
   face: { position: [0.05, 1.74, 1.6], target: [0, 1.68, 0.05] },
   torso: { position: [0, 1.42, 2.6], target: [0, 1.36, 0] },
-  legs: { position: [0, 0.75, 3.0], target: [0, 0.6, 0] },
+  // Creator framings, with room to spare: the face categories show the head
+  // and both shoulders with headroom for tall hair (face stays the talk
+  // close-up); a top shows from mid-thigh to above the head (torso stays the
+  // card portrait); the bottoms from the feet to the waist. An idle sway or a
+  // turn of the head never takes the subject out of frame.
+  head: { position: [0.05, 1.72, 1.95], target: [0, 1.65, 0.05] },
+  upper: { position: [0, 1.42, 3.3], target: [0, 1.35, 0] },
+  legs: { position: [0, 0.72, 3.25], target: [0, 0.58, 0] },
   feet: { position: [0.1, 0.55, 1.7], target: [0, 0.1, 0] },
   // Item thumbnails: a top from the chin to the hips, slightly from the side so
   // the cloth reads in depth; both shoes low and close, three quarters front.

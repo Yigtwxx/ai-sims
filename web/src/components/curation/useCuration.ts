@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { CurationSchema, type AutoPick } from '@/lib/assets/manifest';
+import { CurationSchema, forgetCuratedManifest, type AutoPick } from '@/lib/assets/manifest';
 
 const ENDPOINT = '/api/dev/curation';
 const NONE: ReadonlySet<string> = new Set();
@@ -108,6 +108,8 @@ export function useCuration(): CurationDraft {
       const curation = CurationSchema.parse(await response.json());
       setSaved(new Set(curation.hidden));
       setAuto(curation.auto);
+      // The creator opened next in this tab reads the new curation.
+      forgetCuratedManifest();
       setDraft(null);
       return true;
     } catch {

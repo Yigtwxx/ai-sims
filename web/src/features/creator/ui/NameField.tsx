@@ -24,8 +24,8 @@ export const NameField = forwardRef<HTMLInputElement, NameFieldProps>(function N
   // The count is noise until it matters: shown while typing or near the limit.
   const nearLimit = value.length >= maxLength - 8;
   return (
-    <div className="group/name px-6 pt-4 pb-5">
-      <div className="mb-1 flex items-baseline justify-between">
+    <div className="group/name px-5 pt-2 pb-3 lg:px-6 lg:pt-4 lg:pb-5">
+      <div className="flex items-baseline justify-between lg:mb-1">
         <label htmlFor={id} className="text-label text-ink-muted">
           {label}
         </label>
@@ -51,9 +51,9 @@ export const NameField = forwardRef<HTMLInputElement, NameFieldProps>(function N
         spellCheck={false}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? errorId : undefined}
-        className="font-display text-ink caret-marquee placeholder:text-ink-faint w-full bg-transparent text-[2rem] outline-none focus-visible:outline-none disabled:opacity-50 lg:text-[clamp(2.25rem,3vw,3rem)]"
+        className="font-display text-ink caret-marquee placeholder:text-ink-faint w-full bg-transparent text-[1.75rem] outline-none focus-visible:outline-none disabled:opacity-50 lg:text-[clamp(2.25rem,3vw,3rem)]"
       />
-      <div className="bg-hairline relative mt-2 h-px">
+      <div className="bg-hairline relative mt-1 h-px lg:mt-2">
         <span
           className={cn(
             'ease-out-expo absolute inset-0 origin-left transition-transform duration-500 group-focus-within/name:scale-x-100',

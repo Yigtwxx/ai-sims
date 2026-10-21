@@ -75,18 +75,18 @@ export type Category = (typeof CATEGORIES)[number];
 
 const CATEGORY_FOCUS: Record<Exclude<Category, 'outfit'>, CameraFocus> = {
   identity: 'body',
-  face: 'face',
+  face: 'head',
   body: 'body',
-  skin: 'face',
-  eyes: 'face',
-  hair: 'face',
-  facialHair: 'face',
-  jewelry: 'face',
-  tattoos: 'torso',
+  skin: 'head',
+  eyes: 'head',
+  hair: 'head',
+  facialHair: 'head',
+  jewelry: 'head',
+  tattoos: 'upper',
 };
 
 const OUTFIT_FOCUS: Record<OutfitCategory, CameraFocus> = {
-  top: 'torso',
+  top: 'upper',
   bottom: 'legs',
   shoes: 'feet',
   full: 'body',
@@ -137,18 +137,23 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
   // Whether the stage shows the character the config asks for, dressed and
   // drawn: a new face assembles off screen while the old one stays on.
   const stageCaughtUp = useRef(createWaitFlag());
-  const onStageCaughtUp = useCallback(
-    (caughtUp: boolean) => stageCaughtUp.current.set(caughtUp),
-    [],
-  );
+  // The same, for the busy slate: a swap or reload is pending behind the
+  // character on screen (a new face, skin, hair or clothes still loading).
+  const [stageBusy, setStageBusy] = useState(false);
+  const onStageCaughtUp = useCallback((caughtUp: boolean) => {
+    stageCaughtUp.current.set(caughtUp);
+    setStageBusy(!caughtUp);
+  }, []);
   // A failed stage has nothing to catch up with; "Bitti" must not wait for it.
   const markStageFailed = useCallback(() => {
     setStageShown(true);
+    setStageBusy(false);
     stageCaughtUp.current.set(true);
   }, []);
   // A retry mounts the stage afresh: the loading caption returns until it settles.
   const retryStage = (retry: () => void) => {
     setStageShown(false);
+    setStageBusy(false);
     retry();
   };
 
@@ -300,8 +305,13 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
   const editingDisabled = !ready || phase !== 'editing';
 
   return (
-    <main className="bg-backstage relative h-dvh w-full overflow-hidden">
-      <div ref={stage} className="absolute inset-0">
+    <main className="bg-backstage relative h-dvh w-full overflow-hidden [--creator-panel:64dvh]">
+      {/* On narrow screens the stage ends where the panel starts: the camera frames the
+          uncovered strip, not a full-height canvas half hidden behind the panel. */}
+      <div
+        ref={stage}
+        className={cn('absolute inset-0', !premiere && 'bottom-(--creator-panel) lg:bottom-0')}
+      >
         {manifest && ready ? (
           <StageBoundary
             fallback={(retry) => (
@@ -334,14 +344,18 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
         )}
       </div>
 
-      {/* At the floor of the uncovered stage; it does not come back for later edits. */}
+      {/* Lower left of the uncovered stage (above the category title on desktop):
+          first while the character comes on, then whenever an edit is still
+          loading behind the one on screen. */}
       <StageLoading
         show={
-          !stageShown && (manifestState.status === 'loading' || manifestState.status === 'ready')
+          stageShown
+            ? stageBusy && phase === 'editing'
+            : manifestState.status === 'loading' || manifestState.status === 'ready'
         }
-        label={t('loadingCharacter')}
-        className="absolute top-0 right-0 left-0 z-10 h-[36dvh] justify-center lg:bottom-0 lg:left-[clamp(420px,34vw,560px)] lg:h-auto lg:justify-end lg:pb-[14vh]"
-        style={panelWidth ? { left: panelWidth } : undefined}
+        label={stageShown ? t('updatingCharacter') : t('loadingCharacter')}
+        className="absolute bottom-[calc(var(--creator-panel)+0.75rem)] left-4 z-10 max-w-[calc(100%-2rem)] lg:bottom-[calc(var(--text-headline)+3.25rem)] lg:left-[calc(clamp(420px,34vw,560px)+2.5rem)]"
+        style={panelWidth ? { left: panelWidth + 40 } : undefined}
       />
 
       <StageOverlay
@@ -362,9 +376,9 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
         transition={{ duration: premiere ? 0.8 : 0.6, ease: [0.16, 1, 0.3, 1] }}
         // Inert while the finalizing save runs, so nothing is edited mid-save.
         inert={premiere || phase === 'saving'}
-        className="border-hairline bg-backstage animate-panel-in absolute inset-x-0 bottom-0 z-20 flex h-[64dvh] flex-col border-t shadow-[0_-18px_40px_rgb(5_5_4/0.45)] lg:inset-y-0 lg:right-auto lg:h-auto lg:w-[clamp(420px,34vw,560px)] lg:border-t-0 lg:border-r lg:shadow-[24px_0_60px_rgb(5_5_4/0.35)]"
+        className="border-hairline bg-backstage animate-panel-in absolute inset-x-0 bottom-0 z-20 flex h-(--creator-panel) flex-col border-t shadow-[0_-18px_40px_rgb(5_5_4/0.45)] lg:inset-y-0 lg:right-auto lg:h-auto lg:w-[clamp(420px,34vw,560px)] lg:border-t-0 lg:border-r lg:shadow-[24px_0_60px_rgb(5_5_4/0.35)]"
       >
-        <div className="flex items-center justify-between gap-3 px-6 pt-5">
+        <div className="flex items-center justify-between gap-3 px-5 pt-3 lg:px-6 lg:pt-5">
           <Link
             href="/characters"
             className="rounded-tile text-label text-ink-muted hover:text-ink -ml-1 inline-flex items-center gap-1.5 px-1 transition-colors"
@@ -394,7 +408,7 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
             role="tablist"
             aria-label={t('categoriesLabel')}
             aria-orientation={panelWidth > 0 ? 'vertical' : 'horizontal'}
-            className="border-hairline scroll-fade-x lg:scroll-fade-y flex shrink-0 scrollbar-none gap-1 overflow-x-auto border-b px-4 py-2.5 [--fade-end:2rem] [--fade-start:0.75rem] lg:w-[9rem] lg:flex-col lg:gap-0.5 lg:overflow-x-hidden lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-1.5 lg:py-4"
+            className="border-hairline scroll-fade-x lg:scroll-fade-y flex shrink-0 scrollbar-none gap-1 overflow-x-auto border-b px-4 py-2 [--fade-end:2rem] [--fade-start:0.75rem] lg:w-[9rem] lg:flex-col lg:gap-0.5 lg:overflow-x-hidden lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-1.5 lg:py-4"
           >
             {CATEGORIES.map((id, index) => {
               const active = id === category;
@@ -441,7 +455,7 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
             id="creator-panel"
             aria-labelledby={`creator-tab-${category}`}
             tabIndex={0}
-            className="scroll-fade-y min-w-0 flex-1 scrollbar-none overflow-y-auto px-5 pt-5 pb-12 outline-none [--fade-end:3rem] lg:pt-6"
+            className="scroll-fade-y min-w-0 flex-1 scrollbar-none overflow-y-auto px-5 pt-4 pb-12 outline-none [--fade-end:3rem] lg:pt-6"
           >
             {manifest && ready ? (
               // The old category leaves fast (opacity only); the panel scrolls back
@@ -614,7 +628,7 @@ function AutosaveNote({ status }: { status: ReturnType<typeof useAutosave>['stat
     <p
       role="status"
       className={cn(
-        'text-label flex max-w-[62%] min-w-0 items-center justify-end gap-2',
+        'text-label flex max-w-[62%] min-w-0 items-center justify-end gap-2 text-right',
         status === 'error'
           ? 'text-alert'
           : status === 'saved'
@@ -632,7 +646,8 @@ function AutosaveNote({ status }: { status: ReturnType<typeof useAutosave>['stat
           )}
         />
       )}
-      <span className="truncate">{text}</span>
+      {/* Wraps to a second line on a narrow panel rather than cutting the sentence. */}
+      <span className="line-clamp-2 text-pretty">{text}</span>
     </p>
   );
 }

@@ -255,10 +255,13 @@ export function applyCuration(
 }
 
 let pending: Promise<MhManifest> | null = null;
+let curatedPending: Promise<MhManifest> | null = null;
 
 /**
  * Loads and validates the manifest once per page; a failed load is retried on the
  * next call. `curated: false` (the curation screen) keeps hidden items visible.
+ * The curated manifest is shared too: every screen (and a Strict Mode re-run)
+ * gets the same object from one curation request.
  */
 export async function loadMhManifest({ curated = true } = {}): Promise<MhManifest> {
   pending ??= fetch(MANIFEST_URL, { cache: 'no-cache' })
@@ -270,10 +273,24 @@ export async function loadMhManifest({ curated = true } = {}): Promise<MhManifes
       pending = null;
       throw error;
     });
-  const manifest = await pending;
-  if (!curated) return manifest;
-  const curation = await fetch(CURATION_URL, { cache: 'no-cache' })
-    .then(async (response) => (response.ok ? HiddenOnlySchema.parse(await response.json()) : null))
-    .catch(() => null);
-  return curation ? applyCuration(manifest, curation) : manifest;
+  if (!curated) return pending;
+  curatedPending ??= pending
+    .then(async (manifest) => {
+      const curation = await fetch(CURATION_URL, { cache: 'no-cache' })
+        .then(async (response) =>
+          response.ok ? HiddenOnlySchema.parse(await response.json()) : null,
+        )
+        .catch(() => null);
+      return curation ? applyCuration(manifest, curation) : manifest;
+    })
+    .catch((error: unknown) => {
+      curatedPending = null;
+      throw error;
+    });
+  return curatedPending;
+}
+
+/** Drops the shared curated manifest: the next load reads the saved curation again. */
+export function forgetCuratedManifest(): void {
+  curatedPending = null;
 }
