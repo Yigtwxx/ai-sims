@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from asset_pipeline.mh.build import Builder, fab_animations
+from asset_pipeline.mh.build import Builder, fab_animations, with_thumbnail
 from asset_pipeline.mh.convert import ConversionError
 from asset_pipeline.mh.stamps import Stamps, fingerprint
 
@@ -88,3 +88,13 @@ def test_fab_clip_lists_become_idle_animations(tmp_path: Path) -> None:
             "tags": ["idle"],
         },
     ]
+
+
+def test_thumbnails_are_listed_exactly_when_the_file_exists(tmp_path: Path) -> None:
+    (tmp_path / "faces" / "Ada").mkdir(parents=True)
+    (tmp_path / "faces" / "Ada" / "thumbnail.webp").write_bytes(b"webp")
+    face = {"id": "face.Ada", "head": "faces/Ada/head.glb"}
+    assert with_thumbnail(face, "head", tmp_path)["thumbnail"] == "faces/Ada/thumbnail.webp"
+    stale = {"id": "face.Bo", "head": "faces/Bo/head.glb", "thumbnail": "faces/Bo/thumbnail.webp"}
+    assert "thumbnail" not in with_thumbnail(stale, "head", tmp_path)
+    assert "thumbnail" not in face, "the build record is not modified"

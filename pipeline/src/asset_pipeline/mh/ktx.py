@@ -23,6 +23,7 @@ from numpy.typing import NDArray
 from PIL import Image
 
 KTX_TOOLS_ENV = "KTX_TOOLS"
+KTX_THREADS_ENV = "MH_KTX_THREADS"  # optional cap on encoder threads (output quality unchanged)
 KTX_VERSION = "4.4.2"
 FORMATS = {1: "R8", 2: "R8G8", 3: "R8G8B8", 4: "R8G8B8A8"}
 
@@ -69,6 +70,7 @@ class Ktx2Settings:
     quality: int = 1
     zstd: int = 18
     mipmaps: bool = True
+    wrap: bool = False  # mipmaps filtered as a tiling texture (repeat at the edges)
 
     def arguments(self, channels: int) -> list[str]:
         suffix = "_SRGB" if self.transfer == "srgb" else "_UNORM"
@@ -87,11 +89,17 @@ class Ktx2Settings:
         args += ["--zstd", str(self.zstd)]
         if self.mipmaps:
             args.append("--generate-mipmap")
+            if self.wrap:
+                args += ["--mipmap-wrap", "wrap"]
+        threads = os.environ.get(KTX_THREADS_ENV, "").strip()
+        if threads.isdigit() and int(threads) > 0:
+            args += ["--threads", threads]
         return args
 
     @property
     def key(self) -> str:
-        return f"uastc-q{self.quality}-rdo{self.rdo}-z{self.zstd}-{self.transfer}-mip{self.mipmaps}"
+        key = f"uastc-q{self.quality}-rdo{self.rdo}-z{self.zstd}-{self.transfer}-mip{self.mipmaps}"
+        return f"{key}-wrap" if self.wrap else key
 
 
 def encode_ktx2(image: NDArray[np.uint8], output: Path, settings: Ktx2Settings) -> int:

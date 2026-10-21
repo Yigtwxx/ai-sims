@@ -40,6 +40,11 @@ def add_parser(
     parser.add_argument("--clip", action="append", default=[], help="only these clip ids")
     parser.add_argument("--lighting", action="store_true", help="convert lighting rigs")
     parser.add_argument("--grooms", action="store_true", help="convert groom cards")
+    parser.add_argument("--groom", action="append", default=[], help="only these groom styles")
+    parser.add_argument(
+        "--outfits", action="store_true", help="refit outfit garments onto the bodies"
+    )
+    parser.add_argument("--outfit", action="append", default=[], help="only these outfit names")
     parser.add_argument("--manifest", action="store_true", help="write web/manifest.json")
     parser.add_argument("--all", action="store_true", help="everything above, then the manifest")
     parser.add_argument("--force", action="store_true", help="rebuild even when up to date")
@@ -61,7 +66,15 @@ def run(args: argparse.Namespace) -> int:
         print(f"unknown --parts {sorted(unknown)}", file=sys.stderr)
         return 2
     selected = any(
-        [characters, args.bodies, args.animations, args.lighting, args.grooms, args.manifest]
+        [
+            characters,
+            args.bodies,
+            args.animations,
+            args.lighting,
+            args.grooms,
+            args.outfits,
+            args.manifest,
+        ]
     )
     if not selected and not everything:
         print("nothing to do: pass --all or --character/--bodies/--animations/...", file=sys.stderr)
@@ -84,7 +97,9 @@ def run(args: argparse.Namespace) -> int:
     if args.lighting or everything:
         builder.lighting()
     if args.grooms or everything:
-        builder.grooms()
+        builder.grooms(args.groom)
+    if args.outfits or everything:
+        builder.outfits(args.outfit)
     if args.manifest or everything:
         try:
             path = builder.manifest()

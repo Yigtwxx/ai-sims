@@ -153,6 +153,44 @@ def validate(manifest: Mapping[str, Any], web_root: Path | None = None) -> list[
                 param.get("type") in PARAM_TYPES and bool(param.get("name")),
                 f"{where}: param {param}",
             )
+    for outfit in manifest.get("outfits", []):
+        where = f"outfit {outfit.get('id')}"
+        need(outfit.get("category") in OUTFIT_CATEGORIES, f"{where}: category")
+        need(outfit.get("compat", "unisex") in COMPAT, f"{where}: compat")
+        files_by_gender = outfit.get("files", {})
+        need(
+            isinstance(files_by_gender, dict)
+            and bool(files_by_gender)
+            and set(files_by_gender) <= set(GENDERS),
+            f"{where}: files must map female/male to GLBs",
+        )
+        for value in files_by_gender.values() if isinstance(files_by_gender, dict) else []:
+            file(value, f"{where} files")
+        file(outfit.get("thumbnail"), where, optional=True)
+        for param in outfit.get("params", []):
+            need(
+                param.get("type") in PARAM_TYPES and bool(param.get("name")),
+                f"{where}: param {param}",
+            )
+        for preset in outfit.get("tintPresets", []):
+            need(
+                isinstance(preset.get("id"), str) and bool(ID.match(preset["id"])),
+                f"{where}: tint id",
+            )
+            need(_label_ok(preset.get("label", "x")), f"{where}: tint label")
+            values = preset.get("values", {})
+            need(
+                isinstance(values, dict)
+                and all(
+                    isinstance(v, int | float) or (isinstance(v, str) and bool(HEX.match(v)))
+                    for v in values.values()
+                ),
+                f"{where}: tint values",
+            )
+        need(
+            all(isinstance(r, str) for r in outfit.get("hidesBodyRegions", [])),
+            f"{where}: hidesBodyRegions",
+        )
     for iris in manifest.get("irises", []):
         where = f"iris {iris.get('id')}"
         file(iris.get("color"), where)
@@ -210,11 +248,15 @@ def assemble(
     animations: Iterable[Mapping[str, Any]] = (),
     lighting: Iterable[Mapping[str, Any]] = (),
     grooms: Iterable[Mapping[str, Any]] = (),
+    outfits: Iterable[Mapping[str, Any]] = (),
     face_tones: Mapping[str, float | None] | None = None,
+    face_maps_from: Mapping[str, str | None] | None = None,
 ) -> dict[str, Any]:
     """The manifest from per-asset entries (build infos). Faces get their own preset's skin
-    and iris when converted, else the skin closest in tone (`face_tones`); faces without a
-    known gender are left out (the contract needs one)."""
+    and iris when converted, else the skin closest in tone (`face_tones`). A face without
+    an iris of its own wears the iris of the preset its skin came from, else of the preset
+    its teeth and eyelash maps came from (`face_maps_from`). Faces without a known gender
+    are left out (the contract needs one)."""
     skin_list = sorted(
         ({k: v for k, v in s.items() if k != "stats"} for s in skins),
         key=lambda s: (s["tone"], s["id"]),
@@ -236,8 +278,14 @@ def assemble(
             if fallback is None:
                 continue
             entry["defaultSkin"] = fallback
-        if f"iris.{preset}" in iris_ids:
-            entry["defaultIris"] = f"iris.{preset}"
+        borrowed = [
+            str(entry["defaultSkin"]).removeprefix("skin."),
+            (face_maps_from or {}).get(preset),
+        ]
+        for source in (preset, *borrowed):
+            if source and f"iris.{source}" in iris_ids:
+                entry["defaultIris"] = f"iris.{source}"
+                break
         face_list.append(entry)
     return {
         "version": 2,
@@ -246,7 +294,10 @@ def assemble(
         "skins": skin_list,
         "bodies": sorted((dict(b) for b in bodies), key=lambda b: b["gender"]),
         "grooms": sorted((dict(g) for g in grooms), key=lambda g: (g["slot"], g["id"])),
-        "outfits": [],
+        "outfits": sorted(
+            (dict(o) for o in outfits),
+            key=lambda o: (OUTFIT_CATEGORIES.index(o["category"]), o["id"]),
+        ),
         "irises": iris_list,
         "animations": sorted((dict(a) for a in animations), key=lambda a: a["id"]),
         "lighting": sorted(

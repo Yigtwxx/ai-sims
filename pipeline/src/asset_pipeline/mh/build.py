@@ -56,6 +56,16 @@ from asset_pipeline.mh.grooms import (
 from asset_pipeline.mh.ktx import KtxEncodeError, KtxUnavailableError
 from asset_pipeline.mh.lighting import convert_level, has_lights, list_levels, manifest_entry
 from asset_pipeline.mh.manifest import assemble, write_manifest
+from asset_pipeline.mh.outfits import (
+    OUTFITS_VERSION,
+    BodyFit,
+    OutfitError,
+    OutfitUnit,
+    base_body_path,
+    convert_outfit,
+    list_outfit_units,
+    manifest_entries,
+)
 from asset_pipeline.mh.rig import MetaHumanRig
 from asset_pipeline.mh.stamps import Stamps, fingerprint
 from asset_pipeline.mh.textures import TextureError, write_json
@@ -69,6 +79,7 @@ EXPECTED_ERRORS = (
     KtxUnavailableError,
     ClipError,
     GroomError,
+    OutfitError,
     OSError,
     ValueError,
 )
@@ -392,6 +403,47 @@ class Builder:
 
         return build
 
+    # ------------------------------------------------------------------------ outfits
+
+    def outfits(self, only: Sequence[str] = ()) -> None:
+        """`outfits/<name>/<gender>.glb` for every finished outfit unit, refitted onto the
+        converted body of that gender (build the bodies first)."""
+        bodies: dict[str, BodyFit] = {}
+        for unit in list_outfit_units(self.archive):
+            key = f"outfits/{unit.name}/{unit.gender}"
+            if only and unit.name not in only and key not in only:
+                continue
+            body_glb = self.web / "bodies" / unit.gender / "body.glb"
+            base = base_body_path(self.archive, unit.gender)
+            if not body_glb.is_file() or not base.is_file():
+                self._fail(key, OutfitError(f"needs {body_glb.name} and {base.name} first"))
+                continue
+            print_ = fingerprint(
+                OUTFITS_VERSION, unit.done, base.parent / "done.json", body_glb, self.compress
+            )
+            self.run(key, print_, self._outfit_builder(unit, body_glb, base, bodies))
+
+    def _outfit_builder(
+        self, unit: OutfitUnit, body_glb: Path, base: Path, bodies: dict[str, BodyFit]
+    ) -> Callable[[], tuple[Iterable[Path], dict[str, Any], str]]:
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            if unit.gender not in bodies:
+                bodies[unit.gender] = BodyFit.load(body_glb, base, unit.gender)
+            result = convert_outfit(
+                unit, bodies[unit.gender], self.web, archive=self.archive, log=self.log
+            )
+            stats = result.stats
+            texture_bytes = sum(stats["textures"].values())
+            detail = (
+                f"{stats['bytes'] / 1e6:.1f} MB glb + {texture_bytes / 1e6:.1f} MB maps, "
+                f"{stats['vertices']}v, {stats['caps']} caps, hides {stats['hidden']} body "
+                f"vertices, {result.record['category']}"
+            )
+            info = {"outfit": result.record, "stats": stats}
+            return result.outputs, info, detail
+
+        return build
+
     def _fail(self, key: str, error: Exception) -> Outcome:
         outcome = Outcome(key, "failed", 0.0, str(error))
         self.outcomes.append(outcome)
@@ -416,7 +468,9 @@ class Builder:
     def manifest(self) -> Path:
         heads = self.records("faces")
         manifest = assemble(
-            faces=[info["face"] for info in heads if "face" in info],
+            faces=[
+                with_thumbnail(info["face"], "head", self.web) for info in heads if "face" in info
+            ],
             skins=[info["skin"] for info in self.records("skins") if "skin" in info],
             irises=[info["iris"] for info in self.records("irises") if "iris" in info],
             bodies=[info["body"] for info in self.records("bodies") if "body" in info],
@@ -425,7 +479,19 @@ class Builder:
                 *fab_animations(self.web),
             ],
             lighting=[info["lighting"] for info in self.records("lighting") if "lighting" in info],
-            grooms=[info["groom"] for info in self.records("grooms") if "groom" in info],
+            grooms=[
+                with_thumbnail(info["groom"], "glb", self.web)
+                for info in self.records("grooms")
+                if "groom" in info
+            ],
+            outfits=manifest_entries(
+                [info["outfit"] for info in self.records("outfits") if "outfit" in info], self.web
+            ),
+            face_maps_from={
+                str(info["face"]["id"]).removeprefix("face."): info.get("maps_from")
+                for info in heads
+                if "face" in info
+            },
             face_tones={
                 str(info["face"]["id"]).removeprefix("face."): info.get("tone_estimate")
                 for info in heads
@@ -437,6 +503,19 @@ class Builder:
         counts = ", ".join(f"{k} {len(v)}" for k, v in manifest.items() if isinstance(v, list))
         self.log(f"wrote   {path}  ({counts})")
         return path
+
+
+def with_thumbnail(entry: dict[str, Any], file_key: str, web: Path) -> dict[str, Any]:
+    """The entry with `thumbnail` set exactly when `<its folder>/thumbnail.webp` exists
+    (the web app's thumbnail bench writes them beside the asset)."""
+    out = dict(entry)
+    folder = Path(str(out.get(file_key, ""))).parent
+    thumbnail = web / folder / "thumbnail.webp"
+    if out.get(file_key) and thumbnail.is_file():
+        out["thumbnail"] = (folder / "thumbnail.webp").as_posix()
+    else:
+        out.pop("thumbnail", None)
+    return out
 
 
 def fab_animations(web: Path) -> list[dict[str, Any]]:

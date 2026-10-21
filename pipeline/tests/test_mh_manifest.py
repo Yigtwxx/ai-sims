@@ -80,7 +80,36 @@ def _sample() -> dict:
             },
             {"id": "light.studio", "label": "Studio", "file": "lighting/studio.json", "order": 0},
         ],
+        outfits=[
+            {
+                "id": "outfit.OA_Jeans",
+                "category": "bottom",
+                "label": {"tr": "Kot pantolon", "en": "Jeans"},
+                "compat": "unisex",
+                "files": {
+                    "female": "outfits/OA_Jeans/female.glb",
+                    "male": "outfits/OA_Jeans/male.glb",
+                },
+                "params": [{"name": "diffuse_color_1", "type": "color", "default": "#101010"}],
+                "tintPresets": [
+                    {
+                        "id": "default",
+                        "label": {"tr": "Orijinal", "en": "Original"},
+                        "values": {"diffuse_color_1": "#101010"},
+                    }
+                ],
+                "hidesBodyRegions": ["thighs"],
+            },
+            {
+                "id": "outfit.OA_Boots",
+                "category": "shoes",
+                "label": "Boots",
+                "files": {"female": "outfits/OA_Boots/female.glb"},
+                "hidesBodyRegions": [],
+            },
+        ],
         face_tones={"Bruce": 0.35},
+        face_maps_from={"Bruce": "Ada"},
     )
 
 
@@ -95,6 +124,8 @@ def test_assemble_links_faces_to_skins_and_sorts() -> None:
         and faces["face.Ada"]["defaultIris"] == "iris.Ada"
     )
     assert faces["face.Bruce"]["defaultSkin"] == "skin.Aera", "closest tone stands in"
+    assert faces["face.Bruce"]["defaultIris"] == "iris.Ada", "no iris.Aera: the maps' preset"
+    assert [o["id"] for o in manifest["outfits"]] == ["outfit.OA_Jeans", "outfit.OA_Boots"]
     assert [entry["id"] for entry in manifest["lighting"]] == ["light.studio", "light.tungsten"]
     assert validate(manifest) == []
 
@@ -105,12 +136,16 @@ def test_validate_reports_contract_breaks() -> None:
     manifest["skins"][0]["face"]["wrinkleNormal"].append("extra.ktx2")
     manifest["faces"][0]["defaultSkin"] = "skin.missing"
     manifest["animations"].append(dict(manifest["animations"][0]))
+    manifest["outfits"][0]["category"] = "hat"
+    manifest["outfits"][1]["files"] = {"robot": "x.glb"}
     problems = " | ".join(validate(manifest))
     for fragment in (
         "tone outside",
         "wrinkleNormal holds at most 3",
         "is not a skin",
         "used by animations",
+        "outfit outfit.OA_Jeans: category",
+        "files must map female/male",
     ):
         assert fragment in problems
 
@@ -124,7 +159,7 @@ def test_write_manifest_drops_internal_fields(tmp_path: Path) -> None:
     manifest = _sample()
     for path in {
         value
-        for section in ("faces", "skins", "irises", "bodies", "animations", "lighting")
+        for section in ("faces", "skins", "irises", "bodies", "animations", "lighting", "outfits")
         for item in manifest[section]
         for value in _files(item)
     }:
@@ -155,6 +190,9 @@ def _files(item: dict) -> list[str]:
             "slot",
             "compat",
             "params",
+            "category",
+            "tintPresets",
+            "hidesBodyRegions",
         }:
             continue
         if isinstance(value, str):

@@ -464,6 +464,24 @@ def _texture_settings(path: Path, srgb: bool) -> Ktx2Settings:
     return COLOR if srgb else LINEAR
 
 
+def _resize_straight(pixels: NDArray[np.uint8], size: int) -> NDArray[np.uint8]:
+    """Box-filter every channel on its own. PIL resizes RGBA with premultiplied alpha,
+    which darkens colour and corrupts data channels where coverage is partial."""
+    if pixels.ndim == 2:
+        return np.asarray(Image.fromarray(pixels).resize((size, size), Image.Resampling.BOX))
+    return np.stack(
+        [
+            np.asarray(
+                Image.fromarray(np.ascontiguousarray(pixels[..., c])).resize(
+                    (size, size), Image.Resampling.BOX
+                )
+            )
+            for c in range(pixels.shape[2])
+        ],
+        axis=-1,
+    )
+
+
 def convert_textures(
     groom: GroomUnit, folder: Path, web_root: Path
 ) -> tuple[dict[str, str], str | None]:
@@ -474,11 +492,13 @@ def convert_textures(
     for path in sorted((groom.unit / "textures").glob("*.png")):
         if THUMB.search(path.stem):
             output = folder / "thumbnail.webp"
-            with Image.open(path) as image:
-                picture = image.convert("RGB")
-                picture.thumbnail((384, 384), Image.Resampling.LANCZOS)
-                output.parent.mkdir(parents=True, exist_ok=True)
-                picture.save(output, "WEBP", quality=88, method=6)
+            # Keep an existing thumbnail: the web app's thumbnail bench renders its own.
+            if not output.is_file():
+                with Image.open(path) as image:
+                    picture = image.convert("RGB")
+                    picture.thumbnail((384, 384), Image.Resampling.LANCZOS)
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    picture.save(output, "WEBP", quality=88, method=6)
             thumbnail = output.relative_to(web_root).as_posix()
             continue
         role = next(
@@ -495,10 +515,9 @@ def convert_textures(
         limit = MAX_TEXTURE.get(groom.slot, DEFAULT_MAX_TEXTURE)
         with Image.open(path) as image:
             mode = "L" if image.mode in ("L", "I;16") else ("RGBA" if keep_alpha else "RGB")
-            picture = image.convert(mode)
-            if max(picture.size) > limit:
-                picture = picture.resize((limit, limit), Image.Resampling.BOX)
-            pixels = np.asarray(picture)
+            pixels = np.asarray(image.convert(mode))
+        if max(pixels.shape[:2]) > limit:
+            pixels = _resize_straight(pixels, limit)
         if pixels.ndim == 3 and pixels.shape[2] == 4 and pixels[..., 3].min() == 255:
             pixels = pixels[..., :3]
         output = folder / f"{file_name}.ktx2"

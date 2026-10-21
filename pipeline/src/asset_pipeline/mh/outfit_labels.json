@@ -1,0 +1,150 @@
+{
+  "DefaultGarment": {
+    "en": "Basic tee and shorts",
+    "tr": "Basic tişört ve şort"
+  },
+  "OA_Boots": {
+    "en": "Boots",
+    "tr": "Bot"
+  },
+  "OA_Cargopants": {
+    "en": "Cargo pants",
+    "tr": "Kargo pantolon"
+  },
+  "OA_CasualSneakers": {
+    "en": "Casual sneakers",
+    "tr": "Günlük spor ayakkabı"
+  },
+  "OA_Chelseaboots": {
+    "en": "Chelsea boots",
+    "tr": "Chelsea bot"
+  },
+  "OA_Crewneckt": {
+    "en": "Crew-neck tee",
+    "tr": "Bisiklet yaka tişört"
+  },
+  "OA_CrewnecktTk": {
+    "en": "Crew-neck tee, tucked",
+    "tr": "Bisiklet yaka tişört, içe sokulu"
+  },
+  "OA_Flats": {
+    "en": "Flats",
+    "tr": "Babet"
+  },
+  "OA_Flipflops": {
+    "en": "Flip-flops",
+    "tr": "Parmak arası terlik"
+  },
+  "OA_Hightop": {
+    "en": "High-top sneakers",
+    "tr": "Bilekli spor ayakkabı"
+  },
+  "OA_Hoodie": {
+    "en": "Hoodie",
+    "tr": "Kapüşonlu sweatshirt"
+  },
+  "OA_Jeans": {
+    "en": "Jeans",
+    "tr": "Kot pantolon"
+  },
+  "OA_Jeans_slm": {
+    "en": "Slim jeans",
+    "tr": "Dar kesim kot"
+  },
+  "OA_Jeansakn": {
+    "en": "Ankle jeans",
+    "tr": "Bilek boy kot"
+  },
+  "OA_Jeansmcf": {
+    "en": "Mid-calf jeans",
+    "tr": "Baldır boy kot"
+  },
+  "OA_Loafers": {
+    "en": "Loafers",
+    "tr": "Loafer"
+  },
+  "OA_Oxfords": {
+    "en": "Oxford shoes",
+    "tr": "Oxford ayakkabı"
+  },
+  "OA_Runningshoes": {
+    "en": "Running shoes",
+    "tr": "Koşu ayakkabısı"
+  },
+  "OA_Shirt_01": {
+    "en": "Band-collar shirt",
+    "tr": "Hakim yaka gömlek"
+  },
+  "OA_Shirt_04": {
+    "en": "Long-sleeve shirt",
+    "tr": "Uzun kollu gömlek"
+  },
+  "OA_Shorts": {
+    "en": "Shorts",
+    "tr": "Şort"
+  },
+  "OA_Sweater": {
+    "en": "Sweater",
+    "tr": "Kazak"
+  },
+  "OA_TCrop3QSlv": {
+    "en": "Crop top, 3/4 sleeves",
+    "tr": "Crop top, 3/4 kol"
+  },
+  "OA_TCropLngCufSlv": {
+    "en": "Crop top, long cuffed sleeves",
+    "tr": "Crop top, uzun manşetli kol"
+  },
+  "OA_TCropLngSlv": {
+    "en": "Crop top, long sleeves",
+    "tr": "Crop top, uzun kol"
+  },
+  "OA_TCropPushCufSlv": {
+    "en": "Crop top, pushed-up sleeves",
+    "tr": "Crop top, sıvanmış kol"
+  },
+  "OA_Tshirt3QSlv": {
+    "en": "T-shirt, 3/4 sleeves",
+    "tr": "Tişört, 3/4 kol"
+  },
+  "OA_TshirtLngCufSlv": {
+    "en": "T-shirt, long cuffed sleeves",
+    "tr": "Tişört, uzun manşetli kol"
+  },
+  "OA_TshirtLngSlv": {
+    "en": "T-shirt, long sleeves",
+    "tr": "Tişört, uzun kol"
+  },
+  "OA_TshirtPushCufSlv": {
+    "en": "T-shirt, pushed-up sleeves",
+    "tr": "Tişört, sıvanmış kol"
+  },
+  "OA_TshirtTk3QSlv": {
+    "en": "Tucked T-shirt, 3/4 sleeves",
+    "tr": "İçe sokulu tişört, 3/4 kol"
+  },
+  "OA_TshirtTkLngCufSlv": {
+    "en": "Tucked T-shirt, long cuffed sleeves",
+    "tr": "İçe sokulu tişört, uzun manşetli kol"
+  },
+  "OA_TshirtTkLngSlv": {
+    "en": "Tucked T-shirt, long sleeves",
+    "tr": "İçe sokulu tişört, uzun kol"
+  },
+  "OA_TshirtTkPushCufSlv": {
+    "en": "Tucked T-shirt, pushed-up sleeves",
+    "tr": "İçe sokulu tişört, sıvanmış kol"
+  },
+  "OA_Yogaakn": {
+    "en": "Ankle yoga pants",
+    "tr": "Bilek boy tayt"
+  },
+  "OA_Yogaful": {
+    "en": "Yoga pants",
+    "tr": "Tayt"
+  },
+  "OA_techwearOutfit": {
+    "en": "Techwear outfit",
+    "tr": "Techwear kombin"
+  }
+}

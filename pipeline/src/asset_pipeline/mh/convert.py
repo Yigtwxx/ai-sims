@@ -274,7 +274,10 @@ def wrinkle_extras(dna: DnaFile) -> dict[str, Any]:
 
 
 def write_thumbnail(source: Path, output: Path) -> bool:
-    """A small WebP of the export's portrait (`dcc/<Name>/<Name>.png`), when it has one."""
+    """A small WebP of the export's portrait (`dcc/<Name>/<Name>.png`), when it has one.
+    An existing thumbnail (the web app's thumbnail bench renders its own) is kept."""
+    if output.is_file():
+        return True
     if not source.is_file():
         return False
     with Image.open(source) as image:
