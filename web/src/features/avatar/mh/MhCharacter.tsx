@@ -9,7 +9,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import type { Camera, Material, Mesh, Object3D } from 'three';
+import type { Camera, Material, Mesh, Object3D, WebGLRenderTarget } from 'three';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -30,6 +30,7 @@ import {
   type NeckSeamExtras,
 } from './assembly';
 import { applyEyeMaterials, bindIrisTextures } from './eyeMaterials';
+import { densityFiles, packGroomDensity, setGroomDensity, setGroomTint } from './groomDensity';
 import { takeOffGroom, wearGroom, type GroomWear, type WornGroom } from './hair';
 import { setHairLook } from './hairMaterial';
 import { useMhGltf } from './loaders';
@@ -40,7 +41,12 @@ import {
   setSkinDetail,
   type WrinkleUniforms,
 } from './materials';
-import { bindSkinTextures, loadIrisTextures, loadSkinTextures } from './skinTextures';
+import {
+  bindSkinTextures,
+  loadAssetTexture,
+  loadIrisTextures,
+  loadSkinTextures,
+} from './skinTextures';
 import { compileWrinkleTable, computeWrinkleWeights, type AnimatedMaps } from './wrinkles';
 
 export interface MhCharacterHandle {
@@ -243,12 +249,30 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         mine.push(groom);
       });
     });
+    // Hair growing from the skin: the grooms' density darkens the scalp and brows.
+    let density: WebGLRenderTarget | null = null;
+    const files = densityFiles(wears);
+    if (files.some(Boolean)) {
+      void Promise.all(
+        files.map((file) => (file ? loadAssetTexture(gl, file, 'data') : null)),
+      ).then(
+        (layers) => {
+          if (!live) return;
+          density = packGroomDensity(gl, layers);
+          const look = latestGrooms.current[0]?.look;
+          setGroomDensity(assembled.skins, density.texture, files, look);
+        },
+        (error: unknown) => console.warn('[mh] groom density failed to load', error),
+      );
+    }
     return () => {
       live = false;
       for (const groom of mine) {
         takeOffGroom(assembled.root, assembled.handle.faceMeshes, groom);
         wearing.delete(groom.id);
       }
+      setGroomDensity(assembled.skins, null, [], undefined);
+      density?.dispose();
     };
   }, [assembled, gl, groomKey]);
 
@@ -257,7 +281,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       const groom = worn.current.get(wear.groom.id);
       if (groom) setHairLook(groom.materials, wear.look);
     }
-  }, [grooms]);
+    if (grooms[0]) setGroomTint(assembled.skins, grooms[0].look);
+  }, [assembled, grooms]);
 
   useImperativeHandle(ref, () => assembled.handle, [assembled]);
 

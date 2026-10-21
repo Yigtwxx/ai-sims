@@ -11,6 +11,7 @@ import {
   type Texture,
 } from 'three';
 
+import { createGroomDensityUniforms } from './groomDensity';
 import { WRINKLE_MASK_LAYERS, WRINKLE_WEIGHT_COUNT } from './wrinkles';
 
 /**
@@ -42,6 +43,8 @@ export interface SkinTuning {
   sheen: number;
   /** Blend wrinkle normal maps by region weights (head only). */
   wrinkles: boolean;
+  /** Tint the skin under hair, brows and beard by groom density (head only). */
+  groomDensity: boolean;
 }
 
 export const HEAD_SKIN: SkinTuning = {
@@ -51,6 +54,7 @@ export const HEAD_SKIN: SkinTuning = {
   microStrength: 0.35,
   sheen: 0.1,
   wrinkles: true,
+  groomDensity: true,
 };
 
 export const BODY_SKIN: SkinTuning = {
@@ -58,6 +62,7 @@ export const BODY_SKIN: SkinTuning = {
   microTiling: 36,
   microStrength: 0.3,
   wrinkles: false,
+  groomDensity: false,
 };
 
 const DIFFUSE_LINE =
@@ -128,6 +133,21 @@ vec3 mhWrinkleNormal( sampler2D map ) {
 #endif
 `;
 
+const GROOM_DENSITY_PARS = /* glsl */ `
+#ifdef MH_GROOM_DENSITY
+uniform sampler2D skinGroomDensity;
+uniform vec4 skinGroomStrength;
+uniform vec3 skinGroomTint;
+#endif
+`;
+// Skin under hair, brows and beard takes on the hair colour (see ./groomDensity.ts).
+const GROOM_DENSITY = /* glsl */ `
+#if defined( MH_GROOM_DENSITY ) && defined( USE_MAP )
+  float groomCover = saturate( dot( texture2D( skinGroomDensity, vMapUv ), skinGroomStrength ) );
+  diffuseColor.rgb *= mix( vec3( 1.0 ), skinGroomTint, groomCover );
+#endif
+`;
+
 /** Wrinkle inputs of a head skin; textures arrive asynchronously. */
 export interface WrinkleUniforms {
   wrinkleNormal1: { value: Texture | null };
@@ -195,12 +215,17 @@ export function createSkinMaterial(
         wrinkleActive: { value: 0 },
       }
     : null;
-  if (wrinkles) material.defines = { MH_WRINKLES: '' };
+  const density = tuning.groomDensity ? createGroomDensityUniforms() : null;
+  material.defines = {
+    ...(wrinkles ? { MH_WRINKLES: '' } : {}),
+    ...(density ? { MH_GROOM_DENSITY: '' } : {}),
+  };
   material.userData.skinUniforms = uniforms;
   material.userData.wrinkleUniforms = wrinkles;
+  material.userData.groomDensityUniforms = density;
   material.userData.skinTuning = tuning;
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms, wrinkles ?? {});
+    Object.assign(shader.uniforms, uniforms, wrinkles ?? {}, density ?? {});
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
@@ -213,8 +238,10 @@ export function createSkinMaterial(
           'uniform float skinMicroStrength;',
           'uniform sampler2D skinCavity;',
           'uniform float skinCavityStrength;',
+          GROOM_DENSITY_PARS,
         ].join('\n'),
       )
+      .replace('#include <map_fragment>', `#include <map_fragment>\n${GROOM_DENSITY}`)
       // After the normal map uniforms it reads (normalScale, vNormalMapUv).
       .replace(
         '#include <normalmap_pars_fragment>',
@@ -235,7 +262,8 @@ export function createSkinMaterial(
         ShaderChunk.normal_fragment_maps.replace(NORMAL_SCALE_LINE, MICRO_NORMAL),
       );
   };
-  material.customProgramCacheKey = () => (wrinkles ? 'mh-skin-v3-wrinkles' : 'mh-skin-v3');
+  material.customProgramCacheKey = () =>
+    `mh-skin-v4${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}`;
   return material;
 }
 
