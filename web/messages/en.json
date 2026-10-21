@@ -557,20 +557,25 @@
       "stop": "Stop",
       "hint": "Enter sends, Shift+Enter adds a line.",
       "voice": "Voice",
-      "voiceOn": "Voice on",
-      "voiceOff": "Voice off",
       "empty": {
         "title": "{name} is listening.",
         "body": "Ask anything, or try one of these."
       },
-      "suggestions": ["How are you?", "Tell me a bit about yourself.", "What shall we do today?"]
+      "suggestions": ["How are you?", "Tell me a bit about yourself.", "What shall we do today?"],
+      "voiceMute": "Mute the voice",
+      "voiceUnmute": "Turn the voice on",
+      "hintBusy": "Press Esc to stop the reply.",
+      "dismiss": "Dismiss"
     },
     "status": {
       "connecting": "Connecting…",
       "thinking": "{name} is thinking…",
       "writing": "{name} is writing…",
       "speaking": "{name} is speaking…",
-      "idle": "Ready"
+      "idle": "Ready",
+      "failed": "No reply",
+      "offline": "AI not connected",
+      "voiceOff": "Ready · text only"
     },
     "errors": {
       "unauthenticated": "Your session has ended. Sign in again from the home page.",
@@ -587,7 +592,8 @@
     },
     "retry": "Try again",
     "manifestMissing": "The MetaHuman library is not on this machine; chat still works.",
-    "manifestError": "The parts list could not be loaded; the chat still works."
+    "manifestError": "The parts list could not be loaded; the chat still works.",
+    "loadingCharacter": "Bringing your character on stage"
   },
   "Curate": {
     "title": "Curation",

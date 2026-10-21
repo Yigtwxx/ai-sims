@@ -540,7 +540,7 @@
     "back": "Karakterlerim",
     "edit": "Düzenle",
     "stageLabel": "{name}, tam boy",
-    "dragHint": "Sürükleyerek döndür, kaydırarak yaklaş",
+    "dragHint": "Döndürmek için sürükle, yaklaşmak için kaydır",
     "zoom": {
       "label": "Yakınlık",
       "in": "Yaklaş",
@@ -557,20 +557,25 @@
       "stop": "Durdur",
       "hint": "Enter gönderir, Shift+Enter yeni satır.",
       "voice": "Ses",
-      "voiceOn": "Ses açık",
-      "voiceOff": "Ses kapalı",
       "empty": {
         "title": "{name} seni dinliyor.",
         "body": "Bir şey sor ya da bunlardan birini dene."
       },
-      "suggestions": ["Nasılsın?", "Biraz kendinden bahset.", "Bugün ne yapalım?"]
+      "suggestions": ["Nasılsın?", "Biraz kendinden bahset.", "Bugün ne yapalım?"],
+      "voiceMute": "Sesi kapat",
+      "voiceUnmute": "Sesi aç",
+      "hintBusy": "Yanıtı durdurmak için Esc.",
+      "dismiss": "Kapat"
     },
     "status": {
       "connecting": "Bağlanıyor…",
       "thinking": "{name} düşünüyor…",
       "writing": "{name} yazıyor…",
       "speaking": "{name} konuşuyor…",
-      "idle": "Hazır"
+      "idle": "Hazır",
+      "failed": "Yanıt alınamadı",
+      "offline": "Yapay zekâ bağlı değil",
+      "voiceOff": "Hazır · yalnızca yazı"
     },
     "errors": {
       "unauthenticated": "Oturumun kapanmış. Ana sayfadan yeniden giriş yap.",
@@ -587,7 +592,8 @@
     },
     "retry": "Tekrar dene",
     "manifestMissing": "MetaHuman kütüphanesi bu makinede yok; sohbet yine de çalışır.",
-    "manifestError": "Parça listesi yüklenemedi; sohbet yine de çalışır."
+    "manifestError": "Parça listesi yüklenemedi; sohbet yine de çalışır.",
+    "loadingCharacter": "Karakter sahneye hazırlanıyor"
   },
   "Curate": {
     "title": "Kürasyon",

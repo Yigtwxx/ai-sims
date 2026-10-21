@@ -10,13 +10,15 @@
 import {
   ArrowClockwiseIcon,
   ArrowLeftIcon,
+  HandGrabbingIcon,
   MagnifyingGlassMinusIcon,
   MagnifyingGlassPlusIcon,
   PencilSimpleIcon,
 } from '@phosphor-icons/react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { StageLoading } from '@/components/shell/StageLoading';
 import { StageBoundary, StageFailed } from '@/components/stage/StageBoundary';
 import { StagePoster } from '@/components/stage/StagePoster';
 import { Button } from '@/components/ui/button';
@@ -26,6 +28,7 @@ import { useMhManifest } from '@/features/creator/useMhManifest';
 import { reconcileConfig } from '@/features/creator/reconcile';
 import { Link } from '@/i18n/navigation';
 import type { CharacterConfig } from '@/lib/character/schema';
+import { cn } from '@/lib/utils';
 
 import { Subtitles } from './Subtitles';
 import { TalkChat } from './TalkChat';
@@ -48,6 +51,10 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
   const [zoom, setZoom] = useState(0);
   const [panelWidth, setPanelWidth] = useState(0);
   const panel = useRef<HTMLElement>(null);
+  // Something is on the stage: the character, dressed and drawn, or the failure note.
+  // Stable callback: the memoised stage must not re-render as replies stream in.
+  const [stageShown, setStageShown] = useState(false);
+  const markStageShown = useCallback(() => setStageShown(true), []);
 
   const talk = useTalk({
     characterId: character.id,
@@ -81,7 +88,12 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
       >
         {manifest ? (
           <StageBoundary
-            fallback={(retry) => <StageFailed retry={retry} insetRight={panelWidth} />}
+            fallback={(retry) => (
+              <>
+                <StageFailed retry={retry} insetRight={panelWidth} />
+                <OnMount run={markStageShown} />
+              </>
+            )}
           >
             <MhStage
               config={config}
@@ -92,13 +104,14 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
               speech={talk.player}
               thinking={thinking}
               insetRight={panelWidth}
+              onSettled={markStageShown}
               className="size-full"
             />
           </StageBoundary>
         ) : (
           <div
-            className="absolute inset-0 [--stage-floor:84%] [--stage-x:calc(50%-var(--panel,0px)/2)]"
-            style={{ ['--panel' as string]: `${panelWidth}px` }}
+            className="absolute inset-0 [--stage-floor:84%] [--stage-x:calc(50%-var(--panel,0px)/2)] lg:[--panel:clamp(360px,30vw,480px)]"
+            style={panelWidth ? { ['--panel' as string]: `${panelWidth}px` } : undefined}
           >
             <StagePoster />
           </div>
@@ -107,9 +120,21 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
 
       {/* Over the stage, left of the chat: name, navigation, zoom and subtitles. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[46dvh] lg:inset-y-0 lg:h-auto"
-        style={{ right: panelWidth }}
+        className={cn(
+          'pointer-events-none absolute inset-x-0 top-0 h-[46dvh] lg:inset-y-0 lg:h-auto',
+          // Until the chat column is measured, assume its CSS width so nothing jumps.
+          !panelWidth && 'lg:right-[clamp(360px,30vw,480px)]',
+        )}
+        style={panelWidth ? { right: panelWidth } : undefined}
       >
+        <StageLoading
+          show={
+            !stageShown && manifestState.status !== 'missing' && manifestState.status !== 'error'
+          }
+          label={t('loadingCharacter')}
+          className="absolute inset-x-0 top-1/2 -translate-y-1/2 lg:top-auto lg:bottom-[16%] lg:translate-y-0"
+        />
+
         <div className="pointer-events-auto flex items-start justify-between gap-4 px-5 pt-5 md:px-8">
           <div>
             <Link
@@ -144,8 +169,11 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
                 {t('retry')}
               </Button>
             </div>
-          ) : talk.messages.length === 0 && zoom === 0 ? (
-            <p className="text-label text-ink-faint hidden lg:block">{t('dragHint')}</p>
+          ) : talk.messages.length === 0 && zoom === 0 && stageShown ? (
+            <p className="border-hairline bg-backstage/70 text-label text-ink-muted hidden items-center gap-2 rounded-full border px-4 py-1.5 lg:inline-flex">
+              <HandGrabbingIcon className="size-3.5" aria-hidden="true" />
+              {t('dragHint')}
+            </p>
           ) : null}
         </div>
 
@@ -197,10 +225,17 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
           onStop={talk.stop}
           onRetry={talk.retry}
           onToggleVoice={talk.toggleVoice}
+          onDismissNotice={talk.dismissNotice}
         />
       </aside>
     </main>
   );
+}
+
+/** Runs `run` once when mounted (a render-function fallback cannot set state itself). */
+function OnMount({ run }: { run: () => void }) {
+  useEffect(() => run(), [run]);
+  return null;
 }
 
 function ZoomButton({
