@@ -164,6 +164,9 @@ function hierarchyOrder(joints) {
 
 /** Seconds after the calibration pose ends before the take counts as idle (arms settling). */
 const SETTLE = 1.5;
+/** Hands closer than this (m), more than HANDS_IN_FRONT (m) in front of the pelvis, count as held together in front. */
+const HANDS_TOGETHER = 0.25;
+const HANDS_IN_FRONT = 0.05;
 const DEG = 180 / Math.PI;
 /** Target skeletons are +Y up (see the MetaHuman web asset contract). */
 const UP = new Vector3(0, 1, 0);
@@ -341,6 +344,7 @@ function retarget(source, target, fps) {
   const ballRest = Math.min(...balls.map((ball) => worldPosition(ball).y));
   let handsUp = 0;
   let crossed = 0;
+  let handsFront = 0;
 
   // Pass 2: the retargeted keys.
   for (let frame = 0; frame < frames; frame += 1) {
@@ -409,9 +413,15 @@ function retarget(source, target, fps) {
     stats.lean = Math.max(stats.lean, Math.acos(Math.min(1, spine.dot(UP))) * DEG);
     // The character's left is +X: a left hand right of the right hand means crossed arms.
     if (left.x < right.x) crossed += 1;
+    // Hands held together in front of the hips (clasped, over the groin): fine
+    // for a crowd, odd for someone facing you in a conversation (+Z is forward).
+    const together = left.distanceTo(right) < HANDS_TOGETHER;
+    const inFront = Math.min(left.z, right.z) > pelvisNow.z + HANDS_IN_FRONT;
+    if (together && inFront) handsFront += 1;
   }
   stats.handsUp = handsUp / frames;
   stats.crossed = crossed / frames;
+  stats.handsFront = handsFront / frames;
   return { name: clip.name, times, rotations, pelvisPositions, stats };
 }
 
@@ -521,6 +531,7 @@ const MAX_CROUCH = 0.06;
 const MAX_LEAN = 12;
 const MAX_HANDS_UP = 0.15;
 const MAX_CROSSED = 0.02;
+const MAX_HANDS_FRONT = 0.3;
 
 const args = parseArgs(process.argv.slice(2));
 const fps = args.fps ?? 30;
@@ -542,7 +553,7 @@ for (const file of args.files) {
   const name = basename(file).replace(/\.fbx$/i, '');
   const out = join(args.out, `${name}.glb`);
   writeAnimationGlb(out, target, result, name);
-  const { start, yaw, drift, crouch, lean, floor, handsUp, crossed } = result.stats;
+  const { start, yaw, drift, crouch, lean, floor, handsUp, crossed, handsFront } = result.stats;
   const duration = result.times.at(-1);
   // A standing idle for a conversation: faces the viewer, stays in place, long enough to loop.
   const standing =
@@ -568,9 +579,16 @@ for (const file of args.files) {
     floor: floor.map((height) => round(height, 3)),
     handsUp: round(handsUp, 2),
     crossed: round(crossed, 2),
+    // Share of the clip with the hands held together in front of the hips.
+    handsFront: round(handsFront, 2),
     standing,
-    // Standing, and open: hands low and apart (no crossed arms, no face touching).
-    calm: standing && handsUp <= MAX_HANDS_UP && crossed <= MAX_CROSSED,
+    // Standing, and open: hands low and apart (no crossed arms, no face
+    // touching, not clasped in front of the body).
+    calm:
+      standing &&
+      handsUp <= MAX_HANDS_UP &&
+      crossed <= MAX_CROSSED &&
+      handsFront <= MAX_HANDS_FRONT,
   });
 }
 writeFileSync(
