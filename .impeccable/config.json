@@ -1,0 +1,32 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-color",
+        "value": "#f2cf7c",
+        "createdAt": "2026-10-21T20:05:26.510Z",
+        "reason": "User confirmed #f2cf7c is intentional (gold jewellery preview gradient)"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#b7862f",
+        "createdAt": "2026-10-21T20:05:26.623Z",
+        "reason": "User confirmed #b7862f is intentional (gold jewellery preview gradient)"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#5e3f12",
+        "createdAt": "2026-10-21T20:05:26.728Z",
+        "reason": "User confirmed #5e3f12 is intentional (gold jewellery preview gradient)"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#24180a",
+        "createdAt": "2026-10-21T20:05:26.854Z",
+        "reason": "User confirmed #24180a is intentional (gold jewellery preview gradient)"
+      }
+    ]
+  }
+}
