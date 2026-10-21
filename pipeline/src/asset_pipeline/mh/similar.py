@@ -17,7 +17,10 @@ Each category is compared in its own terms:
   of mean pose and motion range rules out most pairs first.
 
 Thresholds are deliberately tight: the pass only removes what a viewer could not tell
-apart; anything merely alike is left for the user.
+apart; anything merely alike is left for the user. Geometry alone misses what the
+textures carry (a dense brow and a sparse one share their cards), so a groom or outfit
+pair also needs its thumbnails, rendered in one fixed pose, to match pixel for pixel
+(LOOK_LIMIT); a pair without both thumbnails is never proposed.
 
 Pairs under a category's threshold are clustered with complete linkage (every
 member is close to every other member). Each cluster keeps its richest member
@@ -38,6 +41,7 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+from PIL import Image
 from scipy.spatial import cKDTree
 
 from asset_pipeline.mh.glb import accessor_array, accessor_values, read_glb
@@ -65,6 +69,11 @@ THRESHOLDS: dict[str, float] = {
 }
 UNITS = {"animation": "deg"}
 AREA_RATIO = 1.25
+# Largest 99th-percentile pixel difference (0-255) between two thumbnails that still
+# reads as one look. The faintest visible brow difference in the catalogue (a shaded
+# brow against a thin arch) measures 16; render noise stays well under 8.
+LOOK_LIMIT = 8.0
+LOOK_GROUPS = frozenset({"hair", "eyebrows", "beard", "mustache", "outfit"})
 # Clip pairs whose mean pose or motion range differ more than this skip the aligned check.
 MOTION_PREFILTER = 4.0
 
@@ -114,6 +123,7 @@ class Pair:
     a: str
     b: str
     distance: float
+    look: float | None = None  # thumbnail difference, for pairs under the threshold
 
 
 @dataclass(frozen=True)
@@ -221,6 +231,36 @@ def shape_distance(first: Shape, second: Shape) -> float | None:
     return surface_distance(first, second)
 
 
+# --- thumbnails ---------------------------------------------------------------------------
+
+
+def look_difference(first: Path, second: Path) -> float | None:
+    """99th-percentile per-pixel difference (mean over RGB, 0-255) of two thumbnails;
+    None when either is missing or their sizes differ."""
+    if not first.is_file() or not second.is_file():
+        return None
+    with Image.open(first) as a, Image.open(second) as b:
+        pixels_a = np.asarray(a.convert("RGB"), dtype=np.float64)
+        pixels_b = np.asarray(b.convert("RGB"), dtype=np.float64)
+    if pixels_a.shape != pixels_b.shape:
+        return None
+    return float(np.percentile(np.abs(pixels_a - pixels_b).mean(axis=2), 99))
+
+
+def judge_looks(
+    pairs: Sequence[Pair], threshold: float, thumbnails: Mapping[str, Path]
+) -> list[Pair]:
+    """Pairs under the threshold with their thumbnail difference filled in."""
+    judged = []
+    for pair in pairs:
+        if pair.distance <= threshold and pair.a in thumbnails and pair.b in thumbnails:
+            look = look_difference(thumbnails[pair.a], thumbnails[pair.b])
+            if look is not None:
+                pair = Pair(pair.a, pair.b, pair.distance, round(look, 1))
+        judged.append(pair)
+    return judged
+
+
 # --- animation ----------------------------------------------------------------------------
 
 
@@ -325,11 +365,21 @@ def close_pairs(
     return sorted(pairs, key=lambda pair: pair.distance)
 
 
+def _close(pair: Pair, threshold: float, group: str) -> bool:
+    if pair.distance > threshold:
+        return False
+    if group not in LOOK_GROUPS:
+        return True
+    return pair.look is not None and pair.look <= LOOK_LIMIT
+
+
 def propose(
     items: Sequence[Item], pairs: Iterable[Pair], threshold: float, group: str
 ) -> list[Proposal]:
-    """Complete-linkage clusters under `threshold`; each keeps its richest member."""
-    lookup = {(p.a, p.b): p.distance for p in pairs} | {(p.b, p.a): p.distance for p in pairs}
+    """Complete-linkage clusters of close pairs (under `threshold`, and for grooms and
+    outfits matching thumbnails); each keeps its richest member."""
+    close = [p for p in pairs if _close(p, threshold, group)]
+    lookup = {(p.a, p.b): p.distance for p in close} | {(p.b, p.a): p.distance for p in close}
     rank = {item.id: (-item.richness, item.id) for item in items}
     clusters: list[list[str]] = []
     for pair in sorted(lookup.items(), key=lambda entry: entry[1]):
@@ -363,6 +413,11 @@ def _manifest(archive: Path) -> dict[str, Any]:
     return data
 
 
+def _thumbnails(archive: Path, entries: Iterable[Mapping[str, Any]]) -> dict[str, Path]:
+    web = archive / "web"
+    return {e["id"]: web / e["thumbnail"] for e in entries if e.get("thumbnail")}
+
+
 def _label(entry: Mapping[str, Any]) -> str:
     label = entry.get("label", "")
     return label.get("en", "") if isinstance(label, dict) else str(label)
@@ -380,13 +435,14 @@ def groom_groups(
         vertices, triangles = read_surface(web / entry["glb"], ("cards_lod0",))
         item = Item(entry["id"], slot, float(len(triangles)), _label(entry))
         by_slot.setdefault(slot, []).append((item, shape(vertices, triangles)))
+    thumbnails = _thumbnails(archive, manifest.get("grooms", []))
     results = []
     for slot, members in by_slot.items():
         log(f"compare {slot}: {len(members)} grooms")
         shapes = {item.id: surface for item, surface in members}
         items = [item for item, _ in members]
         pairs = close_pairs(items, lambda a, b, s=shapes: shape_distance(s[a.id], s[b.id]))
-        results.append(_result(slot, items, pairs))
+        results.append(_result(slot, items, pairs, thumbnails))
     return results
 
 
@@ -416,7 +472,8 @@ def outfit_group(
             return None
         return max(d for d in distances if d is not None)
 
-    return _result("outfit", items, close_pairs(items, distance))
+    thumbnails = _thumbnails(archive, manifest.get("outfits", []))
+    return _result("outfit", items, close_pairs(items, distance), thumbnails)
 
 
 def face_group(
@@ -466,8 +523,15 @@ def animation_group(
     return _result("animation", items, pairs)
 
 
-def _result(group: str, items: list[Item], pairs: list[Pair]) -> GroupResult:
+def _result(
+    group: str,
+    items: list[Item],
+    pairs: list[Pair],
+    thumbnails: Mapping[str, Path] | None = None,
+) -> GroupResult:
     threshold = THRESHOLDS[group]
+    if thumbnails is not None:
+        pairs = judge_looks(pairs, threshold, thumbnails)
     return GroupResult(
         group,
         threshold,
@@ -543,6 +607,12 @@ def report(results: Sequence[GroupResult], closest: int = 6) -> list[str]:
         )
         for proposal in result.proposals:
             lines.append(f"    hide {proposal.id}  ~ {proposal.keep}  {proposal.distance} {unit}")
+        for pair in result.pairs:
+            if pair.distance <= result.threshold and not _close(
+                pair, result.threshold, result.group
+            ):
+                look = "no thumbnails" if pair.look is None else f"thumbnails differ by {pair.look}"
+                lines.append(f"    kept {pair.a} ~ {pair.b}  {pair.distance} {unit}, {look}")
         shown = [p for p in result.pairs if p.distance > result.threshold][:closest]
         for pair in shown:
             lines.append(f"    near {pair.a} ~ {pair.b}  {pair.distance} {unit}")

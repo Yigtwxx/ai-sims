@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from asset_pipeline.mh.similar import (
     Item,
@@ -13,6 +14,8 @@ from asset_pipeline.mh.similar import (
     Proposal,
     aligned_distance,
     apply_proposals,
+    judge_looks,
+    look_difference,
     motion_distance,
     propose,
     sample_surface,
@@ -52,6 +55,35 @@ def test_clusters_need_every_member_close_and_keep_the_richest() -> None:
     pairs = [Pair("a", "b", 0.1), Pair("b", "c", 0.2), Pair("a", "c", 9.0)]
     assert propose(items, pairs, 1.0, "g") == [Proposal("a", "b", 0.1, "g")]
     assert propose(items, pairs, 0.05, "g") == []
+
+
+def _thumbnail(path: Path, brow: int) -> Path:
+    pixels = np.full((64, 64, 3), 120, dtype=np.uint8)
+    pixels[20:24, 10:54] = brow  # the only part two grooms on one head differ in
+    Image.fromarray(pixels).save(path)
+    return path
+
+
+def test_thumbnails_differ_by_their_visible_change(tmp_path: Path) -> None:
+    dark = _thumbnail(tmp_path / "dark.webp", 30)
+    assert look_difference(dark, _thumbnail(tmp_path / "same.webp", 30)) == 0.0
+    assert look_difference(dark, _thumbnail(tmp_path / "light.webp", 100)) == pytest.approx(70.0)
+    assert look_difference(dark, tmp_path / "missing.webp") is None
+
+
+def test_grooms_close_in_shape_but_not_in_look_are_kept(tmp_path: Path) -> None:
+    items = [Item("a", "eyebrows", 1.0), Item("b", "eyebrows", 2.0), Item("c", "eyebrows", 3.0)]
+    thumbnails = {
+        "a": _thumbnail(tmp_path / "a.webp", 30),
+        "b": _thumbnail(tmp_path / "b.webp", 31),
+        "c": _thumbnail(tmp_path / "c.webp", 100),
+    }
+    pairs = judge_looks(
+        [Pair("a", "b", 0.1), Pair("a", "c", 0.1), Pair("b", "c", 0.1)], 0.5, thumbnails
+    )
+    assert propose(items, pairs, 0.5, "eyebrows") == [Proposal("a", "b", 0.1, "eyebrows")]
+    # Without thumbnails nothing in a groom slot is proposed.
+    assert propose(items, [Pair("a", "b", 0.1)], 0.5, "eyebrows") == []
 
 
 def _motion(frames: np.ndarray) -> Motion:
