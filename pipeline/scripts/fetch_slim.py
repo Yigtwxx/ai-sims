@@ -35,7 +35,8 @@ from urllib.parse import quote
 CHUNK = 1 << 20
 ATTEMPTS = 5
 COPIED = ("web/",)
-"""Path prefixes whose duplicates are copied instead of hard-linked (see the docstring)."""
+"""Path prefixes copied instead of hard-linked when either side of a duplicate is under one
+(see the docstring)."""
 
 
 @dataclass(frozen=True)
@@ -83,7 +84,7 @@ def place_twin(remote: RemoteFile, original: RemoteFile, dest: Path) -> str:
     part = target.with_name(target.name + ".part")
     part.unlink(missing_ok=True)
     outcome = "copied"
-    if not remote.path.startswith(COPIED):
+    if not remote.path.startswith(COPIED) and not original.path.startswith(COPIED):
         try:
             os.link(source, part)
             outcome = "linked"
@@ -130,6 +131,9 @@ class Client:
         target.unlink(missing_ok=True)
         target.parent.mkdir(parents=True, exist_ok=True)
         part = target.with_name(target.name + ".part")
+        if part.is_file() and part.stat().st_nlink > 1:
+            # Left by a twin that was being linked: appending to it would write into its source.
+            part.unlink()
         for attempt in range(1, ATTEMPTS + 1):
             try:
                 start = part.stat().st_size if part.is_file() else 0

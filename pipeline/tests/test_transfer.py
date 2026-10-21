@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -173,3 +174,28 @@ def test_build_index_leaves_out_unused_preset_sources(tmp_path: Path):
         "raw/characters/Ada/textures/face/T_Face_Basecolor.png",
     ], kept
     assert len(build_index(root, ("raw",))) == 5, "no patterns keeps every file"
+
+
+def test_place_twin_copies_when_the_original_is_a_web_file(tmp_path: Path):
+    dest = tmp_path / "mac"
+    original = fetch_slim.RemoteFile("web/shared/micro_normal.png", 4, "x")
+    twin = fetch_slim.RemoteFile("raw/statics/micro_normal.png", 4, "x")
+    (dest / "web" / "shared").mkdir(parents=True)
+    (dest / original.path).write_bytes(b"data")
+    twin = fetch_slim.RemoteFile(twin.path, 4, fetch_slim.sha256_of(dest / original.path))
+    assert fetch_slim.place_twin(twin, original, dest) == "copied"
+    assert not (dest / twin.path).samefile(dest / original.path)
+
+
+def test_fetch_drops_a_part_file_that_is_a_hard_link(server, tmp_path: Path):
+    client = fetch_slim.Client(url_of(server), TOKEN)
+    remote = next(f for f in client.files() if f.path.endswith("head.glb"))
+    dest = tmp_path / "mac"
+    source = dest / "raw" / "other.glb"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"keep me")
+    part = dest / "web" / "faces" / "Ada" / "head.glb.part"
+    part.parent.mkdir(parents=True)
+    os.link(source, part)
+    assert client.fetch(remote, dest) == "downloaded"
+    assert source.read_bytes() == b"keep me", "the linked source must stay untouched"
