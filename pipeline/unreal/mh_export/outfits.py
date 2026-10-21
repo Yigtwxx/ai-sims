@@ -36,6 +36,9 @@ BUILD_ROOT = "/Game/MHExport/Builds"
 BASE_ROOT = "/Game/MHExport/Scratch"
 # A preset per gender to copy as the build base (its face does not matter here).
 BASE_PRESETS = {"female": "Ada", "male": "Bruce"}
+# Masters the web rebuilds from instance parameters. Parts on any other master (custom
+# Fab shirts) also get a baked GLB: every material input rendered on the mesh UVs.
+NATIVE_MASTERS = ("M_fabric_simpler", "M_fabric_simpler_fuzz_option", "M_jeans_nrm_custom_master")
 
 
 def outfit_items() -> list[str]:
@@ -98,6 +101,12 @@ def material_textures(mi: unreal.MaterialInstance) -> list[unreal.Texture]:
     return found
 
 
+def master_of(mi: unreal.MaterialInterface, instances: dict[str, Any]) -> str:
+    """Name of the material at the root of `mi`'s parent chain."""
+    parents = instances.get(mi.get_path_name(), {}).get("parents") or []
+    return str(parents[-1]).rsplit(".", 1)[-1] if parents else mi.get_name()
+
+
 def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
     character = base_character(gender)
     item = unreal.load_asset(item_path)
@@ -136,7 +145,8 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
                 # source art to export; the material dump still names them.
                 textures[key] = {"error": str(exc)}
 
-    slot_materials: list[unreal.MaterialInterface] = []
+    slot_materials: dict[str, list[unreal.MaterialInterface]] = {}
+    mesh_objects: dict[str, unreal.SkeletalMesh] = {}
     for asset in built:
         cls = inventory.class_name(asset)
         obj = asset.get_asset()
@@ -147,16 +157,24 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
                 "glb": glb.name if export_gltf(obj, glb) else None,
                 "fbx": fbx.name if export_object(obj, fbx, fbx_options()) else None,
             }
-            slot_materials += [s.material_interface for s in obj.get_editor_property("materials")]
+            mesh_objects[str(asset.asset_name)] = obj
+            slot_materials[str(asset.asset_name)] = [
+                s.material_interface for s in obj.get_editor_property("materials")
+            ]
         elif cls == "MaterialInstanceConstant":
             add_instance(inventory.object_path(asset), obj)
     # Some items (e.g. OA_Shirt_01/04) keep their own instances on the built
     # mesh instead of copies under Clothing: dump those from the mesh slots.
-    for mi in slot_materials:
+    for mi in (m for slots in slot_materials.values() for m in slots):
         if isinstance(mi, unreal.MaterialInstance):
             path = mi.get_path_name()
             if path not in instances:
                 add_instance(path, mi)
+    for name, slots in slot_materials.items():
+        if any(master_of(mi, instances) not in NATIVE_MASTERS for mi in slots if mi):
+            baked = work / f"{name}.baked.glb"
+            exported = export_gltf(mesh_objects[name], baked, bake=True)
+            meshes[name]["baked_glb"] = baked.name if exported else None
     if not any(m["glb"] for m in meshes.values()):
         raise RuntimeError(f"No fitted clothing mesh was built for {item_path}: {build_warning}")
     write_json(

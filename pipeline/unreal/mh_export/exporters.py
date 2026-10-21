@@ -58,10 +58,18 @@ def export_texture(
     raise RuntimeError(f"No exporter wrote {texture.get_path_name()}")
 
 
-def gltf_options() -> unreal.GLTFExportOptions:
+BAKE_SIZE = 4096  # upper bound; auto-detect follows the largest map the graph samples
+
+
+def gltf_options(bake: bool = False) -> unreal.GLTFExportOptions:
+    """`bake` renders every material input to textures on the mesh UVs (for materials
+    whose graph the web cannot rebuild from the instance parameters alone)."""
     options = unreal.GLTFExportOptions()
+    bake_mode = (
+        unreal.GLTFMaterialBakeMode.USE_MESH_DATA if bake else unreal.GLTFMaterialBakeMode.DISABLED
+    )
     # Keep every vertex attribute and morph target; compression happens later on our side.
-    for name, value in {
+    settings: dict[str, Any] = {
         "export_vertex_colors": True,
         "export_vertex_skin_weights": True,
         "export_morph_targets": True,
@@ -70,9 +78,14 @@ def gltf_options() -> unreal.GLTFExportOptions:
         "export_lights": False,
         "export_cameras": False,
         "adjust_normalmaps": True,
-        "bake_material_inputs": unreal.GLTFMaterialBakeMode.DISABLED,
+        "bake_material_inputs": bake_mode,
         "texture_image_format": unreal.GLTFTextureImageFormat.PNG,
-    }.items():
+    }
+    if bake:
+        settings["default_material_bake_size"] = unreal.GLTFMaterialBakeSize(
+            x=BAKE_SIZE, y=BAKE_SIZE, auto_detect=True
+        )
+    for name, value in settings.items():
         try:
             options.set_editor_property(name, value)
         except Exception as exc:  # option names move between engine versions
@@ -80,13 +93,13 @@ def gltf_options() -> unreal.GLTFExportOptions:
     return options
 
 
-def export_gltf(obj: unreal.Object, path: Path) -> bool:
+def export_gltf(obj: unreal.Object, path: Path, bake: bool = False) -> bool:
     """glTF via the GLTFExporter plugin (meshes keep skin weights and morph targets)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    if export_object(obj, path, gltf_options()):
+    if export_object(obj, path, gltf_options(bake)):
         return True
     exporter = getattr(unreal, "GLTFExporter", None)
     if exporter is None:
         return False
-    exporter.export_to_gltf(obj, str(path), gltf_options(), set())
+    exporter.export_to_gltf(obj, str(path), gltf_options(bake), set())
     return path.is_file()
