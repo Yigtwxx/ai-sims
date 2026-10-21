@@ -98,6 +98,16 @@ describe('fitCards', () => {
     expect(fitted.getAttribute(STRAND_U).count).toBe(4);
   });
 
+  it('bounds the fitted cards without walking their morph targets', () => {
+    const cards = card();
+    // A face morph that would throw the sphere 100 m out if it were included.
+    cards.morphAttributes.position = [new BufferAttribute(new Float32Array(12).fill(100), 3)];
+    cards.morphTargetsRelative = true;
+    const fitted = fitCards(cards, headPositionTable(head()), strandProgress(cards));
+    expect(fitted.morphAttributes.position).toBe(cards.morphAttributes.position);
+    expect(fitted.boundingSphere!.radius).toBeLessThan(1);
+  });
+
   it('wears the cards as loaded without a head table', () => {
     const cards = card();
     const fitted = fitCards(cards, null, strandProgress(cards));

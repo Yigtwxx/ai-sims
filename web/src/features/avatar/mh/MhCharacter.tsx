@@ -11,7 +11,6 @@ import {
   useRef,
 } from 'react';
 import type { Camera, Material, Mesh, Object3D, Scene, WebGLRenderTarget } from 'three';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
@@ -43,7 +42,7 @@ import {
 } from './groomDensity';
 import { takeOffGroom, wearGroom, type GroomWear, type WornGroom } from './hair';
 import { setHairLook } from './hairMaterial';
-import { useMhGltf } from './loaders';
+import { meshoptDecoder, useMhGltf } from './loaders';
 import { MotionPlayer, type MocapLayer, type MotionClip } from './motion';
 import { setOutfitColors, wearOutfit, type OutfitWear, type WornOutfit } from './outfits';
 import {
@@ -59,7 +58,7 @@ import {
   loadIrisTextures,
   loadSkinTextures,
 } from './skinTextures';
-import { warmUp } from './warmUp';
+import { texturesIn, uploadTextures, warmUp, watchSceneTarget } from './warmUp';
 import { compileWrinkleTable, computeWrinkleWeights, type AnimatedMaps } from './wrinkles';
 
 export interface MhCharacterHandle {
@@ -165,6 +164,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     warm.current.enabled = prewarm;
     warm.current.camera = camera;
     warm.current.scene = scene;
+    watchSceneTarget(scene);
   }, [onSettled, onUnsettled, prewarm, camera, scene]);
   const bodyGltf = useMhGltf(bodyUrl);
   const headGltf = useMhGltf(headUrl);
@@ -254,39 +254,64 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     },
     [gl, assembled],
   );
+  /**
+   * Uploads the textures of parts about to go on (or of the hidden character)
+   * a frame at a time and compiles their shaders off the main thread, so the
+   * frame that first draws them does not stall the page. A failure only costs
+   * that slow frame. Resolves whether `current` still holds.
+   */
+  const prepare = useCallback(
+    (parts: Object3D | readonly Object3D[], current: () => boolean) =>
+      warmUp(gl, parts, warm.current.camera, warm.current.scene, current).catch(
+        (error: unknown) => {
+          console.warn('[mh] warm-up failed', error);
+          return current();
+        },
+      ),
+    [gl],
+  );
+
+  // A converted head has no maps of its own: hide it rather than show it white.
+  // Before the first frame, which would otherwise also compile and upload a
+  // map-less skin it never keeps.
+  useLayoutEffect(() => {
+    if (skin && !hasMaps(assembled.skins)) setVisible(assembled.root, false);
+  }, [assembled, skin]);
 
   useEffect(() => {
     unsettle('skin');
     if (!skin && !iris) {
+      setVisible(assembled.root, true);
       settle('skin');
       return;
     }
     let live = true;
-    // A converted head has no maps of its own: hide it rather than show it white.
-    if (skin && !hasMaps(assembled.skins)) setVisible(assembled.root, false);
-    const jobs = [
-      skin &&
-        loadSkinTextures(gl, skin, { makeup }).then((textures) => {
-          if (live) bindSkinTextures(assembled.skins, textures);
-        }),
-      iris &&
-        loadIrisTextures(gl, iris).then((textures) => {
-          if (live) bindIrisTextures(assembled.eyes, textures);
-        }),
-    ];
-    void Promise.allSettled(jobs).then((results) => {
-      for (const result of results) {
-        // Missing files must not take the character down with them.
-        if (result.status === 'rejected') console.warn('[mh] texture set failed', result.reason);
-      }
-      if (!live) return;
-      setVisible(assembled.root, true);
-      settle('skin');
-    });
+    const current = () => live;
+    const hidden = !assembled.root.visible;
+    void Promise.all([
+      skippingFailure(skin && loadSkinTextures(gl, skin, { makeup })),
+      skippingFailure(iris && loadIrisTextures(gl, iris)),
+    ])
+      .then(async ([skinMaps, irisMaps]) => {
+        // On screen, new maps would all upload in the frame that binds them.
+        if (!(await uploadTextures(gl, texturesIn([skinMaps, irisMaps]), current))) return;
+        if (skinMaps) bindSkinTextures(assembled.skins, skinMaps);
+        if (irisMaps) bindIrisTextures(assembled.eyes, irisMaps);
+        // The first maps change the skin and eye shaders: compile before showing them.
+        if (hidden && !(await prepare(assembled.root, current))) return;
+        setVisible(assembled.root, true);
+        settle('skin');
+      })
+      .catch((error: unknown) => {
+        console.warn('[mh] texture upload failed', error);
+        if (!live) return;
+        setVisible(assembled.root, true);
+        settle('skin');
+      });
     return () => {
       live = false;
     };
-  }, [assembled, gl, skin, makeup, iris, settle, unsettle]);
+  }, [assembled, gl, skin, makeup, iris, settle, unsettle, prepare]);
 
   useEffect(() => {
     let live = true;
@@ -403,15 +428,18 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
           },
         )
       : Promise.resolve(null);
-    void Promise.all([fitted, layers]).then(([next, packed]) => {
+    void Promise.all([fitted, layers]).then(async ([next, packed]) => {
+      for (const groom of next) {
+        const look = latestGrooms.current.find((wear) => wear.groom.id === groom.id)?.look;
+        if (look) setHairLook(groom.materials, look);
+      }
+      // The hair on now stays while the new cards upload and compile.
+      const cards = next.flatMap((groom) => groom.meshes);
+      if (live) await prepare(cards, () => live);
       if (!live) {
         for (const groom of next) groom.dispose();
         packed?.dispose();
         return;
-      }
-      for (const groom of next) {
-        const look = latestGrooms.current.find((wear) => wear.groom.id === groom.id)?.look;
-        if (look) setHairLook(groom.materials, look);
       }
       swapGrooms(next, files, packed, painted);
       settle('grooms');
@@ -419,7 +447,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     return () => {
       live = false;
     };
-  }, [assembled, gl, groomKey, hairLod, settle, unsettle, swapGrooms]);
+  }, [assembled, gl, groomKey, hairLod, settle, unsettle, swapGrooms, prepare]);
 
   useEffect(() => {
     for (const wear of grooms) {
@@ -479,27 +507,32 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     }
     let live = true;
     const body = assembled.handle.body;
-    void Promise.allSettled(wears.map((wear) => wearOutfit(gl, wear, body))).then((results) => {
-      const next: WornOutfit[] = [];
-      results.forEach((result, i) => {
-        if (result.status === 'fulfilled') next.push(result.value);
-        else console.warn('[mh] outfit failed to load', wears[i]?.outfit.id, result.reason);
-      });
-      if (!live) {
-        for (const worn of next) worn.dispose();
-        return;
-      }
-      for (const worn of next) {
-        const colors = latestOutfits.current.find((wear) => wear.outfit.id === worn.id)?.colors;
-        if (colors) setOutfitColors(worn, colors);
-      }
-      swapOutfits(next);
-      settle('outfits');
-    });
+    void Promise.allSettled(wears.map((wear) => wearOutfit(gl, wear, body))).then(
+      async (results) => {
+        const next: WornOutfit[] = [];
+        results.forEach((result, i) => {
+          if (result.status === 'fulfilled') next.push(result.value);
+          else console.warn('[mh] outfit failed to load', wears[i]?.outfit.id, result.reason);
+        });
+        for (const worn of next) {
+          const colors = latestOutfits.current.find((wear) => wear.outfit.id === worn.id)?.colors;
+          if (colors) setOutfitColors(worn, colors);
+        }
+        // The clothes on now stay while the new ones upload and compile.
+        const garments = next.flatMap((worn) => worn.meshes);
+        if (live) await prepare(garments, () => live);
+        if (!live) {
+          for (const worn of next) worn.dispose();
+          return;
+        }
+        swapOutfits(next);
+        settle('outfits');
+      },
+    );
     return () => {
       live = false;
     };
-  }, [assembled, gl, outfitKey, settle, unsettle, swapOutfits]);
+  }, [assembled, gl, outfitKey, settle, unsettle, swapOutfits, prepare]);
 
   useEffect(() => {
     for (const wear of outfits) {
@@ -548,7 +581,7 @@ async function loadClips(urls: readonly string[]): Promise<MotionClip[]> {
       if (!pending) {
         // Converter clips are meshopt-compressed; they carry no textures.
         pending = new GLTFLoader()
-          .setMeshoptDecoder(MeshoptDecoder)
+          .setMeshoptDecoder(meshoptDecoder())
           .loadAsync(url)
           .then((gltf) => {
             const pelvisRest = gltf.scene.getObjectByName('pelvis')?.position.clone() ?? null;
@@ -564,6 +597,15 @@ async function loadClips(urls: readonly string[]): Promise<MotionClip[]> {
     if (result.status === 'fulfilled') return result.value;
     console.warn('[mh] idle clip failed to load', urls[i], result.reason);
     return [];
+  });
+}
+
+/** A texture set, or null when there is none or it failed (missing files must not take the character down). */
+function skippingFailure<T>(job: Promise<T> | null): Promise<T | null> {
+  if (!job) return Promise.resolve(null);
+  return job.catch((error: unknown) => {
+    console.warn('[mh] texture set failed', error);
+    return null;
   });
 }
 

@@ -174,9 +174,13 @@ export function fitCards(
   }
   copy.setAttribute('position', new BufferAttribute(positions, 3));
   copy.setAttribute(STRAND_U, new BufferAttribute(progress, 1));
+  // Bounds of the rest cards, before the morphs are attached: with them, three
+  // widens the sphere by every face morph of every vertex (most of a second on
+  // long hair, on the main thread). The cards are never frustum culled, and
+  // the expressions move them by millimetres.
+  copy.computeBoundingSphere();
   copy.morphAttributes = cards.morphAttributes;
   copy.morphTargetsRelative = cards.morphTargetsRelative;
-  copy.computeBoundingSphere();
   copy.name = cards.name;
   return copy;
 }

@@ -38,10 +38,29 @@ export function ktx2LoaderFor(renderer: WebGLRenderer): KTX2Loader {
   return loader;
 }
 
+/** Meshopt decoder workers; the KTX2 transcoder keeps a pool of the same size. */
+const MESHOPT_WORKERS = 4;
+let meshoptWorkers = false;
+
+/**
+ * The meshopt decoder, decoding in a worker pool. Without one, every GLB's
+ * buffers are decoded on the main thread as it is parsed (a head, its hair
+ * cards and each garment stall the stage for tens to hundreds of ms).
+ */
+export function meshoptDecoder(): typeof MeshoptDecoder {
+  if (!meshoptWorkers && typeof Worker !== 'undefined') {
+    // Not a React hook despite the name (the linter would take it for one).
+    const startWorkers = MeshoptDecoder.useWorkers;
+    startWorkers(MESHOPT_WORKERS);
+    meshoptWorkers = true;
+  }
+  return MeshoptDecoder;
+}
+
 /** Configures a GLTFLoader for MetaHuman assets: KTX2 textures and meshopt geometry. */
 export function configureLoader(loader: GLTFLoader, renderer: WebGLRenderer): void {
   loader.setKTX2Loader(ktx2LoaderFor(renderer));
-  loader.setMeshoptDecoder(MeshoptDecoder);
+  loader.setMeshoptDecoder(meshoptDecoder());
 }
 
 /**
