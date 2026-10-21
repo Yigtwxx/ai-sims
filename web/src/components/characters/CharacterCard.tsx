@@ -83,8 +83,11 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               ref={(node) => {
-                // Server-rendered: the image may finish before hydration attaches onLoad.
-                if (node?.complete && node.naturalWidth > 0) setLoaded(true);
+                // Server-rendered: the image may finish (or fail) before hydration attaches
+                // onLoad and onError; a failed one is complete with no pixels.
+                if (!node?.complete) return;
+                if (node.naturalWidth > 0) setLoaded(true);
+                else setBroken(true);
               }}
               src={`/api/characters/${character.id}/thumbnail`}
               alt=""
