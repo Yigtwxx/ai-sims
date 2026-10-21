@@ -13,7 +13,14 @@
 import { ArrowLeftIcon } from '@phosphor-icons/react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { toast } from 'sonner';
 import { useStore } from 'zustand';
 
@@ -105,7 +112,6 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
   const manifest = manifestState.status === 'ready' ? manifestState.manifest : undefined;
 
   const name = useCreatorStore((state) => state.name);
-  const config = useCreatorStore((state) => state.config);
   const canUndo = useStore(useCreatorStore.temporal, (state) => state.pastStates.length > 0);
   const canRedo = useStore(useCreatorStore.temporal, (state) => state.futureStates.length > 0);
 
@@ -257,14 +263,7 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
               <StageFailed retry={retry} insetLeft={premiere ? 0 : panelWidth} />
             )}
           >
-            <MhStage
-              config={config}
-              manifest={manifest}
-              mode="creator"
-              focus={focus}
-              insetLeft={premiere ? 0 : panelWidth}
-              className="size-full"
-            />
+            <CreatorStage manifest={manifest} focus={focus} insetLeft={premiere ? 0 : panelWidth} />
           </StageBoundary>
         ) : (
           <div
@@ -465,6 +464,33 @@ function CategoryPanel({
     case 'tattoos':
       return <TattooPanel />;
   }
+}
+
+/**
+ * The stage, subscribed to the config on its own: an edit re-renders this and
+ * the panel that made it, not the whole editor. The stage follows in the
+ * background (deferred), so a slider drag never stalls on a stage render.
+ */
+function CreatorStage({
+  manifest,
+  focus,
+  insetLeft,
+}: {
+  manifest: MhManifest;
+  focus: CameraFocus;
+  insetLeft: number;
+}) {
+  const config = useDeferredValue(useCreatorStore((state) => state.config));
+  return (
+    <MhStage
+      config={config}
+      manifest={manifest}
+      mode="creator"
+      focus={focus}
+      insetLeft={insetLeft}
+      className="size-full"
+    />
+  );
 }
 
 function AutosaveNote({ status }: { status: ReturnType<typeof useAutosave>['status'] }) {

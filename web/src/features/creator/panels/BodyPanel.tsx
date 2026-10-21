@@ -1,9 +1,10 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { memo, useCallback } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { BODY_PRESETS, BODY_SLIDERS } from '@/lib/character/schema';
+import { BODY_PRESETS, BODY_SLIDERS, type BodySlider } from '@/lib/character/schema';
 
 import { bodyFor, presetSliders } from '../reconcile';
 import { useCreatorStore } from '../store';
@@ -13,7 +14,7 @@ import { signedPercent, useConfig, type PanelProps } from './shared';
 
 export function BodyPanel({ manifest }: PanelProps) {
   const t = useTranslations('Creator.body');
-  const { config, update } = useConfig();
+  const { config } = useConfig();
   const setBodyPreset = useCreatorStore((state) => state.setBodyPreset);
   const body = bodyFor(manifest, config.base);
   const presets = BODY_PRESETS.filter((preset) => !body || preset in body.presets);
@@ -53,20 +54,13 @@ export function BodyPanel({ manifest }: PanelProps) {
             {BODY_SLIDERS.map((id) => {
               const def = body.sliders.find((slider) => slider.id === id);
               if (!def) return null;
-              const value = config.body.sliders[id] ?? def.default;
               return (
-                <LabeledSlider
+                <SliderRow
                   key={id}
-                  label={t(`sliderNames.${id}`)}
-                  value={value}
+                  id={id}
+                  value={config.body.sliders[id] ?? def.default}
                   min={Math.max(-1, def.min)}
                   max={Math.min(1, def.max)}
-                  centered
-                  ends={[t(`ends.${id}.min`), t(`ends.${id}.max`)]}
-                  valueText={signedPercent(value, t('neutral'))}
-                  onChange={(next) =>
-                    update((draft) => void (draft.body.sliders[id] = Number(next.toFixed(3))))
-                  }
                 />
               );
             })}
@@ -78,3 +72,39 @@ export function BodyPanel({ manifest }: PanelProps) {
     </>
   );
 }
+
+/**
+ * One body slider. Memoised: a drag re-renders the row being dragged, not all
+ * seven (each a full Radix slider), which kept the editor busy for tens of
+ * milliseconds per pointer move.
+ */
+const SliderRow = memo(function SliderRow({
+  id,
+  value,
+  min,
+  max,
+}: {
+  id: BodySlider;
+  value: number;
+  min: number;
+  max: number;
+}) {
+  const t = useTranslations('Creator.body');
+  const update = useCreatorStore((state) => state.update);
+  const onChange = useCallback(
+    (next: number) => update((draft) => void (draft.body.sliders[id] = Number(next.toFixed(3)))),
+    [update, id],
+  );
+  return (
+    <LabeledSlider
+      label={t(`sliderNames.${id}`)}
+      value={value}
+      min={min}
+      max={max}
+      centered
+      ends={[t(`ends.${id}.min`), t(`ends.${id}.max`)]}
+      valueText={signedPercent(value, t('neutral'))}
+      onChange={onChange}
+    />
+  );
+});

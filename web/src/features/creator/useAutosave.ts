@@ -47,8 +47,11 @@ export interface Autosave {
  */
 export function useAutosave({ enabled, id, status, onCreated }: AutosaveOptions): Autosave {
   const name = useCreatorStore((state) => state.name);
-  const config = useCreatorStore((state) => state.config);
-  const savedSnapshot = useCreatorStore((state) => state.savedSnapshot);
+  // A boolean, not the config: an edit re-renders the editor only when it flips
+  // (every slider step used to re-render the whole editor through this hook).
+  const unsaved = useCreatorStore(
+    (state) => state.savedSnapshot !== snapshotOf(state.name, state.config),
+  );
   const idRef = useRef(id);
   const inFlight = useRef<Promise<SaveOutcome> | null>(null);
   const timer = useRef<number | null>(null);
@@ -118,23 +121,31 @@ export function useAutosave({ enabled, id, status, onCreated }: AutosaveOptions)
     while (inFlight.current) await inFlight.current.catch(() => undefined);
   }, [cancelTimer]);
 
-  const current = snapshotOf(name, config);
-  const dirty = enabled && Boolean(name.trim()) && savedSnapshot !== current;
+  const dirty = enabled && Boolean(name.trim()) && unsaved;
 
   // Debounce: each edit restarts the quiet period; the save itself never
   // overlaps another. A failed save is retried, backing off up to 16x.
   useEffect(() => {
     if (!dirty) return undefined;
-    cancelTimer();
-    timer.current = window.setTimeout(
-      () => {
-        timer.current = null;
-        void save(latest.current.status);
-      },
-      DEBOUNCE_MS * 2 ** Math.min(failures, 4),
-    );
-    return cancelTimer;
-  }, [dirty, current, failures, save, cancelTimer]);
+    const restart = () => {
+      cancelTimer();
+      timer.current = window.setTimeout(
+        () => {
+          timer.current = null;
+          void save(latest.current.status);
+        },
+        DEBOUNCE_MS * 2 ** Math.min(failures, 4),
+      );
+    };
+    restart();
+    const unsubscribe = useCreatorStore.subscribe((state, previous) => {
+      if (state.config !== previous.config || state.name !== previous.name) restart();
+    });
+    return () => {
+      unsubscribe();
+      cancelTimer();
+    };
+  }, [dirty, failures, save, cancelTimer]);
 
   // Leaving the editor (client navigation) still writes a pending change.
   useEffect(() => {
@@ -163,7 +174,7 @@ export function useAutosave({ enabled, id, status, onCreated }: AutosaveOptions)
   else if (!name.trim()) state = 'needsName';
   else if (saving) state = 'saving';
   else if (failures > 0) state = 'error';
-  else if (savedSnapshot !== current) state = 'pending';
+  else if (unsaved) state = 'pending';
   else if (savedAt) state = 'saved';
 
   return { status: state, savedAt, idRef, flush, save };
