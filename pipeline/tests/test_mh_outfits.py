@@ -14,6 +14,7 @@ from PIL import Image
 from asset_pipeline.mh import outfits
 from asset_pipeline.mh.compat import curated_compat
 from asset_pipeline.mh.geometry import vertex_normals
+from asset_pipeline.mh.glb import read_glb
 from asset_pipeline.mh.outfits import (
     BodyFit,
     Fit,
@@ -605,3 +606,46 @@ def test_custom_master_takes_the_maps_unreal_baked(tmp_path: Path, monkeypatch) 
     assert pbr["baseColorFactor"] == [1.0, 1.0, 1.0, 1.0] and pbr["metallicFactor"] == 1.0
     assert result.gltf["normalTexture"] == {"scale": 1.0}
     assert outfits.baked_maps(unit, "MI_Other") == {}
+
+
+def test_custom_master_keeps_the_factors_unreal_baked_to_constants(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Unreal leaves out metallicRoughnessTexture when metallic and roughness bake to
+    constants and writes them as factors: those factors, and the occlusion map, must stay."""
+
+    def fake_encode(image: np.ndarray, output: Path, settings: object) -> int:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"KTX2")
+        return 4
+
+    monkeypatch.setattr(outfits, "encode_ktx2", fake_encode)
+    unit = _baked_unit(tmp_path / "raw" / "WI_OA_Custom")
+    path = unit.folder / "OutfitBase_female_Outfits.baked.glb"
+    document, binary = read_glb(path.read_bytes())
+    pbr = document["materials"][0]["pbrMetallicRoughness"]
+    del pbr["metallicRoughnessTexture"]
+    pbr.update(metallicFactor=0.0, roughnessFactor=0.5, baseColorFactor=[0.5, 1.0, 1.0, 1.0])
+    text = json.dumps(document).encode()
+    text += b" " * (-len(text) % 4)
+    glb = struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(text) + 8 + len(binary))
+    glb += struct.pack("<I4s", len(text), b"JSON") + text
+    glb += struct.pack("<I4s", len(binary), b"BIN\0") + binary
+    path.write_bytes(glb)
+
+    assert outfits.baked_factors(unit, "MI_Custom") == {
+        "baseColorFactor": [0.5, 1.0, 1.0, 1.0],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.5,
+    }
+    maps = outfits.baked_maps(unit, "MI_Custom")
+    orm = maps["data"].pixels
+    assert orm is not None and orm[0, 1].tolist() == [252, 255, 255], "occlusion, G=B=1"
+    result = outfits.convert_material(
+        unit, "MI_Custom", outfits.TextureWriter(tmp_path / "web"), {}
+    )
+    gltf_pbr = result.gltf["pbrMetallicRoughness"]
+    assert gltf_pbr["metallicFactor"] == 0.0, "not rendered fully metallic"
+    assert gltf_pbr["roughnessFactor"] == 0.5
+    assert gltf_pbr["baseColorFactor"] == [0.5, 1.0, 1.0, 1.0]
+    assert "orm" in result.textures, "the occlusion map is kept"

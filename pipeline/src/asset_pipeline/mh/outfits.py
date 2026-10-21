@@ -42,7 +42,9 @@ heads and bodies, the runtime derives the tangent frame from UV derivatives.
 Materials on other (custom) masters stay "plain" glTF PBR. When the export also wrote a
 baked GLB for the mesh (`<mesh>.baked.glb`, every material input rendered to textures on
 UV0), its base colour, normal and occlusion + metallic/roughness (packed as one ORM map)
-become the plain material's maps.
+become the plain material's maps. That bake only covers UV 0..1, so a Khaos material painted
+on UDIM tiles past 1001 is rebuilt from its raw tiles instead and its part's UVs move into an
+atlas of the tiles it uses (`outfit_udim`, one 2048-px cell per tile).
 """
 
 import base64
@@ -79,6 +81,16 @@ from asset_pipeline.mh.glb import (
 )
 from asset_pipeline.mh.gltf import MAX_INFLUENCES, merge_influences
 from asset_pipeline.mh.ktx import Ktx2Settings, encode_ktx2
+from asset_pipeline.mh.outfit_udim import RECIPE as UDIM_RECIPE
+from asset_pipeline.mh.outfit_udim import (
+    AtlasLayout,
+    is_khaos,
+    is_udim_material,
+    khaos_atlas,
+    plan_atlas,
+    remap_uvs,
+    triangle_tiles,
+)
 from asset_pipeline.mh.textures import (
     AMBIGUOUS_CONVENTION,
     flip_green,
@@ -611,6 +623,36 @@ def load_garment(path: Path, body: "BodyFit | None" = None) -> Garment:
     if not garment.parts:
         raise OutfitError(f"{path.name}: no garment geometry")
     return garment
+
+
+def pack_udim_parts(
+    unit: "OutfitUnit", garment: Garment, log: Callable[[str], None] = lambda _: None
+) -> dict[str, AtlasLayout]:
+    """Move the UVs of every UDIM part (a Khaos material whose triangles use tiles past
+    1001) into an atlas of those tiles, splitting vertices shared by two tiles; returns the
+    atlas layout by material. Other parts are left as they are."""
+    materials = unit.materials()
+    textures = unit.info.get("textures", {})
+    layouts: dict[str, AtlasLayout] = {}
+    for part in garment.parts:
+        material = materials.get(part.material)
+        if material is None or not is_khaos(material) or not is_udim_material(material, textures):
+            continue
+        tiles = sorted(set(triangle_tiles(part.uvs, part.triangles).tolist()))
+        if tiles == [1001]:
+            continue  # the baked GLB covers it
+        layout = plan_atlas(tiles)
+        remapped = remap_uvs(part.uvs, part.triangles, layout)
+        part.positions = part.positions[remapped.source]
+        part.normals = part.normals[remapped.source]
+        part.uvs = remapped.uvs
+        part.triangles = remapped.triangles
+        layouts[part.material] = layout
+        log(
+            f"        udim {part.material}: tiles {tiles} -> {layout.width}x{layout.height} "
+            f"atlas ({layout.cell} px cells), {remapped.split} vertices split"
+        )
+    return layouts
 
 
 # ---------------------------------------------------------------------------- transfer
@@ -1276,8 +1318,12 @@ class TextureWriter:
     log: Callable[[str], None] = lambda _: None
     written: dict[Path, int] = field(default_factory=dict)
 
-    def write(self, source: TextureSource, role: Role, tile: bool, item: str) -> dict[str, Any]:
-        size_cap = TILE_TEXTURE_SIZE if tile else ITEM_TEXTURE_SIZE
+    def write(
+        self, source: TextureSource, role: Role, tile: bool, item: str, cap: int | None = None
+    ) -> dict[str, Any]:
+        """`cap`: largest side kept (default: the tile or item map size; a UDIM atlas keeps
+        one item-size cell per tile)."""
+        size_cap = cap or (TILE_TEXTURE_SIZE if tile else ITEM_TEXTURE_SIZE)
         srgb = source.srgb and role != "normal"
         settings = _settings(role, srgb, tile)
         origin = source.sha256 or source.path.name
@@ -1315,6 +1361,8 @@ class TextureWriter:
         self.written[output] = output.stat().st_size
         info["file"] = output.relative_to(self.web_root).as_posix()
         info["size"] = int(pixels.shape[0])
+        if pixels.shape[1] != pixels.shape[0]:
+            info["width"] = int(pixels.shape[1])
         if role != "normal":
             # Share of texels above 1/4 per channel (source resolution), for parameter use.
             info["coverage"] = [round(float(c), 5) for c in coverage]
@@ -1392,9 +1440,15 @@ def baked_maps(unit: OutfitUnit, instance: str) -> dict[Role, TextureSource]:
     if normal:
         maps["normal"] = source(*normal, decode(normal[1], "RGB"), srgb=False)
     rough = image(pbr.get("metallicRoughnessTexture"))
+    occlusion = image(material.get("occlusionTexture"))
+    if not rough and occlusion:
+        # Metallic and roughness baked to constants (factors, see baked_factors): the ORM
+        # map carries the occlusion, with G and B at 1 so the factors pass through.
+        packed = decode(occlusion[1], "RGB").copy()
+        packed[..., 1:] = 255
+        maps["data"] = source(f"{instance}_ORM", occlusion[1], packed, srgb=False)
     if rough:
         packed = decode(rough[1], "RGB").copy()
-        occlusion = image(material.get("occlusionTexture"))
         if occlusion:
             occlusion_red = decode(occlusion[1], "RGB")[..., 0]
             if occlusion_red.shape == packed.shape[:2]:
@@ -1406,6 +1460,31 @@ def baked_maps(unit: OutfitUnit, instance: str) -> dict[Role, TextureSource]:
         data = rough[1] + (occlusion[1] if occlusion else b"")
         maps["data"] = source(f"{instance}_ORM", data, packed, srgb=False)
     return maps
+
+
+GLTF_FACTORS: dict[str, Any] = {
+    "baseColorFactor": [1.0, 1.0, 1.0, 1.0],
+    "metallicFactor": 1.0,
+    "roughnessFactor": 1.0,
+}
+
+
+def baked_factors(unit: OutfitUnit, instance: str) -> dict[str, Any]:
+    """The baked material's own PBR factors (glTF defaults where it leaves them out). Unreal
+    writes properties that bake to a constant as factors only: e.g. metallic 0 and
+    roughness 0.5 with no metallicRoughnessTexture."""
+    path = _baked_glb(unit)
+    factors = json.loads(json.dumps(GLTF_FACTORS))
+    if path is None:
+        return factors
+    document, _ = read_glb(path.read_bytes())
+    material = next((m for m in document.get("materials", []) if m.get("name") == instance), None)
+    pbr = (material or {}).get("pbrMetallicRoughness", {})
+    for name in factors:
+        if name in pbr:
+            value = pbr[name]
+            factors[name] = [float(v) for v in value] if isinstance(value, list) else float(value)
+    return factors
 
 
 @dataclass
@@ -1422,8 +1501,10 @@ def convert_material(
     instance: str,
     writer: TextureWriter,
     hashes: Mapping[str, str],
+    atlas: AtlasLayout | None = None,
 ) -> MaterialResult:
-    """extras.mh.materials entry, glTF approximation and manifest params of one part."""
+    """extras.mh.materials entry, glTF approximation and manifest params of one part.
+    `atlas`: the UDIM tiles the part's UVs were moved into (see `pack_udim_parts`)."""
     materials = unit.materials()
     material = materials.get(instance)
     key = material_key(instance, unit.folder.name.removeprefix("WI_"))
@@ -1451,7 +1532,24 @@ def convert_material(
     else:
         slots, shader = {}, "plain"
     textures: dict[str, Any] = {}
-    baked_glb = _baked_glb(unit) if shader == "plain" else None
+    udim: dict[str, Any] | None = None
+    if shader == "plain" and atlas is not None and is_khaos(material):
+        # UDIM tiles past 1001: the bake holds tile 1001 only (see outfit_udim).
+        built, missing = khaos_atlas(
+            unit.folder, material, unit.info.get("textures", {}), atlas, hashes, writer.log
+        )
+        udim = {**atlas.as_dict(), "recipe": UDIM_RECIPE, "missing_tiles": missing}
+        cap = max(atlas.width, atlas.height)
+        for role, atlas_map in built.items():
+            source = TextureSource(
+                unit.folder / f"{key}_udim_{role}.png",
+                srgb=role == "color",
+                sha256=atlas_map.sha256,
+                size=atlas_map.pixels.shape[0],
+                pixels=atlas_map.pixels,
+            )
+            textures[f"udim_{role}"] = writer.write(source, role, False, unit.name, cap=cap)
+    baked_glb = _baked_glb(unit) if shader == "plain" and udim is None else None
     baked = baked_maps(unit, instance) if baked_glb else {}
     for role, baked_source in baked.items():
         textures[f"baked_{role}"] = writer.write(baked_source, role, False, unit.name)
@@ -1496,24 +1594,35 @@ def convert_material(
     orm = textures.get("AO") or {}
     if orm.get("file"):
         gltf_textures["orm"] = orm["file"]
-    if baked and baked_glb is not None:
+    prefix = "udim" if udim is not None else "baked" if baked and baked_glb is not None else None
+    if udim is not None:
+        extras["udim"] = udim
+    elif prefix == "baked" and baked_glb is not None:
         extras["baked"] = baked_glb.name
-        pbr.update(baseColorFactor=[1.0, 1.0, 1.0, 1.0], metallicFactor=1.0, roughnessFactor=1.0)
+    if prefix is not None:
+        # The atlas maps hold the final values; a bake keeps its own factors, which scale
+        # its maps (glTF) and are all there is for properties that baked to a constant.
+        factors = baked_factors(unit, instance) if prefix == "baked" else GLTF_FACTORS
+        pbr.update(json.loads(json.dumps(factors)))
         for role, gltf_role, factor in (
             ("color", "color", "baseColorFactor"),
             ("normal", "normal", None),
             ("data", "orm", None),
         ):
-            info = textures.get(f"baked_{role}") or {}
+            info = textures.get(f"{prefix}_{role}") or {}
             if info.get("file"):
                 gltf_textures[gltf_role] = info["file"]
             elif factor and info.get("constant"):
-                pbr[factor] = [*info["constant"][:3], 1.0]
+                scale = pbr[factor]
+                pbr[factor] = [
+                    *(c * s for c, s in zip(info["constant"][:3], scale, strict=False)),
+                    scale[3],
+                ]
         if "orm" not in gltf_textures:
-            orm_constant = (textures.get("baked_data") or {}).get("constant")
+            orm_constant = (textures.get(f"{prefix}_data") or {}).get("constant")
             if orm_constant:
-                pbr["roughnessFactor"] = float(orm_constant[1])
-                pbr["metallicFactor"] = float(orm_constant[2])
+                pbr["roughnessFactor"] = float(orm_constant[1]) * float(pbr["roughnessFactor"])
+                pbr["metallicFactor"] = float(orm_constant[2]) * float(pbr["metallicFactor"])
     if shader == "mh-jeans-v1":
         color = textures.get("Diffuse") or {}
         if color.get("file"):
@@ -1811,6 +1920,7 @@ def convert_outfit(
 ) -> OutfitResult:
     """Write `outfits/<name>/<gender>.glb` and its maps; return the manifest record."""
     garment = load_garment(unit.glb, body)
+    atlases = pack_udim_parts(unit, garment, log)
     fit = fit_garment(garment, body)
     hidden, hide_stats = body_hide(fit, body)
     coverage = region_coverage(hidden, body_regions(body))
@@ -1826,7 +1936,7 @@ def convert_outfit(
     for part in garment.parts:
         if part.material in materials:
             continue
-        result = convert_material(unit, part.material, writer, hashes)
+        result = convert_material(unit, part.material, writer, hashes, atlases.get(part.material))
         key, n = result.key, 1
         while key in keys:
             n += 1
