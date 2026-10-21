@@ -1,0 +1,153 @@
+"""Pull the MetaHuman archive from the PC (`asset-pipeline serve-slim`) onto this machine.
+
+Standard library only, so it runs before `uv sync`:
+
+    python3 pipeline/scripts/fetch_slim.py --url http://<pc>:8765 --token <token> \\
+        --dest ~/MetaHumanArchive
+
+Files download in parallel into `<file>.part` and resume from where they stopped
+(HTTP Range); each one is checked against the server's sha256 before it takes its
+final name. Re-running skips files that are already complete, so an interrupted
+transfer is simply started again. The token is sent as a header, never in a URL.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+import time
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from urllib.parse import quote
+
+CHUNK = 1 << 20
+ATTEMPTS = 5
+
+
+@dataclass(frozen=True)
+class RemoteFile:
+    path: str
+    size: int
+    sha256: str
+
+
+def safe_target(dest: Path, relative: str) -> Path:
+    """Destination of a served path; refuses absolute paths and `..` components."""
+    posix = PurePosixPath(relative)
+    if posix.is_absolute() or ".." in posix.parts or not posix.parts:
+        raise ValueError(f"unsafe path from server: {relative!r}")
+    return dest.joinpath(*posix.parts)
+
+
+def sha256_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(CHUNK):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+class Client:
+    def __init__(self, url: str, token: str, timeout: float = 60) -> None:
+        self.url = url.rstrip("/")
+        self.token = token
+        self.timeout = timeout
+
+    def _request(self, route: str, start: int = 0) -> urllib.request.Request:
+        request = urllib.request.Request(f"{self.url}{route}")
+        request.add_header("Authorization", f"Bearer {self.token}")
+        if start:
+            request.add_header("Range", f"bytes={start}-")
+        return request
+
+    def files(self) -> list[RemoteFile]:
+        with urllib.request.urlopen(self._request("/files.json"), timeout=self.timeout) as reply:
+            listing = json.load(reply)
+        return [RemoteFile(f["path"], int(f["size"]), f["sha256"]) for f in listing["files"]]
+
+    def fetch(self, remote: RemoteFile, dest: Path) -> str:
+        """Downloads one file (resuming), verifies it and moves it into place.
+        Returns 'skipped', 'downloaded' or raises after ATTEMPTS failures."""
+        target = safe_target(dest, remote.path)
+        if target.is_file() and target.stat().st_size == remote.size:
+            if sha256_of(target) == remote.sha256:
+                return "skipped"
+            target.unlink()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        part = target.with_name(target.name + ".part")
+        for attempt in range(1, ATTEMPTS + 1):
+            try:
+                start = part.stat().st_size if part.is_file() else 0
+                if start > remote.size:
+                    part.unlink()
+                    start = 0
+                if start < remote.size:
+                    route = "/f/" + quote(remote.path)
+                    with urllib.request.urlopen(
+                        self._request(route, start), timeout=self.timeout
+                    ) as reply:
+                        # A server that ignored the range sends the whole file again.
+                        mode = "ab" if start and reply.status == 206 else "wb"
+                        with part.open(mode) as out:
+                            while chunk := reply.read(CHUNK):
+                                out.write(chunk)
+                if sha256_of(part) != remote.sha256:
+                    part.unlink()
+                    raise OSError(f"sha256 mismatch for {remote.path}")
+                part.replace(target)
+                return "downloaded"
+            except (OSError, urllib.error.URLError) as error:
+                if attempt == ATTEMPTS:
+                    raise
+                print(f"retry {attempt}/{ATTEMPTS - 1} {remote.path}: {error}", file=sys.stderr)
+                time.sleep(min(30, 2**attempt))
+        raise AssertionError("unreachable")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--url", required=True, help="http://<pc address>:<port>")
+    parser.add_argument("--token", required=True, help="token printed by serve-slim")
+    parser.add_argument("--dest", type=Path, required=True, help="archive root on this machine")
+    parser.add_argument("--jobs", type=int, default=6, help="parallel downloads")
+    parser.add_argument("--only", action="append", default=[], help="path prefix (repeatable)")
+    args = parser.parse_args(argv)
+
+    client = Client(args.url, args.token)
+    dest = args.dest.expanduser()
+    files = [f for f in client.files() if not args.only or f.path.startswith(tuple(args.only))]
+    total = sum(f.size for f in files)
+    print(f"{len(files)} files, {total / 1e9:.1f} GB -> {dest}", flush=True)
+    done_bytes = 0
+    failures: list[str] = []
+    started = time.monotonic()
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        futures = {pool.submit(client.fetch, f, dest): f for f in files}
+        for future in as_completed(futures):
+            remote = futures[future]
+            try:
+                outcome = future.result()
+            except Exception as error:
+                failures.append(remote.path)
+                print(f"FAILED {remote.path}: {error}", file=sys.stderr, flush=True)
+                continue
+            done_bytes += remote.size
+            rate = done_bytes / max(time.monotonic() - started, 1e-3) / 1e6
+            print(
+                f"{outcome:10} {done_bytes / max(total, 1):6.1%} {rate:6.1f} MB/s {remote.path}",
+                flush=True,
+            )
+    if failures:
+        print(f"{len(failures)} files failed; run the same command again to resume.")
+        return 1
+    print("all files verified")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
