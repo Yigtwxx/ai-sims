@@ -128,12 +128,19 @@ export function sampleTimeline(
   return weights;
 }
 
+/**
+ * How strongly a closure's weight drives the lips. An m/b/p lasts 50-80 ms and
+ * the cross-fades leave it at full weight only at its centre; boosted, the lips
+ * meet for most of it (replays of recorded speech: closure 0.97 instead of 0.7).
+ */
+export const CLOSURE_GAIN = 1.8;
+
 /** Scale all weights (e.g. by audio loudness); silence collapses the mouth. */
 export function scaleWeights(weights: VisemeWeights, factor: number): VisemeWeights {
   const out: VisemeWeights = {};
   for (const [viseme, w] of Object.entries(weights) as [Viseme, number][]) {
-    // Closures keep full strength: quiet speech still closes the lips.
-    out[viseme] = viseme === 'PP' ? w : w * factor;
+    // Closures ignore loudness: quiet speech still closes the lips.
+    out[viseme] = viseme === 'PP' ? Math.min(1, w * CLOSURE_GAIN) : w * factor;
   }
   return out;
 }

@@ -1,4 +1,4 @@
-import { alignTextToAudio } from './align';
+import { alignTextToAudio, estimateAudioLag, shiftTimeline, snapClosuresToAudio } from './align';
 import { computeEnvelope, detectSpeechRegions, sampleEnvelope, type Envelope } from './envelope';
 import { sampleTimeline, scaleWeights, timelineFromEvents, type TimedViseme } from './timeline';
 import type { Viseme, VisemeWeights } from './visemes';
@@ -12,12 +12,12 @@ import { timelineFromWords, type WordBoundary } from './wordAlign';
  */
 /**
  * How far the mouth runs ahead of the heard audio (seconds). Budget: the mouth
- * driver's smoothing reaches a new shape ~30 ms late and a frame reaches the
+ * driver's smoothing reaches a closure ~15 ms late and a frame reaches the
  * screen ~25 ms after it is sampled; on top of that lips should lead the sound
- * by ~35 ms, as they do in real speech (the plan's 40-80 ms window, measured
- * from what the viewer sees).
+ * by ~35 ms, as they do in real speech. Replays of recorded TTS speech put the
+ * seen closures 30-40 ms ahead of the heard ones with this value.
  */
-export const VISUAL_LEAD = 0.09;
+export const VISUAL_LEAD = 0.07;
 
 export class SpeechPlayer {
   private context: AudioContext | undefined;
@@ -58,13 +58,15 @@ export class SpeechPlayer {
     this.buffer = buffer;
     this.envelope = computeEnvelope(samples, buffer.sampleRate);
     if ('events' in script) this.timeline = timelineFromEvents(script.events, buffer.duration);
-    else if ('words' in script) this.timeline = timelineFromWords(script.words);
     else {
-      this.timeline = alignTextToAudio(
-        script.text,
-        detectSpeechRegions(this.envelope),
-        buffer.duration,
-      );
+      // Word and text timings place letters evenly and may sit ahead of the decoded
+      // audio; the audio says where the speech and the lip closures really are.
+      const estimated =
+        'words' in script
+          ? timelineFromWords(script.words)
+          : alignTextToAudio(script.text, detectSpeechRegions(this.envelope), buffer.duration);
+      const shifted = shiftTimeline(estimated, estimateAudioLag(estimated, this.envelope));
+      this.timeline = snapClosuresToAudio(shifted, this.envelope);
     }
   }
 

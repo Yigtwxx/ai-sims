@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTimeline, sampleTimeline, scaleWeights, timelineFromEvents } from './timeline';
+import {
+  buildTimeline,
+  CLOSURE_GAIN,
+  sampleTimeline,
+  scaleWeights,
+  timelineFromEvents,
+} from './timeline';
 import { textToVisemes } from './turkish';
 
 describe('buildTimeline', () => {
@@ -69,7 +75,8 @@ describe('sampleTimeline', () => {
 });
 
 describe('scaleWeights', () => {
-  it('scales open shapes but keeps lip closure at full strength', () => {
-    expect(scaleWeights({ aa: 1, PP: 0.8 }, 0.5)).toEqual({ aa: 0.5, PP: 0.8 });
+  it('scales open shapes but drives lip closures to full strength', () => {
+    expect(scaleWeights({ aa: 1, PP: 0.8 }, 0.5)).toEqual({ aa: 0.5, PP: 1 });
+    expect(scaleWeights({ PP: 0.25 }, 0.5).PP).toBeCloseTo(0.25 * CLOSURE_GAIN);
   });
 });

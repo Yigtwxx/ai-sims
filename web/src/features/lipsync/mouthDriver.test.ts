@@ -20,6 +20,13 @@ describe('prioritizeClosures', () => {
     expect(out.E).toBeCloseTo(0.3);
   });
 
+  it('keeps every channel of a full mouth state', () => {
+    const state = { ...createMouthState(), PP: 0.9, aa: 0.5 };
+    const out = prioritizeClosures(state);
+    expect(Object.keys(out).sort()).toEqual(Object.keys(state).sort());
+    expect(out.aa).toBeCloseTo(0.05);
+  });
+
   it('leaves weights untouched without closures', () => {
     const weights = { aa: 0.7, O: 0.2 };
     expect(prioritizeClosures(weights)).toBe(weights);
@@ -35,5 +42,11 @@ describe('stepMouth and applyMouthToMorphs', () => {
     const mesh = { morphTargetDictionary: { viseme_aa: 0 }, morphTargetInfluences: [0] };
     applyMouthToMorphs([mesh], state);
     expect(mesh.morphTargetInfluences[0]).toBeCloseTo(state.aa);
+  });
+
+  it('closes the lips faster than it opens a vowel', () => {
+    const state = createMouthState();
+    stepMouth(state, { PP: 1, aa: 1 }, 1 / 60);
+    expect(state.PP).toBeGreaterThan(state.aa);
   });
 });

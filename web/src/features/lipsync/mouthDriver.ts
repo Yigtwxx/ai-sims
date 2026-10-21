@@ -22,8 +22,10 @@ export function createMouthState(): MouthState {
  * Lets lip closures win over the shapes blended around them. Coarticulation
  * mixes the neighbours of an m/b/p into it, and morphs add up, so without this
  * the lips never quite meet; an f/v likewise needs the lower lip at the teeth.
+ * Applied to the target and again to the smoothed state, where the vowel
+ * before a closure is still fading out while the lips meet.
  */
-export function prioritizeClosures(weights: VisemeWeights): VisemeWeights {
+export function prioritizeClosures<T extends VisemeWeights>(weights: T): T {
   const seal = Math.min(1, weights.PP ?? 0);
   const bite = Math.min(1, weights.FF ?? 0) * 0.7;
   if (seal === 0 && bite === 0) return weights;
@@ -32,18 +34,22 @@ export function prioritizeClosures(weights: VisemeWeights): VisemeWeights {
     if (viseme === 'PP' || viseme === 'FF') out[viseme] = w;
     else out[viseme] = w * (1 - seal) * (1 - bite);
   }
-  return out;
+  // Same keys as the input, so a full MouthState stays full.
+  return out as T;
 }
 
 /** Fast attack keeps consonants crisp; a slightly slower release reads naturally. */
 const ATTACK = 32;
 const RELEASE = 20;
+/** Closures are short (50-80 ms): the lips must get there within the first half. */
+const CLOSURE_ATTACK = 60;
 
 export function stepMouth(state: MouthState, target: VisemeWeights, dt: number): MouthState {
   for (const viseme of VISEMES) {
     const goal = target[viseme] ?? 0;
     const current = state[viseme];
-    state[viseme] = MathUtils.damp(current, goal, goal > current ? ATTACK : RELEASE, dt);
+    const attack = viseme === 'PP' || viseme === 'FF' ? CLOSURE_ATTACK : ATTACK;
+    state[viseme] = MathUtils.damp(current, goal, goal > current ? attack : RELEASE, dt);
   }
   return state;
 }
