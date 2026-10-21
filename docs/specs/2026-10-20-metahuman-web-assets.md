@@ -53,6 +53,20 @@ The manifest lives at `/assets/mh/manifest.json` and is validated by the zod sch
 - **`outfits[]`:** `{ id, category: top|bottom|shoes|full, label, thumbnail, files: { female, male }, params, tintPresets[], hidesBodyRegions[] }`.
 - **`irises[]`, `animations[]`, `lighting[]`:** the exported iris textures, playable clips and lighting rigs.
 
+## Outfit GLBs (2026-10-21)
+
+- **File:** one GLB per outfit and gender, `outfits/<id>/<gender>.glb`, fitted to that gender's neutral body.
+- **Skinning:** skinned to the body skeleton by joint name, in the body's bind space. At runtime the garment binds to the body's bones and inverse bind matrices, as grooms bind to the head's.
+- **Morph targets:** the body slider ends (`body_<slider>_min/max`), transferred from the body. The same slider weights then move the garment with the body.
+- **Textures:** outside the GLB as KTX2, as with skins.
+  - Per material: normal, AO and the region mask (RGB = regions A/B/C of Unreal's fabric material).
+  - Shared tiling detail maps (weave normals, pilling, wrinkles) live once under `outfits/shared/`.
+- **`extras.mh` on the scene:**
+  - `{ kind: "outfit", id, gender, category, materials, body_hide }`.
+  - `materials`: per material name, the fabric parameters the web shader reads: region colours, roughness/specular per region, detail tiling and strengths, and the texture file per slot.
+  - `body_hide`: body vertices the garment covers closely enough that skin would poke through. Stored as a base64 bitset over the body primitive's vertex order. The body shader discards surfaces whose vertices are all hidden. It replaces `hidesBodyRegions`, which stays for coarse fallbacks.
+- **Colour variants:** variants that differ only in colour share one GLB and become `tintPresets` (region colours).
+
 ## Curation
 
 - The curation screen (`/[locale]/curate`) writes `curation.json`, which looks like `{ hidden: string[] }`.
