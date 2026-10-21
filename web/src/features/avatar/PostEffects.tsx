@@ -9,16 +9,18 @@ import {
   Vignette,
 } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
+import { memo } from 'react';
 
 export type RenderLook = 'realistic' | 'anime';
 
 /**
- * Finishing stack. Realistic: contact AO, AgX tone mapping (soft highlight
- * roll-off, natural skin). Anime: lighter AO and Neutral tone mapping so the
- * flat MToon colours stay saturated. Both: a whisper of bloom and a subtle
- * vignette. N8AO breaks with MSAA under three r186, so SMAA does the AA.
+ * Finishing stack: contact AO (lighter for anime), Neutral tone mapping, a
+ * whisper of bloom and a subtle vignette. Neutral keeps albedo colours as they
+ * are below its highlight roll-off, as the MetaHuman Creator studio does (no
+ * tone curve); AgX desaturated and lifted darker skin until faces read as
+ * another ethnicity. N8AO breaks with MSAA under three r186, so SMAA does the AA.
  */
-export function PostEffects({
+export const PostEffects = memo(function PostEffects({
   look = 'realistic',
   ao = 'high',
 }: {
@@ -38,9 +40,9 @@ export function PostEffects({
         />
       )}
       <Bloom intensity={0.12} luminanceThreshold={0.92} luminanceSmoothing={0.2} mipmapBlur />
-      <ToneMapping mode={anime ? ToneMappingMode.NEUTRAL : ToneMappingMode.AGX} />
+      <ToneMapping mode={ToneMappingMode.NEUTRAL} />
       <Vignette offset={0.32} darkness={0.3} />
       <SMAA />
     </EffectComposer>
   );
-}
+});

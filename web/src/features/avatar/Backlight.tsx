@@ -9,7 +9,7 @@ import { AdditiveBlending, CanvasTexture, SRGBColorSpace } from 'three';
  * additive and never writes depth, so it can't occlude anything.
  */
 export function Backlight({
-  color = '#ffe2b8',
+  color = '#ece4d8',
   intensity = 0.16,
   height = 1.6,
 }: {

@@ -1,9 +1,15 @@
 'use client';
 
-import { ContactShadows, PerformanceMonitor } from '@react-three/drei';
+import { PerformanceMonitor } from '@react-three/drei';
 import { Canvas, useThree } from '@react-three/fiber';
-import { Suspense, useEffect, useState, type ReactNode, type RefObject } from 'react';
-import { AgXToneMapping, NoToneMapping, PCFShadowMap, SRGBColorSpace, type Vector3 } from 'three';
+import { memo, Suspense, useEffect, useState, type ReactNode, type RefObject } from 'react';
+import {
+  NeutralToneMapping,
+  NoToneMapping,
+  PCFShadowMap,
+  SRGBColorSpace,
+  type Vector3,
+} from 'three';
 
 import { Backlight } from './Backlight';
 import { CameraRig } from './CameraRig';
@@ -13,7 +19,7 @@ import { PostEffects, type RenderLook } from './PostEffects';
 import {
   QUALITY,
   QualityContext,
-  stepDown,
+  autoStep,
   type QualityPreference,
   type RenderQuality,
 } from './quality';
@@ -59,13 +65,13 @@ interface StageProps {
 }
 
 const BACKDROPS = {
-  light: { background: '#f2f1ee', cyc: '#f4f3f0', glow: 0.55, shadow: 0.55 },
-  dark: { background: '#121113', cyc: '#121114', glow: 0.015, shadow: 0.8 },
+  light: { background: '#f2f1ee', cyc: '#f4f3f0', glow: 0.55 },
+  dark: { background: '#121113', cyc: '#121114', glow: 0.015 },
 } as const;
 
 /**
  * The photo studio: renderer settings, lighting, backdrop, camera and post.
- * Tone mapping happens in the post stack (AgX), so the renderer outputs linear.
+ * Tone mapping happens in the post stack (Neutral), so the renderer outputs linear.
  */
 export function Stage({
   children,
@@ -91,7 +97,6 @@ export function Stage({
   const settings = QUALITY[tier];
   const initial =
     zoom === undefined ? getCameraPose(focus, subjectHeight) : zoomPose(zoom, subjectHeight);
-  const theme = BACKDROPS[backdrop];
   return (
     <Canvas
       className={[
@@ -105,8 +110,8 @@ export function Stage({
       frameloop={settings.maxFps ? 'demand' : 'always'}
       gl={{
         antialias: false,
-        // Tone mapping runs in the post stack (AgX); without post use AgX directly.
-        toneMapping: post ? NoToneMapping : AgXToneMapping,
+        // Tone mapping runs in the post stack; without post the renderer applies it.
+        toneMapping: post ? NoToneMapping : NeutralToneMapping,
         outputColorSpace: SRGBColorSpace,
         powerPreference: 'high-performance',
         preserveDrawingBuffer: true,
@@ -114,24 +119,23 @@ export function Stage({
       camera={{ fov: 24, near: 0.05, far: 50, position: [...initial.position] }}
       onCreated={onCreated}
     >
-      <color attach="background" args={[theme.background]} />
       {quality === 'auto' && (
-        <PerformanceMonitor onDecline={() => setAutoTier((current) => stepDown(current))} />
+        <PerformanceMonitor
+          onDecline={() => setAutoTier((current) => autoStep(current, 'down'))}
+          onIncline={() => setAutoTier((current) => autoStep(current, 'up'))}
+          // Settle on the current tier rather than flip between two forever.
+          flipflops={4}
+        />
       )}
       {settings.maxFps && <FrameCap fps={settings.maxFps} />}
       <QualityContext.Provider value={settings}>
         <Suspense fallback={null}>
-          {lighting ?? <StudioLighting />}
-          <Cyclorama color={theme.cyc} glow={theme.glow} />
-          {backdrop === 'dark' && <Backlight height={subjectHeight} />}
-          <ContactShadows
-            position={[0, 0.002, 0]}
-            scale={3}
-            blur={2.4}
-            far={1.2}
-            opacity={theme.shadow}
+          <StudioSet
+            backdrop={backdrop}
+            lighting={lighting}
+            scenery={scenery}
+            subjectHeight={subjectHeight}
           />
-          {scenery}
           <Turntable>{children}</Turntable>
           {post && <PostEffects look={look} ao={settings.ao} />}
         </Suspense>
@@ -148,6 +152,36 @@ export function Stage({
     </Canvas>
   );
 }
+
+/**
+ * Backdrop and lights. Memoised: a character edit re-renders the stage every
+ * slider step, and the studio itself never depends on the character. The
+ * floor needs no contact-shadow pass: the key light's shadow and the AO ground
+ * the feet, and drei's ContactShadows re-rendered the whole skinned character
+ * every frame (a quarter of the main thread) and left blotches on the floor.
+ */
+const StudioSet = memo(function StudioSet({
+  backdrop,
+  lighting,
+  scenery,
+  subjectHeight,
+}: {
+  backdrop: 'light' | 'dark';
+  lighting?: ReactNode;
+  scenery?: ReactNode;
+  subjectHeight?: number;
+}) {
+  const theme = BACKDROPS[backdrop];
+  return (
+    <>
+      <color attach="background" args={[theme.background]} />
+      {lighting ?? <StudioLighting />}
+      <Cyclorama color={theme.cyc} glow={theme.glow} />
+      {backdrop === 'dark' && <Backlight height={subjectHeight} />}
+      {scenery}
+    </>
+  );
+});
 
 /** Renders on demand at most `fps` times a second (canvas frameloop 'demand'). */
 function FrameCap({ fps }: { fps: number }) {

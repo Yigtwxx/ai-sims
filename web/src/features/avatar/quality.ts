@@ -4,8 +4,8 @@ import { createContext, useContext } from 'react';
  * Render quality tiers. `high` is the look the stage is tuned for (desktop GPU);
  * `balanced` trades pixel density and AO samples for frame rate; `battery`
  * (laptops off the charger, weak GPUs) drops AO, wears the lighter hair cards
- * and caps the stage at 30 fps. `auto` starts high and steps down when the
- * frame rate cannot keep up.
+ * and caps the stage at 30 fps. `auto` starts high, steps down to balanced
+ * when the frame rate cannot keep up and back up once it recovers.
  */
 export type RenderQuality = 'high' | 'balanced' | 'battery';
 export type QualityPreference = RenderQuality | 'auto';
@@ -31,9 +31,18 @@ export const QUALITY: Record<RenderQuality, QualitySettings> = {
 
 const ORDER: RenderQuality[] = ['high', 'balanced', 'battery'];
 
-/** The next lower tier (battery stays battery). */
-export function stepDown(quality: RenderQuality): RenderQuality {
-  return ORDER[Math.min(ORDER.indexOf(quality) + 1, ORDER.length - 1)]!;
+/** Lowest tier `auto` reaches; battery is only ever chosen explicitly. */
+const AUTO_FLOOR = ORDER.indexOf('balanced');
+
+/**
+ * The tier `auto` moves to when the frame rate drops or recovers. It stops at
+ * balanced: battery caps the stage at 30 fps, where the monitor can never see
+ * a recovery, so one slow moment (a long slider drag, a large upload) kept the
+ * stage there, choppy and without AO, for the rest of the visit.
+ */
+export function autoStep(quality: RenderQuality, direction: 'down' | 'up'): RenderQuality {
+  const index = ORDER.indexOf(quality);
+  return ORDER[direction === 'down' ? Math.min(index + 1, AUTO_FLOOR) : Math.max(index - 1, 0)]!;
 }
 
 /** Settings of the tier the stage currently renders at, for scene components. */

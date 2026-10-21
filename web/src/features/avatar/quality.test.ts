@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { QUALITY, stepDown } from './quality';
+import { autoStep, QUALITY } from './quality';
 
-describe('stepDown', () => {
-  it('walks high -> balanced -> battery and stays at battery', () => {
-    expect(stepDown('high')).toBe('balanced');
-    expect(stepDown('balanced')).toBe('battery');
-    expect(stepDown('battery')).toBe('battery');
+describe('autoStep', () => {
+  it('steps down to balanced and no further', () => {
+    expect(autoStep('high', 'down')).toBe('balanced');
+    expect(autoStep('balanced', 'down')).toBe('balanced');
+  });
+
+  it('steps back up when the frame rate recovers', () => {
+    expect(autoStep('balanced', 'up')).toBe('high');
+    expect(autoStep('high', 'up')).toBe('high');
   });
 
   it('gets cheaper at every step', () => {
