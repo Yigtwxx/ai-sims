@@ -45,6 +45,7 @@ from asset_pipeline.mh.convert import (
     head_live_rule,
     iris_fingerprint,
     list_characters,
+    preset_gender,
     skin_fingerprint,
 )
 from asset_pipeline.mh.dna import read_dna
@@ -517,7 +518,11 @@ class Builder:
             faces=[
                 with_thumbnail(info["face"], "head", self.web) for info in heads if "face" in info
             ],
-            skins=[info["skin"] for info in self.records("skins") if "skin" in info],
+            skins=[
+                with_gender(info["skin"], self.archive)
+                for info in self.records("skins")
+                if "skin" in info
+            ],
             irises=[info["iris"] for info in self.records("irises") if "iris" in info],
             bodies=[info["body"] for info in self.records("bodies") if "body" in info],
             animations=[
@@ -563,6 +568,19 @@ def with_compat(groom: dict[str, Any]) -> dict[str, Any]:
     needs no reconversion."""
     compat = curated_compat("grooms", str(groom["id"]).split(".", 2)[-1])
     return {**groom, "compat": compat} if compat else groom
+
+
+def with_gender(skin: dict[str, Any], archive: Path) -> dict[str, Any]:
+    """The skin entry with its preset's gender, read at manifest time (no reconversion).
+    A preset's maps carry its body's stubble shadow and strap mask, so the creator offers a
+    skin on that body only."""
+    name = str(skin["id"]).split(".", 1)[-1]
+    try:
+        source = CharacterSource.find(archive, name)
+    except ConversionError:
+        return skin
+    gender, _ = preset_gender(archive, name, source.body_dna)
+    return {**skin, "gender": gender} if gender else skin
 
 
 def with_thumbnail(entry: dict[str, Any], file_key: str, web: Path) -> dict[str, Any]:

@@ -8,6 +8,7 @@ from asset_pipeline.mh.build import (
     _entry_files,
     fab_animations,
     with_compat,
+    with_gender,
     with_thumbnail,
 )
 from asset_pipeline.mh.convert import ConversionError
@@ -164,3 +165,17 @@ def test_skin_outputs_include_the_nested_underwear_maps_but_not_the_strap_colour
         "skins/underwear/u/mask.ktx2",
         "skins/underwear/u/normal.ktx2",
     ], f"unexpected skin outputs: {files}"
+
+
+def test_skins_take_their_preset_gender(tmp_path: Path, monkeypatch) -> None:
+    unit = tmp_path / "raw" / "characters" / "Omari"
+    (unit / "dcc" / "Omari").mkdir(parents=True)
+    (unit / "dcc" / "Omari" / "head.dna").write_bytes(b"")
+    (unit / "done.json").write_text("{}", "utf-8")
+    monkeypatch.setattr(
+        "asset_pipeline.mh.build.preset_gender", lambda archive, name, dna: ("male", "test")
+    )
+    skin = {"id": "skin.Omari", "tone": 0.9}
+    assert with_gender(skin, tmp_path) == {**skin, "gender": "male"}
+    missing = {"id": "skin.Nobody", "tone": 0.1}
+    assert with_gender(missing, tmp_path) == missing, "a skin without sources keeps its entry"
