@@ -14,6 +14,7 @@ import {
 
 import { BODY_HIDDEN } from './garments';
 import { createGroomDensityUniforms } from './groomDensity';
+import { skinToneGain } from './skinTone';
 import { WRINKLE_MASK_LAYERS, WRINKLE_WEIGHT_COUNT } from './wrinkles';
 
 /**
@@ -459,6 +460,17 @@ export function setUnderwear(
   for (const material of materials) {
     const uniforms = material.userData.underwearUniforms as UnderwearUniforms | null | undefined;
     uniforms?.skinUnderwearShow.value.set(show.top ? 1 : 0, show.bottom ? 1 : 0);
+  }
+}
+
+/**
+ * Fine tone adjustment of the worn skin set (-1 lighter .. 1 darker): a gain
+ * on the albedo through the material colour, so it needs no recompile.
+ */
+export function setSkinTone(materials: readonly Material[], tone: number): void {
+  const [r, g, b] = skinToneGain(tone);
+  for (const material of materials) {
+    if (material.userData.skinTuning) (material as MeshPhysicalMaterial).color.setRGB(r, g, b);
   }
 }
 

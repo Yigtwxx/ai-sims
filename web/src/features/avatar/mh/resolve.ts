@@ -23,6 +23,8 @@ export interface ResolvedCharacter {
   /** Skin set to wear: the configured one, else the face's own, else none (GLB materials). */
   skin: MhSkin | null;
   makeup: boolean;
+  /** Fine tone adjustment of the skin set, -1 lighter .. 1 darker. */
+  skinTone: number;
   /** Eyes: the configured iris, else the face's default, else the iris named like the face. */
   iris: MhIris | null;
   /** Body idle clips and how much of the body they drive (see idleSet). */
@@ -72,6 +74,7 @@ export function resolveCharacter(
     sliders,
     skin,
     makeup: config.skin.makeup,
+    skinTone: config.skin.tone,
     // Faces exported without eyes of their own borrow the iris of the preset
     // their skin comes from, so they never render with white eyes.
     iris:

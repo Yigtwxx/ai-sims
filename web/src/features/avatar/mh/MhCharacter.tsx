@@ -49,6 +49,7 @@ import {
   applySkinMaterials,
   loadSkinDetail,
   setSkinDetail,
+  setSkinTone,
   setUnderwear,
   type WrinkleUniforms,
 } from './materials';
@@ -84,6 +85,8 @@ export interface MhCharacterProps {
   skin?: MhSkin | null;
   /** Wear the skin's makeup-baked face albedo when it has one. */
   makeup?: boolean;
+  /** Fine tone adjustment of the skin set, -1 lighter .. 1 darker; needs no reload. */
+  skinTone?: number;
   /** Eyeball maps; converted heads carry none, so the eyes are white without one. */
   iris?: MhIris | null;
   /** Idle body clips (GLB animations targeting MetaHuman bone names). */
@@ -130,6 +133,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     sliders,
     skin = null,
     makeup = false,
+    skinTone = 0,
     iris = null,
     idleClips = NO_CLIPS,
     idleLayer = 'full',
@@ -497,6 +501,9 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     [assembled, underwearTop],
   );
   useEffect(() => () => swapOutfits([]), [swapOutfits]);
+  useEffect(() => {
+    if (assembled) setSkinTone(assembled.skins, skinTone);
+  }, [assembled, skinTone]);
   useEffect(() => {
     unsettle('outfits');
     const wears = latestOutfits.current;
