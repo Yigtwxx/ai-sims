@@ -9,6 +9,11 @@ Files download in parallel into `<file>.part` and resume from where they stopped
 (HTTP Range); each one is checked against the server's sha256 before it takes its
 final name. Re-running skips files that are already complete, so an interrupted
 transfer is simply started again. The token is sent as a header, never in a URL.
+
+Byte-identical files (an outfit's textures under both genders, the underwear maps every
+preset carries) download once; the other paths are made locally from that copy: hard
+links for the sources, real copies under `web/`, whose files the converter rewrites in
+place (a rewrite through one hard link would change its twins too).
 """
 
 from __future__ import annotations
@@ -16,6 +21,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shutil
 import sys
 import time
 import urllib.error
@@ -27,6 +34,8 @@ from urllib.parse import quote
 
 CHUNK = 1 << 20
 ATTEMPTS = 5
+COPIED = ("web/",)
+"""Path prefixes whose duplicates are copied instead of hard-linked (see the docstring)."""
 
 
 @dataclass(frozen=True)
@@ -42,6 +51,48 @@ def safe_target(dest: Path, relative: str) -> Path:
     if posix.is_absolute() or ".." in posix.parts or not posix.parts:
         raise ValueError(f"unsafe path from server: {relative!r}")
     return dest.joinpath(*posix.parts)
+
+
+def dedupe(files: list[RemoteFile]) -> tuple[list[RemoteFile], list[tuple[RemoteFile, RemoteFile]]]:
+    """The first file of every distinct content, and (twin, original) pairs for the rest."""
+    originals: dict[str, RemoteFile] = {}
+    twins: list[tuple[RemoteFile, RemoteFile]] = []
+    for remote in files:
+        original = originals.setdefault(remote.sha256, remote)
+        if original is not remote:
+            twins.append((remote, original))
+    return list(originals.values()), twins
+
+
+def is_complete(target: Path, remote: RemoteFile) -> bool:
+    return (
+        target.is_file()
+        and target.stat().st_size == remote.size
+        and sha256_of(target) == remote.sha256
+    )
+
+
+def place_twin(remote: RemoteFile, original: RemoteFile, dest: Path) -> str:
+    """Makes `remote` from the already downloaded `original` (same content).
+    Returns 'skipped', 'linked' or 'copied'."""
+    target = safe_target(dest, remote.path)
+    if is_complete(target, remote):
+        return "skipped"
+    source = safe_target(dest, original.path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    part = target.with_name(target.name + ".part")
+    part.unlink(missing_ok=True)
+    outcome = "copied"
+    if not remote.path.startswith(COPIED):
+        try:
+            os.link(source, part)
+            outcome = "linked"
+        except OSError:  # no hard links on this volume
+            pass
+    if outcome == "copied":
+        shutil.copyfile(source, part)
+    part.replace(target)
+    return outcome
 
 
 def sha256_of(path: Path) -> str:
@@ -74,10 +125,9 @@ class Client:
         """Downloads one file (resuming), verifies it and moves it into place.
         Returns 'skipped', 'downloaded' or raises after ATTEMPTS failures."""
         target = safe_target(dest, remote.path)
-        if target.is_file() and target.stat().st_size == remote.size:
-            if sha256_of(target) == remote.sha256:
-                return "skipped"
-            target.unlink()
+        if is_complete(target, remote):
+            return "skipped"
+        target.unlink(missing_ok=True)
         target.parent.mkdir(parents=True, exist_ok=True)
         part = target.with_name(target.name + ".part")
         for attempt in range(1, ATTEMPTS + 1):
@@ -121,13 +171,18 @@ def main(argv: list[str] | None = None) -> int:
     client = Client(args.url, args.token)
     dest = args.dest.expanduser()
     files = [f for f in client.files() if not args.only or f.path.startswith(tuple(args.only))]
-    total = sum(f.size for f in files)
-    print(f"{len(files)} files, {total / 1e9:.1f} GB -> {dest}", flush=True)
+    unique, twins = dedupe(files)
+    total = sum(f.size for f in unique)
+    print(
+        f"{len(files)} files, {total / 1e9:.1f} GB to download "
+        f"(+{len(twins)} identical copies made here) -> {dest}",
+        flush=True,
+    )
     done_bytes = 0
     failures: list[str] = []
     started = time.monotonic()
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        futures = {pool.submit(client.fetch, f, dest): f for f in files}
+        futures = {pool.submit(client.fetch, f, dest): f for f in unique}
         for future in as_completed(futures):
             remote = futures[future]
             try:
@@ -142,6 +197,16 @@ def main(argv: list[str] | None = None) -> int:
                 f"{outcome:10} {done_bytes / max(total, 1):6.1%} {rate:6.1f} MB/s {remote.path}",
                 flush=True,
             )
+    failed = set(failures)
+    for twin, original in twins:
+        if original.path in failed:
+            failures.append(twin.path)
+            continue
+        try:
+            print(f"{place_twin(twin, original, dest):10} {twin.path}", flush=True)
+        except OSError as error:
+            failures.append(twin.path)
+            print(f"FAILED {twin.path}: {error}", file=sys.stderr, flush=True)
     if failures:
         print(f"{len(failures)} files failed; run the same command again to resume.")
         return 1

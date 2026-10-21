@@ -122,3 +122,36 @@ def test_safe_target_refuses_paths_outside_the_destination(tmp_path: Path):
     for bad in ["../x", "/etc/passwd", "web/../../x"]:
         with pytest.raises(ValueError):
             fetch_slim.safe_target(tmp_path, bad)
+
+
+def test_fetch_main_downloads_identical_files_once(tmp_path: Path):
+    root = tmp_path / "archive"
+    texture = bytes(range(256)) * 1024
+    for path in ("raw/outfits/female/T.png", "raw/outfits/male/T.png", "web/a.ktx2", "web/b.ktx2"):
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        (root / path).write_bytes(texture)
+    instance, _ = start_server(root, ("raw", "web"), "127.0.0.1", 0, TOKEN)
+    try:
+        dest = tmp_path / "mac"
+        args = ["--url", url_of(instance), "--token", TOKEN, "--dest", str(dest)]
+        assert fetch_slim.main(args) == 0
+    finally:
+        instance.shutdown()
+        instance.server_close()
+    for path in ("raw/outfits/female/T.png", "raw/outfits/male/T.png", "web/a.ktx2", "web/b.ktx2"):
+        assert (dest / path).read_bytes() == texture, path
+    # Sources become hard links; converter outputs stay independent copies.
+    female, male = dest / "raw/outfits/female/T.png", dest / "raw/outfits/male/T.png"
+    assert female.samefile(male), "raw twins should be hard links"
+    assert not (dest / "web/a.ktx2").samefile(dest / "web/b.ktx2"), "web twins must be copies"
+
+
+def test_dedupe_keeps_the_first_file_of_each_content():
+    files = [
+        fetch_slim.RemoteFile("raw/a", 3, "x"),
+        fetch_slim.RemoteFile("raw/b", 3, "x"),
+        fetch_slim.RemoteFile("web/c", 3, "y"),
+    ]
+    unique, twins = fetch_slim.dedupe(files)
+    assert [f.path for f in unique] == ["raw/a", "web/c"]
+    assert [(t.path, o.path) for t, o in twins] == [("raw/b", "raw/a")]
