@@ -124,6 +124,13 @@ describe('startingConfig', () => {
     }
   });
 
+  it('starts with a hair style from the manifest for each base', () => {
+    for (const base of ['female', 'male'] as const) {
+      const style = startingConfig(base, manifest).hair.style;
+      expect(manifest.grooms.some((g) => g.slot === 'hair' && g.id === style)).toBe(true);
+    }
+  });
+
   it('keeps eyebrows off when the manifest has none', () => {
     const bare = { ...manifest, grooms: manifest.grooms.filter((g) => g.slot !== 'eyebrows') };
     expect(startingConfig('female', bare).eyebrows.style).toBeNull();

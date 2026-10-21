@@ -220,12 +220,26 @@ export const ACCESSORY_IDS = ACCESSORIES.map((def) => def.id);
  * A new character for this base: the defaults reconciled with the manifest,
  * wearing natural eyebrows (a bare brow ridge reads as uncanny, not as a choice).
  */
+/** Hair a new character starts with, preferred first (manifest groom ids). */
+const STARTING_HAIR: Record<CharacterBase, RegExp[]> = {
+  female: [/Hair_M_BobStraight/, /Hair_M_Bob/, /Hair_L_Straight$/],
+  male: [/Hair_S_Clean/, /Hair_S_Casual/, /Hair_S_/],
+};
+
 export function startingConfig(base: CharacterBase, manifest: MhManifest): CharacterConfig {
   const config = reconcileConfig(createDefaultConfig(base), manifest);
   if (config.eyebrows.style === null) {
     const brows = groomsFor(manifest, 'eyebrows', base);
     const natural = brows.find((groom) => /natural/i.test(groom.id)) ?? brows[0];
     config.eyebrows.style = natural?.id ?? null;
+  }
+  // A bald first character reads as unfinished: start with an everyday cut.
+  if (config.hair.style === null) {
+    const hair = groomsFor(manifest, 'hair', base);
+    const everyday = STARTING_HAIR[base]
+      .map((pattern) => hair.find((groom) => pattern.test(groom.id)))
+      .find(Boolean);
+    config.hair.style = (everyday ?? hair[0])?.id ?? null;
   }
   return config;
 }
