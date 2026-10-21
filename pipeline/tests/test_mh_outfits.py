@@ -308,6 +308,20 @@ def test_colors_parse_from_unreal_and_print_as_srgb() -> None:
     assert hex_from_linear([0.0, 1.0, 0.2158605]) == "#00ff80"
 
 
+def test_template_blue_second_colour_takes_colour_one() -> None:
+    blue = [0.0382, 0.2582, 1.0, 1.0]
+    assert hex_from_linear(blue) == outfits.TEMPLATE_BLUE
+    vectors = {"diffuse_color_1": [0.2, 0.1, 0.05, 1.0], "diffuse_color_2": blue}
+    assert outfits.replace_template_colors(vectors) == ["diffuse_color_2"]
+    assert vectors["diffuse_color_2"] == [0.2, 0.1, 0.05, 1.0]
+
+
+def test_chosen_second_colour_is_kept() -> None:
+    vectors = {"diffuse_color_1": [0.2, 0.1, 0.05, 1.0], "diffuse_color_2": [0.5, 0.5, 0.5, 1.0]}
+    assert outfits.replace_template_colors(vectors) == []
+    assert vectors["diffuse_color_2"] == [0.5, 0.5, 0.5, 1.0]
+
+
 def test_labels_come_from_the_table_or_the_name() -> None:
     assert outfit_label("OA_Jeans")["en"] == "Jeans"
     assert outfit_label("OA_NewThing")["en"] == "New Thing"

@@ -78,11 +78,14 @@ F64 = NDArray[np.float64]
 I64 = NDArray[np.int64]
 Bool = NDArray[np.bool_]
 
-OUTFITS_VERSION = "outfit-v3"  # v3: map coverage, visible colour params, "black" map fix
+OUTFITS_VERSION = "outfit-v4"  # v4: template blue second colour follows colour 1
 TEXTURE_RECIPE = "outfit-v1"  # part of every map's content name; bump to re-encode all maps
 GENERATOR = "ai-sims mh-convert (outfits)"
 GENDERS = ("female", "male")
 WORLD_GRID = "WorldGridMaterial"  # Unreal's missing-material placeholder
+# Unreal's fabric template default for colour 2 (sleeves, ribbing, stitches); instances
+# that never set it would ship bright blue trims.
+TEMPLATE_BLUE = "#378bff"
 
 # Caps: fans of at least this many triangles around a hub at the rim's centre.
 CAP_MIN_FAN = 16  # buttons, rivets and patch corners use smaller fans
@@ -1008,6 +1011,17 @@ def hex_from_linear(color: Sequence[float]) -> str:
     return "#" + "".join(f"{int(v):02x}" for v in rgb)
 
 
+def replace_template_colors(vectors: dict[str, list[float]]) -> list[str]:
+    """Colour 2 left at the template blue takes colour 1 (a single-colour garment, as
+    the creator shows it); returns the names it replaced."""
+    first = vectors.get("diffuse_color_1")
+    second = vectors.get("diffuse_color_2")
+    if first is None or second is None or hex_from_linear(second) != TEMPLATE_BLUE:
+        return []
+    vectors["diffuse_color_2"] = list(first)
+    return ["diffuse_color_2"]
+
+
 def master_of(material: Mapping[str, Any]) -> str:
     parents = material.get("parents") or []
     return str(parents[-1]).rsplit(".", 1)[-1] if parents else "?"
@@ -1322,6 +1336,7 @@ def convert_material(
             continue
         textures[slot] = writer.write(source, role, tile, unit.name)
     scalars, vectors, switches = _scalars(material), _vectors(material), _switches(material)
+    replaced = replace_template_colors(vectors)
     extras = {
         "shader": shader,
         "ue": instance,
@@ -1332,6 +1347,7 @@ def convert_material(
         "scalars": scalars,
         "vectors": vectors,
         "switches": switches,
+        **({"template_colors": replaced} if replaced else {}),
     }
     base = vectors.get("diffuse_color_1", [0.5, 0.5, 0.5, 1.0])
     pbr: dict[str, Any] = {
