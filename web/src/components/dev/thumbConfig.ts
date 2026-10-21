@@ -2,8 +2,10 @@
  * Neutral characters for thumbnails: one item on an otherwise bare figure, so
  * every image in a grid reads the same way.
  */
+import type { CameraFocus } from '@/features/avatar/cameraFocus';
 import { reconcileConfig, startingConfig } from '@/features/creator/reconcile';
-import type { MhFace, MhManifest } from '@/lib/assets/manifest';
+import type { MhFace, MhManifest, MhOutfit, OutfitCategory } from '@/lib/assets/manifest';
+import { createDefaultConfig } from '@/lib/character/defaults';
 import type { CharacterBase, CharacterConfig } from '@/lib/character/schema';
 
 import type { ThumbTarget } from './thumbTargets';
@@ -38,14 +40,50 @@ function wearing(manifest: MhManifest, face: MhFace): CharacterConfig {
 }
 
 /**
+ * The base an outfit is shown on: female for female and unisex, male for male
+ * (as in the curation preview), or the other base when the outfit has no file
+ * for that one yet.
+ */
+export function outfitBase(outfit: MhOutfit): CharacterBase | null {
+  const preferred: CharacterBase = outfit.compat === 'male' ? 'male' : 'female';
+  const other: CharacterBase = preferred === 'male' ? 'female' : 'male';
+  if (outfit.files[preferred]) return preferred;
+  return outfit.files[other] ? other : null;
+}
+
+function outfitConfig(manifest: MhManifest, outfit: MhOutfit): CharacterConfig | null {
+  const base = outfitBase(outfit);
+  if (!base) return null;
+  // The base's default face, as a new character of that base starts with.
+  const preset = reconcileConfig(createDefaultConfig(base), manifest).face.preset;
+  const face = manifest.faces.find((entry) => entry.id === preset);
+  if (!face) return null;
+  const config = wearing(manifest, face);
+  config.outfit = { top: null, bottom: null, shoes: null, full: null };
+  config.outfit[outfit.category] = {
+    id: outfit.id,
+    tint: outfit.tintPresets[0]?.id ?? null,
+    colors: {},
+  };
+  const reconciled = reconcileConfig(config, manifest);
+  // Reconcile swaps an unwearable outfit for another one: never render that.
+  return reconciled.outfit[outfit.category]?.id === outfit.id ? reconciled : null;
+}
+
+/**
  * Faces: the face with its default skin and iris and a natural brow, no hair.
  * Grooms: worn on a model face of a compatible gender (facial hair on a male
- * face unless it is female-only). Null when the manifest has no such face.
+ * face unless it is female-only). Outfits: worn alone, first colourway, on the
+ * default face of their base, no hair. Null when the manifest has no such face.
  */
 export function thumbConfig(manifest: MhManifest, target: ThumbTarget): CharacterConfig | null {
   if (target.kind === 'face') {
     const face = manifest.faces.find((entry) => entry.id === target.id);
     return face ? reconcileConfig(wearing(manifest, face), manifest) : null;
+  }
+  if (target.kind === 'outfit') {
+    const outfit = manifest.outfits.find((entry) => entry.id === target.id);
+    return outfit ? outfitConfig(manifest, outfit) : null;
   }
 
   const groom = manifest.grooms.find((entry) => entry.id === target.id);
@@ -62,4 +100,29 @@ export function thumbConfig(manifest: MhManifest, target: ThumbTarget): Characte
   else if (groom.slot === 'beard') config.beard.style = groom.id;
   else if (groom.slot === 'mustache') config.mustache.style = groom.id;
   return reconcileConfig(config, manifest);
+}
+
+const OUTFIT_FOCUS: Record<OutfitCategory, CameraFocus> = {
+  top: 'torso',
+  bottom: 'legs',
+  shoes: 'feet',
+  full: 'body',
+};
+
+/**
+ * Framing per kind: faces and hair head and shoulders, brows and facial hair
+ * a close-up of their part of the face, outfits the part of the body they cover.
+ */
+export function thumbFocus(target: ThumbTarget): CameraFocus {
+  switch (target.kind) {
+    case 'eyebrows':
+      return 'brows';
+    case 'beard':
+    case 'mustache':
+      return 'mouth';
+    case 'outfit':
+      return OUTFIT_FOCUS[target.category ?? 'full'];
+    default:
+      return 'face';
+  }
 }

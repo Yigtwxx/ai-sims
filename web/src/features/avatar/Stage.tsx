@@ -52,6 +52,8 @@ interface StageProps {
   onCreated?: () => void;
   /** How far the subject's head moved from rest; close-up framing follows it. */
   follow?: RefObject<Vector3 | null>;
+  /** The subject's eye centre (world); the brows and mouth framings aim at it. */
+  anchor?: RefObject<Vector3 | null>;
   /** Render tier; `auto` starts high and steps down while frames drop. */
   quality?: QualityPreference;
 }
@@ -81,6 +83,7 @@ export function Stage({
   lighting,
   onCreated,
   follow,
+  anchor,
   quality = 'auto',
 }: StageProps) {
   const [autoTier, setAutoTier] = useState<RenderQuality>('high');
@@ -139,6 +142,7 @@ export function Stage({
         zoom={zoom}
         interactive={interactive}
         follow={follow}
+        anchor={anchor}
       />
       <ViewInset left={insetLeft} right={insetRight} />
     </Canvas>

@@ -4,7 +4,7 @@ import { ArrowClockwiseIcon, ImageIcon, PlayIcon, StopIcon } from '@phosphor-ico
 import { NextIntlClientProvider, useTranslations, type AbstractIntlMessages } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { thumbConfig } from '@/components/dev/thumbConfig';
+import { thumbConfig, thumbFocus } from '@/components/dev/thumbConfig';
 import { type ThumbKind, type ThumbTarget } from '@/components/dev/thumbTargets';
 import { StageBoundary } from '@/components/stage/StageBoundary';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,8 @@ interface SavedBatch {
   queue: string[];
   states: Record<string, ItemState>;
   retried: string[];
+  /** The kind filter, so the list a recycled page shows is the one being rendered. */
+  kinds?: ThumbKind[];
 }
 
 function takeSavedBatch(): SavedBatch | null {
@@ -56,7 +58,7 @@ function saveBatch(batch: SavedBatch): boolean {
     return false;
   }
 }
-const KIND_ORDER: ThumbKind[] = ['face', 'hair', 'eyebrows', 'beard', 'mustache'];
+const KIND_ORDER: ThumbKind[] = ['face', 'hair', 'eyebrows', 'beard', 'mustache', 'outfit'];
 
 interface ListItem extends ThumbTarget {
   exists: boolean;
@@ -97,6 +99,8 @@ function Bench() {
   const [retried, setRetried] = useState<string[]>([]);
   /** Jobs finished since this page loaded (see CHUNK). */
   const [sinceLoad, setSinceLoad] = useState(0);
+  /** Kinds the list and the render buttons are limited to; empty means every kind. */
+  const [kinds, setKinds] = useState<readonly ThumbKind[]>([]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,6 +120,7 @@ function Bench() {
           setStates(saved.states);
           setRetried(saved.retried);
           setQueue(saved.queue);
+          setKinds(saved.kinds ?? []);
           setRan(true);
         }
       } catch {
@@ -188,10 +193,15 @@ function Bench() {
   const recycle = queue.length > 0 && sinceLoad >= CHUNK;
   useEffect(() => {
     if (!recycle) return;
-    if (saveBatch({ queue, states, retried })) window.location.reload();
-  }, [recycle, queue, states, retried]);
+    if (saveBatch({ queue, states, retried, kinds: [...kinds] })) window.location.reload();
+  }, [recycle, queue, states, retried, kinds]);
 
-  const all = items ?? [];
+  const all = (items ?? []).filter((item) => kinds.length === 0 || kinds.includes(item.kind));
+  const present = KIND_ORDER.filter((kind) => items?.some((item) => item.kind === kind));
+  const toggleKind = (kind: ThumbKind) =>
+    setKinds((previous) =>
+      previous.includes(kind) ? previous.filter((entry) => entry !== kind) : [...previous, kind],
+    );
   const done = all.filter((item) => states[item.id]?.status === 'done').length;
   const failed = all.filter((item) => states[item.id]?.status === 'failed').length;
   const notInManifest = all.filter((item) => !item.inManifest);
@@ -233,6 +243,24 @@ function Bench() {
             </Button>
           ) : null}
         </div>
+
+        {present.length > 1 ? (
+          <div role="group" aria-label={t('kindFilter.label')} className="flex flex-wrap gap-2">
+            <KindChip active={kinds.length === 0} disabled={running} onClick={() => setKinds([])}>
+              {t('kindFilter.all')}
+            </KindChip>
+            {present.map((kind) => (
+              <KindChip
+                key={kind}
+                active={kinds.includes(kind)}
+                disabled={running}
+                onClick={() => toggleKind(kind)}
+              >
+                {t(`kinds.${kind}`)}
+              </KindChip>
+            ))}
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-2" aria-live="polite">
           <div className="bg-backstage-lift h-1 overflow-hidden rounded-full">
@@ -334,8 +362,39 @@ function Bench() {
 function labelOf(manifest: MhManifest | undefined, target: ThumbTarget): string {
   const entry =
     manifest?.faces.find((face) => face.id === target.id) ??
-    manifest?.grooms.find((groom) => groom.id === target.id);
+    manifest?.grooms.find((groom) => groom.id === target.id) ??
+    manifest?.outfits.find((outfit) => outfit.id === target.id);
   return entry ? labelFor(entry.label, 'en') : target.id;
+}
+
+/** A toggle in the kind filter (several can be on at once). */
+function KindChip({
+  active,
+  disabled,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'rounded-tile text-ui h-9 border px-3.5 transition-colors duration-200 disabled:opacity-40',
+        active
+          ? 'border-marquee bg-backstage-lift text-ink'
+          : 'border-hairline text-ink-muted hover:border-ink-faint hover:text-ink',
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
 function ThumbTile({
@@ -467,7 +526,7 @@ function RenderJob({
   }, [config, finish]);
 
   // What the settle loop is still waiting for, reported on a timeout.
-  const blocker = useRef<SettleBlocker | 'character' | 'groom' | 'ready'>('ready');
+  const blocker = useRef<SettleBlocker | 'character' | 'groom' | 'outfit' | 'ready'>('ready');
   // Asset responses (textures, grooms) keep arriving after the first frame.
   const lastAsset = useRef(0);
   useEffect(() => {
@@ -494,8 +553,9 @@ function RenderJob({
         if (!canvas || !luma) continue;
         // The picture alone cannot tell a bald head from one whose hair is
         // still being fitted: wait until the item is actually in the scene.
-        if (!onStage(canvas, target.kind)) {
-          blocker.current = target.kind === 'face' ? 'character' : 'groom';
+        if (!onStage(canvas, target)) {
+          blocker.current =
+            target.kind === 'face' ? 'character' : target.kind === 'outfit' ? 'outfit' : 'groom';
           calm = 0;
           continue;
         }
@@ -537,7 +597,7 @@ function RenderJob({
         finish({ ok: false, error: 'network' });
       }
     }
-  }, [finish, target.id, target.kind]);
+  }, [finish, target]);
 
   if (!config) return null;
   return (
@@ -549,7 +609,7 @@ function RenderJob({
           config={config}
           manifest={manifest}
           mode="thumbnail"
-          focus="face"
+          focus={thumbFocus(target)}
           onReady={onReady}
           className="size-full"
         />

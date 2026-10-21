@@ -10,13 +10,13 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Vector3, type Camera } from 'three';
+import { Vector3, type Camera, type Object3D } from 'three';
 
 import type { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import type { MhManifest } from '@/lib/assets/manifest';
 import type { CharacterConfig } from '@/lib/character/schema';
 
-import type { CameraFocus } from '../cameraFocus';
+import { isCloseUp, type CameraFocus } from '../cameraFocus';
 import type { QualityPreference } from '../quality';
 import { Stage } from '../Stage';
 import { CharacterLife, type LifeInput } from './characterLife';
@@ -72,6 +72,8 @@ export interface MhStageProps {
 
 const WHEEL_STEP = 0.0016;
 const headWorld = new Vector3();
+const eyeWorld = new Vector3();
+const EYE_BONES = ['FACIAL_L_Eye', 'FACIAL_R_Eye'] as const;
 const PINCH_STEP = 0.004;
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -124,9 +126,28 @@ export function MhStage({
   const followRest = useRef<{ handle: MhCharacterHandle; head: Vector3 } | null>(null);
   // Thumbnails are stills: life holds its first pose (no blink, no glance).
   const frozen = mode === 'thumbnail';
+  // The eye centre, for the close-up framings (brows, mouth) to aim at.
+  const closeUp = isCloseUp(focus);
+  const anchor = useRef<Vector3 | null>(null);
+  const eyes = useRef<{ handle: MhCharacterHandle; bones: Object3D[] } | null>(null);
   const onFrame = useCallback(
     (handle: MhCharacterHandle, delta: number, camera: Camera) => {
       life.step(handle, frozen ? 0 : delta, { ...input.current, viewer: camera.position });
+      if (closeUp) {
+        if (eyes.current?.handle !== handle) {
+          const bones = EYE_BONES.flatMap((name) => {
+            const bone = handle.body.root.getObjectByName(name);
+            return bone ? [bone] : [];
+          });
+          eyes.current = { handle, bones };
+        }
+        const { bones } = eyes.current;
+        if (bones.length > 0) {
+          const centre = (anchor.current ??= new Vector3()).set(0, 0, 0);
+          for (const bone of bones) centre.add(bone.getWorldPosition(eyeWorld));
+          centre.divideScalar(bones.length);
+        }
+      }
       const head = handle.body.bones.get('head');
       if (!head) return;
       head.getWorldPosition(headWorld);
@@ -137,7 +158,7 @@ export function MhStage({
         .copy(headWorld)
         .sub(followRest.current.head);
     },
-    [life, frozen],
+    [life, frozen, closeUp],
   );
   const latestOnSettled = useRef(onSettled);
   useLayoutEffect(() => {
@@ -179,6 +200,7 @@ export function MhStage({
         subjectHeight={resolved?.height}
         interactive={mode === 'creator' || talk}
         follow={talk ? follow : undefined}
+        anchor={closeUp ? anchor : undefined}
         quality={quality}
         className="size-full"
       >
@@ -193,7 +215,8 @@ export function MhStage({
                 skin={resolved.skin}
                 makeup={resolved.makeup}
                 iris={resolved.iris}
-                idleClips={resolved.idleClips}
+                // A still takes the same pose every time: the first clip, not a random one.
+                idleClips={frozen ? resolved.idleClips.slice(0, 1) : resolved.idleClips}
                 idleLayer={resolved.idleLayer}
                 grooms={resolved.grooms}
                 outfits={resolved.outfits}

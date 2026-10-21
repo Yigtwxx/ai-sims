@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { fixtureManifest } from '@/features/creator/fixtures/manifest';
+import { createDefaultConfig } from '@/lib/character/defaults';
 import { CharacterConfigSchema } from '@/lib/character/schema';
 
-import { irisFor, thumbConfig } from './thumbConfig';
-import { thumbnailTargets } from './thumbTargets';
+import { irisFor, outfitBase, thumbConfig, thumbFocus } from './thumbConfig';
+import { thumbnailTargets, type ThumbTarget } from './thumbTargets';
 
 const manifest = fixtureManifest();
 const target = (id: string) => {
@@ -47,6 +48,91 @@ describe('thumbConfig', () => {
     )!;
     const config = thumbConfig(manifest, target(hair.id));
     expect(config).toMatchObject({ base: 'female', hair: { style: hair.id } });
+  });
+});
+
+describe('thumbConfig for outfits', () => {
+  const outfitTarget = (id: string): ThumbTarget => {
+    const outfit = manifest.outfits.find((entry) => entry.id === id)!;
+    return {
+      id,
+      kind: 'outfit',
+      category: outfit.category,
+      file: `outfits/${id}/thumbnail.webp`,
+      inManifest: false,
+    };
+  };
+
+  it('wears a unisex outfit alone, in its first colourway, on the default female figure', () => {
+    const hoodie = manifest.outfits.find((entry) => entry.id === 'Top_Hoodie')!;
+    const config = thumbConfig(manifest, outfitTarget(hoodie.id));
+    const female = createDefaultConfig('female');
+    const face = manifest.faces.find((entry) => entry.id === female.face.preset)!;
+    expect(config).toMatchObject({
+      base: 'female',
+      face: { preset: face.id },
+      skin: { set: face.defaultSkin },
+      hair: { style: null },
+      beard: { style: null },
+      mustache: { style: null },
+      outfit: {
+        top: { id: hoodie.id, tint: hoodie.tintPresets[0]!.id, colors: {} },
+        bottom: null,
+        shoes: null,
+        full: null,
+      },
+    });
+    expect(CharacterConfigSchema.safeParse(config).success).toBe(true);
+  });
+
+  it('shows a male-only outfit on the default male figure', () => {
+    const jeans = manifest.outfits.find((entry) => entry.id === 'Bottom_Jeans')!;
+    const maleOnly = {
+      ...jeans,
+      id: 'Bottom_MaleOnly',
+      compat: 'male' as const,
+      files: { male: 'outfits/Bottom_MaleOnly/male.glb' },
+    };
+    const config = thumbConfig(
+      { ...manifest, outfits: [...manifest.outfits, maleOnly] },
+      { ...outfitTarget(jeans.id), id: maleOnly.id },
+    );
+    expect(config?.base).toBe('male');
+    expect(config?.face.preset).toBe(createDefaultConfig('male').face.preset);
+    expect(config?.outfit.bottom?.id).toBe(maleOnly.id);
+  });
+
+  it('falls back to the other base when the outfit has no file for its own yet', () => {
+    const hoodie = manifest.outfits.find((entry) => entry.id === 'Top_Hoodie')!;
+    const maleOnlyFile = { ...hoodie, files: { male: 'outfits/Top_Hoodie/male.glb' } };
+    expect(outfitBase(maleOnlyFile)).toBe('male');
+    expect(outfitBase({ ...hoodie, files: {} })).toBeNull();
+    const config = thumbConfig({ ...manifest, outfits: [maleOnlyFile] }, outfitTarget(hoodie.id));
+    expect(config).toMatchObject({ base: 'male', outfit: { top: { id: hoodie.id } } });
+  });
+
+  it('returns null for an outfit it cannot show', () => {
+    expect(thumbConfig(manifest, { ...outfitTarget('Top_Hoodie'), id: 'Nobody' })).toBeNull();
+  });
+});
+
+describe('thumbFocus', () => {
+  const of = (kind: ThumbTarget['kind'], category?: ThumbTarget['category']) =>
+    thumbFocus({ id: 'x', kind, category, file: 'x/thumbnail.webp', inManifest: false });
+
+  it('frames faces and hair head and shoulders, brows and facial hair close up', () => {
+    expect(of('face')).toBe('face');
+    expect(of('hair')).toBe('face');
+    expect(of('eyebrows')).toBe('brows');
+    expect(of('beard')).toBe('mouth');
+    expect(of('mustache')).toBe('mouth');
+  });
+
+  it('frames an outfit on the part of the body it covers', () => {
+    expect(of('outfit', 'top')).toBe('torso');
+    expect(of('outfit', 'bottom')).toBe('legs');
+    expect(of('outfit', 'shoes')).toBe('feet');
+    expect(of('outfit', 'full')).toBe('body');
   });
 });
 

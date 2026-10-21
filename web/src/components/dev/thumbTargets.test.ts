@@ -23,6 +23,55 @@ describe('thumbnailTargets', () => {
     expect(targets.filter((target) => target.kind === 'face')).toHaveLength(manifest.faces.length);
     expect(targets.at(-1)?.kind).not.toBe('face');
   });
+
+  it('lists every outfit last, its image beside its files unless the manifest names one', () => {
+    const [jeans, hoodie] = ['Bottom_Jeans', 'Top_Hoodie'].map((id) =>
+      manifest.outfits.find((outfit) => outfit.id === id)!,
+    );
+    const outfits = [
+      { ...jeans, id: 'outfit.OA_Jeans', thumbnail: undefined },
+      {
+        ...jeans,
+        id: 'outfit.OA_Boots',
+        category: 'shoes' as const,
+        thumbnail: undefined,
+        files: { male: 'outfits/OA_Boots/male.glb' },
+      },
+      { ...hoodie, id: 'outfit.OA_Hoodie', thumbnail: 'outfits/OA_Hoodie/thumbnail.webp' },
+      { ...hoodie, id: 'outfit.Unexported', thumbnail: undefined, files: {} },
+    ];
+    const targets = thumbnailTargets({ ...manifest, outfits });
+    expect(targets.slice(-3)).toEqual([
+      {
+        id: 'outfit.OA_Jeans',
+        kind: 'outfit',
+        category: 'bottom',
+        file: 'outfits/Bottom_Jeans/thumbnail.webp',
+        inManifest: false,
+      },
+      {
+        id: 'outfit.OA_Boots',
+        kind: 'outfit',
+        category: 'shoes',
+        file: 'outfits/OA_Boots/thumbnail.webp',
+        inManifest: false,
+      },
+      {
+        id: 'outfit.OA_Hoodie',
+        kind: 'outfit',
+        category: 'top',
+        file: 'outfits/OA_Hoodie/thumbnail.webp',
+        inManifest: true,
+      },
+    ]);
+    // An outfit without files cannot be rendered.
+    expect(targets.some((target) => target.id === 'outfit.Unexported')).toBe(false);
+    expect(
+      targets
+        .filter((target) => target.kind === 'outfit')
+        .every((t) => isSafeThumbnailPath(t.file)),
+    ).toBe(true);
+  });
 });
 
 describe('isSafeThumbnailPath', () => {

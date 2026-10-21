@@ -203,7 +203,7 @@ export function DevMhViewer() {
         <label className="flex gap-2">
           focus
           <select value={focus} onChange={(e) => setFocus(e.target.value as CameraFocus)}>
-            {['face', 'torso', 'body', 'legs', 'feet'].map((f) => (
+            {['face', 'brows', 'mouth', 'torso', 'body', 'legs', 'feet'].map((f) => (
               <option key={f}>{f}</option>
             ))}
           </select>

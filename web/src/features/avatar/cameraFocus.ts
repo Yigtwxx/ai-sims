@@ -4,7 +4,8 @@
  * character height so a 1.5 m anime avatar and a 1.85 m human frame alike.
  */
 
-export type CameraFocus = 'body' | 'face' | 'torso' | 'legs' | 'feet' | 'premiere';
+export type CameraFocus =
+  'body' | 'face' | 'torso' | 'legs' | 'feet' | 'premiere' | 'brows' | 'mouth';
 
 type Vec3 = readonly [number, number, number];
 
@@ -13,8 +14,33 @@ export interface CameraPose {
   target: Vec3;
 }
 
+const scale = (v: Vec3, s: number): Vec3 => [v[0] * s, v[1] * s, v[2] * s];
+
 /** Height (metres) the presets below were authored for. */
 export const REFERENCE_HEIGHT = 1.85;
+
+/**
+ * Close-ups for item thumbnails, as offsets from the subject's eye centre
+ * (the midpoint of the eyeballs): both brows with the eyes under them, and the
+ * lower face from the nose to under the chin (beards and mustaches). Anchored
+ * on the eyes because the idle pose moves the head a few centimetres off the
+ * axis, which a fixed height would leave off-centre at this distance.
+ */
+const CLOSE_UP_OFFSETS = {
+  brows: { position: [0, 0.015, 0.36], target: [0, 0.01, 0] },
+  mouth: { position: [0, -0.09, 0.38], target: [0, -0.1, 0] },
+} as const satisfies Record<string, CameraPose>;
+
+type CloseUp = keyof typeof CLOSE_UP_OFFSETS;
+
+/** Where the eye centre of the reference character sits; places a close-up before it is measured. */
+const REFERENCE_EYES: Vec3 = [0, 1.72, 0.07];
+
+const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const around = (eyes: Vec3, offset: CameraPose, s: number): CameraPose => ({
+  position: add(eyes, scale(offset.position, s)),
+  target: add(eyes, scale(offset.target, s)),
+});
 
 const REFERENCE_POSES: Record<CameraFocus, CameraPose> = {
   body: { position: [0, 1.02, 5.9], target: [0, 0.9, 0] },
@@ -24,14 +50,31 @@ const REFERENCE_POSES: Record<CameraFocus, CameraPose> = {
   feet: { position: [0.1, 0.55, 1.7], target: [0, 0.1, 0] },
   // Smaller and higher in frame, leaving the lower third for the title card.
   premiere: { position: [0, 0.78, 7.6], target: [0, 0.5, 0] },
+  brows: around(REFERENCE_EYES, CLOSE_UP_OFFSETS.brows, 1),
+  mouth: around(REFERENCE_EYES, CLOSE_UP_OFFSETS.mouth, 1),
 };
-
-const scale = (v: Vec3, s: number): Vec3 => [v[0] * s, v[1] * s, v[2] * s];
 
 export function getCameraPose(focus: CameraFocus, height = REFERENCE_HEIGHT): CameraPose {
   const s = height / REFERENCE_HEIGHT;
   const pose = REFERENCE_POSES[focus];
   return { position: scale(pose.position, s), target: scale(pose.target, s) };
+}
+
+/** True for the framings that follow the subject's eyes (see closeUpPose). */
+export function isCloseUp(focus: CameraFocus): focus is CloseUp {
+  return Object.hasOwn(CLOSE_UP_OFFSETS, focus);
+}
+
+/**
+ * A close-up framed on the measured eye centre (world, metres), its offsets
+ * scaled like the presets. Null for the framings that are not close-ups.
+ */
+export function closeUpPose(
+  focus: CameraFocus,
+  eyes: Vec3,
+  height = REFERENCE_HEIGHT,
+): CameraPose | null {
+  return isCloseUp(focus) ? around(eyes, CLOSE_UP_OFFSETS[focus], height / REFERENCE_HEIGHT) : null;
 }
 
 const smooth = (t: number) => t * t * (3 - 2 * t);

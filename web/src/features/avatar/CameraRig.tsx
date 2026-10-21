@@ -5,7 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useRef, type RefObject } from 'react';
 import { Vector3 } from 'three';
 
-import { getCameraPose, zoomPose, type CameraFocus } from './cameraFocus';
+import { closeUpPose, getCameraPose, isCloseUp, zoomPose, type CameraFocus } from './cameraFocus';
 
 const { ACTION } = CameraControlsImpl;
 
@@ -27,7 +27,8 @@ const smoothstep = (a: number, b: number, x: number) => {
  * built-in dolly is off, so zooming always heads for the face. `follow` is how
  * far the subject's head has moved from rest (world, m): close up, the camera
  * drifts with it like an operator would, so a swaying speaker stays framed;
- * at full body it holds still.
+ * at full body it holds still. `anchor` is the subject's eye centre (world, m):
+ * the close-up framings aim relative to it, wherever the pose put the head.
  */
 export function CameraRig({
   focus,
@@ -35,21 +36,36 @@ export function CameraRig({
   zoom,
   interactive = true,
   follow,
+  anchor,
 }: {
   focus: CameraFocus;
   height?: number;
   zoom?: number;
   interactive?: boolean;
   follow?: RefObject<Vector3 | null>;
+  anchor?: RefObject<Vector3 | null>;
 }) {
   const controls = useRef<CameraControlsImpl>(null);
   const aimed = useRef(new Vector3());
+  /** Eye centre the close-up was last aimed at; null until it has been. */
+  const anchored = useRef<Vector3 | null>(null);
 
   useEffect(() => {
     const pose = zoom === undefined ? getCameraPose(focus, height) : zoomPose(zoom, height);
     aimed.current.set(0, 0, 0);
+    anchored.current = null;
     void controls.current?.setLookAt(...pose.position, ...pose.target, true);
   }, [focus, height, zoom]);
+
+  useFrame(() => {
+    const eyes = anchor?.current;
+    if (zoom !== undefined || !eyes || !controls.current || !isCloseUp(focus)) return;
+    if (anchored.current && anchored.current.distanceTo(eyes) < FOLLOW_STEP) return;
+    anchored.current = (anchored.current ?? new Vector3()).copy(eyes);
+    const pose = closeUpPose(focus, [eyes.x, eyes.y, eyes.z], height);
+    // Rigidly on the eyes: a close-up a few millimetres off reads as a miss.
+    if (pose) void controls.current.setLookAt(...pose.position, ...pose.target, false);
+  });
 
   useFrame(() => {
     const offset = follow?.current;

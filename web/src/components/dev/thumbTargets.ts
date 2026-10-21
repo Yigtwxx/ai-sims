@@ -3,15 +3,17 @@
  * the bench page and the write endpoint, which trusts nothing but the
  * manifest (the client only ever sends an id).
  */
-import type { GroomSlot, MhManifest } from '@/lib/assets/manifest';
+import type { GroomSlot, MhManifest, OutfitCategory } from '@/lib/assets/manifest';
 
 export const THUMBNAIL_FILE = 'thumbnail.webp';
 
-export type ThumbKind = 'face' | GroomSlot;
+export type ThumbKind = 'face' | GroomSlot | 'outfit';
 
 export interface ThumbTarget {
   id: string;
   kind: ThumbKind;
+  /** Outfits only: what the garment covers, which sets its framing. */
+  category?: OutfitCategory;
   /** Manifest-relative path of the image (POSIX separators). */
   file: string;
   /** False when the manifest has no thumbnail entry and the path is derived from the asset's folder. */
@@ -26,7 +28,12 @@ const besides = (file: string) => {
   return dir ? `${dir}/${THUMBNAIL_FILE}` : THUMBNAIL_FILE;
 };
 
-/** Every face and every groom, faces first, in manifest order. */
+/**
+ * Every face, groom and outfit, in that order and in manifest order within
+ * each. An outfit's image goes in the folder of its files
+ * (`outfits/OA_Jeans/female.glb` -> `outfits/OA_Jeans/thumbnail.webp`); one
+ * without files cannot be rendered and is left out.
+ */
 export function thumbnailTargets(manifest: MhManifest): ThumbTarget[] {
   const faces = manifest.faces.map((face) => ({
     id: face.id,
@@ -42,7 +49,20 @@ export function thumbnailTargets(manifest: MhManifest): ThumbTarget[] {
       file: groom.thumbnail ?? besides(groom.glb),
       inManifest: groom.thumbnail !== undefined,
     }));
-  return [...faces, ...grooms];
+  const outfits = manifest.outfits.flatMap((outfit) => {
+    const source = outfit.files.female ?? outfit.files.male;
+    if (!source) return [];
+    return [
+      {
+        id: outfit.id,
+        kind: 'outfit' as const,
+        category: outfit.category,
+        file: outfit.thumbnail ?? besides(source),
+        inManifest: outfit.thumbnail !== undefined,
+      },
+    ];
+  });
+  return [...faces, ...grooms, ...outfits];
 }
 
 /**
