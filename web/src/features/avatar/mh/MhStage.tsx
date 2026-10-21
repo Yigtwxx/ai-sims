@@ -2,6 +2,7 @@
 
 import { useFrame } from '@react-three/fiber';
 import {
+  memo,
   Suspense,
   useCallback,
   useEffect,
@@ -19,12 +20,12 @@ import type { CharacterConfig } from '@/lib/character/schema';
 import { isCloseUp, type CameraFocus } from '../cameraFocus';
 import type { QualityPreference } from '../quality';
 import { Stage } from '../Stage';
-import { CharacterLife, type LifeInput } from './characterLife';
+import { CharacterLife, type FaceLayers, type LifeInput } from './characterLife';
 import { loadFaceClip } from './faceClips';
 import type { LifeMode } from './idle';
 import { MhCharacter, type MhCharacterHandle } from './MhCharacter';
 import { MhLighting } from './MhLighting';
-import { resolveCharacter } from './resolve';
+import { resolveCharacter, type ResolvedCharacter } from './resolve';
 
 /**
  * Public interface of the photoreal MetaHuman stage. Pages (creator, talk, landing
@@ -76,8 +77,18 @@ const eyeWorld = new Vector3();
 const EYE_BONES = ['FACIAL_L_Eye', 'FACIAL_R_Eye'] as const;
 const PINCH_STEP = 0.004;
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+/** One element for every render: a new one would re-render the whole studio set. */
+const STUDIO_LIGHTING = <MhLighting rig="studio" />;
 
-export function MhStage({
+/** A character is rebuilt (new GLBs) only when its body or head changes. */
+export const characterKey = (resolved: ResolvedCharacter) =>
+  `${resolved.bodyUrl}|${resolved.headUrl}`;
+
+/**
+ * Memoised: the creator re-renders on every slider step and keystroke; the
+ * stage only needs to when its own props change.
+ */
+export const MhStage = memo(function MhStage({
   config,
   manifest,
   mode,
@@ -113,8 +124,34 @@ export function MhStage({
   );
   const container = usePinchAndWheel(talk ? changeZoom : undefined);
 
+  // A face or body change assembles the new character off screen; the one on
+  // screen stays until the new one has its skin, hair and clothes, then they
+  // swap in one frame (no empty stage, no bare or bald in-between).
+  const [shown, setShown] = useState(resolved);
+  const swapping = !!resolved && !!shown && characterKey(resolved) !== characterKey(shown);
+  if (!swapping && resolved !== shown) setShown(resolved);
+  const latestResolved = useRef(resolved);
+  useLayoutEffect(() => {
+    latestResolved.current = resolved;
+  }, [resolved]);
+  const promote = useCallback((key: string) => {
+    const next = latestResolved.current;
+    if (next && characterKey(next) === key) setShown(next);
+  }, []);
+
+  // One life per character: the incoming one is posed while it assembles.
   // Life reads the latest mode and speech without re-creating the frame callback.
-  const life = useMemo(() => new CharacterLife(), []);
+  const lives = useRef(new WeakMap<MhCharacterHandle, CharacterLife>());
+  const faceLayers = useRef<FaceLayers>({});
+  const lifeOf = useCallback((handle: MhCharacterHandle) => {
+    let life = lives.current.get(handle);
+    if (!life) {
+      life = new CharacterLife();
+      lives.current.set(handle, life);
+    }
+    life.faceLayers = faceLayers.current;
+    return life;
+  }, []);
   const lifeMode: LifeMode = talk ? (thinking ? 'thinking' : 'listening') : 'idle';
   const input = useRef<LifeInput>({ mode: lifeMode, speech });
   useLayoutEffect(() => {
@@ -130,9 +167,21 @@ export function MhStage({
   const closeUp = isCloseUp(focus);
   const anchor = useRef<Vector3 | null>(null);
   const eyes = useRef<{ handle: MhCharacterHandle; bones: Object3D[] } | null>(null);
+  const onIncomingFrame = useCallback(
+    (handle: MhCharacterHandle, delta: number, camera: Camera) => {
+      lifeOf(handle).step(handle, frozen ? 0 : delta, {
+        ...input.current,
+        viewer: camera.position,
+      });
+    },
+    [lifeOf, frozen],
+  );
   const onFrame = useCallback(
     (handle: MhCharacterHandle, delta: number, camera: Camera) => {
-      life.step(handle, frozen ? 0 : delta, { ...input.current, viewer: camera.position });
+      lifeOf(handle).step(handle, frozen ? 0 : delta, {
+        ...input.current,
+        viewer: camera.position,
+      });
       if (closeUp) {
         if (eyes.current?.handle !== handle) {
           const bones = EYE_BONES.flatMap((name) => {
@@ -158,7 +207,7 @@ export function MhStage({
         .copy(headWorld)
         .sub(followRest.current.head);
     },
-    [life, frozen, closeUp],
+    [lifeOf, frozen, closeUp],
   );
   const latestOnSettled = useRef(onSettled);
   useLayoutEffect(() => {
@@ -181,12 +230,17 @@ export function MhStage({
           })
         : Promise.resolve(undefined);
     void Promise.all([load(idleFace), load(smileFace)]).then(([idle, smile]) => {
-      if (live) life.faceLayers = { idle, smile };
+      if (live) faceLayers.current = { idle, smile };
     });
     return () => {
       live = false;
     };
-  }, [life, idleFace, smileFace]);
+  }, [idleFace, smileFace]);
+
+  const slots = [
+    ...(swapping ? [{ resolved: shown!, incoming: false }] : []),
+    ...(resolved ? [{ resolved, incoming: swapping }] : []),
+  ];
 
   return (
     <div ref={container} className={className}>
@@ -196,7 +250,7 @@ export function MhStage({
         insetLeft={insetLeft}
         insetRight={insetRight}
         backdrop="dark"
-        lighting={<MhLighting rig="studio" />}
+        lighting={STUDIO_LIGHTING}
         subjectHeight={resolved?.height}
         interactive={mode === 'creator' || talk}
         follow={talk ? follow : undefined}
@@ -204,33 +258,45 @@ export function MhStage({
         quality={quality}
         className="size-full"
       >
-        <Suspense fallback={null}>
-          {resolved && (
-            <>
-              <MhCharacter
-                key={`${resolved.bodyUrl}|${resolved.headUrl}`}
-                bodyUrl={resolved.bodyUrl}
-                headUrl={resolved.headUrl}
-                sliders={resolved.sliders}
-                skin={resolved.skin}
-                makeup={resolved.makeup}
-                iris={resolved.iris}
-                // A still takes the same pose every time: the first clip, not a random one.
-                idleClips={frozen ? resolved.idleClips.slice(0, 1) : resolved.idleClips}
-                idleLayer={resolved.idleLayer}
-                grooms={resolved.grooms}
-                outfits={resolved.outfits}
-                onFrame={onFrame}
-                onSettled={handleSettled}
-              />
-              <FirstFrame onReady={onReady} />
-            </>
-          )}
-        </Suspense>
+        {slots.map(({ resolved: character, incoming }) => {
+          const key = characterKey(character);
+          return (
+            // Same key and position whether incoming or shown, so the swap
+            // keeps the assembled character instead of rebuilding it.
+            <group key={key} visible={!incoming}>
+              <Suspense fallback={null}>
+                <MhCharacter
+                  bodyUrl={character.bodyUrl}
+                  headUrl={character.headUrl}
+                  sliders={character.sliders}
+                  skin={character.skin}
+                  makeup={character.makeup}
+                  iris={character.iris}
+                  // A still takes the same pose every time: the first clip, not a random one.
+                  idleClips={frozen ? character.idleClips.slice(0, 1) : character.idleClips}
+                  idleLayer={character.idleLayer}
+                  grooms={character.grooms}
+                  outfits={character.outfits}
+                  onFrame={incoming ? onIncomingFrame : onFrame}
+                  prewarm={incoming}
+                  onSettled={
+                    incoming
+                      ? () => {
+                          promote(key);
+                          handleSettled();
+                        }
+                      : handleSettled
+                  }
+                />
+                {!incoming && <FirstFrame onReady={onReady} />}
+              </Suspense>
+            </group>
+          );
+        })}
       </Stage>
     </div>
   );
-}
+});
 
 /** Calls `onReady` on the first rendered frame after the character mounted. */
 function FirstFrame({ onReady }: { onReady?: () => void }) {

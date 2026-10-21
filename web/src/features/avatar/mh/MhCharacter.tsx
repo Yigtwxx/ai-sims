@@ -10,7 +10,16 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import type { Camera, Material, Mesh, Object3D, WebGLRenderTarget } from 'three';
+import type {
+  Camera,
+  Material,
+  Mesh,
+  Object3D,
+  Scene,
+  Texture,
+  WebGLRenderer,
+  WebGLRenderTarget,
+} from 'three';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -24,6 +33,7 @@ import {
   collectMorphMeshes,
   createBodyRig,
   mhExtras,
+  presetSkinnedBounds,
   setMorph,
   type BodyRig,
   type BodySliderId,
@@ -93,6 +103,12 @@ export interface MhCharacterProps {
    * failed and were skipped); again after every change that reloads them.
    */
   onSettled?: () => void;
+  /**
+   * Upload every texture and compile every material before reporting settled,
+   * a texture per frame. For a character assembled off screen: shown without
+   * it, its first frame uploads all its maps at once and the stage freezes.
+   */
+  prewarm?: boolean;
 }
 
 /**
@@ -114,22 +130,48 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     outfits = NO_OUTFITS,
     onFrame,
     onSettled,
+    prewarm = false,
   },
   ref,
 ) {
   const gl = useThree((state) => state.gl);
+  const camera = useThree((state) => state.camera);
+  const scene = useThree((state) => state.scene);
   // The first frame can show a character whose skin and hair are still
   // loading; thumbnails and the premiere wait for both parts to settle.
   const settled = useRef({ skin: false, grooms: false, outfits: false });
   const latestOnSettled = useRef(onSettled);
+  const warm = useRef<{ enabled: boolean; root: Object3D | null; camera: Camera; scene: Scene }>({
+    enabled: prewarm,
+    root: null,
+    camera,
+    scene,
+  });
   useLayoutEffect(() => {
     latestOnSettled.current = onSettled;
-  }, [onSettled]);
-  const settle = useCallback((part: keyof typeof settled.current) => {
-    settled.current[part] = true;
-    const { skin: skinDone, grooms: groomsDone, outfits: outfitsDone } = settled.current;
-    if (skinDone && groomsDone && outfitsDone) latestOnSettled.current?.();
-  }, []);
+    warm.current.enabled = prewarm;
+    warm.current.camera = camera;
+    warm.current.scene = scene;
+  }, [onSettled, prewarm, camera, scene]);
+  // Counts settles, so a warm-up that a newer change overtook reports nothing.
+  const settles = useRef(0);
+  const settle = useCallback(
+    (part: keyof typeof settled.current) => {
+      settled.current[part] = true;
+      const { skin: skinDone, grooms: groomsDone, outfits: outfitsDone } = settled.current;
+      if (!skinDone || !groomsDone || !outfitsDone) return;
+      const run = ++settles.current;
+      const { enabled, root, camera: view, scene: world } = warm.current;
+      if (!enabled || !root) {
+        latestOnSettled.current?.();
+        return;
+      }
+      void warmUp(gl, root, view, world).then(() => {
+        if (run === settles.current) latestOnSettled.current?.();
+      });
+    },
+    [gl],
+  );
   const bodyGltf = useMhGltf(bodyUrl);
   const headGltf = useMhGltf(headUrl);
 
@@ -155,8 +197,12 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       if (mesh.isMesh) {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        // Always in frame; culling would first walk every skinned vertex
+        // through its bones to size the body's bounds (a long first frame).
+        mesh.frustumCulled = false;
       }
     });
+    presetSkinnedBounds(bodyRoot);
     const skins = applySkinMaterials(bodyRoot, { microNormal: null });
     const eyes = applyEyeMaterials(bodyRoot);
     const faceMeshes = collectMorphMeshes(bodyRoot).filter((mesh) => mesh !== body.mesh);
@@ -247,76 +293,86 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   }, [assembled, clipKey, idleLayer]);
 
   // Grooms load in the background (the character never waits for its hair);
-  // changing one groom re-fits all of them from the loader cache.
+  // changing one groom re-fits all of them from the loader cache. The hair on
+  // now stays until the new set is fitted, so a change never shows a bald head.
   const groomKey = grooms.map((wear) => wear.groom.id).join('|');
   const latestGrooms = useRef(grooms);
   useLayoutEffect(() => {
     latestGrooms.current = grooms;
   }, [grooms]);
   const worn = useRef(new Map<string, WornGroom>());
+  const density = useRef<WebGLRenderTarget | null>(null);
   const { hairLod } = useQuality();
+  const swapGrooms = useCallback(
+    (next: WornGroom[], files: (string | null)[], layers: WebGLRenderTarget | null) => {
+      for (const groom of worn.current.values()) {
+        takeOffGroom(assembled.root, assembled.handle.faceMeshes, groom);
+      }
+      worn.current.clear();
+      for (const groom of next) {
+        for (const mesh of groom.meshes) assembled.root.add(mesh);
+        assembled.handle.faceMeshes.push(...groom.meshes);
+        worn.current.set(groom.id, groom);
+      }
+      presetSkinnedBounds(assembled.root);
+      // Hair growing from the skin: the grooms' density darkens the scalp and brows.
+      setGroomDensity(
+        assembled.skins,
+        layers?.texture ?? null,
+        files,
+        latestGrooms.current[0]?.look,
+      );
+      density.current?.dispose();
+      density.current = layers;
+    },
+    [assembled],
+  );
+  useEffect(() => () => swapGrooms([], [], null), [swapGrooms]);
   useEffect(() => {
     const head = assembled.headSkin;
     settled.current.grooms = false;
     if (!groomKey || !head) {
+      swapGrooms([], [], null);
       settle('grooms');
       return;
     }
     let live = true;
-    const wearing = worn.current;
-    const mine: WornGroom[] = [];
     const wears = latestGrooms.current;
     const fitted = Promise.allSettled(wears.map((wear) => wearGroom(gl, wear, head, hairLod))).then(
-      (results) => {
-        results.forEach((result, i) => {
-          if (result.status === 'rejected') {
-            console.warn('[mh] groom failed to load', wears[i]?.groom.id, result.reason);
-            return;
-          }
-          const groom = result.value;
-          if (!live) {
-            groom.dispose();
-            return;
-          }
-          for (const mesh of groom.meshes) assembled.root.add(mesh);
-          assembled.handle.faceMeshes.push(...groom.meshes);
-          const look = latestGrooms.current.find((wear) => wear.groom.id === groom.id)?.look;
-          if (look) setHairLook(groom.materials, look);
-          wearing.set(groom.id, groom);
-          mine.push(groom);
-        });
-      },
+      (results) =>
+        results.flatMap((result, i) => {
+          if (result.status === 'fulfilled') return [result.value];
+          console.warn('[mh] groom failed to load', wears[i]?.groom.id, result.reason);
+          return [];
+        }),
     );
-    // Hair growing from the skin: the grooms' density darkens the scalp and brows.
-    let density: WebGLRenderTarget | null = null;
     const files = densityFiles(wears);
-    let tinted: Promise<void> = Promise.resolve();
-    if (files.some(Boolean)) {
-      tinted = Promise.all(
-        files.map((file) => (file ? loadAssetTexture(gl, file, 'data') : null)),
-      ).then(
-        (layers) => {
-          if (!live) return;
-          density = packGroomDensity(gl, layers);
-          const look = latestGrooms.current[0]?.look;
-          setGroomDensity(assembled.skins, density.texture, files, look);
-        },
-        (error: unknown) => console.warn('[mh] groom density failed to load', error),
-      );
-    }
-    void Promise.all([fitted, tinted]).then(() => {
-      if (live) settle('grooms');
+    const layers: Promise<WebGLRenderTarget | null> = files.some(Boolean)
+      ? Promise.all(files.map((file) => (file ? loadAssetTexture(gl, file, 'data') : null))).then(
+          (textures) => packGroomDensity(gl, textures),
+          (error: unknown) => {
+            console.warn('[mh] groom density failed to load', error);
+            return null;
+          },
+        )
+      : Promise.resolve(null);
+    void Promise.all([fitted, layers]).then(([next, packed]) => {
+      if (!live) {
+        for (const groom of next) groom.dispose();
+        packed?.dispose();
+        return;
+      }
+      for (const groom of next) {
+        const look = latestGrooms.current.find((wear) => wear.groom.id === groom.id)?.look;
+        if (look) setHairLook(groom.materials, look);
+      }
+      swapGrooms(next, files, packed);
+      settle('grooms');
     });
     return () => {
       live = false;
-      for (const groom of mine) {
-        takeOffGroom(assembled.root, assembled.handle.faceMeshes, groom);
-        wearing.delete(groom.id);
-      }
-      setGroomDensity(assembled.skins, null, [], undefined);
-      density?.dispose();
     };
-  }, [assembled, gl, groomKey, hairLod, settle]);
+  }, [assembled, gl, groomKey, hairLod, settle, swapGrooms]);
 
   useEffect(() => {
     for (const wear of grooms) {
@@ -349,6 +405,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         for (const mesh of worn.meshes) (body.mesh.parent ?? assembled.root).add(mesh);
         body.garments.push(...worn.meshes);
       }
+      presetSkinnedBounds(assembled.root);
       wornOutfits.current = next;
       applyBodyHide(
         body.mesh,
@@ -398,6 +455,9 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   }, [outfits]);
 
   useImperativeHandle(ref, () => assembled.handle, [assembled]);
+  useLayoutEffect(() => {
+    warm.current.root = assembled.root;
+  }, [assembled]);
 
   useLayoutEffect(() => {
     applyBodySliders(assembled.handle.body, sliders ?? {});
@@ -458,6 +518,48 @@ async function loadClips(urls: readonly string[]): Promise<MotionClip[]> {
 
 function attachMotion(handle: MhCharacterHandle, motion: MotionPlayer | null): void {
   handle.motion = motion;
+}
+
+/** Every texture a character's materials sample, uniforms of patched shaders included. */
+function texturesOf(root: Object3D): Set<Texture> {
+  const found = new Set<Texture>();
+  const take = (value: unknown) => {
+    if ((value as Texture | null)?.isTexture) found.add(value as Texture);
+    else if (Array.isArray(value)) value.forEach(take);
+  };
+  root.traverse((node) => {
+    const mesh = node as Mesh;
+    if (!mesh.isMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      Object.values(material).forEach(take);
+      // Uniform groups the skin, hair and fabric shaders keep in userData.
+      for (const group of Object.values(material.userData)) {
+        if (group && typeof group === 'object') {
+          for (const uniform of Object.values(group as Record<string, { value?: unknown }>)) {
+            take(uniform?.value);
+          }
+        }
+      }
+    }
+  });
+  return found;
+}
+
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+/** Uploads a character's textures one per frame, then compiles its materials. */
+async function warmUp(
+  gl: WebGLRenderer,
+  root: Object3D,
+  camera: Camera,
+  scene: Scene,
+): Promise<void> {
+  for (const texture of texturesOf(root)) {
+    gl.initTexture(texture);
+    await nextFrame();
+  }
+  await gl.compileAsync(root, camera, scene);
 }
 
 function hasMaps(materials: readonly Material[]): boolean {

@@ -116,19 +116,32 @@ export function attachHead(head: Object3D, body: BodyRig): SkinnedMesh[] {
     const parent = bone.parent as Bone | null;
     if (parent?.isBone && body.bones.has(parent.name)) body.bones.get(parent.name)!.add(bone);
   }
+  // The primitives share one glTF skin: give them one skeleton too. The
+  // renderer updates and uploads a skeleton's ~870 bone matrices once per
+  // render pass, so one per primitive multiplied that work ninefold.
+  const shared: Skeleton[] = [];
   for (const mesh of meshes) {
     const { bones, boneInverses } = mesh.skeleton;
     const remapped = bones.map((bone) => body.bones.get(bone.name) ?? bone);
-    mesh.bind(
+    const skeleton =
+      shared.find((candidate) => sameSkin(candidate, remapped, boneInverses)) ??
       new Skeleton(
         remapped,
         boneInverses.map((inverse) => inverse.clone()),
-      ),
-      mesh.bindMatrix,
-    );
+      );
+    if (!shared.includes(skeleton)) shared.push(skeleton);
+    mesh.bind(skeleton, mesh.bindMatrix);
     mesh.frustumCulled = false;
   }
   return meshes;
+}
+
+function sameSkin(skeleton: Skeleton, bones: readonly Bone[], inverses: readonly Matrix4[]) {
+  return (
+    skeleton.bones.length === bones.length &&
+    skeleton.bones.every((bone, i) => bone === bones[i]) &&
+    skeleton.boneInverses.every((inverse, i) => inverse.equals(inverses[i]!))
+  );
 }
 
 export const BODY_SLIDER_IDS = [
@@ -196,6 +209,20 @@ export function applyBodySliders(
   // Garments share the skeleton, so the new inverse binds are theirs already.
   for (const garment of body.garments) syncGarmentMorphs(garment, body);
   if (body.seam) snapNeckSeam(body.seam);
+}
+
+/**
+ * Gives skinned meshes the bind-pose bounds of their geometry. Otherwise three
+ * sizes a skinned mesh's bounds the first time it sorts it, walking every
+ * vertex through its bones: a third of a second for a newly shown character.
+ */
+export function presetSkinnedBounds(root: Object3D): void {
+  root.traverse((node) => {
+    const mesh = node as SkinnedMesh;
+    if (!mesh.isSkinnedMesh || mesh.boundingSphere) return;
+    if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+    mesh.boundingSphere = mesh.geometry.boundingSphere!.clone();
+  });
 }
 
 /** extras.mh.neck_seam written by the converter for heads and bodies. */
@@ -297,14 +324,47 @@ function skinTransform(mesh: SkinnedMesh, vertex: number, target: Matrix4): Matr
   return target.multiply(mesh.bindMatrix);
 }
 
-/** Copy of a geometry that owns the attributes the seam rewrites and shares the rest. */
+const SEAM_OWNED = ['position', 'normal', 'skinIndex', 'skinWeight'];
+interface SeamCopy {
+  copy: BufferGeometry;
+  /** The owned attributes as loaded, de-interleaved like the copy's. */
+  loaded: Map<string, ArrayLike<number>>;
+}
+/** The seam copy made of each head geometry, reused by the next character with that head. */
+const seamCopies = new WeakMap<BufferGeometry, SeamCopy>();
+
+/**
+ * Copy of a geometry that owns the attributes the seam rewrites and shares the
+ * rest. One copy per head, restored to the loaded values on every bind: the
+ * renderer keys a geometry's morph texture (67 targets for a head) by the
+ * geometry, so a fresh copy rebuilt it, a ~0.3 s freeze, every time a face was
+ * picked again. Two characters with one head on different bodies at the same
+ * time would share the snapped seam; no page shows that.
+ */
 function ownSeamAttributes(geometry: BufferGeometry): BufferGeometry {
+  const cached = seamCopies.get(geometry);
+  if (cached) {
+    for (const [name, values] of cached.loaded) {
+      const attribute = cached.copy.getAttribute(name) as BufferAttribute;
+      (attribute.array as unknown as { set(values: ArrayLike<number>): void }).set(values);
+      attribute.needsUpdate = true;
+    }
+    return cached.copy;
+  }
   const copy = new BufferGeometry();
+  const loaded = new Map<string, ArrayLike<number>>();
   copy.setIndex(geometry.index);
   for (const [name, attribute] of Object.entries(geometry.attributes)) {
-    const owned = ['position', 'normal', 'skinIndex', 'skinWeight'].includes(name);
-    copy.setAttribute(name, owned ? attribute.clone() : attribute);
+    if (!SEAM_OWNED.includes(name)) {
+      copy.setAttribute(name, attribute);
+      continue;
+    }
+    // clone() de-interleaves; keep a second copy of the values to restore from.
+    const owned = attribute.clone() as BufferAttribute;
+    copy.setAttribute(name, owned);
+    loaded.set(name, owned.array.slice());
   }
+  seamCopies.set(geometry, { copy, loaded });
   copy.morphAttributes = geometry.morphAttributes;
   copy.morphTargetsRelative = geometry.morphTargetsRelative;
   for (const group of geometry.groups) copy.addGroup(group.start, group.count, group.materialIndex);
