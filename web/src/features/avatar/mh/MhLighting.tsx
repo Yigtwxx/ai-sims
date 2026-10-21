@@ -4,6 +4,7 @@ import { Environment } from '@react-three/drei';
 import { useEffect, useMemo } from 'react';
 import { Object3D, SpotLight } from 'three';
 
+import { useQuality } from '../quality';
 import { LIGHTING_RIGS, type SpotRig } from './lighting';
 
 const HDRI_URL = '/assets/hdri/studio_small_09_2k.hdr';
@@ -26,7 +27,7 @@ export function MhLighting({ rig = 'studio' }: { rig?: keyof typeof LIGHTING_RIG
   );
 }
 
-function createSpot(spot: SpotRig): SpotLight {
+function createSpot(spot: SpotRig, shadowMapSize: number): SpotLight {
   const light = new SpotLight(
     0xffffff,
     spot.intensity,
@@ -41,7 +42,7 @@ function createSpot(spot: SpotRig): SpotLight {
   light.target.position.set(...spot.target);
   light.castShadow = spot.castShadow;
   if (spot.castShadow) {
-    light.shadow.mapSize.set(2048, 2048);
+    light.shadow.mapSize.set(shadowMapSize, shadowMapSize);
     light.shadow.bias = -0.0002;
     light.shadow.normalBias = 0.02;
     light.shadow.radius = spot.shadowRadius;
@@ -52,7 +53,8 @@ function createSpot(spot: SpotRig): SpotLight {
 }
 
 function RigSpot({ spot }: { spot: SpotRig }) {
-  const light = useMemo(() => createSpot(spot), [spot]);
+  const { shadowMapSize } = useQuality();
+  const light = useMemo(() => createSpot(spot, shadowMapSize), [spot, shadowMapSize]);
   useEffect(() => () => light.dispose(), [light]);
   return (
     <>

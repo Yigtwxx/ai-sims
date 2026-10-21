@@ -17,6 +17,7 @@ import type { MhManifest } from '@/lib/assets/manifest';
 import type { CharacterConfig } from '@/lib/character/schema';
 
 import type { CameraFocus } from '../cameraFocus';
+import type { QualityPreference } from '../quality';
 import { Stage } from '../Stage';
 import { CharacterLife, type LifeInput } from './characterLife';
 import { loadFaceClip } from './faceClips';
@@ -59,6 +60,8 @@ export interface MhStageProps {
   insetRight?: number;
   /** Fired once the character is assembled and the first frame is on screen. */
   onReady?: () => void;
+  /** Render tier (default auto: starts high, steps down while frames drop). */
+  quality?: QualityPreference;
   className?: string;
 }
 
@@ -80,6 +83,7 @@ export function MhStage({
   insetRight = 0,
   onReady,
   className,
+  quality,
 }: MhStageProps) {
   const resolved = useMemo(() => resolveCharacter(config, manifest), [config, manifest]);
   const talk = mode === 'talk';
@@ -159,6 +163,7 @@ export function MhStage({
         subjectHeight={resolved?.height}
         interactive={mode === 'creator' || talk}
         follow={talk ? follow : undefined}
+        quality={quality}
         className="size-full"
       >
         <Suspense fallback={null}>

@@ -18,16 +18,25 @@ export type RenderLook = 'realistic' | 'anime';
  * flat MToon colours stay saturated. Both: a whisper of bloom and a subtle
  * vignette. N8AO breaks with MSAA under three r186, so SMAA does the AA.
  */
-export function PostEffects({ look = 'realistic' }: { look?: RenderLook }) {
+export function PostEffects({
+  look = 'realistic',
+  ao = 'high',
+}: {
+  look?: RenderLook;
+  /** N8AO preset, or null to skip ambient occlusion (battery tier). */
+  ao?: 'high' | 'medium' | null;
+}) {
   const anime = look === 'anime';
   return (
     <EffectComposer multisampling={0}>
-      <N8AO
-        aoRadius={anime ? 0.2 : 0.3}
-        distanceFalloff={0.5}
-        intensity={anime ? 0.9 : 1.6}
-        quality="high"
-      />
+      {ao && (
+        <N8AO
+          aoRadius={anime ? 0.2 : 0.3}
+          distanceFalloff={0.5}
+          intensity={anime ? 0.9 : 1.6}
+          quality={ao}
+        />
+      )}
       <Bloom intensity={0.12} luminanceThreshold={0.92} luminanceSmoothing={0.2} mipmapBlur />
       <ToneMapping mode={anime ? ToneMappingMode.NEUTRAL : ToneMappingMode.AGX} />
       <Vignette offset={0.32} darkness={0.3} />

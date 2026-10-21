@@ -29,6 +29,7 @@ import {
   type JointDeltas,
   type NeckSeamExtras,
 } from './assembly';
+import { useQuality } from '../quality';
 import { applyEyeMaterials, bindIrisTextures } from './eyeMaterials';
 import { densityFiles, packGroomDensity, setGroomDensity, setGroomTint } from './groomDensity';
 import { takeOffGroom, wearGroom, type GroomWear, type WornGroom } from './hair';
@@ -223,6 +224,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     latestGrooms.current = grooms;
   }, [grooms]);
   const worn = useRef(new Map<string, WornGroom>());
+  const { hairLod } = useQuality();
   useEffect(() => {
     const head = assembled.headSkin;
     if (!groomKey || !head) return;
@@ -230,25 +232,27 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     const wearing = worn.current;
     const mine: WornGroom[] = [];
     const wears = latestGrooms.current;
-    void Promise.allSettled(wears.map((wear) => wearGroom(gl, wear, head))).then((results) => {
-      results.forEach((result, i) => {
-        if (result.status === 'rejected') {
-          console.warn('[mh] groom failed to load', wears[i]?.groom.id, result.reason);
-          return;
-        }
-        const groom = result.value;
-        if (!live) {
-          groom.dispose();
-          return;
-        }
-        for (const mesh of groom.meshes) assembled.root.add(mesh);
-        assembled.handle.faceMeshes.push(...groom.meshes);
-        const look = latestGrooms.current.find((wear) => wear.groom.id === groom.id)?.look;
-        if (look) setHairLook(groom.materials, look);
-        wearing.set(groom.id, groom);
-        mine.push(groom);
-      });
-    });
+    void Promise.allSettled(wears.map((wear) => wearGroom(gl, wear, head, hairLod))).then(
+      (results) => {
+        results.forEach((result, i) => {
+          if (result.status === 'rejected') {
+            console.warn('[mh] groom failed to load', wears[i]?.groom.id, result.reason);
+            return;
+          }
+          const groom = result.value;
+          if (!live) {
+            groom.dispose();
+            return;
+          }
+          for (const mesh of groom.meshes) assembled.root.add(mesh);
+          assembled.handle.faceMeshes.push(...groom.meshes);
+          const look = latestGrooms.current.find((wear) => wear.groom.id === groom.id)?.look;
+          if (look) setHairLook(groom.materials, look);
+          wearing.set(groom.id, groom);
+          mine.push(groom);
+        });
+      },
+    );
     // Hair growing from the skin: the grooms' density darkens the scalp and brows.
     let density: WebGLRenderTarget | null = null;
     const files = densityFiles(wears);
@@ -274,7 +278,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       setGroomDensity(assembled.skins, null, [], undefined);
       density?.dispose();
     };
-  }, [assembled, gl, groomKey]);
+  }, [assembled, gl, groomKey, hairLod]);
 
   useEffect(() => {
     for (const wear of grooms) {

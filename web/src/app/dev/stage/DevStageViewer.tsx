@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MhStage } from '@/features/avatar/mh/MhStage';
+import type { QualityPreference } from '@/features/avatar/quality';
 import { fetchSpeechClip, speechScript, type SpeechScript } from '@/features/chat/ttsClient';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import {
@@ -76,6 +77,7 @@ export function DevStageViewer() {
   const [redness, setRedness] = useState(0.3);
   const [pattern, setPattern] = useState<HairPattern>('none');
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
+  const [quality, setQuality] = useState<QualityPreference>('high');
   const [thinking, setThinking] = useState(false);
   const [zoom, setZoom] = useState(0);
   const [speech, setSpeech] = useState<SpeechPlayer | null>(null);
@@ -149,6 +151,7 @@ export function DevStageViewer() {
         thinking={thinking}
         insetRight={mode === 'talk' ? 420 : 0}
         onReady={() => setReady(true)}
+        quality={quality}
         className="absolute inset-0"
       />
       <aside className="bg-backstage/90 absolute top-3 right-3 flex w-[396px] flex-col gap-2 rounded-lg p-3 text-xs">
@@ -166,6 +169,16 @@ export function DevStageViewer() {
           <select value={mode} onChange={(e) => setMode(e.target.value as 'talk' | 'creator')}>
             <option>talk</option>
             <option>creator</option>
+          </select>
+          quality
+          <select
+            data-testid="quality"
+            value={quality}
+            onChange={(e) => setQuality(e.target.value as QualityPreference)}
+          >
+            {['auto', 'high', 'balanced', 'battery'].map((q) => (
+              <option key={q}>{q}</option>
+            ))}
           </select>
           idles
           <select value={idles} onChange={(e) => setIdles(e.target.value as IdleSet)}>

@@ -1,8 +1,8 @@
 'use client';
 
-import { ContactShadows } from '@react-three/drei';
-import { Canvas } from '@react-three/fiber';
-import { Suspense, type ReactNode, type RefObject } from 'react';
+import { ContactShadows, PerformanceMonitor } from '@react-three/drei';
+import { Canvas, useThree } from '@react-three/fiber';
+import { Suspense, useEffect, useState, type ReactNode, type RefObject } from 'react';
 import { AgXToneMapping, NoToneMapping, PCFShadowMap, SRGBColorSpace, type Vector3 } from 'three';
 
 import { Backlight } from './Backlight';
@@ -10,6 +10,13 @@ import { CameraRig } from './CameraRig';
 import { getCameraPose, zoomPose, type CameraFocus } from './cameraFocus';
 import { Cyclorama } from './Cyclorama';
 import { PostEffects, type RenderLook } from './PostEffects';
+import {
+  QUALITY,
+  QualityContext,
+  stepDown,
+  type QualityPreference,
+  type RenderQuality,
+} from './quality';
 import { StudioLighting } from './StudioLighting';
 import { Turntable } from './Turntable';
 import { ViewInset } from './ViewInset';
@@ -45,6 +52,8 @@ interface StageProps {
   onCreated?: () => void;
   /** How far the subject's head moved from rest; close-up framing follows it. */
   follow?: RefObject<Vector3 | null>;
+  /** Render tier; `auto` starts high and steps down while frames drop. */
+  quality?: QualityPreference;
 }
 
 const BACKDROPS = {
@@ -72,7 +81,11 @@ export function Stage({
   lighting,
   onCreated,
   follow,
+  quality = 'auto',
 }: StageProps) {
+  const [autoTier, setAutoTier] = useState<RenderQuality>('high');
+  const tier = quality === 'auto' ? autoTier : quality;
+  const settings = QUALITY[tier];
   const initial =
     zoom === undefined ? getCameraPose(focus, subjectHeight) : zoomPose(zoom, subjectHeight);
   const theme = BACKDROPS[backdrop];
@@ -85,7 +98,8 @@ export function Stage({
         .filter(Boolean)
         .join(' ')}
       shadows={{ type: PCFShadowMap }}
-      dpr={[1, 2]}
+      dpr={settings.dpr}
+      frameloop={settings.maxFps ? 'demand' : 'always'}
       gl={{
         antialias: false,
         // Tone mapping runs in the post stack (AgX); without post use AgX directly.
@@ -98,21 +112,27 @@ export function Stage({
       onCreated={onCreated}
     >
       <color attach="background" args={[theme.background]} />
-      <Suspense fallback={null}>
-        {lighting ?? <StudioLighting />}
-        <Cyclorama color={theme.cyc} glow={theme.glow} />
-        {backdrop === 'dark' && <Backlight height={subjectHeight} />}
-        <ContactShadows
-          position={[0, 0.002, 0]}
-          scale={3}
-          blur={2.4}
-          far={1.2}
-          opacity={theme.shadow}
-        />
-        {scenery}
-        <Turntable>{children}</Turntable>
-        {post && <PostEffects look={look} />}
-      </Suspense>
+      {quality === 'auto' && (
+        <PerformanceMonitor onDecline={() => setAutoTier((current) => stepDown(current))} />
+      )}
+      {settings.maxFps && <FrameCap fps={settings.maxFps} />}
+      <QualityContext.Provider value={settings}>
+        <Suspense fallback={null}>
+          {lighting ?? <StudioLighting />}
+          <Cyclorama color={theme.cyc} glow={theme.glow} />
+          {backdrop === 'dark' && <Backlight height={subjectHeight} />}
+          <ContactShadows
+            position={[0, 0.002, 0]}
+            scale={3}
+            blur={2.4}
+            far={1.2}
+            opacity={theme.shadow}
+          />
+          {scenery}
+          <Turntable>{children}</Turntable>
+          {post && <PostEffects look={look} ao={settings.ao} />}
+        </Suspense>
+      </QualityContext.Provider>
       <CameraRig
         focus={focus}
         height={subjectHeight}
@@ -123,4 +143,25 @@ export function Stage({
       <ViewInset left={insetLeft} right={insetRight} />
     </Canvas>
   );
+}
+
+/** Renders on demand at most `fps` times a second (canvas frameloop 'demand'). */
+function FrameCap({ fps }: { fps: number }) {
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => {
+    let frame = 0;
+    let last = 0;
+    const interval = 1000 / fps;
+    const tick = (now: number) => {
+      frame = requestAnimationFrame(tick);
+      // A couple of ms of slack so a 60 Hz display lands on every second frame.
+      if (now - last >= interval - 2) {
+        last = now;
+        invalidate();
+      }
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [fps, invalidate]);
+  return null;
 }

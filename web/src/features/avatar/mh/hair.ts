@@ -5,7 +5,7 @@ import {
   type Object3D,
   type WebGLRenderer,
 } from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { assetUrl, type MhGroom } from '@/lib/assets/manifest';
 
@@ -39,23 +39,41 @@ interface CardsAsset {
   progress: Float32Array;
 }
 
-/** Closest level of detail first; the converter writes cards_lod0 and cards_lod2. */
-const CARD_NODES = ['cards_lod0', 'cards_lod2'];
+/**
+ * Card meshes by level of detail, preferred first: the converter writes
+ * cards_lod0 (full) and cards_lod2 (about two thirds of the cards).
+ */
+const CARD_NODES: Record<0 | 1, string[]> = {
+  0: ['cards_lod0', 'cards_lod2'],
+  1: ['cards_lod2', 'cards_lod0'],
+};
 
+const gltfs = new Map<string, Promise<GLTF>>();
 const assets = new Map<string, Promise<CardsAsset>>();
 
-function loadCards(renderer: WebGLRenderer, url: string): Promise<CardsAsset> {
-  let pending = assets.get(url);
+function loadGltf(renderer: WebGLRenderer, url: string): Promise<GLTF> {
+  let pending = gltfs.get(url);
   if (!pending) {
     const loader = new GLTFLoader();
     configureLoader(loader, renderer);
-    pending = loader.loadAsync(url).then((gltf) => {
+    pending = loader.loadAsync(url);
+    pending.catch(() => gltfs.delete(url));
+    gltfs.set(url, pending);
+  }
+  return pending;
+}
+
+function loadCards(renderer: WebGLRenderer, url: string, lod: 0 | 1): Promise<CardsAsset> {
+  const key = `${url}#${lod}`;
+  let pending = assets.get(key);
+  if (!pending) {
+    pending = loadGltf(renderer, url).then((gltf) => {
       const meshes: SkinnedMesh[] = [];
       gltf.scene.traverse((node) => {
         if ((node as SkinnedMesh).isSkinnedMesh) meshes.push(node as SkinnedMesh);
       });
       const source =
-        CARD_NODES.map((name) => meshes.find((mesh) => mesh.name === name)).find(Boolean) ??
+        CARD_NODES[lod].map((name) => meshes.find((mesh) => mesh.name === name)).find(Boolean) ??
         meshes[0];
       if (!source) throw new Error(`No card mesh in ${url}`);
       return {
@@ -64,8 +82,8 @@ function loadCards(renderer: WebGLRenderer, url: string): Promise<CardsAsset> {
         progress: strandProgress(source.geometry),
       };
     });
-    pending.catch(() => assets.delete(url));
-    assets.set(url, pending);
+    pending.catch(() => assets.delete(key));
+    assets.set(key, pending);
   }
   return pending;
 }
@@ -106,11 +124,12 @@ export async function wearGroom(
   renderer: WebGLRenderer,
   wear: GroomWear,
   head: SkinnedMesh,
+  lod: 0 | 1 = 0,
 ): Promise<WornGroom> {
   const { groom } = wear;
   const atlas = cardAtlas(groom);
   const [cards, attribute, tangent] = await Promise.all([
-    loadCards(renderer, assetUrl(groom.glb)),
+    loadCards(renderer, assetUrl(groom.glb), lod),
     loadAssetTexture(renderer, atlas.coverage, 'data'),
     atlas.tangent ? loadAssetTexture(renderer, atlas.tangent, 'data') : Promise.resolve(null),
   ]);
