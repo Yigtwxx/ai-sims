@@ -7,6 +7,7 @@ import type { GroomWear } from './hair';
 import type { Rgb } from './hairColor';
 import type { HairLook } from './hairMaterial';
 import type { MocapLayer } from './motion';
+import type { OutfitWear } from './outfits';
 
 /** Standing heights (m) of the neutral MetaHuman bodies (pipeline bodies job). */
 export const BASE_HEIGHT = { female: 1.66, male: 1.78 } as const;
@@ -29,6 +30,8 @@ export interface ResolvedCharacter {
   idleLayer: MocapLayer;
   /** Hair, eyebrows, beard and mustache the manifest has, with their colour. */
   grooms: GroomWear[];
+  /** Outfit items with a mesh for this body, one-piece first, with their colours. */
+  outfits: OutfitWear[];
   /** Face loops under the live face: the idle loop and a happy loop for the smile. */
   faceClips: { idle: string | null; smile: string | null };
   /** Approximate standing height (m), for camera framing. */
@@ -75,6 +78,7 @@ export function resolveCharacter(
       null,
     ...idleSet(manifest),
     grooms: groomWears(config, manifest),
+    outfits: outfitWears(config, manifest),
     faceClips: faceClipSet(manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };
@@ -133,6 +137,30 @@ export function groomWears(config: CharacterConfig, manifest: MhManifest): Groom
   return picks.flatMap(([id, look]) => {
     const groom = id ? manifest.grooms.find((g) => g.id === id) : undefined;
     return groom ? [{ groom, look }] : [];
+  });
+}
+
+/**
+ * Outfit items to wear: the tint preset's colours under the creator's own
+ * picks (sRGB hex in the config, linear here). Items without a mesh for the
+ * body are skipped.
+ */
+export function outfitWears(config: CharacterConfig, manifest: MhManifest): OutfitWear[] {
+  const { full, top, bottom, shoes } = config.outfit;
+  return [full, top, bottom, shoes].flatMap((item) => {
+    const outfit = item && manifest.outfits.find((o) => o.id === item.id);
+    const file = outfit?.files[config.base];
+    if (!item || !outfit || !file) return [];
+    const preset = outfit.tintPresets.find((p) => p.id === item.tint);
+    const hexes: Record<string, string> = {};
+    for (const [name, value] of Object.entries(preset?.values ?? {})) {
+      if (typeof value === 'string') hexes[name] = value;
+    }
+    Object.assign(hexes, item.colors);
+    const colors = Object.fromEntries(
+      Object.entries(hexes).map(([name, hex]) => [name, linear(hex)]),
+    );
+    return [{ outfit, file, colors }];
   });
 }
 

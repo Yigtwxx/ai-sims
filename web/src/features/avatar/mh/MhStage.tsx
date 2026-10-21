@@ -196,6 +196,7 @@ export function MhStage({
                 idleClips={resolved.idleClips}
                 idleLayer={resolved.idleLayer}
                 grooms={resolved.grooms}
+                outfits={resolved.outfits}
                 onFrame={onFrame}
                 onSettled={handleSettled}
               />

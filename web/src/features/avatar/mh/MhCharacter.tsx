@@ -32,11 +32,13 @@ import {
 } from './assembly';
 import { useQuality } from '../quality';
 import { applyEyeMaterials, bindIrisTextures } from './eyeMaterials';
+import { applyBodyHide } from './garments';
 import { densityFiles, packGroomDensity, setGroomDensity, setGroomTint } from './groomDensity';
 import { takeOffGroom, wearGroom, type GroomWear, type WornGroom } from './hair';
 import { setHairLook } from './hairMaterial';
 import { useMhGltf } from './loaders';
 import { MotionPlayer, type MocapLayer, type MotionClip } from './motion';
+import { setOutfitColors, wearOutfit, type OutfitWear, type WornOutfit } from './outfits';
 import {
   applySkinMaterials,
   loadSkinDetail,
@@ -82,6 +84,8 @@ export interface MhCharacterProps {
   idleLayer?: MocapLayer;
   /** Hair and facial hair cards, fitted to this head; recolouring needs no reload. */
   grooms?: readonly GroomWear[];
+  /** Garments bound to the body skeleton; recolouring needs no reload. */
+  outfits?: readonly OutfitWear[];
   /** Called every frame after the mixer and before rendering (life, lip-sync). */
   onFrame?: (handle: MhCharacterHandle, delta: number, camera: Camera) => void;
   /**
@@ -107,6 +111,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     idleClips = NO_CLIPS,
     idleLayer = 'full',
     grooms = NO_GROOMS,
+    outfits = NO_OUTFITS,
     onFrame,
     onSettled,
   },
@@ -115,14 +120,15 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   const gl = useThree((state) => state.gl);
   // The first frame can show a character whose skin and hair are still
   // loading; thumbnails and the premiere wait for both parts to settle.
-  const settled = useRef({ skin: false, grooms: false });
+  const settled = useRef({ skin: false, grooms: false, outfits: false });
   const latestOnSettled = useRef(onSettled);
   useLayoutEffect(() => {
     latestOnSettled.current = onSettled;
   }, [onSettled]);
-  const settle = useCallback((part: 'skin' | 'grooms') => {
+  const settle = useCallback((part: keyof typeof settled.current) => {
     settled.current[part] = true;
-    if (settled.current.skin && settled.current.grooms) latestOnSettled.current?.();
+    const { skin: skinDone, grooms: groomsDone, outfits: outfitsDone } = settled.current;
+    if (skinDone && groomsDone && outfitsDone) latestOnSettled.current?.();
   }, []);
   const bodyGltf = useMhGltf(bodyUrl);
   const headGltf = useMhGltf(headUrl);
@@ -320,6 +326,77 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     if (grooms[0]) setGroomTint(assembled.skins, grooms[0].look);
   }, [assembled, grooms]);
 
+  // Outfits load in the background; the previous ones stay on until the new
+  // set is ready, so changing a garment never flashes bare skin.
+  const outfitKey = outfits.map((wear) => `${wear.outfit.id}@${wear.file}`).join('|');
+  const latestOutfits = useRef(outfits);
+  useLayoutEffect(() => {
+    latestOutfits.current = outfits;
+  }, [outfits]);
+  const wornOutfits = useRef<WornOutfit[]>([]);
+  const swapOutfits = useCallback(
+    (next: WornOutfit[]) => {
+      const body = assembled.handle.body;
+      for (const worn of wornOutfits.current) {
+        for (const mesh of worn.meshes) {
+          mesh.removeFromParent();
+          const i = body.garments.indexOf(mesh);
+          if (i >= 0) body.garments.splice(i, 1);
+        }
+        worn.dispose();
+      }
+      for (const worn of next) {
+        for (const mesh of worn.meshes) (body.mesh.parent ?? assembled.root).add(mesh);
+        body.garments.push(...worn.meshes);
+      }
+      wornOutfits.current = next;
+      applyBodyHide(
+        body.mesh,
+        next.flatMap((worn) => (worn.hide ? [worn.hide] : [])),
+      );
+    },
+    [assembled],
+  );
+  useEffect(() => () => swapOutfits([]), [swapOutfits]);
+  useEffect(() => {
+    settled.current.outfits = false;
+    const wears = latestOutfits.current;
+    if (!outfitKey) {
+      swapOutfits([]);
+      settle('outfits');
+      return;
+    }
+    let live = true;
+    const body = assembled.handle.body;
+    void Promise.allSettled(wears.map((wear) => wearOutfit(gl, wear, body))).then((results) => {
+      const next: WornOutfit[] = [];
+      results.forEach((result, i) => {
+        if (result.status === 'fulfilled') next.push(result.value);
+        else console.warn('[mh] outfit failed to load', wears[i]?.outfit.id, result.reason);
+      });
+      if (!live) {
+        for (const worn of next) worn.dispose();
+        return;
+      }
+      for (const worn of next) {
+        const colors = latestOutfits.current.find((wear) => wear.outfit.id === worn.id)?.colors;
+        if (colors) setOutfitColors(worn, colors);
+      }
+      swapOutfits(next);
+      settle('outfits');
+    });
+    return () => {
+      live = false;
+    };
+  }, [assembled, gl, outfitKey, settle, swapOutfits]);
+
+  useEffect(() => {
+    for (const wear of outfits) {
+      const worn = wornOutfits.current.find((candidate) => candidate.id === wear.outfit.id);
+      if (worn) setOutfitColors(worn, wear.colors);
+    }
+  }, [outfits]);
+
   useImperativeHandle(ref, () => assembled.handle, [assembled]);
 
   useLayoutEffect(() => {
@@ -345,6 +422,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
 
 const NO_CLIPS: readonly string[] = [];
 const NO_GROOMS: readonly GroomWear[] = [];
+const NO_OUTFITS: readonly OutfitWear[] = [];
 
 const clipCache = new Map<string, Promise<MotionClip[]>>();
 

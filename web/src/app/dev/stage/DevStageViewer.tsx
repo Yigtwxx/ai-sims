@@ -5,15 +5,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MhStage } from '@/features/avatar/mh/MhStage';
 import type { QualityPreference } from '@/features/avatar/quality';
 import { fetchSpeechClip, speechScript, type SpeechScript } from '@/features/chat/ttsClient';
+import { outfitsFor } from '@/features/creator/reconcile';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import {
+  labelFor,
   MANIFEST_URL,
   MhManifestSchema,
+  OUTFIT_CATEGORIES,
   type GroomSlot,
   type MhManifest,
+  type OutfitCategory,
 } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
-import { HAIR_PATTERNS, type HairPattern } from '@/lib/character/schema';
+import {
+  HAIR_PATTERNS,
+  type CharacterConfig,
+  type HairPattern,
+  type OutfitItem,
+} from '@/lib/character/schema';
 
 /**
  * Retargeted crowd idles (web/scripts/retarget-fbx.mjs output) that its
@@ -76,6 +85,9 @@ export function DevStageViewer() {
   const [melanin, setMelanin] = useState(0.5);
   const [redness, setRedness] = useState(0.3);
   const [pattern, setPattern] = useState<HairPattern>('none');
+  const [outfit, setOutfit] = useState<CharacterConfig['outfit']>(
+    () => createDefaultConfig('female').outfit,
+  );
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
   const [quality, setQuality] = useState<QualityPreference>('high');
   const [thinking, setThinking] = useState(false);
@@ -84,8 +96,8 @@ export function DevStageViewer() {
   const [ready, setReady] = useState(false);
   const player = useRef<SpeechPlayer | null>(null);
 
+  const gender = manifest?.faces.find((f) => f.id === face)?.gender ?? 'female';
   const config = useMemo(() => {
-    const gender = manifest?.faces.find((f) => f.id === face)?.gender ?? 'female';
     const value = createDefaultConfig(gender);
     value.face.preset = face;
     value.hair.style = styles.hair || null;
@@ -94,8 +106,30 @@ export function DevStageViewer() {
     value.eyebrows.style = styles.eyebrows || null;
     value.beard.style = styles.beard || null;
     value.mustache.style = styles.mustache || null;
+    value.outfit = outfit;
     return value;
-  }, [manifest, face, styles, melanin, redness, pattern]);
+  }, [gender, face, styles, melanin, redness, pattern, outfit]);
+
+  const pickOutfit = useCallback((category: OutfitCategory, id: string) => {
+    setOutfit((current) => {
+      const next = { ...current, [category]: id ? { id, tint: null, colors: {} } : null };
+      // A one-piece outfit replaces top and bottom (see reconcileConfig).
+      if (id && category === 'full') {
+        next.top = null;
+        next.bottom = null;
+      }
+      if (id && (category === 'top' || category === 'bottom')) next.full = null;
+      return next;
+    });
+  }, []);
+
+  const pickOutfitColor = useCallback((category: OutfitCategory, name: string, hex: string) => {
+    setOutfit((current) => {
+      const item = current[category];
+      if (!item) return current;
+      return { ...current, [category]: { ...item, colors: { ...item.colors, [name]: hex } } };
+    });
+  }, []);
 
   const play = useCallback(async (audio: ArrayBuffer, script: SpeechScript) => {
     await player.current?.dispose();
@@ -118,7 +152,6 @@ export function DevStageViewer() {
   const [ttsText, setTtsText] = useState(TTS_SAMPLE);
   const [ttsSource, setTtsSource] = useState('');
   const speakTts = useCallback(async () => {
-    const gender = manifest?.faces.find((f) => f.id === face)?.gender ?? 'female';
     try {
       const clip = await fetchSpeechClip({ text: ttsText, voice: gender, locale: 'tr' });
       const script = speechScript(clip);
@@ -127,7 +160,7 @@ export function DevStageViewer() {
     } catch (error) {
       setTtsSource(`failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }, [manifest, face, ttsText, play]);
+  }, [gender, ttsText, play]);
 
   useEffect(
     () => () => {
@@ -138,6 +171,9 @@ export function DevStageViewer() {
 
   if (!manifest) return <p className="p-4 text-xs">loading manifest…</p>;
   const groomsOf = (slot: GroomSlot) => manifest.grooms.filter((g) => g.slot === slot);
+  /** The colour a picker shows: the creator's pick, else the parameter's authored default. */
+  const colorOf = (item: OutfitItem, name: string, fallback: unknown) =>
+    item.colors[name] ?? (typeof fallback === 'string' ? fallback.toLowerCase() : '#000000');
 
   return (
     <div className="relative h-full w-full">
@@ -154,9 +190,9 @@ export function DevStageViewer() {
         quality={quality}
         className="absolute inset-0"
       />
-      <aside className="bg-backstage/90 absolute top-3 right-3 flex w-[396px] flex-col gap-2 rounded-lg p-3 text-xs">
+      <aside className="bg-backstage/90 absolute top-3 right-3 flex max-h-[calc(100%-1.5rem)] w-[396px] flex-col gap-2 overflow-y-auto rounded-lg p-3 text-xs">
         <span data-testid="ready">{ready ? 'ready' : 'loading'}</span>
-        <label className="flex gap-2">
+        <label className="flex flex-wrap gap-2">
           face
           <select value={face} onChange={(e) => setFace(e.target.value)}>
             {manifest.faces.map((f) => (
@@ -204,7 +240,7 @@ export function DevStageViewer() {
             </select>
           </label>
         ))}
-        <label className="flex items-center gap-2">
+        <label className="flex flex-wrap items-center gap-2">
           melanin
           <input
             type="range"
@@ -233,6 +269,46 @@ export function DevStageViewer() {
             ))}
           </select>
         </label>
+        {OUTFIT_CATEGORIES.map((category) => {
+          const options = outfitsFor(manifest, category, gender);
+          const item = outfit[category];
+          const worn = options.find((o) => o.id === item?.id);
+          const colorParams = worn?.params.filter((p) => p.type === 'color') ?? [];
+          return (
+            <div key={category} className="flex flex-col gap-1">
+              <label className="flex gap-2">
+                {category}
+                <select
+                  data-testid={`outfit-${category}`}
+                  value={worn?.id ?? ''}
+                  onChange={(e) => pickOutfit(category, e.target.value)}
+                >
+                  <option value="">none</option>
+                  {options.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {labelFor(o.label, 'en')}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {item && colorParams.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 pl-3">
+                  {colorParams.map((p) => (
+                    <label key={p.name} className="flex items-center gap-1">
+                      {p.name}
+                      <input
+                        type="color"
+                        data-testid={`outfit-${category}-${p.name}`}
+                        value={colorOf(item, p.name, p.default)}
+                        onChange={(e) => pickOutfitColor(category, p.name, e.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
         <label className="flex items-center gap-2">
           zoom
           <input

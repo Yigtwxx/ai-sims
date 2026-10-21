@@ -9,6 +9,7 @@ import {
   HEIGHT_RANGE,
   idleSet,
   MIN_CALM_IDLES,
+  outfitWears,
   resolveCharacter,
 } from './resolve';
 
@@ -163,6 +164,128 @@ describe('groomWears', () => {
     expect(hair!.look).toMatchObject({ melanin: 0.2, pattern: 'ombre', patternAmount: 0.8 });
     expect(brows!.look).toMatchObject({ melanin: 0.2, redness: 0.6, pattern: 'none' });
     for (const channel of brows!.look.dye!) expect(channel).toBeCloseTo(1);
+  });
+});
+
+describe('outfitWears', () => {
+  const colorParams = ['A', 'B', 'C'].map((name) => ({
+    name,
+    type: 'color',
+    default: '#444444',
+  }));
+  const piece = (
+    id: string,
+    category: 'top' | 'bottom' | 'shoes' | 'full',
+    files: { female?: string; male?: string },
+  ) => ({
+    id,
+    category,
+    label: id,
+    files,
+    params: colorParams,
+    tintPresets: [
+      // The non-colour value is not a colour parameter and must be ignored.
+      { id: 'mono', values: { A: '#ffffff', B: '#000000', C: '#808080', Gloss: 0.5 } },
+    ],
+  });
+  const withOutfits = MhManifestSchema.parse({
+    ...manifest,
+    outfits: [
+      piece('outfit.Suit', 'full', { female: 'outfits/Suit/f.glb', male: 'outfits/Suit/m.glb' }),
+      piece('outfit.Hoodie', 'top', {
+        female: 'outfits/Hoodie/f.glb',
+        male: 'outfits/Hoodie/m.glb',
+      }),
+      piece('outfit.Jeans', 'bottom', { female: 'outfits/Jeans/f.glb' }),
+      piece('outfit.Boots', 'shoes', { male: 'outfits/Boots/m.glb' }),
+      piece('outfit.Flats', 'shoes', { female: 'outfits/Flats/f.glb' }),
+    ],
+  });
+  const item = (id: string, tint: string | null = null, colors: Record<string, string> = {}) => ({
+    id,
+    tint,
+    colors,
+  });
+  const expectRgb = (actual: readonly number[] | undefined, expected: readonly number[]) => {
+    expect(actual).toHaveLength(3);
+    expected.forEach((channel, i) => expect(actual![i]).toBeCloseTo(channel, 5));
+  };
+
+  it('wears nothing by default', () => {
+    expect(outfitWears(createDefaultConfig('female'), withOutfits)).toEqual([]);
+  });
+
+  it('lists the one-piece outfit first, then top, bottom and shoes', () => {
+    const config = createDefaultConfig('female');
+    config.outfit = {
+      shoes: item('outfit.Flats'),
+      bottom: item('outfit.Jeans'),
+      top: item('outfit.Hoodie'),
+      full: item('outfit.Suit'),
+    };
+    const wears = outfitWears(config, withOutfits);
+    expect(wears.map((wear) => wear.outfit.id)).toEqual([
+      'outfit.Suit',
+      'outfit.Hoodie',
+      'outfit.Jeans',
+      'outfit.Flats',
+    ]);
+    expect(wears.map((wear) => wear.file)).toEqual([
+      'outfits/Suit/f.glb',
+      'outfits/Hoodie/f.glb',
+      'outfits/Jeans/f.glb',
+      'outfits/Flats/f.glb',
+    ]);
+  });
+
+  it('skips ids the manifest lacks and items without a mesh for the body', () => {
+    const config = createDefaultConfig('female');
+    config.outfit = {
+      full: null,
+      top: item('outfit.Gone'),
+      bottom: item('outfit.Jeans'),
+      shoes: item('outfit.Boots'),
+    };
+    expect(outfitWears(config, withOutfits).map((wear) => wear.outfit.id)).toEqual([
+      'outfit.Jeans',
+    ]);
+
+    const male = createDefaultConfig('male');
+    male.outfit = config.outfit;
+    const wears = outfitWears(male, withOutfits);
+    expect(wears.map((wear) => [wear.outfit.id, wear.file])).toEqual([
+      ['outfit.Boots', 'outfits/Boots/m.glb'],
+    ]);
+  });
+
+  it('converts the tint preset from sRGB hex to linear RGB', () => {
+    const config = createDefaultConfig('female');
+    config.outfit.top = item('outfit.Hoodie', 'mono');
+    const [wear] = outfitWears(config, withOutfits);
+    expect(Object.keys(wear!.colors).sort()).toEqual(['A', 'B', 'C']);
+    expectRgb(wear!.colors.A, [1, 1, 1]);
+    expectRgb(wear!.colors.B, [0, 0, 0]);
+    // sRGB 0x80 is 0.2159 in linear light, not 0.5.
+    expectRgb(wear!.colors.C, [0.21586, 0.21586, 0.21586]);
+  });
+
+  it('lets the creator picks override the preset', () => {
+    const config = createDefaultConfig('female');
+    config.outfit.top = item('outfit.Hoodie', 'mono', { B: '#ffffff', A: '#000000' });
+    const [wear] = outfitWears(config, withOutfits);
+    expectRgb(wear!.colors.A, [0, 0, 0]);
+    expectRgb(wear!.colors.B, [1, 1, 1]);
+    expectRgb(wear!.colors.C, [0.21586, 0.21586, 0.21586]);
+  });
+
+  it('uses only the picks without a tint preset', () => {
+    const config = createDefaultConfig('female');
+    config.outfit.top = item('outfit.Hoodie', null, { B: '#ffffff' });
+    config.outfit.bottom = item('outfit.Jeans', 'gone');
+    const [top, bottom] = outfitWears(config, withOutfits);
+    expect(Object.keys(top!.colors)).toEqual(['B']);
+    expectRgb(top!.colors.B, [1, 1, 1]);
+    expect(bottom!.colors).toEqual({});
   });
 });
 
