@@ -188,8 +188,10 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
    cd pipeline && uv run asset-pipeline serve-slim --archive C:/Users/Asus/MetaHumanArchive
    ```
 
-   - Bayraklar: `--archive` (varsayılan `$MH_ARCHIVE`, yoksa `~/MetaHumanArchive`), `--include` (virgüllü klasör listesi), `--bind` (varsayılan PC'nin LAN adresi), `--port` (varsayılan 8765).
-   - Varsayılan klasörler: `web`, `raw`, `fab_anims`, `gestures`, `logs`. Toplam **~48 GB** (web 3.0 GB, raw 45 GB, fab_anims 140 MB, gestures 216 MB, logs 1.3 MB).
+   - Bayraklar: `--archive` (varsayılan `$MH_ARCHIVE`, yoksa `~/MetaHumanArchive`), `--include` (virgüllü klasör listesi), `--everything` (dönüştürücünün okumadığı dosyaları da sun), `--bind` (varsayılan PC'nin LAN adresi), `--port` (varsayılan 8765).
+   - Varsayılan klasörler: `web`, `raw`, `fab_anims`, `gestures`, `logs`. Diskte **~48 GB** (web 3.0 GB, raw 45 GB, fab_anims 140 MB, gestures 216 MB, logs 1.3 MB).
+   - **Okunmayan kaynaklar sunulmaz** (`UNUSED_SOURCES`, `transfer.py`), toplam ~11 GB. Liste, tam bir Ada dönüşümü ile her slottan bir groom, gövdeler, animasyonlar ve ışığın dosya açma izinden (audit hook) çıkarıldı. Kapsam: preset'lerin 8K `*_Animated_*` girdileri, göğüs haritaları ve 4K gövde albedo'su, groom FBX'leri, Creator'ın deri bölge maskeleri. Bunlar olmadan Mac her web varlığını yeniden üretebilir.
+   - **Aynı içerik bir kez iner.** Kıyafet dokuları iki cinsiyette ve iç çamaşırı haritaları 29 preset'te aynı; ~16 GB tekrar. `fetch_slim.py` her içeriği bir kez indirir. Kopyaları Mac'te `raw/` altında hard link, `web/` altında gerçek kopya olarak üretir; dönüştürücü web dosyalarını yerinde yeniden yazar. İndirilecek toplam **~25 GB**.
    - Fab `.mhpkg`'leri (`fab`, 16 GB) yalnız Unreal'da işe yarar; istenirse `--include web,raw,fab_anims,gestures,logs,fab` ver.
    - İlk açılışta her dosyanın sha256'sı hesaplanır ve arşiv köküne `.transfer-index.json` olarak önbelleğe alınır; ilk açılış uzun sürer.
    - Windows güvenlik duvarı sorarsa **"Özel ağ: İzin ver"**.
