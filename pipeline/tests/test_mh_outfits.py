@@ -232,6 +232,53 @@ def test_fit_keeps_the_garment_outside_the_skin_at_a_slider_end() -> None:
     assert counts["body_weight_max"] == 0
 
 
+def _two_layer_sleeve(outer: float, inner: float) -> GarmentPart:
+    """A sleeve with thickness: an outward-facing outer tube and an inward-facing inner tube
+    (same rings and angles, so vertex k of one lies over vertex k of the other)."""
+    out_v, out_t = _tube(outer, 0.3, 0.7, rings=10, segments=24)
+    in_v, in_t = _tube(inner, 0.3, 0.7, rings=10, segments=24)
+    vertices = np.vstack([out_v, in_v])
+    triangles = np.vstack([out_t, in_t[:, ::-1] + len(out_v)])
+    return GarmentPart(
+        material="MI_test",
+        positions=vertices,
+        normals=vertex_normals(vertices, triangles),
+        uvs=np.zeros((len(vertices), 2)),
+        triangles=triangles,
+    )
+
+
+def test_fit_push_keeps_the_inner_layer_under_the_outer() -> None:
+    limb, triangles = _tube(0.1, 0.0, 1.0)
+    body = _body(limb, triangles)
+    # Both layers are closer than the clearance: pushing each to it would flatten them
+    # onto one surface and the inner side (two-sided cloth) would show through the outer.
+    part = _two_layer_sleeve(0.1015, 0.1005)
+    half = len(part.positions) // 2
+    fit = fit_garment(Garment(parts=[part]), body)
+    radius = np.linalg.norm(fit.parts[0].positions[:, [0, 2]], axis=1)
+    gap = radius[:half] - radius[half:]
+    assert gap.min() > 0.0009, f"layers collapsed: smallest gap {gap.min() * 1e3:.2f} mm"
+    assert radius[half:].min() >= 0.1 + outfits.CLEARANCE - 1e-3, "inner layer still in skin"
+
+
+def test_morph_clearance_keeps_the_inner_layer_under_the_outer() -> None:
+    limb, triangles = _tube(0.1, 0.0, 1.0)
+    body = _body(limb, triangles)
+    body.morphs["body_weight_max"] = limb * np.array([0.1, 0.0, 0.1])  # skin grows 1 cm
+    part = _two_layer_sleeve(0.1063, 0.105)
+    half = len(part.positions) // 2
+    morphs = {"body_weight_max": np.zeros_like(part.positions)}
+    cleared, _ = outfits.clear_morphs(
+        part.positions, morphs, body, outside=np.ones(len(part.positions), dtype=bool)
+    )
+    end = part.positions + cleared["body_weight_max"]
+    radius = np.linalg.norm(end[:, [0, 2]], axis=1)
+    gap = radius[:half] - radius[half:]
+    assert gap.min() > 0.0009, f"layers collapsed: smallest gap {gap.min() * 1e3:.2f} mm"
+    assert radius[half:].min() >= 0.11 + outfits.CLEARANCE - 1e-3, "inner layer in grown skin"
+
+
 def test_closed_shoes_hide_every_toe_and_sandals_none() -> None:
     limb, triangles = _tube(0.05, 0.0, 1.0, rings=11, segments=8)
     body = _body(limb, triangles)

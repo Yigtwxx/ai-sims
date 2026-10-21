@@ -23,9 +23,13 @@ space rather than copied:
    4) and its slider morphs, so a garment follows the skin it covers.
 4. Clearance. Vertices that end up closer than 2 mm to the skin are pushed out along the
    skin normal (tight bands sit slightly inside the body in Unreal, which hides the body).
-   Each slider morph gets the same check at its end (body and garment morphed), since a
-   loose vertex averages the deltas of a wide skin patch and can sink further than the
-   skin right under it (a collar over the neck and back at weight -1).
+   Cloth with thickness has an inner layer about 2 mm under the outer one, and both are
+   often inside the clearance: every vertex takes the largest push over the skin around
+   it (`stack_push`), so the layers move together instead of meeting on one surface, where
+   the two-sided inner side showed through the outer as dark blotches. Each slider morph
+   gets the same check at its end (body and garment morphed), since a loose vertex
+   averages the deltas of a wide skin patch and can sink further than the skin right
+   under it (a collar over the neck and back at weight -1).
 5. `body_hide`. Body vertices that cannot see out: thirteen rays around the skin normal
    (up to 60 degrees) all run into the garment or the body within 10 cm, and the vertex
    is not near an exposed garment opening (collars, cuffs, hems). A closed shoe (one that
@@ -103,7 +107,7 @@ F64 = NDArray[np.float64]
 I64 = NDArray[np.int64]
 Bool = NDArray[np.bool_]
 
-OUTFITS_VERSION = "outfit-v5"  # v5: plain materials take Unreal's baked maps
+OUTFITS_VERSION = "outfit-v6"  # v6: cloth layers keep their order when pushed out
 TEXTURE_RECIPE = "outfit-v1"  # part of every map's content name; bump to re-encode all maps
 GENERATOR = "ai-sims mh-convert (outfits)"
 GENDERS = ("female", "male")
@@ -132,6 +136,7 @@ KERNEL_SIGMA_SCALE = 0.5  # sigma grows by this times the distance to the skin
 EXACT_RADIUS = 0.02  # closest-point weights fade out over this distance
 CLEARANCE = 0.002  # metres between skin and garment after the fit
 PUSH_DEPTH_LIMIT = 0.02  # deeper vertices are inner layers or leftovers: not pushed
+LAYER_REACH = 0.006  # metres over the skin: vertices this close move out as one layer stack
 MORPH_EPSILON = 1e-4  # metres: transferred morphs smaller than this are left out
 FACE_ON_SHARE = 0.9  # |signed| / distance of an offset taken as along the skin normal
 
@@ -763,18 +768,47 @@ def _blend_skin(matrix: csr_matrix, body: BodyFit) -> tuple[I64, F64]:
     return merged_joints.astype(np.int64), merged_weights.astype(np.float64)
 
 
+def _closest_points(surface: F64, triangles: I64, triangle: I64, bary: F64) -> F64:
+    return np.einsum("nk,nkj->nj", bary, surface[triangles[triangle]])
+
+
+def stack_push(over: F64, need: F64, movable: Bool, reach: float = LAYER_REACH) -> F64:
+    """How far to push every vertex out: the largest positive `need` among the `movable`
+    vertices whose skin points (`over`, the closest point on the skin) lie within `reach`
+    of its own; zero for the others.
+
+    Pushing each vertex by its own need moves every layer of a garment with thickness to
+    the same clearance surface: the inner layer meets the outer one (or ends up in front
+    of it) and its two-sided inside shows through. Vertices stacked over the same skin take
+    one push, so the gaps between layers hold."""
+    push = np.zeros(len(need))
+    sources = np.flatnonzero(movable & (need > 0.0))
+    if not len(sources):
+        return push
+    targets = np.flatnonzero(movable)
+    pairs = cKDTree(over[targets]).sparse_distance_matrix(
+        cKDTree(over[sources]), reach, output_type="ndarray"
+    )
+    np.maximum.at(push, targets[pairs["i"]], need[sources[pairs["j"]]])
+    push[sources] = np.maximum(push[sources], need[sources])
+    return push
+
+
 def fit_garment(garment: Garment, body: BodyFit) -> Fit:
     """Re-express the garment in the web body's bind space (positions, normals, skin,
     slider morphs); see the module docstring."""
     points = np.concatenate([p.positions for p in garment.parts])
     transfer = build_transfer(points, body)
     moved = points + transfer.matrix @ body.displacement
-    _, signed, triangle, _, normal = _signed_distance(
+    _, signed, triangle, bary, normal = _signed_distance(
         moved, body.positions, body.normals, body.triangles
     )
     near_seam = body.boundary[body.triangles[triangle]].any(axis=1)
-    push = (transfer.signed > -PUSH_DEPTH_LIMIT) & (signed < CLEARANCE) & ~near_seam
-    moved[push] += (CLEARANCE - signed[push])[:, None] * normal[push]
+    over = _closest_points(body.positions, body.triangles, triangle, bary)
+    movable = (transfer.signed > -PUSH_DEPTH_LIMIT) & ~near_seam
+    amount = stack_push(over, CLEARANCE - signed, movable)
+    push = amount > 0.0
+    moved[push] += amount[push][:, None] * normal[push]
     joints, weights = _blend_skin(transfer.matrix, body)
     morphs = {name: transfer.matrix @ delta for name, delta in body.morphs.items()}
     morphs, cleared = clear_morphs(moved, morphs, body, outside=push | (signed > 0.0))
@@ -828,15 +862,15 @@ def clear_morphs(
     wider patch the looser the cloth. At a slider end it can therefore move further in
     than the skin right under it, and the body shows through. Each morph is checked at its
     end: vertices `outside` the skin at rest that end closer than CLEARANCE to the morphed
-    skin are pushed back out along its normal. Returns the morphs and the vertices fixed
-    per morph.
+    skin are pushed back out along its normal, layers stacked over the same skin by one
+    amount (`stack_push`). Returns the morphs and the vertices fixed per morph.
     """
     cleared: dict[str, F64] = {}
     counts: dict[str, int] = {}
     for name, delta in morphs.items():
         skin = body.positions + body.morphs[name]
         normals = vertex_normals(skin, body.triangles)
-        distance, signed, triangle, _, normal = _signed_distance(
+        distance, signed, triangle, bary, normal = _signed_distance(
             positions + delta, skin, normals, body.triangles
         )
         # By the neck seam the closest point may lie on the open edge, where the signed
@@ -844,9 +878,11 @@ def clear_morphs(
         # (collars sit right over that edge and sink most).
         near_seam = body.boundary[body.triangles[triangle]].any(axis=1)
         on_face = np.abs(signed) >= FACE_ON_SHARE * distance
-        fix = outside & (signed < CLEARANCE) & (~near_seam | on_face)
+        over = _closest_points(skin, body.triangles, triangle, bary)
+        amount = stack_push(over, CLEARANCE - signed, outside & (~near_seam | on_face))
+        fix = amount > 0.0
         fixed = delta.copy()
-        fixed[fix] += (CLEARANCE - signed[fix])[:, None] * normal[fix]
+        fixed[fix] += amount[fix][:, None] * normal[fix]
         cleared[name] = fixed
         counts[name] = int(fix.sum())
     return cleared, counts
