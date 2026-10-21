@@ -1,25 +1,24 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { SplitText } from '@/components/reactbits/SplitText';
 import { CloseUpStage } from '@/components/stage/CloseUpStage';
 import { cn } from '@/lib/utils';
 
-import type { EyeFocus } from './eye/EyeMacro';
-
-const LAYERS = ['skin', 'eyes', 'hair', 'light'] as const satisfies readonly EyeFocus[];
+const LAYERS = ['skin', 'eyes', 'hair', 'light'] as const;
+type Layer = (typeof LAYERS)[number];
 
 /**
  * Realism close-up. Desktop: the close-up frame stays pinned (sticky) on the
  * right while the four realism layers scroll past on the left; the layer in
- * the middle of the viewport is "in focus" and the close-up responds.
+ * the middle of the viewport is "in focus".
  * Mobile: the frame comes first, the layers follow as a short list.
  */
-export function RealismSection({ closeUp }: { closeUp?: React.ReactNode }) {
+export function RealismSection({ closeUp }: { closeUp: ReactNode }) {
   const t = useTranslations('Landing.realism');
-  const [focus, setFocus] = useState<EyeFocus>('eyes');
+  const [focus, setFocus] = useState<Layer>('eyes');
   const list = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
@@ -28,7 +27,7 @@ export function RealismSection({ closeUp }: { closeUp?: React.ReactNode }) {
     const observer = new IntersectionObserver(
       (entries) => {
         const hit = entries.find((entry) => entry.isIntersecting);
-        const layer = hit?.target.getAttribute('data-layer') as EyeFocus | null | undefined;
+        const layer = hit?.target.getAttribute('data-layer') as Layer | null | undefined;
         if (layer) setFocus(layer);
       },
       { rootMargin: '-45% 0px -45% 0px' },
@@ -94,8 +93,7 @@ export function RealismSection({ closeUp }: { closeUp?: React.ReactNode }) {
         <div className="order-first self-start lg:sticky lg:top-[calc(var(--header-h)+2.5rem)] lg:order-none lg:col-span-7">
           <CloseUpStage
             label={t('stageLabel')}
-            focus={focus}
-            className="aspect-[4/5] w-full lg:aspect-auto lg:h-[min(78vh,820px)]"
+            className="aspect-[5/4] w-full lg:aspect-auto lg:h-[min(78vh,820px)]"
           >
             {closeUp}
           </CloseUpStage>

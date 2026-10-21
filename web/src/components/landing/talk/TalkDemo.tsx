@@ -1,9 +1,6 @@
 'use client';
 
-import { useGSAP } from '@gsap/react';
 import { PauseIcon, PlayIcon } from '@phosphor-icons/react';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -21,8 +18,6 @@ import {
   type TimedWord,
   type VisemeId,
 } from './timeline';
-
-gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 /** Waveform bars: fewer on narrow screens so each bar stays readable. */
 const barCount = () => (window.innerWidth < 640 ? 52 : 88);
@@ -52,13 +47,12 @@ const formatTime = (seconds: number) => {
 /**
  * Talking demo: the sample recording as a waveform with a playhead, a
  * karaoke-style subtitle that fills word by word, and a 15-cell viseme meter.
- * Press "Dinle" to hear it; otherwise scrolling through the section scrubs
- * the same timeline (pinned on desktop). Timing comes from timeline.ts.
+ * Only the audio drives the timeline: nothing moves until "Dinle" is pressed,
+ * so the button always tells the truth. Timing comes from timeline.ts.
  */
 export function TalkDemo({ id, audioSrc, transcript }: TalkDemoProps) {
   const t = useTranslations('Landing.talk');
   const section = useRef<HTMLElement>(null);
-  const pinTarget = useRef<HTMLDivElement>(null);
   const audio = useRef<HTMLAudioElement>(null);
   const playedLayer = useRef<HTMLDivElement>(null);
   const playhead = useRef<HTMLDivElement>(null);
@@ -152,42 +146,6 @@ export function TalkDemo({ id, audioSrc, transcript }: TalkDemoProps) {
     return () => cancelAnimationFrame(raf.current);
   }, [status, showTime]);
 
-  // Scroll scrub (pinned on desktop) while the audio is not playing.
-  const statusRef = useRef(status);
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
-  useGSAP(
-    () => {
-      if (!analysis || !pinTarget.current) return;
-      const media = gsap.matchMedia();
-      const scrub = (self: ScrollTrigger) => {
-        if (statusRef.current === 'playing') return;
-        showTime(self.progress * analysis.duration);
-      };
-      media.add('(min-width: 1024px) and (prefers-reduced-motion: no-preference)', () => {
-        ScrollTrigger.create({
-          trigger: pinTarget.current,
-          start: 'top top',
-          end: '+=110%',
-          pin: true,
-          onUpdate: scrub,
-        });
-      });
-      media.add('(max-width: 1023px) and (prefers-reduced-motion: no-preference)', () => {
-        ScrollTrigger.create({
-          trigger: pinTarget.current,
-          start: 'top 70%',
-          end: 'bottom 40%',
-          onUpdate: scrub,
-        });
-      });
-      return () => media.revert();
-    },
-    { dependencies: [analysis, showTime], scope: section },
-  );
-
   const toggle = async () => {
     const element = audio.current;
     if (!element || !analysis) return;
@@ -216,10 +174,7 @@ export function TalkDemo({ id, audioSrc, transcript }: TalkDemoProps) {
 
   return (
     <section ref={section} id={id} aria-labelledby="talk-title" className="relative">
-      <div
-        ref={pinTarget}
-        className="py-section mx-auto flex max-w-[1440px] flex-col justify-center px-5 md:px-8 lg:min-h-[100dvh] lg:px-12 lg:py-24"
-      >
+      <div className="py-section mx-auto flex max-w-[1440px] flex-col justify-center px-5 md:px-8 lg:min-h-[100dvh] lg:px-12 lg:py-24">
         <SplitText
           as="h2"
           id="talk-title"
@@ -306,7 +261,10 @@ export function TalkDemo({ id, audioSrc, transcript }: TalkDemoProps) {
                       wordEls.current[index] = node;
                     }}
                     className={cn(
-                      'relative inline-block transition-colors duration-150',
+                      'relative inline-block',
+                      // Fade only while playing; the end state must land at once,
+                      // even when the tab paints late (background tabs, captures).
+                      playing && 'transition-colors duration-150',
                       (past || current) && 'text-ink',
                     )}
                   >

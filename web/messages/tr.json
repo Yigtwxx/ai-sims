@@ -62,7 +62,7 @@
     "realism": {
       "title": "Yakından bak. Hâlâ gerçek.",
       "lede": "Ten, göz, saç ve ışık ayrı malzemeler olarak hesaplanır; yakın planda da plastik durmaz.",
-      "stageLabel": "Yakın plan: stüdyo ışığında bir göz, iris ve kornea",
+      "stageLabel": "Yakın plan: stüdyo ışığında MetaHuman yüzü, gözler ve ten dokusu",
       "layers": {
         "skin": {
           "title": "Ten",

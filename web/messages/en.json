@@ -62,7 +62,7 @@
     "realism": {
       "title": "Look closer. Still real.",
       "lede": "Skin, eyes, hair and light are computed as separate materials, so a close-up never turns to plastic.",
-      "stageLabel": "Close-up: an eye under studio light, iris and cornea",
+      "stageLabel": "Close-up: a MetaHuman face under studio light, eyes and skin texture",
       "layers": {
         "skin": {
           "title": "Skin",

@@ -35,12 +35,16 @@ export interface SplitTextProps {
   trigger?: 'load' | 'view';
   /** Seconds before the first piece moves. */
   delay?: number;
-  /** Seconds between pieces. */
+  /** Seconds between pieces (on-scroll reveals cap the total at 0.8 s). */
   stagger?: number;
   /** Seconds per piece. */
   duration?: number;
   onComplete?: () => void;
 }
+
+/** On-scroll reveals: seconds per piece, and the whole title including the stagger. */
+const VIEW_PIECE_SECONDS = 0.55;
+const VIEW_REVEAL_SECONDS = 0.8;
 
 const fontsReady = () =>
   typeof document !== 'undefined' && (!document.fonts || document.fonts.status === 'loaded');
@@ -106,20 +110,42 @@ export function SplitText({
         onSplit: (self: GSAPSplitText) => {
           const pieces = self[splitType];
           el.setAttribute('data-split-ready', '');
+          if (trigger === 'view') {
+            // A title already scrolled past (deep link, reload mid-page) stays as it is.
+            if (el.getBoundingClientRect().bottom <= 0) {
+              onCompleteRef.current?.();
+              return undefined;
+            }
+            // Read while scrolling: the whole title lands within VIEW_REVEAL_SECONDS,
+            // so a fast scroll never leaves it half faded.
+            const pieceSeconds = Math.min(duration, VIEW_PIECE_SECONDS);
+            const step =
+              pieces.length > 1
+                ? Math.min(stagger, (VIEW_REVEAL_SECONDS - pieceSeconds) / (pieces.length - 1))
+                : 0;
+            return gsap.from(pieces, {
+              yPercent: 112,
+              opacity: 0,
+              duration: pieceSeconds,
+              ease: GSAP_EASE.outExpo,
+              stagger: step,
+              delay,
+              clearProps: 'transform,opacity',
+              onComplete: () => onCompleteRef.current?.(),
+              scrollTrigger: { trigger: el, start: 'top 92%', once: true },
+            });
+          }
           // On-load reveals are timed from navigation start, so a slow
           // hydration never pushes the title behind the CSS-timed copy.
-          const start = trigger === 'load' ? Math.max(0, delay - performance.now() / 1000) : delay;
           return gsap.from(pieces, {
             yPercent: 112,
             opacity: 0,
             duration,
             ease: GSAP_EASE.outExpo,
             stagger,
-            delay: start,
+            delay: Math.max(0, delay - performance.now() / 1000),
             clearProps: 'transform,opacity',
             onComplete: () => onCompleteRef.current?.(),
-            scrollTrigger:
-              trigger === 'view' ? { trigger: el, start: 'top 86%', once: true } : undefined,
           });
         },
       });

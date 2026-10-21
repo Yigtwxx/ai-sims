@@ -16,6 +16,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import Image from 'next/image';
 import type { ReactNode } from 'react';
 
 import { ClosingSection } from '@/components/landing/ClosingSection';
@@ -36,12 +37,22 @@ async function getSampleTranscript(): Promise<string> {
   return (await readFile(file, 'utf8')).trim();
 }
 
-/**
- * Slots for the main session: pass the live 3D character into `heroStage`
- * and a face close-up into `closeUp`; until then the posters render.
- */
+/** Slot for the main session: pass the live 3D character here; until then the poster renders. */
 const heroStage: ReactNode = undefined;
-const closeUp: ReactNode = undefined;
+
+/**
+ * Realism close-up: a render of our MetaHuman (Ada, studio light rig, brows
+ * camera) from /dev/mh. The frame's aria-label describes it, so alt is empty.
+ */
+const closeUp = (
+  <Image
+    src="/assets/landing/mh-ada-eyes.webp"
+    alt=""
+    fill
+    sizes="(min-width: 1024px) 58vw, 100vw"
+    className="object-cover"
+  />
+);
 
 export default async function LandingPage() {
   const transcript = await getSampleTranscript();
