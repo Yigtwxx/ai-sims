@@ -256,14 +256,14 @@
     },
     "face": {
       "presets": "Hazır yüzler",
-      "blend": "Karışım",
-      "blendHint": "Seçili yüzü en fazla üç yüze doğru karıştır.",
-      "addBlend": "Karışım ekle",
+      "blend": "Yüz karışımı",
+      "blendHint": "Seçili yüze başka yüzlerden özellik kat. Her kaydırıcı, o yüze ne kadar benzeyeceğini belirler.",
+      "addBlend": "Karıştırılacak yüz ekle",
       "pickBlend": "Karıştırılacak yüzü seç",
       "cancelBlend": "Vazgeç",
-      "blendTowards": "{name} oranı",
+      "blendTowards": "{name} etkisi",
       "removeBlend": "{name} karışımını kaldır",
-      "blendFull": "En fazla üç yüz karıştırılabilir."
+      "blendFull": "En fazla üç yüz karıştırılabilir; yenisi için birini kaldır."
     },
     "body": {
       "presets": "Vücut tipi",
@@ -274,8 +274,8 @@
         "curvy": "Kıvrımlı"
       },
       "sliders": "İnce ayar",
-      "custom": "Ayarlar elle değiştirildi.",
-      "reset": "Tipe geri dön",
+      "custom": "Kaydırıcılarla değiştirildi.",
+      "reset": "Tipe sıfırla",
       "sliderNames": {
         "height": "Boy",
         "weight": "Kilo",
@@ -316,22 +316,25 @@
         }
       },
       "neutral": "Ortada",
-      "unavailable": "Bu tabanın vücut ayarları henüz dışa aktarılmadı."
+      "unavailable": "Bu tabanın vücut ayarları henüz dışa aktarılmadı.",
+      "slidersHint": "Seçili tipten başlayıp her ölçüyü ayrı ayarla."
     },
     "skin": {
       "sets": "Cilt",
-      "tone": "Ton ince ayarı",
+      "tone": "Ton ayarı",
       "lighter": "Daha açık",
       "darker": "Daha koyu",
       "makeup": "Makyaj",
       "makeupHint": "Bu cilt setinin makyajlı yüz dokusunu kullanır.",
-      "makeupUnavailable": "Bu cilt setinde makyaj yok."
+      "makeupUnavailable": "Bu cilt setinde makyaj yok.",
+      "setsHint": "Tona göre sıralı gerçek cilt dokuları."
     },
     "eyes": {
       "iris": "İris",
       "default": "Yüzün kendi gözü",
       "tint": "Renk tonu",
-      "noTint": "Ton yok"
+      "noTint": "Ton yok",
+      "tintHint": "İrisin üstüne hafif bir renk katar."
     },
     "hair": {
       "styles": "Saç modeli",
@@ -343,7 +346,7 @@
       "redness": "Kızıllık",
       "neutral": "Nötr",
       "red": "Kızıl",
-      "dye": "Boya",
+      "dye": "Saç boyası",
       "noDye": "Boya yok",
       "pattern": "Boya deseni",
       "patterns": {
@@ -354,7 +357,9 @@
         "underlayer": "İç katman"
       },
       "patternColor": "Desen rengi",
-      "amount": "Yoğunluk"
+      "amount": "Yoğunluk",
+      "dyeHint": "Boya, doğal rengin yerine geçer.",
+      "patternHint": "Desen, boyanın ya da doğal rengin üstüne ikinci bir renk ekler."
     },
     "facialHair": {
       "eyebrows": "Kaş",
@@ -375,7 +380,6 @@
       "none": "Yok",
       "tints": "Renk seçenekleri",
       "authored": "Orijinal",
-      "colors": "Özel renk",
       "params": {
         "PrimaryColor": "Ana renk",
         "SecondaryColor": "İkincil renk"
@@ -383,7 +387,8 @@
       "fullReplaces": "Tek parça kıyafet, üst ve altın yerine geçer.",
       "empty": "Bu bölümde bu taban için kıyafet yok.",
       "comingSoon": "Gardırop hazırlanıyor.",
-      "comingSoonBody": "Kıyafetler dışa aktarılıp kütüphaneye eklenince burada görünecek. Şimdilik karakter MetaHuman taban kıyafetiyle görünür."
+      "comingSoonBody": "Kıyafetler dışa aktarılıp kütüphaneye eklenince burada görünecek. Şimdilik karakter MetaHuman taban kıyafetiyle görünür.",
+      "colorsHint": "Kıyafetin bu bölümünü istediğin renge boya."
     },
     "jewelry": {
       "count": "{count}/{max} parça",
@@ -479,14 +484,14 @@
       "saving": "Kaydediliyor…"
     },
     "autosave": {
-      "needsName": "İsim verince taslak kendiliğinden kaydedilir.",
-      "pending": "Değişiklikler kaydedilecek…",
+      "needsName": "İsim verdiğinde taslak otomatik kaydedilir.",
+      "pending": "Kaydedilecek…",
       "saving": "Taslak kaydediliyor…",
       "saved": "Taslak kaydedildi",
       "error": "Taslak kaydedilemedi. Tekrar denenecek."
     },
     "saveFailed": "Kaydedilemedi. Bağlantını kontrol edip tekrar dene.",
-    "dragHint": "Sürükle ve döndür",
+    "dragHint": "Döndürmek için sürükle",
     "loadingStage": "Sahne hazırlanıyor",
     "manifest": {
       "loading": "Parça kütüphanesi yükleniyor",
@@ -528,7 +533,8 @@
       "cognac": "Konyak",
       "wine": "Şarap",
       "stone": "Taş"
-    }
+    },
+    "loadingCharacter": "Karakter sahneye hazırlanıyor"
   },
   "Talk": {
     "back": "Karakterlerim",

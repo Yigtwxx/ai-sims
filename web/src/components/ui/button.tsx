@@ -6,12 +6,14 @@ import { cn } from '@/lib/utils';
 
 /*
  * shadcn/ui Button (new-york), restyled for "The Lit Stage": one marquee-amber
- * primary, quiet raised controls, 12px control radius, press scales to 0.98.
+ * primary, quiet raised controls, 12px control radius. A press sinks to 0.97
+ * in 100 ms and springs back in 200 ms (Tailwind's `scale` is its own CSS
+ * property, so it must be listed in the transition to animate at all).
  * A disabled primary goes dark instead of half-transparent amber (the lamp is
  * off), except while busy: a pressed button that is working keeps its light.
  */
 const buttonVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-control font-semibold whitespace-nowrap transition-[background-color,color,border-color,transform] duration-200 ease-out-quint outline-none select-none active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-control font-semibold whitespace-nowrap transition-[background-color,color,border-color,box-shadow,scale] duration-200 ease-out-quint outline-none select-none active:scale-[0.97] active:duration-100 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

@@ -26,7 +26,7 @@ export const NameField = forwardRef<HTMLInputElement, NameFieldProps>(function N
   return (
     <div className="group/name px-6 pt-4 pb-5">
       <div className="mb-1 flex items-baseline justify-between">
-        <label htmlFor={id} className="text-label text-ink-muted font-medium">
+        <label htmlFor={id} className="text-label text-ink-muted">
           {label}
         </label>
         <span

@@ -91,7 +91,7 @@ async function CharacterList() {
       <p className="text-label text-ink-faint mt-10 tabular-nums">
         {t('count', { count: characters.length })}
       </p>
-      <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
+      <ul className="stagger-in mt-4 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
         {characters.map((character) => (
           <CharacterCard
             key={character.id}

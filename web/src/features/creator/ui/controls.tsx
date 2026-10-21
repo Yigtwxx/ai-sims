@@ -1,14 +1,39 @@
 'use client';
 
 import { CheckIcon, ProhibitIcon } from '@phosphor-icons/react';
-import { useId, type ReactNode } from 'react';
+import { motion } from 'motion/react';
+import { memo, useId, type ReactNode } from 'react';
 
+import { SPRING_SNAP } from '@/components/motion/tokens';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 
 import { useCreatorStore } from '../store';
 
 const endGesture = () => useCreatorStore.getState().endGesture();
+
+/**
+ * The highlight that slides to the picked option (Motion shared layout). Its
+ * only props are constant strings and it is memoised, so a panel that
+ * re-renders on every slider tick never re-renders it: Motion measures layout
+ * only when the pick itself moves the indicator.
+ */
+export const SlidingIndicator = memo(function SlidingIndicator({
+  layoutId,
+  className,
+}: {
+  layoutId: string;
+  className: string;
+}) {
+  return (
+    <motion.span
+      aria-hidden="true"
+      layoutId={layoutId}
+      transition={SPRING_SNAP}
+      className={cn('pointer-events-none absolute', className)}
+    />
+  );
+});
 
 /** A titled block inside a category: more space above than below. */
 export function Section({
@@ -103,7 +128,7 @@ export function LabeledSlider({
         </label>
       ) : (
         <div className="flex items-baseline justify-between gap-3">
-          <label id={id} className="text-label text-ink-muted font-medium">
+          <label id={id} className="text-label text-ink-muted">
             {label}
           </label>
           <span className="text-label text-ink flex items-center gap-2 font-medium tabular-nums">
@@ -161,6 +186,7 @@ export function Segmented<T extends string>({
   onChange,
   className,
 }: SegmentedProps<T>) {
+  const indicator = `segment-${useId()}`;
   return (
     <div
       role="radiogroup"
@@ -188,13 +214,17 @@ export function Segmented<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-tile text-ui h-9 min-w-0 flex-1 truncate px-2 transition-[background-color,color,box-shadow] duration-200',
-              active
-                ? 'bg-backstage-lift text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_1px_2px_rgb(5_5_4/0.4)]'
-                : 'text-ink-muted hover:bg-backstage-raised hover:text-ink',
+              'rounded-tile text-ui relative h-9 min-w-0 flex-1 px-2 transition-[color,scale] duration-200 active:scale-[0.97] active:duration-100',
+              active ? 'text-ink' : 'text-ink-muted hover:text-ink',
             )}
           >
-            {option.label}
+            {active ? (
+              <SlidingIndicator
+                layoutId={indicator}
+                className="rounded-tile bg-backstage-lift inset-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_1px_2px_rgb(5_5_4/0.4)]"
+              />
+            ) : null}
+            <span className="relative block truncate">{option.label}</span>
           </button>
         );
       })}
@@ -232,13 +262,21 @@ export function SwatchPicker({
   size = 'md',
   iris = false,
 }: SwatchPickerProps) {
+  const indicator = `swatch-${useId()}`;
   const dimension = size === 'sm' ? 'size-8' : 'size-10';
   const swatch = (selected: boolean) =>
     cn(
-      'relative flex shrink-0 items-center justify-center rounded-full ring-offset-[3px] ring-offset-backstage transition-[box-shadow,transform] duration-200 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-marquee',
+      'relative flex shrink-0 items-center justify-center rounded-full transition-[box-shadow,scale] duration-200 hover:scale-105 active:scale-95 active:duration-100 focus-visible:outline-2 focus-visible:outline-offset-[6px] focus-visible:outline-marquee',
       dimension,
-      selected ? 'ring-2 ring-marquee' : 'ring-1 ring-hairline',
+      selected ? 'ring-0' : 'ring-1 ring-hairline',
     );
+  // The amber ring travels between swatches; a 3px gap keeps it off the colour.
+  const ring = (
+    <SlidingIndicator
+      layoutId={indicator}
+      className="-inset-[5px] rounded-full shadow-[inset_0_0_0_2px_var(--color-marquee)]"
+    />
+  );
 
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2.5">
@@ -252,7 +290,8 @@ export function SwatchPicker({
           onClick={() => onChange(null)}
           className={cn(swatch(value === null), 'bg-backstage-raised text-ink-faint')}
         >
-          <ProhibitIcon className="size-4" aria-hidden="true" />
+          {value === null ? ring : null}
+          <ProhibitIcon className="size-4" weight="light" aria-hidden="true" />
         </button>
       ) : null}
       {colors.map((color) => {
@@ -277,11 +316,12 @@ export function SwatchPicker({
                     : fill,
             }}
           >
+            {selected ? ring : null}
             {selected && !iris ? (
               <CheckIcon
                 weight="bold"
                 aria-hidden="true"
-                className="text-ink size-3.5 mix-blend-difference"
+                className="text-ink animate-mark-in size-3.5 mix-blend-difference"
               />
             ) : null}
           </button>
@@ -305,6 +345,7 @@ export function ChipRadio<T extends string>({
   options,
   onChange,
 }: ChipRadioProps<T>) {
+  const indicator = `chip-${useId()}`;
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5">
       {options.map((option) => {
@@ -318,13 +359,20 @@ export function ChipRadio<T extends string>({
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-tile text-ui h-9 border px-3 transition-colors duration-200 disabled:opacity-40',
+              'rounded-tile text-ui relative h-9 border px-3 transition-[border-color,color,scale] duration-200 active:scale-[0.97] active:duration-100 disabled:opacity-40',
               active
-                ? 'border-marquee bg-backstage-lift text-ink'
+                ? 'text-ink border-transparent'
                 : 'border-hairline text-ink-muted hover:border-ink-faint hover:text-ink',
             )}
           >
-            {option.label}
+            {/* Inset shadow, not a border: Motion keeps shadows crisp while it scales. */}
+            {active ? (
+              <SlidingIndicator
+                layoutId={indicator}
+                className="rounded-tile bg-backstage-lift -inset-px shadow-[inset_0_0_0_1px_var(--color-marquee)]"
+              />
+            ) : null}
+            <span className="relative">{option.label}</span>
           </button>
         );
       })}

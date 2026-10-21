@@ -8,7 +8,7 @@ import { HAIR_DYES, HAIR_PATTERN_COLORS, naturalHairColor } from '../palettes';
 import { groomsFor } from '../reconcile';
 import { thumbnailSrc } from '../useMhManifest';
 import { OptionGrid, OptionTile } from '../ui/OptionGrid';
-import { ChipRadio, LabeledSlider, Section, SwatchPicker } from '../ui/controls';
+import { ChipRadio, Hint, LabeledSlider, Section, SwatchPicker } from '../ui/controls';
 
 import { useConfig, useLabel, type PanelProps } from './shared';
 
@@ -33,7 +33,7 @@ export function HairPanel({ manifest }: PanelProps) {
   return (
     <>
       <Section title={t('styles')} aside={styles.length}>
-        <OptionGrid label={t('styles')}>
+        <OptionGrid label={t('styles')} revealSelected>
           <OptionTile
             label={t('none')}
             none
@@ -85,6 +85,7 @@ export function HairPanel({ manifest }: PanelProps) {
           value={dye}
           onChange={(value) => update((draft) => void (draft.hair.color.dye = value))}
         />
+        <Hint>{t('dyeHint')}</Hint>
       </Section>
 
       <Section title={t('pattern')}>
@@ -94,6 +95,7 @@ export function HairPanel({ manifest }: PanelProps) {
           options={HAIR_PATTERNS.map((type) => ({ value: type, label: t(`patterns.${type}`) }))}
           onChange={(type) => update((draft) => void (draft.hair.pattern.type = type))}
         />
+        {pattern.type === 'none' ? <Hint>{t('patternHint')}</Hint> : null}
         {pattern.type !== 'none' ? (
           <div className="flex flex-col gap-6 pt-2">
             <SwatchPicker

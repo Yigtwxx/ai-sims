@@ -256,14 +256,14 @@
     },
     "face": {
       "presets": "Ready-made faces",
-      "blend": "Blend",
-      "blendHint": "Blend the selected face towards up to three others.",
-      "addBlend": "Add a blend",
+      "blend": "Face blend",
+      "blendHint": "Mix in features from other faces. Each slider sets how far the face leans towards that one.",
+      "addBlend": "Add a face to blend",
       "pickBlend": "Pick a face to blend towards",
       "cancelBlend": "Cancel",
-      "blendTowards": "Towards {name}",
+      "blendTowards": "{name} influence",
       "removeBlend": "Remove the {name} blend",
-      "blendFull": "Up to three faces can be blended."
+      "blendFull": "Up to three faces can be blended; remove one to add another."
     },
     "body": {
       "presets": "Body type",
@@ -274,8 +274,8 @@
         "curvy": "Curvy"
       },
       "sliders": "Fine tuning",
-      "custom": "Adjusted by hand.",
-      "reset": "Back to the type",
+      "custom": "Adjusted with the sliders.",
+      "reset": "Reset to type",
       "sliderNames": {
         "height": "Height",
         "weight": "Weight",
@@ -316,22 +316,25 @@
         }
       },
       "neutral": "Centre",
-      "unavailable": "The body sliders for this base have not been exported yet."
+      "unavailable": "The body sliders for this base have not been exported yet.",
+      "slidersHint": "Start from the chosen type and tune each measure on its own."
     },
     "skin": {
       "sets": "Skin",
-      "tone": "Tone fine-tuning",
+      "tone": "Tone adjustment",
       "lighter": "Lighter",
       "darker": "Darker",
       "makeup": "Makeup",
       "makeupHint": "Uses this skin set's made-up face texture.",
-      "makeupUnavailable": "This skin set has no makeup."
+      "makeupUnavailable": "This skin set has no makeup.",
+      "setsHint": "Real skin textures, sorted by tone."
     },
     "eyes": {
       "iris": "Iris",
       "default": "The face's own eyes",
       "tint": "Tint",
-      "noTint": "No tint"
+      "noTint": "No tint",
+      "tintHint": "Lays a light colour over the iris."
     },
     "hair": {
       "styles": "Hairstyle",
@@ -343,7 +346,7 @@
       "redness": "Redness",
       "neutral": "Neutral",
       "red": "Red",
-      "dye": "Dye",
+      "dye": "Hair dye",
       "noDye": "No dye",
       "pattern": "Dye pattern",
       "patterns": {
@@ -354,7 +357,9 @@
         "underlayer": "Underlayer"
       },
       "patternColor": "Pattern colour",
-      "amount": "Strength"
+      "amount": "Strength",
+      "dyeHint": "Dye replaces the natural colour.",
+      "patternHint": "A pattern adds a second colour over the dye or natural colour."
     },
     "facialHair": {
       "eyebrows": "Brows",
@@ -375,7 +380,6 @@
       "none": "None",
       "tints": "Colourways",
       "authored": "Original",
-      "colors": "Custom colour",
       "params": {
         "PrimaryColor": "Main colour",
         "SecondaryColor": "Secondary colour"
@@ -383,7 +387,8 @@
       "fullReplaces": "A one-piece outfit replaces the top and bottom.",
       "empty": "No clothes in this section for this base.",
       "comingSoon": "The wardrobe is on its way.",
-      "comingSoonBody": "Clothes appear here once they are exported into the library. Until then the character wears the MetaHuman base outfit."
+      "comingSoonBody": "Clothes appear here once they are exported into the library. Until then the character wears the MetaHuman base outfit.",
+      "colorsHint": "Paint this part of the garment any colour."
     },
     "jewelry": {
       "count": "{count}/{max} pieces",
@@ -479,8 +484,8 @@
       "saving": "Saving…"
     },
     "autosave": {
-      "needsName": "Name it and the draft saves itself.",
-      "pending": "Changes will be saved…",
+      "needsName": "Give it a name and the draft saves automatically.",
+      "pending": "Saving shortly…",
       "saving": "Saving draft…",
       "saved": "Draft saved",
       "error": "Could not save the draft. Will retry."
@@ -528,7 +533,8 @@
       "cognac": "Cognac",
       "wine": "Wine",
       "stone": "Stone"
-    }
+    },
+    "loadingCharacter": "Bringing your character on stage"
   },
   "Talk": {
     "back": "My characters",

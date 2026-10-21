@@ -1,9 +1,25 @@
 'use client';
 
 import { CheckIcon, ProhibitIcon } from '@phosphor-icons/react';
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 
 import { cn } from '@/lib/utils';
+
+import { SlidingIndicator } from './controls';
+
+/** The layout id of this grid's selection ring, so it travels only within its own grid. */
+const RingId = createContext<string | undefined>(undefined);
+
+const RING = 'rounded-tile inset-0 shadow-[inset_0_0_0_2px_var(--color-marquee)]';
 
 /**
  * Arrow keys move between the radios of a grid (visual order), Home/End jump
@@ -41,18 +57,52 @@ interface OptionGridProps {
   className?: string;
   /** Tile columns; swatch grids pass their own. */
   columns?: string;
+  /**
+   * Long lists: when the grid opens with its pick below the fold, scroll the
+   * panel (before paint, no animation) so the current choice is in view.
+   */
+  revealSelected?: boolean;
 }
 
-export function OptionGrid({ label, children, className, columns }: OptionGridProps) {
+/**
+ * A grid of picks. Tiles arrive in a short stagger (CSS, once per mount) and
+ * the amber selection ring slides from the old pick to the new one.
+ */
+export function OptionGrid({
+  label,
+  children,
+  className,
+  columns,
+  revealSelected = false,
+}: OptionGridProps) {
+  const ringId = `tile-ring-${useId()}`;
+  const grid = useRef<HTMLDivElement>(null);
+
+  // Once, on mount: later picks happen where the user already is.
+  useLayoutEffect(() => {
+    if (!revealSelected) return;
+    const picked = grid.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+    const scroller = picked?.closest<HTMLElement>('[role="tabpanel"]');
+    if (!picked || !scroller) return;
+    const view = scroller.getBoundingClientRect();
+    const tile = picked.getBoundingClientRect();
+    if (tile.bottom <= view.bottom - 48) return;
+    scroller.scrollTop += tile.top - view.top - (view.height - tile.height) / 2;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only, by design
+  }, []);
+
   return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      onKeyDown={onGridKeyDown}
-      className={cn('grid gap-x-2.5 gap-y-4', columns ?? 'grid-cols-3', className)}
-    >
-      {children}
-    </div>
+    <RingId value={ringId}>
+      <div
+        ref={grid}
+        role="radiogroup"
+        aria-label={label}
+        onKeyDown={onGridKeyDown}
+        className={cn('stagger-in grid gap-x-2.5 gap-y-4', columns ?? 'grid-cols-3', className)}
+      >
+        {children}
+      </div>
+    </RingId>
   );
 }
 
@@ -69,7 +119,10 @@ interface OptionTileProps {
   disabled?: boolean;
 }
 
-/** A 3:4 option with its label always visible (scanable), amber ring when selected. */
+/**
+ * A 3:4 option with its label always visible (scanable). The frame lifts on
+ * hover and sinks on press; the selected one carries the amber ring and tick.
+ */
 export function OptionTile({
   label,
   selected,
@@ -79,6 +132,7 @@ export function OptionTile({
   swatches,
   disabled,
 }: OptionTileProps) {
+  const ringId = useContext(RingId);
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const showImage = Boolean(image) && !broken && !none;
@@ -94,48 +148,58 @@ export function OptionTile({
       onClick={onSelect}
       className="group/tile flex min-w-0 flex-col gap-2 text-left outline-none disabled:opacity-40"
     >
-      <span
-        className={cn(
-          'rounded-tile bg-backstage-raised ease-out-expo group-focus-visible/tile:outline-marquee relative block aspect-[3/4] w-full overflow-hidden transition-[box-shadow,transform] duration-300 group-hover/tile:-translate-y-0.5 group-hover/tile:shadow-[0_10px_24px_rgb(5_5_4/0.45)] group-focus-visible/tile:outline-2 group-focus-visible/tile:outline-offset-2 group-active/tile:translate-y-0',
-          selected ? 'ring-marquee ring-2' : 'ring-hairline group-hover/tile:ring-ink-faint ring-1',
-          // Until the art arrives the tile carries the slow tungsten sweep, not a blank box.
-          showImage &&
-            !loaded &&
-            'after:animate-skeleton-sweep after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.06),transparent)]',
-        )}
-      >
-        {showImage ? (
-          // eslint-disable-next-line @next/next/no-img-element -- local manifest art, no optimizer needed
-          <img
-            ref={(node) => {
-              // Cached art can finish before React attaches onLoad.
-              if (node?.complete && node.naturalWidth > 0) setLoaded(true);
-            }}
-            src={image}
-            alt=""
-            draggable={false}
-            loading="lazy"
-            decoding="async"
-            onLoad={() => setLoaded(true)}
-            onError={() => setBroken(true)}
-            className={cn(
-              'ease-out-expo size-full object-cover transition-[opacity,transform] duration-500 group-hover/tile:scale-[1.03]',
-              loaded ? 'opacity-100' : 'opacity-0',
-            )}
-          />
-        ) : none ? (
-          <span className="text-ink-faint flex size-full items-center justify-center">
-            <ProhibitIcon className="size-7" weight="light" aria-hidden="true" />
-          </span>
-        ) : (
-          <span className="flex size-full items-end bg-[radial-gradient(90%_70%_at_50%_20%,rgb(255_226_176/0.12),transparent_70%)] p-2.5">
-            <span className="font-display text-subhead text-ink/25">{label.slice(0, 2)}</span>
-          </span>
-        )}
+      {/* The frame moves (translate/scale only); the ring rides on it. */}
+      <span className="ease-out-expo relative block transition-[translate,scale] duration-300 group-hover/tile:-translate-y-0.5 group-active/tile:translate-y-0 group-active/tile:scale-[0.98] group-active/tile:duration-100">
+        <span
+          className={cn(
+            'rounded-tile bg-backstage-raised group-focus-visible/tile:outline-marquee relative block aspect-[3/4] w-full overflow-hidden transition-[box-shadow] duration-300 group-hover/tile:shadow-[0_10px_24px_rgb(5_5_4/0.45)] group-focus-visible/tile:outline-2 group-focus-visible/tile:outline-offset-2',
+            selected ? 'ring-0' : 'ring-hairline group-hover/tile:ring-ink-faint ring-1',
+            // Until the art arrives the tile carries the slow tungsten sweep, not a blank box.
+            showImage &&
+              !loaded &&
+              'after:animate-skeleton-sweep after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.06),transparent)]',
+          )}
+        >
+          {showImage ? (
+            // eslint-disable-next-line @next/next/no-img-element -- local manifest art, no optimizer needed
+            <img
+              ref={(node) => {
+                // Cached art can finish before React attaches onLoad.
+                if (node?.complete && node.naturalWidth > 0) setLoaded(true);
+              }}
+              src={image}
+              alt=""
+              draggable={false}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setLoaded(true)}
+              onError={() => setBroken(true)}
+              className={cn(
+                'ease-out-expo size-full object-cover transition-[opacity,scale] duration-500 group-hover/tile:scale-[1.03]',
+                loaded ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+          ) : none ? (
+            <span className="text-ink-faint flex size-full items-center justify-center">
+              <ProhibitIcon className="size-7" weight="light" aria-hidden="true" />
+            </span>
+          ) : (
+            <span className="flex size-full items-end bg-[radial-gradient(90%_70%_at_50%_20%,rgb(255_226_176/0.12),transparent_70%)] p-2.5">
+              <span className="font-display text-subhead text-ink/25">{label.slice(0, 2)}</span>
+            </span>
+          )}
+          {selected ? (
+            <span className="bg-marquee text-backstage animate-mark-in absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full shadow-[0_2px_6px_rgb(5_5_4/0.5)]">
+              <CheckIcon weight="bold" className="size-3" aria-hidden="true" />
+            </span>
+          ) : null}
+        </span>
         {selected ? (
-          <span className="bg-marquee text-backstage absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full shadow-[0_2px_6px_rgb(5_5_4/0.5)]">
-            <CheckIcon weight="bold" className="size-3" aria-hidden="true" />
-          </span>
+          ringId ? (
+            <SlidingIndicator layoutId={ringId} className={RING} />
+          ) : (
+            <span aria-hidden="true" className={cn('pointer-events-none absolute', RING)} />
+          )
         ) : null}
       </span>
       <span

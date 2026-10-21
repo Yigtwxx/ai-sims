@@ -6,7 +6,7 @@ import { useId } from 'react';
 import { Switch } from '@/components/ui/switch';
 
 import { skinsByTone } from '../reconcile';
-import { LabeledSlider, Section, SwatchPicker } from '../ui/controls';
+import { Hint, LabeledSlider, Section, SwatchPicker } from '../ui/controls';
 
 import { signedPercent, useConfig, useLabel, type PanelProps } from './shared';
 
@@ -34,6 +34,7 @@ export function SkinPanel({ manifest }: PanelProps) {
             if (id) update((draft) => void (draft.skin.set = id));
           }}
         />
+        <Hint>{t('setsHint')}</Hint>
       </Section>
 
       <Section title={t('tone')} aside={signedPercent(config.skin.tone, neutral)}>

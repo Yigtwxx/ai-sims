@@ -10,7 +10,7 @@
  */
 'use client';
 
-import { ArrowLeftIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon, HandGrabbingIcon } from '@phosphor-icons/react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner';
 import { useStore } from 'zustand';
 
+import { EASE, SPRING_SOFT } from '@/components/motion/tokens';
 import { StageBoundary, StageFailed } from '@/components/stage/StageBoundary';
 import { StagePoster } from '@/components/stage/StagePoster';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,6 +52,7 @@ import { MAX_NAME_LENGTH, useCreatorStore } from './store';
 import { startingConfig } from './reconcile';
 import { captureThumbnail } from './thumbnail';
 import { ActionBar } from './ui/ActionBar';
+import { SlidingIndicator } from './ui/controls';
 import { NameField } from './ui/NameField';
 import { useAutosave } from './useAutosave';
 import { useMhManifest, wantsFixture, type ManifestState } from './useMhManifest';
@@ -129,6 +131,7 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
   const markStageShown = useCallback(() => setStageShown(true), []);
 
   const panel = useRef<HTMLElement>(null);
+  const panelBody = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -307,7 +310,7 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
           !stageShown && (manifestState.status === 'loading' || manifestState.status === 'ready')
         }
         left={panelWidth}
-        label={t('loadingStage')}
+        label={t('loadingCharacter')}
       />
 
       <StageOverlay
@@ -355,7 +358,7 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
           error={nameError}
         />
 
-        <div className="border-hairline flex min-h-0 flex-1 flex-col border-t lg:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div
             role="tablist"
             aria-label={t('categoriesLabel')}
@@ -380,27 +383,29 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
                   onClick={() => setCategory(id)}
                   onKeyDown={(event) => onTabKey(event, index)}
                   className={cn(
-                    'group rounded-tile text-ui relative flex h-9 shrink-0 items-center gap-2 px-3 text-left leading-tight whitespace-nowrap transition-colors duration-200 focus-visible:outline-offset-0 disabled:opacity-40 lg:h-auto lg:min-h-10 lg:items-start lg:px-2.5 lg:py-2.5 lg:whitespace-normal',
+                    'group rounded-tile text-ui relative flex h-9 shrink-0 items-center gap-2 px-3 text-left leading-tight whitespace-nowrap transition-[color,background-color,scale] duration-200 focus-visible:outline-offset-0 active:scale-[0.98] active:duration-100 disabled:opacity-40 lg:h-auto lg:min-h-10 lg:items-start lg:px-2.5 lg:py-2.5 lg:whitespace-normal',
                     active
-                      ? 'bg-backstage-raised text-ink'
-                      : 'text-ink-muted hover:bg-backstage-raised/60 hover:text-ink',
+                      ? 'text-ink'
+                      : 'text-ink-muted hover:bg-backstage-raised/50 hover:text-ink',
                   )}
                 >
-                  {/* Amber rule: before the label on the rail, under it on the strip. */}
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      'bg-marquee ease-out-expo absolute inset-x-3 bottom-0 h-px origin-left transition-transform duration-300 lg:static lg:mt-[calc(0.5lh-0.5px)] lg:w-2.5 lg:shrink-0',
-                      active ? 'scale-x-100' : 'scale-x-0',
-                    )}
-                  />
-                  {t(`categories.${id}`)}
+                  {/* The pill and the amber rule glide to the picked category (shared layout). */}
+                  {active ? (
+                    <>
+                      <SlidingIndicator layoutId="creator-category" className={TAB_PILL} />
+                      <SlidingIndicator layoutId="creator-category-rule" className={TAB_RULE} />
+                    </>
+                  ) : null}
+                  {/* Reserves the rule's place before the label on the rail. */}
+                  <span aria-hidden="true" className="hidden w-2.5 shrink-0 lg:block" />
+                  <span className="relative">{t(`categories.${id}`)}</span>
                 </button>
               );
             })}
           </div>
 
           <div
+            ref={panelBody}
             role="tabpanel"
             id="creator-panel"
             aria-labelledby={`creator-tab-${category}`}
@@ -408,13 +413,26 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
             className="scroll-fade-y min-w-0 flex-1 scrollbar-none overflow-y-auto px-5 pt-5 pb-12 outline-none [--fade-end:3rem] lg:pt-6"
           >
             {manifest && ready ? (
-              <AnimatePresence mode="wait" initial={false}>
+              // The old category leaves fast (opacity only); the panel scrolls back
+              // to the top unseen; the new one settles in on a soft spring while
+              // its tiles stagger in (CSS). Reduced motion keeps only the fades.
+              <AnimatePresence
+                mode="wait"
+                initial={false}
+                onExitComplete={() => panelBody.current?.scrollTo({ top: 0 })}
+              >
                 <motion.div
                   key={category}
-                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
-                  transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    transition: {
+                      ...SPRING_SOFT,
+                      opacity: { duration: 0.18, ease: EASE.outQuint },
+                    },
+                  }}
+                  exit={{ opacity: 0, transition: { duration: 0.1, ease: EASE.inQuart } }}
                   className="flex flex-col gap-1"
                 >
                   <CategoryPanel
@@ -465,6 +483,11 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
     </main>
   );
 }
+
+/** The active category's surface; the rule sits before the label on the rail, under it on the strip. */
+const TAB_PILL = 'rounded-tile bg-backstage-raised inset-0';
+const TAB_RULE =
+  'bg-marquee inset-x-3 bottom-0 h-px lg:inset-x-auto lg:bottom-auto lg:top-[calc(0.625rem+0.5lh-0.5px)] lg:left-2.5 lg:w-2.5';
 
 /** Keeps `?fixture=1` across creator → talk in development. */
 function fixtureQuery() {
@@ -685,7 +708,6 @@ function StageOverlay({
   fixture: boolean;
   labels: { dragHint: string; fixture: string };
 }) {
-  const reduceMotion = useReducedMotion();
   return (
     <div
       aria-hidden="true"
@@ -701,10 +723,9 @@ function StageOverlay({
         {title ? (
           <motion.p
             key={title}
-            initial={reduceMotion ? false : { opacity: 0, y: 12, filter: 'blur(4px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0, transition: SPRING_SOFT }}
+            exit={{ opacity: 0, y: -6, transition: { duration: 0.14, ease: EASE.inQuart } }}
             className="font-display text-headline text-ink/20 absolute bottom-8 left-10"
           >
             {title}
@@ -712,7 +733,8 @@ function StageOverlay({
         ) : null}
       </AnimatePresence>
       {hint ? (
-        <p className="border-hairline bg-backstage/70 text-label text-ink-muted absolute right-6 bottom-9 rounded-full border px-4 py-1.5">
+        <p className="border-hairline bg-backstage/70 text-label text-ink-muted absolute right-6 bottom-9 inline-flex items-center gap-2 rounded-full border px-4 py-1.5">
+          <HandGrabbingIcon className="size-3.5" aria-hidden="true" />
           {labels.dragHint}
         </p>
       ) : null}

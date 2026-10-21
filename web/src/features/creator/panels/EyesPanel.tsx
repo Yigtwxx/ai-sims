@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 
 import { EYE_TINTS } from '../palettes';
 import { facesFor } from '../reconcile';
-import { Section, SwatchPicker } from '../ui/controls';
+import { Hint, Section, SwatchPicker } from '../ui/controls';
 
 import { useConfig, useLabel, type PanelProps } from './shared';
 
@@ -47,6 +47,7 @@ export function EyesPanel({ manifest }: PanelProps) {
           value={config.eyes.color}
           onChange={(color) => update((draft) => void (draft.eyes.color = color))}
         />
+        <Hint>{t('tintHint')}</Hint>
       </Section>
     </>
   );

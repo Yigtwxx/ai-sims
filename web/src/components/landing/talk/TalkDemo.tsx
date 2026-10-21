@@ -240,7 +240,7 @@ export function TalkDemo({ id, audioSrc, transcript }: TalkDemoProps) {
               onClick={() => void toggle()}
               disabled={!canPlay}
               aria-label={playing ? t('pause') : t('play')}
-              className="rounded-control bg-marquee text-ui text-backstage hover:bg-marquee-deep inline-flex h-11 items-center gap-2.5 pr-5 pl-4 font-semibold transition-[background-color,transform] duration-200 active:scale-[0.98] disabled:cursor-progress disabled:opacity-60"
+              className="rounded-control bg-marquee text-ui text-backstage hover:bg-marquee-deep inline-flex h-11 items-center gap-2.5 pr-5 pl-4 font-semibold transition-[background-color,scale] duration-200 active:scale-[0.97] active:duration-100 disabled:cursor-progress disabled:opacity-60"
             >
               {playing ? (
                 <PauseIcon weight="fill" aria-hidden="true" className="size-4" />

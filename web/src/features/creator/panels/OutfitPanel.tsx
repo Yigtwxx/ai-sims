@@ -75,7 +75,7 @@ export function OutfitPanel({ manifest, slot, onSlotChange }: OutfitPanelProps) 
         {options.length === 0 ? (
           <Hint>{t('empty')}</Hint>
         ) : (
-          <OptionGrid label={t(`slots.${slot}`)}>
+          <OptionGrid label={t(`slots.${slot}`)} revealSelected>
             <OptionTile
               label={t('none')}
               none
@@ -127,8 +127,9 @@ export function OutfitPanel({ manifest, slot, onSlotChange }: OutfitPanelProps) 
       ) : null}
 
       {outfit && item
-        ? colorParams.map((param) => (
-            <Section key={param.name} title={`${t('colors')}: ${paramLabel(param.name)}`}>
+        ? colorParams.map((param, index) => (
+            <Section key={param.name} title={paramLabel(param.name)}>
+              {index === 0 ? <Hint>{t('colorsHint')}</Hint> : null}
               <SwatchPicker
                 label={paramLabel(param.name)}
                 size="sm"

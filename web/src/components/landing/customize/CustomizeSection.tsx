@@ -294,7 +294,7 @@ function SwatchButton({
       title={label}
       onClick={onSelect}
       className={cn(
-        'ring-offset-backstage-raised relative size-10 rounded-full ring-offset-[3px] transition-[box-shadow,transform] duration-200 hover:scale-105 sm:size-11 md:size-12 md:ring-offset-4',
+        'ring-offset-backstage-raised relative size-10 rounded-full ring-offset-[3px] transition-[box-shadow,scale] duration-200 hover:scale-105 active:scale-95 active:duration-100 sm:size-11 md:size-12 md:ring-offset-4',
         selected ? 'ring-marquee ring-2' : 'ring-hairline ring-1',
       )}
       style={{ background: iris ? irisBackground(color) : color }}

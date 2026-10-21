@@ -49,6 +49,7 @@ export function BodyPanel({ manifest }: PanelProps) {
       </Section>
 
       <Section title={t('sliders')}>
+        <Hint>{t('slidersHint')}</Hint>
         {body ? (
           <div className="flex flex-col gap-6">
             {BODY_SLIDERS.map((id) => {
