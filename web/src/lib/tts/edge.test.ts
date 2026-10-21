@@ -84,4 +84,38 @@ describe('synthesizeWithEdge', () => {
     ).rejects.toMatchObject({ kind: 'timeout' });
     expect(edge.connections).toBe(1);
   });
+
+  it.each([
+    ['403', 'auth'],
+    ['401', 'auth'],
+    ['429', 'rate_limit'],
+    ['404', 'bad_request'],
+  ])('does not retry a handshake refused with %s', async (status, kind) => {
+    edge.attempts = [
+      new Error(`Edge TTS WebSocket error: Unexpected server response: ${status}`),
+      'ok',
+    ];
+    // Only the kind travels on: the provider's wording never reaches a log.
+    await expect(
+      synthesizeWithEdge({ text: 'Merhaba', voice: 'tr-TR-EmelNeural', retryDelaysMs: [0, 0] }),
+    ).rejects.toMatchObject({ kind, message: `Text-to-speech failed: ${kind}` });
+    expect(edge.connections).toBe(1);
+  });
+
+  it('retries a handshake that hit a server fault', async () => {
+    edge.attempts = [new Error('Edge TTS WebSocket error: Unexpected server response: 503'), 'ok'];
+    await synthesizeWithEdge({ text: 'Merhaba', voice: 'tr-TR-EmelNeural', retryDelaysMs: [0] });
+    expect(edge.connections).toBe(2);
+  });
+
+  it('gives up on a server fault after the last retry', async () => {
+    edge.attempts = Array.from(
+      { length: 3 },
+      () => new Error('Edge TTS WebSocket error: Unexpected server response: 502'),
+    );
+    await expect(
+      synthesizeWithEdge({ text: 'Merhaba', voice: 'tr-TR-EmelNeural', retryDelaysMs: [0, 0] }),
+    ).rejects.toMatchObject({ kind: 'service' });
+    expect(edge.connections).toBe(3);
+  });
 });

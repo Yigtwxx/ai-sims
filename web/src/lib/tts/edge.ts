@@ -16,7 +16,11 @@ import type { TtsWord } from './types';
 const TICKS_PER_SECOND = 10_000_000;
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_RETRY_DELAYS_MS = [300, 900] as const;
+// Socket drops and server faults only: a refused handshake (403, 429) stays refused,
+// and retrying it just loads a rate-limited endpoint and delays the fallback.
 const RETRYABLE_KINDS: ReadonlySet<TtsFailureKind> = new Set(['network', 'service']);
+/** A refused websocket handshake, as msedge-tts words it: "Unexpected server response: 429". */
+const HANDSHAKE_STATUS = /Unexpected server response: (\d{3})/;
 
 export const EDGE_SPEECH_MIME = 'audio/mpeg';
 
@@ -76,6 +80,22 @@ function collect(stream: Readable): Promise<Buffer[]> {
   });
 }
 
+/**
+ * The failure kind of an msedge-tts error. Its timeouts and handshake statuses
+ * exist only in the message text; the message itself is never passed on.
+ */
+function kindOf(error: unknown): TtsFailureKind {
+  if (!(error instanceof Error)) return 'network';
+  if (/timed out/i.test(error.message)) return 'timeout';
+  const match = HANDSHAKE_STATUS.exec(error.message);
+  if (!match) return 'network';
+  const status = Number(match[1]);
+  if (status === 401 || status === 403) return 'auth';
+  if (status === 429) return 'rate_limit';
+  if (status >= 400 && status < 500) return 'bad_request';
+  return 'service';
+}
+
 /** Escapes text for the SSML body msedge-tts wraps it in. */
 function escapeSsml(text: string): string {
   return text.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -84,7 +104,8 @@ function escapeSsml(text: string): string {
 /**
  * Synthesizes `text`, retrying quick transient failures (dropped connections,
  * empty audio) with backoff, so a hiccup does not fall through to a provider
- * without word timings. Timeouts and aborts fail immediately.
+ * without word timings. Timeouts, refused handshakes (403, 429) and aborts fail
+ * immediately.
  */
 export function synthesizeWithEdge(params: EdgeSynthesizeParams): Promise<EdgeSpeech> {
   return withRetry(() => synthesizeOnce(params), {
@@ -119,10 +140,7 @@ async function synthesizeOnce(params: EdgeSynthesizeParams): Promise<EdgeSpeech>
   } catch (error) {
     if (error instanceof TtsError) throw error;
     if (params.signal?.aborted) throw new TtsError('aborted');
-    // msedge-tts reports its connection and synthesis timeouts only in the message.
-    throw new TtsError(
-      error instanceof Error && /timed out/i.test(error.message) ? 'timeout' : 'network',
-    );
+    throw new TtsError(kindOf(error));
   } finally {
     params.signal?.removeEventListener('abort', abort);
     tts.close();
