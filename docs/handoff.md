@@ -1,134 +1,192 @@
-# Devir notu (2026-10-20)
+# Devir notu (2026-10-21 sabah)
 
-Yeni bir Claude Code oturumu (ör. Windows'ta) bu dosyayı okuyarak kaldığımız yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu ve sıradaki işi anlatıyor.
+Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu, Mac'e taşımayı ve sıradaki işi anlatır.
 
 ## Ürün
 
-- Şirket içi demo/POC; izleyici yönetim ve karar vericiler.
-- Tarayıcıda 3D karakter oluşturucu. "Bitti" denince karakter AI ile sesli konuşuyor ve ağız hareketleri kelimelerle senkron oluyor.
-- Erkek + kadın, TR + EN.
-- Kişiselleştirme seçenekleri sol panelde, karakter sağda.
+- Şirket içi demo/POC. İzleyici yönetim ve karar vericiler.
+- Tarayıcıda gerçekçi 3D karakter oluşturucu. "Bitti" denince karakter AI ile sesli konuşur; ağız kelimelerle senkron oynar.
+- Erkek ve kadın, TR ve EN.
+- Ekranlar:
+  - Oluşturucu: sol panelde kişiselleştirme, sağda sahne.
+  - Konuşma: karakter solda tam boy, sohbet sağda. Zoom ve döndürme var, yüz yakın planı (PiP) yok.
 - Kalite çıtası:
-  - "Basit bir proje gibi durmayacak", her detay ince işçilik.
-  - Karakter canlı görünecek; görsel hata olmayacak.
+  - "Basit bir proje gibi durmayacak."
+  - Karakter hiç dümdüz durmaz.
+  - Dudak senkronu en kritik ölçüt.
 
-## Yön değişikliği: anime iptal, MetaHuman
+## Yön
 
-- Anime (VRoid/VRM) stili şirket tarafından reddedildi ("bu kadar animatik olamaz"). Anime kodu `d147f71` commit'inde donduruldu; üzerinde çalışılmıyor.
-- Hedef artık **ciddi ve gerçekçi** görünüm. Kullanıcı **MetaHuman**'ı seçti.
-- MetaHuman Creator, Unreal Engine'in içinde bir eklenti olarak geliyor. Karakter üretimi ve dışa aktarma **Windows PC'de** yapılacak (tam destekli platform). Web geliştirme MacBook'ta sürüyor; dışa aktarılan dosyalar Mac'e taşınıyor.
-- Lisans: MetaHuman'lar başka motorlarda kullanılabiliyor; Unreal lisansı kapsamında, yıllık geliri 1M $ altı olana ücretsiz. Şirket ürüne dönüştürürse lisans yeniden kontrol edilmeli.
+- Anime (VRoid) iptal; kod `d147f71`'de donduruldu.
+- Gerçekçi rota **MetaHuman**:
+  - Unreal yalnızca bu Windows PC'de, bir kez kullanılır.
+  - Kütüphanenin tamamı dosya olarak dışa aktarılır, web'e çevrilir ve Mac'e taşınır.
+  - Sonraki her şey Mac'ten yapılır.
 
-## Windows'ta yapılacaklar (MetaHuman üretimi)
+## Durum
 
-1. Epic Games Launcher → Unreal Engine → Library → **+** → en güncel 5.x (5.7 veya üstü). **Options**:
-   - ✅ **MetaHuman Creator Core Data**
-   - ⬜ Starter Content, Templates and Feature Packs, Android/iOS/Linux, Editor symbols for debugging
-2. Yeni proje oluştur → Edit → Plugins → **MetaHuman Creator**'ı aç → editörü yeniden başlat.
-3. İçerik tarayıcısında **MetaHuman Character** asset'i oluştur; MetaHuman Creator'da karakterleri hazırla.
-   - Çeşitlilik hedefi: iki cinsiyet, farklı etnik kökenler, yüz şablonları.
-   - Örgü ve kıvırcık dahil çok sayıda saç; kıyafetler.
-4. Yüksek çözünürlüklü dokuları indir → **Assemble → DCC Export**. Bu adım baş/yüz DNA'sını ve dokuları zip olarak verir. Saç kartları (groom → cards) ve kıyafetler FBX olarak dışa aktarılacak; betikler Windows oturumunda yazılacak.
-5. **İlk partide kütüphanenin tamamını dışa aktar.** MetaHuman'daki tüm saç modellerini (örgü, topuz, kıvırcık dahil) ve tüm kıyafetleri al. Saçlar ve kıyafetler bütün MetaHuman kafalarına ve vücutlarına oturuyor. Böylece yeni saç veya kıyafet için Windows'a nadiren dönmek gerekir; saç rengi ve boya desenleri zaten tarayıcıda (shader) yapılıyor.
-6. Çıktıları Mac'e taşı (USB disk / Drive): `pipeline/source/metahuman/` (gitignore'da olmalı). Yedeği Drive'da da tut.
+### Unreal dışa aktarımı (Windows, `pipeline/unreal/mh_export/`)
 
-## Kullanıcının hedefi: Windows bir kez, ekleme her zaman Mac'ten
+- **Bitti:**
 
-- Unreal yalnızca Windows'ta ve bir kez kullanılır. MetaHuman kütüphanesinin tamamı (yüzler, tüm saçlar, tüm kıyafetler) dosya olarak dışa aktarılır. Unreal Mac'e kurulmaz ve uygulama çalışırken hiç gerekmez.
-- Sonradan eklemelerin hepsi Mac'ten yapılabilmeli:
-  - Renk, boya deseni, ten, göz, makyaj, dövme, piercing ve takı uygulamanın içinde (kod).
-  - Yeni yüzler, yüz şablonları arasında slider karışımıyla (morph) gelir.
-  - **Yeni saç veya kıyafet** için Mac'te bir "varlık ekleme" hattı kurulacak, örnek:
-    ```bash
-    uv run asset-pipeline add-hair  path/to/hair.fbx  --label "..."
-    uv run asset-pipeline add-outfit path/to/top.fbx  --label "..."
-    ```
-    Bu hat (Blender headless) dosyayı MetaHuman kafasına veya vücuduna oturtur. Kıyafette ağırlıklar vücuttan aktarılır, saçta kafa kemiğine bağlanır. Ardından dokular web formatına çevrilir, küçük resim üretilir ve kayıt manifest'e eklenir.
-- Unreal yalnızca Epic'in MetaHuman kütüphanesine sonradan eklediği yeni bir varlık için gerekir.
+  | İş | Sonuç |
+  |---|---|
+  | inventory | 29 preset |
+  | arkit | 66 poz, 274 kontrol |
+  | bodies | 2 cinsiyet × 15 DNA varyantı |
+  | lighting | 9 sahne |
+  | animations | — |
+  | statics | — |
+  | materials | parametreler (düğüm grafiği boş) |
+  | wardrobe | — |
+  | grooms | 79 kartlı groom |
+  | outfits | kadın 38 öğe |
 
-## Mac'te sıradaki iş (web)
+- **Sürüyor** (gece zinciri `chain_night3.sh`, tek editör, RAM yüzünden ikinci editör yok):
+  - outfits erkek: ~4 dk/öğe.
+  - Ardından kalan 22 preset (`characters`, ~11 dk/preset, 8K yüz).
+  - Ardından Fab karakteri (Vampire).
+- Bitmiş presetler: Ada, Aera, Aoi, Asha, Bo.
+- **Bruce ve Cameron:** ilk sürüm eksik dışa aktarılmıştı (DCC haritası yok). `raw/characters/*.stale` olarak kenara alındılar; zincir yeniden dışa aktarır.
+- **Cinsiyet:** `raw/characters_genders.json`'daki masculine/feminine değerinden gelir. |değer| < 0.3 ise vücut şekli karar verir. Asha bu yüzden kadın.
 
-- **Dönüştürme hattı:** DNA/FBX → glTF.
-  - Yüz için ARKit 52 + Oculus 15 viseme blendshape'leri gerekli. Kaynak: RigLogic pozlarından bake veya eklem pozları.
-  - Dokular sıkıştırılacak (KTX2).
-- **three.js gerçekçi görüntü:**
-  - Deri (SSS yaklaşımı, detay normal).
-  - Göz (kornea/iris).
-  - Saç kartları: alpha-to-coverage, anizotropi.
-- **Montaj:** MetaHuman'lar aynı iskelet ve topolojiyi paylaşıyor, bu yüzden parça montajı basit.
-  - Yüz şablonları arasında morph ile "blend" slider'ları.
-  - Saç, kıyafet ve ten seçenekleri.
-- **Isı ve pil (kullanıcı için önemli):** MacBook'ta ısınma ve pil tüketimi defalarca dile getirildi.
-  - Kalite modu: Yüksek / Dengeli / Pil tasarrufu. Demoda şarjdayken Yüksek.
-  - Boşta (sürükleme ve konuşma yokken) 30 fps sınırı.
-  - Kare süresi uzarsa DPR ve post efektleri otomatik düşer (`PerformanceMonitor`).
-  - Gizli sekmede çizim durur.
-  - Varlık ekleme işleri kısa sürmeli; doku sıkıştırma paralelliği ölçülü tutulmalı.
-- **Yeniden kullanılacak katmanlar** (stilden bağımsız):
-  - `web/src/features/lipsync/`: Türkçe viseme motoru, Azure viseme ve kelime hizalama.
-  - Canlılık: göz kırpma, sakkad, nefes ve idle (`web/src/features/avatar/vrm/pose.ts`, `life.ts`; yeni rig'e uyarlanacak).
-  - Takı ve piercing altyapısı: `web/src/features/avatar/accessories/`. 37 ürünlük katalog, PBR malzemeler, geometri, bağlama noktası yardımcıları. VRoid'e özel kısım yalnızca `vroid.ts`; MetaHuman için yeni adapter yazılacak. `rig.ts` şu an yer tutucu.
-  - Oluşturucu arayüzü (`web/src/features/creator/`), Mongo + Better Auth, karakter kaydı, AI sohbet ve TTS route'ları.
-- **Kullanıcının istediği kişiselleştirme:**
-  - İsim, cinsiyet, yüz, vücut tipi + boy, ten, göz.
-  - Saç stili (örgü, kıvırcık…) ve **saç boyası desenleri**: ombre (alt farklı), kökler (üst farklı), röfle/ara renk, iç katman.
-  - Üst/alt/ayakkabı + renk.
-  - Takı ve **piercing** (burun, kaş, dudak, kulak kıkırdağı, göbek).
-  - **Çok sayıda dövme**: büyük vücut dövmeleri ve küçük minimal dövmeler, yerleşim seçenekleriyle.
+### Dönüştürücü (`asset-pipeline mh-convert`, `pipeline/src/asset_pipeline/mh/`)
 
-## AI ve ses (hazır)
+- Komut `--all` ile artımlı çalışır; yalnızca değişen ya da yeni gelen birimleri çevirir. Çıktı `MetaHumanArchive/web/`.
+- Manifest v2: 7 yüz, 5 cilt, 2 vücut, 79 groom, 5 iris, 116 animasyon, 8 ışık. Kıyafet henüz yok.
+- Sıkıştırma:
+  - Kendi meshopt encoder'ı; vertex sırası ve IBM'ler korunur.
+  - Dokular GLB dışında, KTX2 UASTC. Normal haritalar OpenGL.
+- Yüz:
+  - ARKit 52 + 15 viseme morph.
+  - Kırışıklık haritaları ve boyun dikişi verisi.
+- Groom:
+  - Kart LOD0 ve LOD2.
+  - Yüzey bağlaması (`_bind_*`) sayesinde her yüze oturur.
+  - Baked yoğunluk dokusu (head UV).
+- Animasyon:
+  - Gövde klipleri RigLogic twist'li GLB.
+  - Yüz klipleri ARKit ağırlık JSON'u (`{fps, names, frames}`).
+- Doğrulama:
+  - `gltf-transform validate` 0 hata.
+  - pytest 209 test geçiyor, ruff temiz.
 
-- **Sıra:** groq → gemini → anthropic (`AI_PROVIDER_ORDER`).
-- **Modeller:**
-  - Groq: `openai/gpt-oss-120b`, reasoning low.
-  - Gemini: `gemini-3.5-flash-lite`, thinking MINIMAL.
-  - Anthropic: `claude-haiku-5-5`, effort low, sunucu fallback'i yok.
-- **İlk token zaman aşımı:** groq/gemini 10 sn, anthropic 25 sn.
-- **Anahtarlar:** Mac'te `web/.env.local` içinde (git'te yok). Anthropic, Gemini ve Groq dolu; Azure Speech boş.
-- **Azure:**
-  - Gmail'li Microsoft hesabı `AADSTS50020` verdi.
-  - Önce https://signup.azure.com/signup?offer=ms-azr-0044p ile ücretsiz kayıt, sonra Speech kaynağı (F0).
-  - Olmazsa yedek: Gemini TTS (`gemini-3.8-flash-tts`, anahtarla test edildi). Viseme olayı olmadığı için metin tabanlı hizalama kullanılır.
+### Web (`web/`)
+
+- **Sahne (`web/src/features/avatar/mh/`)**, sayfaların tek 3D giriş noktası `MhStage`'dir. İçinde:
+  - Montaj:
+    - Kafa gövde iskeletine bağlanır.
+    - Boyun dikişi kaynaklanır. Kafa kenarı gövdenin altına 1.5 mm uzanır, böylece çatlak kalmaz.
+  - Cilt shader'ı:
+    - SSS sarma, SRMF speküler, gözenek mikro normali, cavity.
+    - Kırışıklık normalleri.
+    - Groom yoğunluğuyla kafa derisi, kaş ve sakal tonu.
+  - Göz: kornea, iris ve göz oklüzyonu.
+  - Saç, kaş, sakal ve bıyık kartları (`hair.ts`, `grooms.ts`, `hairMaterial.ts`):
+    - Yüze yeniden oturtma ve kafa eklemlerine skin.
+    - Melanin/redness/dye renk modeli ve desenler (ombre, kökler, röfle, iç katman).
+    - Kajiya-Kay çift lob.
+    - Alpha-test çekirdek + harmanlanan saçak (MSAA yok, N8AO yüzünden).
+  - Canlılık (`characterLife.ts`):
+    - Mocap idle klipleri: Fab crowd/stand döngüleri, `web/scripts/retarget-fbx.mjs` ile.
+    - Prosedürel nefes ve kol katmanı.
+    - Göz teması ve başın kısmen kullanıcıya dönmesi.
+    - Sakkad, göz kırpma.
+    - Yüz idle döngüsü ve hafif "nefes alan" gülümseme.
+    - Vurgulu hecede baş onayı ve kaş kalkması.
+  - Lip-sync (`web/src/features/lipsync/`):
+    - Kaynak önceliği: TTS viseme olayı, kelime zamanı, metin hizalaması.
+    - 90 ms görsel öncülük; m/b/p'de dudaklar kapanır.
+    - Edge TTS kelime zamanlarıyla TR cümlede kare kare kontrol edildi.
+  - Konuşma kamerası: yakın planda başı takip eder, sallanan konuşmacı kadrajda kalır.
+  - Gölge: PCF 16 örnek, sabit disk. Three'nin gürültülü 5 örneği kolda tanecik bırakıyordu.
+  - Kalite katmanları (`quality.ts`): high / balanced / battery.
+    - Varsayılan `auto`: high'tan başlar, kare düşünce iner.
+    - Battery: AO kapalı, hafif saç kartı, 30 fps.
+- **Sayfalar** (ajan B):
+  - Landing.
+  - Karakterlerim.
+  - Oluşturucu: autosave, undo, hazır yüz/saç/kıyafet panelleri.
+  - Konuşma: sol sahne, sağ sohbet, altyazı.
+  - Kürasyon: `/[locale]/curate`, yalnız dev.
+  - i18n anahtar testi ve Playwright e2e (4 test).
+  - Bu işin commit'i inceleme bulguları düzeltilince atılıyor.
+- **Dev sayfaları:**
+  - `/dev/stage`: gerçek manifest; yüz, saç ve kalite seçimi; `/api/tts` ile canlı TTS; zoom.
+  - `/dev/thumbs`: küçük resim üretici (ajan B yazıyor).
+
+## Mac'e taşıma (sabah)
+
+1. Mac ile PC aynı ağda olmalı.
+2. PC'de sunucuyu aç:
+
+   ```bash
+   cd pipeline && uv run asset-pipeline serve-slim --archive C:/Users/Asus/MetaHumanArchive
+   ```
+
+   - Varsayılan klasörler: `web`, `raw`, `fab_anims`, `logs`. Fab `.mhpkg`'leri (`fab`, ~14 GB) yalnız Unreal'da işe yarar; istenirse `--include web,raw,fab_anims,logs,fab` ver.
+   - Windows güvenlik duvarı sorarsa **"Özel ağ: İzin ver"**.
+   - Komut, Mac'te çalıştırılacak komutu token'ıyla birlikte yazar.
+3. Mac'te, repo kökünde (yalnız standart kütüphane, `uv` gerekmez):
+
+   ```bash
+   python3 pipeline/scripts/fetch_slim.py --url http://<pc>:8765 --token <token> --dest ~/MetaHumanArchive
+   ```
+
+   - Paralel indirir, kalınan yerden devam eder, her dosyanın sha256'sını doğrular.
+   - Yarıda kalırsa aynı komut yeniden çalıştırılır.
+   - "all files verified" yazınca PC'de Ctrl+C.
+4. Toplam boyut arşivin tamamı (tahmini 40-60 GB), 170 GB bütçesinin çok altında. Ayrı bir "slim" kopya üretilmiyor.
+
+## Mac kurulumu
+
+```bash
+ln -s ~/MetaHumanArchive/web web/public/assets/mh       # web sahnesi buradan okur (gitignore'da)
+cd web && pnpm install && pnpm db:start && pnpm dev     # .env.local Mac'te zaten var
+cd ../pipeline && uv sync                               # dönüştürücü için
+uv run --no-sync python scripts/build_openriglogic.py   # macOS arm64'te RigLogic modülleri
+```
+
+- KTX-Software 4.4.2 gerekir (`$KTX_TOOLS` ya da PATH).
+- Yeniden dönüştürme: `uv run asset-pipeline mh-convert --all --archive ~/MetaHumanArchive`.
+
+## Sıradaki iş
+
+- Kıyafet dönüştürme:
+  - Ham kıyafetler bitince F7: UE glTF'leri normalize edilir.
+  - Renk varyantları tint preset olarak birleştirilir.
+  - Vücut morph'ları kıyafete aktarılır.
+  - Ardından web'de kıyafet bağlama (`SkinnedMesh.bind`) ve bölge gizleme.
+- Küçük resimler: `/dev/thumbs` ile tüm yüz ve groom'lar web renderer'ından üretilir. Unreal küçük resimleri placeholder dokuyla çizilmişti.
+- Konuşma jestleri: MoCap Online / ActorCore ücretsiz paketleri sabah Epic Launcher'dan projeye eklenir (kullanıcı aksiyonu), sonra UE retarget.
+- Kartsız 9 groom (stubble, buzz cut) kafa materyaline baked doku olarak eklenecek.
+- Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).
+- Baş ve gövde cildi arasında göğüste hafif ton farkı var.
+- CC BY atfı: crowd idle klipleri için UI'da kredi satırı.
+
+## AI ve ses
+
+- **AI sırası:** groq → gemini → anthropic (`AI_PROVIDER_ORDER`). Modeller `web/src/lib/env.ts`'te.
+- **TTS sırası:** azure → edge → gemini (`TTS_PROVIDER_ORDER`).
+  - Azure yapılandırılmamış.
+  - Edge anahtarsız çalışır ve kelime zamanı verir; lip-sync bunu kullanır.
+- **Anahtarlar** `web/.env.local`'da (git'te yok). Değerleri hiçbir zaman loglanmaz.
 
 ## Ortam
 
-- Mac geliştirme DB'si: `cd web && pnpm db:start` (mongod 127.0.0.1:27018). Kullanıcının kendi mongod'una (27017) **dokunma**.
+- Geliştirme DB'si: `cd web && pnpm db:start` (mongod 127.0.0.1:27018). Kullanıcının kendi mongod'una (27017) **dokunma**.
 - Komutlar, doğrulama ve git kuralları `CLAUDE.md`'de. Bu projede küçük Conventional Commit + push yetkisi var.
-- Anime işinin iptal edilen yarım kalanı (VRoid kaynak genişletme, doku büyütme) yalnızca Mac'teki `git stash`'te duruyor; repoda yok.
-- Kullanıcının kişisel kuralları Mac'te `~/.claude/CLAUDE.md` ve `~/.claude/rules/` içinde. Windows'ta aynı davranış için bu dosyalar `%USERPROFILE%\.claude\` altına kopyalanmalı. Özet:
-  - Yanıtlar Türkçe; kod, identifier ve yorumlar İngilizce.
-  - Gövde en fazla ~120 kelime; her yanıt `Kısaca:` ile biter.
-  - Karar gerekiyorsa `Senin Kararın:` bölümü eklenir; her madde öneri ve gerekçeyle biter.
-  - Secret'lar koda ve loga asla yazılmaz.
+- Kullanıcının kişisel kuralları `~/.claude/CLAUDE.md` ve `~/.claude/rules/` içinde:
+  - Yanıtlar Türkçe; kod İngilizce.
+  - Gövde ≤80 kelime; sonda `Kısaca:` ve gerekiyorsa `Senin Kararın:`.
 
-## Kararlar (2026-10-20 akşam, kullanıcı onaylı)
+## Kararlar (kullanıcı onaylı)
 
-- **Demo cihazı:** yalnızca bu MacBook (M4 Pro, 48 GB). Kalite en üste çekilir: yüksek çözünürlüklü dokular, akıcı çalışan en detaylı LOD.
-- **Dövme ve piercing:** kalıyor ama ölçülü. Küçük/minimal dövmeler, küpe ve ince piercing'ler var; abartılı büyük vücut parçaları yok.
-- **Kıyafet:** karışık; iş/kurumsal (takım, ceket, gömlek) + günlük parçalar.
-- **Sohbet rolü:** genel sohbet asistanı (mevcut persona ayarı).
-- **Anime oluşturucu:** sonraki oturumda arayüzden kaldırılacak; kod git geçmişinde kalır.
-
-## Kararlar (2026-10-20, Windows oturumu, kullanıcı onaylı)
-
-- **Kurulum:** UE **5.8.4**, seçenekler: Çekirdek + Şablonlar + Motor Kaynağı + **MetaHuman Creator Temel Verileri**. Hata ayıklama simgeleri ve hedef platformlar kapalı.
-- **Kapsam:** Windows'ta seçim yapılmaz. **Tüm hazır yüzler**, tüm saç/kaş/sakal/kirpik ve tüm kıyafetler dışa aktarılır. Ayıklama sonradan Mac'teki kişiselleştirme ekranında yapılır.
-- **Otomasyon:** Dışa aktarma Unreal editör Python betikleriyle yapılır, tek tek tıklanmaz.
-- **Doku çözünürlüğü:** kaynak **8K**.
-- **Ham arşiv bu Windows PC'de kalır** (C: ~416 GB boş). Aynı PC'de bir küçültme adımı çalışır: yalnızca web'in kullandığı haritalar, sıkıştırılmış format, yüz 8K, vücut ve ikincil haritalar 4K. Mac'e yalnızca küçültülmüş set gider.
-- **Windows'tan ayrılmadan önce** en az bir yüz bu PC'de uçtan uca glTF'e çevrilip test edilir (eksik dışa aktarma yüzünden geri dönmemek için).
-- **ARKit kaynağı:** ARKit 52 → MetaHuman kontrol eşlemesi DNA'da değil, Unreal'daki bir PoseAsset'te. Windows'ta JSON olarak dışa aktarılır; Mac'te Blender + Poly Hammer Character DNA (OpenRigLogic) ile shape key olarak bake edilir.
-- **Lisans notu:** UE EULA, MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor; LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
-- **Seat lisansı:** şirket gerekmediğini söyledi (gelir eşiği altında); tekrar sorulmaz.
-- **Kıyafet kaynağı:** Core Data'da yalnızca 1 kıyafet (`WI_DefaultGarment`) var. Fab'den kullanıcının kütüphanesine eklenenler (hepsi ücretsiz, iki lisans katmanında da $0):
-  - Epic, 20 kıyafet (UE 5.7 `.mhpkg`, boyutlanabilir Outfit): Boots, Cargo Pants, Casual Sneakers, Chelsea Boots, Crop Top Variants, Flats, FlipFlops, Hightops, Hoodie, Jeans, Loafers, Oxfords, Running Shoes, Shorts, Slim Jeans Variants, Sweater, T Shirt Variants, Techwear Outfit, Tucked T Shirt Variants, Yoga Pants Variants.
-  - Epic, 6 saç (groom, UE 5.6–5.8): Bantu Knots, Long High Ponytail, Slick Ponytail, Updo Cornrows, Updo Dutch Braid, Updo Messy Bun. Kart LOD'ları var mı doğrulanacak; yoksa Hair Card Generator.
-  - Epic, MetaHuman Vampire Character Asset (eğlence için; Mac'te elenebilir).
-  - Nyanpasinka: Shirt V-neck with rolled sleeves, Shirt longsleeve with pockets (FBX + MetaHuman).
-- **Ücretli içerik alınmaz.** Takım elbise, blazer ve kadın iş kıyafeti sonradan Mac'teki kıyafet ekleme hattıyla (ör. CC0 MakeHuman takımları) gelir.
-- **Mac bütçesi:** ~208 GB boş, 30 GB boş kalacak; küçültülmüş set için **~170 GB** kullanılabilir.
-- **Eleme Mac'te yapılır:** her şey küçültülüp taşınır; kullanıcı oluşturucu ekranında gizler. Yalnızca renk farkı olan varyantlar (ör. iki yakın ton kot) küçültme sırasında otomatik birleştirilir: geometri bir kez saklanır, renkler tint preset'i olur.
-
-## Açık kararlar
-
-- Azure kaydı mı, Gemini TTS mi? (öneri: önce Azure, çünkü kelime senkronu için viseme verisi veriyor)
+- **Demo cihazı:** MacBook (M4 Pro, 48 GB). Kalite en üste çekilir.
+- **Kapsam:** Windows'ta seçim yapılmaz; her şey dışa aktarılır. Ayıklama Mac'teki kürasyon ekranında yapılır.
+- **Kaynak dokular** 8K; web için yüz 4K, diğerleri 2K, KTX2.
+- **Tasarım:** karanlık sinematik. Grafit zemin, tek amber vurgu. Mor gradyan ve her yerde glassmorphism yasak.
+- **Dövme ve piercing:** ölçülü.
+- **Kıyafet:** iş ve günlük karışık.
+- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği).
+- **Lisans:** UE EULA MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor. LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
