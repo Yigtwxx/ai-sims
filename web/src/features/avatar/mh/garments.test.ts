@@ -6,10 +6,11 @@ import {
   MeshStandardMaterial,
   Skeleton,
   SkinnedMesh,
+  Vector3,
 } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { createBodyRig, type NeckSeamBinding } from './assembly';
+import { applyBodySliders, createBodyRig, type NeckSeamBinding } from './assembly';
 import {
   applyBodyHide,
   BODY_HIDDEN,
@@ -199,5 +200,44 @@ describe('skinGarmentToHead', () => {
     const before = garment.geometry.getAttribute('skinWeight');
     expect(skinGarmentToHead(garment, seam)).toBe(0);
     expect(garment.geometry.getAttribute('skinWeight')).toBe(before);
+  });
+});
+
+describe('a garment through a body rebind', () => {
+  /** World position of a skinned vertex, morphs and skinning applied. */
+  const worldOf = (mesh: SkinnedMesh, vertex: number) =>
+    mesh.localToWorld(mesh.getVertexPosition(vertex, new Vector3()));
+
+  it('stays on the body when the sliders rebind it while the turntable is turned', () => {
+    const turntable = new Group();
+    const root = new Group();
+    turntable.add(root);
+    const pelvis = bone('pelvis');
+    pelvis.position.set(0, 1, 0);
+    const spine = bone('spine_01', pelvis);
+    spine.position.set(0, 0.3, 0);
+    root.add(pelvis);
+    const body = skinned([pelvis, spine], [1]);
+    body.geometry.getAttribute('position').setXYZ(0, 0.2, 1.4, 0.05);
+    root.add(body);
+    root.updateMatrixWorld(true);
+    body.bind(body.skeleton);
+    const rigged = createBodyRig(root, {});
+
+    const garment = skinned([bone('pelvis'), bone('spine_01')], [1]);
+    garment.geometry.getAttribute('position').setXYZ(0, 0.2, 1.4, 0.05);
+    root.add(garment);
+    bindGarment(garment, rigged);
+    rigged.garments.push(garment);
+
+    // The viewer turns the character, then a body slider re-bakes the rest pose.
+    turntable.rotation.y = Math.PI / 2;
+    turntable.updateMatrixWorld(true);
+    applyBodySliders(rigged, { height: 0.4 });
+    turntable.updateMatrixWorld(true);
+
+    const skin = worldOf(body, 0);
+    expect(skin.x).toBeCloseTo(0.05);
+    expect(worldOf(garment, 0).distanceTo(skin)).toBeLessThan(1e-6);
   });
 });

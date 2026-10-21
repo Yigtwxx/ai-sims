@@ -206,8 +206,15 @@ export function applyBodySliders(
   // Re-bake the rest pose: inverse bind matrices from the moved joints. In
   // three's attached bind mode this is valid even while the turntable is turned.
   mesh.bind(mesh.skeleton);
-  // Garments share the skeleton, so the new inverse binds are theirs already.
-  for (const garment of body.garments) syncGarmentMorphs(garment, body);
+  // Garments share the skeleton, so the new inverse binds are theirs already;
+  // the bind matrix is not. It holds the body's world transform at the bind,
+  // turntable included: a garment keeping the old one would swing off the body
+  // by however far the character was turned since.
+  for (const garment of body.garments) {
+    garment.bindMatrix.copy(mesh.bindMatrix);
+    garment.bindMatrixInverse.copy(mesh.bindMatrixInverse);
+    syncGarmentMorphs(garment, body);
+  }
   if (body.seam) snapNeckSeam(body.seam);
 }
 
