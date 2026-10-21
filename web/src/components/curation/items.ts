@@ -105,8 +105,19 @@ export function itemsFor(manifest: MhManifest, tab: CurationTab, locale: string)
   }
 }
 
-/** Animations carry no label: their id, spaced out. */
-const animationLabel = (id: string) => id.replace(/[_-]+/g, ' ');
+/**
+ * Animations carry no label: their id without the `anim.` prefix, the Fab pack
+ * folder and the body/face suffix (the card's meta shows the kind), spaced out.
+ */
+export function animationLabel(id: string): string {
+  const name = id
+    .replace(/^anim\./, '')
+    .replace(/^fab\.[^.]+\./, '')
+    .replace(/\.(body|face)$/, '')
+    .replace(/[._-]+/g, ' ')
+    .trim();
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
 
 /**
  * The visibility filter of the sheet. `auto` shows every pick of the
@@ -136,6 +147,8 @@ export function matchesVisibility(
 export interface AutoSummary {
   /** Pre-pass picks per tab (items in the manifest only). */
   perTab: Record<CurationTab, number>;
+  /** Picks per tab that are still hidden in the draft. */
+  hiddenPerTab: Record<CurationTab, number>;
   total: number;
   /** Picks that are still hidden in the draft. */
   hidden: number;
@@ -147,10 +160,10 @@ export function summarizeAuto(
   auto: Readonly<Record<string, AutoPick>>,
   hidden: ReadonlySet<string>,
 ): AutoSummary {
-  const perTab = Object.fromEntries(CURATION_TABS.map((tab) => [tab, 0])) as Record<
-    CurationTab,
-    number
-  >;
+  const zero = () =>
+    Object.fromEntries(CURATION_TABS.map((tab) => [tab, 0])) as Record<CurationTab, number>;
+  const perTab = zero();
+  const hiddenPerTab = zero();
   let total = 0;
   let stillHidden = 0;
   for (const tab of CURATION_TABS) {
@@ -158,10 +171,12 @@ export function summarizeAuto(
       if (!Object.hasOwn(auto, item.id)) continue;
       perTab[tab] += 1;
       total += 1;
-      if (hidden.has(item.id)) stillHidden += 1;
+      if (!hidden.has(item.id)) continue;
+      hiddenPerTab[tab] += 1;
+      stillHidden += 1;
     }
   }
-  return { perTab, total, hidden: stillHidden };
+  return { perTab, hiddenPerTab, total, hidden: stillHidden };
 }
 
 /**

@@ -456,10 +456,11 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
           </div>
         ) : null}
 
-        {autoSummary.total > 0 && byTab[tab].length > 0 ? (
+        {/* Only the tab whose items the pre-pass picked: elsewhere the count would read as theirs. */}
+        {autoSummary.perTab[tab] > 0 ? (
           <AutoNotice
-            total={autoSummary.total}
-            restored={autoSummary.total - autoSummary.hidden}
+            total={autoSummary.perTab[tab]}
+            restored={autoSummary.perTab[tab] - autoSummary.hiddenPerTab[tab]}
             viewing={visibility === 'auto'}
             onView={viewAuto}
             onLeave={() => setVisibility('visible')}

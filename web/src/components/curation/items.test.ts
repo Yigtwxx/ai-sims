@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fixtureManifest } from '@/features/creator/fixtures/manifest';
 
 import {
+  animationLabel,
   CURATION_TABS,
   groupNearDuplicates,
   itemsFor,
@@ -21,6 +22,16 @@ const item = (id: string, label: string): CurationItem => ({
   label,
   meta: [],
   glyph: 'groom',
+});
+
+describe('animationLabel', () => {
+  it('reads an animation id as a name', () => {
+    expect(animationLabel('anim.expression.surprise_b.body')).toBe('Expression surprise b');
+    expect(animationLabel('anim.fab.crowd_idle_59.Crowd_Idle_UE5_Smooth032')).toBe(
+      'Crowd Idle UE5 Smooth032',
+    );
+    expect(animationLabel('anim.pose.surprise.face')).toBe('Pose surprise');
+  });
 });
 
 describe('labelStem', () => {
@@ -116,6 +127,8 @@ describe('pre-pass helpers', () => {
     expect(summary.perTab.eyebrows).toBe(1);
     expect(summary.perTab.beards).toBe(1);
     expect(summary.perTab.hair).toBe(0);
+    expect(summary.hiddenPerTab.eyebrows).toBe(1);
+    expect(summary.hiddenPerTab.beards).toBe(0);
   });
 
   it('names the kept item from the manifest, falling back to the English label', () => {
