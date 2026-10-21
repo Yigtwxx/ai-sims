@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from asset_pipeline.transfer import build_index, parse_range, start_server
+from asset_pipeline.transfer import UNUSED_SOURCES, build_index, parse_range, start_server
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "fetch_slim.py"
 spec = importlib.util.spec_from_file_location("fetch_slim", SCRIPT)
@@ -155,3 +155,21 @@ def test_dedupe_keeps_the_first_file_of_each_content():
     unique, twins = fetch_slim.dedupe(files)
     assert [f.path for f in unique] == ["raw/a", "web/c"]
     assert [(t.path, o.path) for t, o in twins] == [("raw/b", "raw/a")]
+
+
+def test_build_index_leaves_out_unused_preset_sources(tmp_path: Path):
+    root = tmp_path / "archive"
+    face = root / "raw" / "characters" / "Ada" / "textures" / "face"
+    body = face.parent / "body"
+    face.mkdir(parents=True)
+    body.mkdir()
+    for name in ("T_Face_Basecolor.png", "T_Face_Normal_Animated_WM1.png"):
+        (face / name).write_bytes(b"face")
+    for name in ("T_Body_Body_Normal.png", "T_Body_Chest_Cavity.png", "T_Body_Body_Basecolor.png"):
+        (body / name).write_bytes(b"body")
+    kept = [f.path for f in build_index(root, ("raw",), UNUSED_SOURCES)]
+    assert kept == [
+        "raw/characters/Ada/textures/body/T_Body_Body_Normal.png",
+        "raw/characters/Ada/textures/face/T_Face_Basecolor.png",
+    ], kept
+    assert len(build_index(root, ("raw",))) == 5, "no patterns keeps every file"

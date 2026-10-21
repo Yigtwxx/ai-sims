@@ -13,6 +13,7 @@ token never appears in the request log.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import hmac
 import json
@@ -37,6 +38,23 @@ retargeted Fab animation sources, the gesture FBX sources (Mocap.in, ActorCore) 
 `web/scripts/retarget-fbx.mjs` reads and the run logs. Fab .mhpkg packages (`fab`)
 are Unreal-only and stay out unless asked for."""
 
+UNUSED_SOURCES = (
+    # Preset exports: Unreal material inputs the converter never opens (traced on a
+    # full Ada conversion, 2026-10-21). The 8K wrinkle inputs are grey (the DCC bakes
+    # carry the wrinkle maps); the chest maps and the 4K body albedo are inputs too.
+    "raw/characters/*/textures/face/T_Face_*_Animated_*",
+    "raw/characters/*/textures/body/T_Body_Chest_*",
+    "raw/characters/*/textures/body/T_Body_Body_Basecolor.png",
+    # Groom FBX exports: the converter reads the glTF twin of every mesh.
+    "raw/grooms/*.fbx",
+    # MetaHuman Creator's skin-region masks (uncompressed 8K TGA), only used by its
+    # own texture synthesis.
+    "raw/statics/MetaHumanCharacter/Lookdev_UHM/Skin/*",
+)
+"""Archive files left out of the transfer unless `--everything` is given: exported but
+never read by `asset_pipeline.mh` (the converter), so the Mac can rebuild every web
+asset without them. Patterns are fnmatch globs on the POSIX path from the root."""
+
 CHUNK = 1 << 20
 RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
 
@@ -56,9 +74,15 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
-def build_index(root: Path, include: tuple[str, ...]) -> list[IndexedFile]:
-    """Every regular file under the included top-level folders, hashed once and
-    re-hashed only when its size or mtime changes."""
+def is_excluded(relative: str, exclude: tuple[str, ...]) -> bool:
+    return any(fnmatch.fnmatchcase(relative, pattern) for pattern in exclude)
+
+
+def build_index(
+    root: Path, include: tuple[str, ...], exclude: tuple[str, ...] = ()
+) -> list[IndexedFile]:
+    """Every regular file under the included top-level folders that no `exclude`
+    pattern matches, hashed once and re-hashed only when its size or mtime changes."""
     cache_path = root / INDEX_CACHE
     try:
         cache: dict[str, dict[str, int | str]] = json.loads(cache_path.read_text("utf-8"))
@@ -72,6 +96,8 @@ def build_index(root: Path, include: tuple[str, ...]) -> list[IndexedFile]:
             continue
         for path in sorted(p for p in top.rglob("*") if p.is_file() and not p.is_symlink()):
             relative = path.relative_to(root).as_posix()
+            if is_excluded(relative, exclude):
+                continue
             stat = path.stat()
             entry = cache.get(relative)
             if entry and entry["size"] == stat.st_size and entry["mtime"] == stat.st_mtime_ns:
@@ -203,23 +229,36 @@ class TransferHandler(BaseHTTPRequestHandler):
 
 
 def start_server(
-    root: Path, include: tuple[str, ...], host: str, port: int, token: str | None = None
+    root: Path,
+    include: tuple[str, ...],
+    host: str,
+    port: int,
+    token: str | None = None,
+    exclude: tuple[str, ...] = (),
 ) -> tuple[TransferServer, threading.Thread]:
     """Indexes and starts serving in a background thread (tests, `serve`)."""
-    files = build_index(root, include)
+    files = build_index(root, include, exclude)
     server = TransferServer((host, port), root, files, token or secrets.token_urlsafe(24))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, thread
 
 
-def serve(root: Path, include: tuple[str, ...], host: str | None, port: int) -> int:
+def serve(
+    root: Path, include: tuple[str, ...], exclude: tuple[str, ...], host: str | None, port: int
+) -> int:
     host = host or lan_address()
     print(f"indexing {', '.join(include)} under {root} (hashes are cached) ...", flush=True)
-    server, thread = start_server(root, include, host, port)
+    if exclude:
+        print(f"leaving out {len(exclude)} unused source patterns (--everything keeps them)")
+    server, thread = start_server(root, include, host, port, exclude=exclude)
     total = sum(f.size for f in server.files.values())
+    unique = sum({f.sha256: f.size for f in server.files.values()}.values())
     actual_port = server.server_address[1]
-    print(f"serving {len(server.files)} files, {total / 1e9:.1f} GB on http://{host}:{actual_port}")
+    print(
+        f"serving {len(server.files)} files, {total / 1e9:.1f} GB "
+        f"({unique / 1e9:.1f} GB to download, identical files once) on http://{host}:{actual_port}"
+    )
     print("on the Mac (same network), from the repo root:")
     print(
         f"  python3 pipeline/scripts/fetch_slim.py --url http://{host}:{actual_port} "
@@ -243,6 +282,11 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
         default=",".join(DEFAULT_INCLUDE),
         help=f"top-level folders to serve (default: {','.join(DEFAULT_INCLUDE)})",
     )
+    parser.add_argument(
+        "--everything",
+        action="store_true",
+        help="also serve the exported files the converter never reads (UNUSED_SOURCES)",
+    )
     parser.add_argument("--bind", help="address to listen on (default: this PC's LAN address)")
     parser.add_argument("--port", type=int, default=8765)
 
@@ -250,4 +294,5 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
 def run(args: argparse.Namespace) -> int:
     root = args.archive or Path(os.environ.get("MH_ARCHIVE", Path.home() / "MetaHumanArchive"))
     include = tuple(part.strip() for part in args.include.split(",") if part.strip())
-    return serve(root, include, args.bind, args.port)
+    exclude = () if args.everything else UNUSED_SOURCES
+    return serve(root, include, exclude, args.bind, args.port)
