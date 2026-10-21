@@ -698,6 +698,8 @@ export function fitGarmentOverHead(garment: SkinnedMesh, seam: NeckSeamBinding):
 const LAYER_REACH = 0.03;
 /** Inner garment points one outer vertex is compared with. */
 const LAYER_NEIGHBOURS = 8;
+/** Outer vertices each inner point asks directly (see the cover pass in layerGarments). */
+const LAYER_COVER = 6;
 /** Clearance (m) an outer garment keeps over the one under it. */
 const LAYER_CLEARANCE = 0.004;
 /** Largest move (m): deeper than this, the two pieces are not meant to overlap there. */
@@ -817,6 +819,7 @@ export function layerGarments(
   const near: {
     garment: SkinnedMesh;
     v: number;
+    point: [number, number, number];
     index: Int32Array;
     distance: Float64Array;
     normal: number;
@@ -862,14 +865,77 @@ export function layerGarments(
         const depth = along + LAYER_CLEARANCE;
         if (depth <= LAYER_MAX_PUSH) want[h] = Math.max(want[h]!, depth);
       }
-      near.push({ garment, v, index: nearIndex.slice(0, found), distance: lateral, normal: b });
+      near.push({
+        garment,
+        v,
+        point: [x, y, z],
+        index: nearIndex.slice(0, found),
+        distance: lateral,
+        normal: b,
+      });
+    }
+  }
+
+  // Cover pass: an inner point between sparse outer vertices (the button tab of
+  // trousers under a T-shirt) can be no vertex's nearest and would come through
+  // the triangle over it. Each inner point also asks the outer vertices around
+  // it directly, fading with the distance along the skin.
+  const cover = new Float32Array(near.length);
+  if (near.length > 0) {
+    const outerPoints = new Float32Array(near.length * 3);
+    const outerLo: Vec3Array = [Infinity, Infinity, Infinity];
+    const outerHi: Vec3Array = [-Infinity, -Infinity, -Infinity];
+    near.forEach(({ point: p }, i) => {
+      outerPoints.set(p, i * 3);
+      for (let a = 0; a < 3; a += 1) {
+        outerLo[a] = Math.min(outerLo[a], p[a]);
+        outerHi[a] = Math.max(outerHi[a], p[a]);
+      }
+    });
+    const outerTree = buildTree(outerPoints);
+    const coverIndex = new Int32Array(LAYER_COVER);
+    const coverDistance = new Float64Array(LAYER_COVER);
+    const coverAlong = new Float64Array(LAYER_COVER);
+    const alongNormal = (q: Float32Array, { point: p, normal }: (typeof near)[number]) =>
+      (q[0]! - p[0]) * skin.normals[normal * 3]! +
+      (q[1]! - p[1]) * skin.normals[normal * 3 + 1]! +
+      (q[2]! - p[2]) * skin.normals[normal * 3 + 2]!;
+    for (let h = 0; h < total; h += 1) {
+      point.set(innerPoints.subarray(h * 3, h * 3 + 3));
+      if (!withinBox(point, outerLo, outerHi, LAYER_REACH)) continue;
+      const found = nearestPoints(
+        outerTree,
+        point[0]!,
+        point[1]!,
+        point[2]!,
+        LAYER_COVER,
+        LAYER_REACH,
+        coverIndex,
+        coverDistance,
+      );
+      // How far the point stands out of the outermost of those vertices: every
+      // layer under it (a hem's lining) takes that same push and keeps its gap.
+      let outermost = Infinity;
+      for (let n = 0; n < found; n += 1) {
+        coverAlong[n] = alongNormal(point, near[coverIndex[n]!]!);
+        outermost = Math.min(outermost, coverAlong[n]!);
+      }
+      const depth = outermost + LAYER_CLEARANCE;
+      if (found === 0 || depth <= 0 || depth > LAYER_MAX_PUSH) continue;
+      for (let n = 0; n < found; n += 1) {
+        const i = coverIndex[n]!;
+        const along = coverAlong[n]!;
+        const lateral = Math.sqrt(Math.max(0, coverDistance[n]! ** 2 - along * along));
+        const t = Math.min(1, Math.max(0, (LAYER_REACH - lateral) / (LAYER_REACH / 2)));
+        cover[i] = Math.max(cover[i]!, depth * t * t * (3 - 2 * t));
+      }
     }
   }
 
   // Every outer vertex near an inner garment: the blended push of its inner points.
   const touched = new Set<SkinnedMesh>();
   let moved = 0;
-  for (const { garment, v, index, distance, normal } of near) {
+  for (const [i, { garment, v, index, distance, normal }] of near.entries()) {
     let push = 0;
     let weights = 0;
     let strongest = 0;
@@ -885,7 +951,7 @@ export function layerGarments(
     // Close to the inner garment the strongest ask wins (no vertex is left
     // short of clearing it); farther away the blend fades the move out.
     const blend = push / weights;
-    const shift = (blend + (strongest - blend) * t) * t * t * (3 - 2 * t);
+    const shift = Math.max((blend + (strongest - blend) * t) * t * t * (3 - 2 * t), cover[i]!);
     if (shift <= 0) continue;
     const dx = skin.normals[normal * 3]! * shift;
     const dy = skin.normals[normal * 3 + 1]! * shift;

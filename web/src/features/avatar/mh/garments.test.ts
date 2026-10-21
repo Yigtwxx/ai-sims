@@ -365,6 +365,24 @@ describe('layerGarments', () => {
     expect(radius(hem, 16) - radius(hem, 0)).toBeCloseTo(0.003, 4);
   });
 
+  it('covers an inner bump that lies between sparse outer vertices', () => {
+    const { rig } = neckRig();
+    // Shirt rings 4 cm apart; the waistband right under them (its points are
+    // every shirt vertex's nearest) and a button tab between the rings.
+    const shirt = garmentOf(rig, [
+      [0.075, 0.79],
+      [0.075, 0.83],
+    ]);
+    const waistband = garmentOf(
+      rig,
+      Array.from({ length: 13 }, (_, i) => [0.07, 0.77 + i * 0.005] as [number, number]),
+    );
+    const button = garmentOf(rig, [[0.085, 0.81]]);
+    layerGarments([shirt], [waistband, button], rig.mesh);
+    // The straight edge between the rings passes over the tab.
+    expect((radius(shirt, 0) + radius(shirt, 16)) / 2).toBeGreaterThan(0.085);
+  });
+
   it('leaves an outer garment alone where the inner one stays under it', () => {
     const { rig } = neckRig();
     const shirt = garmentOf(rig, [[0.09, 0.8]]);
