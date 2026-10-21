@@ -29,6 +29,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
+from scipy.ndimage import gaussian_filter
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 from scipy.spatial import cKDTree
@@ -74,6 +75,12 @@ ATTACH_DISTANCE = 0.01  # metres
 # Texture caps by slot: a 4K cards atlas costs ~10 MB as UASTC, 2K ~2.7 MB; eyebrows are
 # seen in face close-ups and keep 4K.
 MAX_TEXTURE = {"eyebrows": 4096}
+# `density`: where on the head the cards grow, from their root UVs (see density_from_roots).
+ROOT_GRID = 512  # head-UV texels the roots are counted on
+ROOT_SIGMA = 4.0  # blur (grid texels): sparse roots stand for the scalp between them
+ROOT_COVERAGE = 0.05  # atlas texels fainter than this carry no strand
+ROOT_FULL = 0.5  # share of the median root density that already counts as full cover
+DENSITY_SIZE = 1024
 DEFAULT_MAX_TEXTURE = 2048
 # The MetaHuman hair material is driven by melanin, redness and an optional dye.
 COLOR_PARAMS = [
@@ -382,6 +389,18 @@ def _blend_skin(reference: ReferenceHead, binding: Binding) -> tuple[I64, F64]:
     return merged_joints.astype(np.int64), merged_weights.astype(np.float64)
 
 
+def _local_joints(remap: I64, joints: I64, weights: F64) -> NDArray[np.uint16]:
+    """Head joint indices as groom-skin indices for JOINTS_0.
+
+    Empty slots (weight 0) carry head joint 0, which the skin may not include; they point
+    at skin joint 0 instead, since glTF requires every index to name a skin joint.
+    """
+    local = np.where(weights > 0, remap[joints], 0)
+    if (local < 0).any():
+        raise ValueError("a weighted influence is outside the groom skin")
+    return local.astype(np.uint16)
+
+
 # ---------------------------------------------------------------------------- units
 
 
@@ -482,6 +501,31 @@ def _resize_straight(pixels: NDArray[np.uint8], size: int) -> NDArray[np.uint8]:
     )
 
 
+def density_from_roots(root_uv_seed_coverage: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """A head-UV density map (alpha, 0..1) from a card atlas's root UV texture (R, G: the head
+    UV a texel's strands grow from; A: their coverage). Every covered texel adds its coverage
+    at its root; a blur turns the sparse roots into the scalp they cover, and anything over
+    half the median density is full cover. Unreal bakes its `_baked` map the same way, but
+    with strand detail and only for some grooms; this one is smooth and exists for all."""
+    rgba = root_uv_seed_coverage.astype(np.float32) / 255.0
+    coverage = rgba[..., 3]
+    grown = coverage > ROOT_COVERAGE
+    cols = np.clip((rgba[..., 0][grown] * ROOT_GRID).astype(np.int64), 0, ROOT_GRID - 1)
+    rows = np.clip((rgba[..., 1][grown] * ROOT_GRID).astype(np.int64), 0, ROOT_GRID - 1)
+    grid = np.zeros((ROOT_GRID, ROOT_GRID), dtype=np.float32)
+    np.add.at(grid, (rows, cols), coverage[grown])
+    grid = gaussian_filter(grid, ROOT_SIGMA)
+    present = grid[grid > grid.max() * 0.01] if grid.max() > 0 else grid[:0]
+    full = float(np.median(present)) * ROOT_FULL if present.size else 1.0
+    t = np.clip(grid / max(full, 1e-9), 0.0, 1.0)
+    density = t * t * (3.0 - 2.0 * t)
+    image = Image.fromarray(density.astype(np.float32))
+    upsized = np.asarray(image.resize((DENSITY_SIZE, DENSITY_SIZE), Image.Resampling.BILINEAR))
+    out = np.zeros((DENSITY_SIZE, DENSITY_SIZE, 4), dtype=np.uint8)
+    out[..., 3] = np.round(np.clip(upsized, 0.0, 1.0) * 255.0).astype(np.uint8)
+    return out
+
+
 def convert_textures(
     groom: GroomUnit, folder: Path, web_root: Path
 ) -> tuple[dict[str, str], str | None]:
@@ -523,6 +567,10 @@ def convert_textures(
         output = folder / f"{file_name}.ktx2"
         encode_ktx2(pixels, output, _texture_settings(path, flags.get(path.name.lower(), False)))
         textures[name] = output.relative_to(web_root).as_posix()
+        if name == "rootUvSeedCoverage" and pixels.ndim == 3 and pixels.shape[2] == 4:
+            density = folder / "density.ktx2"
+            encode_ktx2(density_from_roots(pixels), density, LINEAR)
+            textures["density"] = density.relative_to(web_root).as_posix()
     return textures, thumbnail
 
 
@@ -608,7 +656,9 @@ def write_cards_glb(
             "POSITION": builder.add_accessor(
                 positions.astype(np.float32), target=ARRAY_BUFFER, bounds=True
             ),
-            "JOINTS_0": builder.add_accessor(remap[joints].astype(np.uint16), target=ARRAY_BUFFER),
+            "JOINTS_0": builder.add_accessor(
+                _local_joints(remap, joints, weights), target=ARRAY_BUFFER
+            ),
             "WEIGHTS_0": builder.add_accessor(
                 quantize_weights(weights), target=ARRAY_BUFFER, normalized=True
             ),
@@ -690,6 +740,35 @@ def write_cards_glb(
     return {"bytes": len(data), "raw_bytes": builder.raw_bytes, "lods": lod_info}
 
 
+def convert_painted(
+    groom: GroomUnit, web_root: Path
+) -> tuple[dict[str, Any], list[Path], dict[str, Any]]:
+    """A groom Unreal draws from strands only (stubble, buzz cuts, waves): there are no cards
+    to fit, but its `_baked` head-UV map (RG: strand direction, A: coverage, strand by
+    strand) is that hair as the skin shows it, so the web paints it on the head skin in the
+    hair colour. The manifest entry has `painted` (the map) instead of `glb`."""
+    folder = web_root / "grooms" / groom.slot / groom.style
+    textures, thumbnail = convert_textures(groom, folder, web_root)
+    painted = textures.get("baked")
+    if painted is None:
+        raise GroomError(f"{groom.style}: no hair cards and no baked head-UV map")
+    entry: dict[str, Any] = {
+        "id": f"groom.{groom.slot}.{groom.style}",
+        "slot": groom.slot,
+        "label": groom.label,
+        "compat": COMPAT.get(groom.slot, "unisex"),
+        "painted": painted,
+        "textures": textures,
+        "params": [dict(p) for p in COLOR_PARAMS],
+    }
+    if thumbnail:
+        entry["thumbnail"] = thumbnail
+    outputs = [*(web_root / f for f in textures.values())]
+    if thumbnail:
+        outputs.append(web_root / thumbnail)
+    return entry, outputs, {"painted": True, "textures": sorted(textures)}
+
+
 def convert_groom(
     groom: GroomUnit,
     heads: Mapping[str, GroomHead],
@@ -699,7 +778,7 @@ def convert_groom(
     """Write `grooms/<slot>/<style>/` and return (manifest entry, outputs, stats)."""
     lods = groom.lod_files()
     if "LOD0" not in lods:
-        raise GroomError(f"{groom.style}: no hair cards (strands and a baked head-UV texture only)")
+        return convert_painted(groom, web_root)
     light = next((name for name in LIGHT_LODS if name in lods), None)
     chosen = ["LOD0", *([light] if light else [])]
     meshes = {name: CardMesh.load(lods[name]) for name in chosen}

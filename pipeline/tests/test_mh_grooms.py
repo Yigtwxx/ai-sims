@@ -4,13 +4,17 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from PIL import Image
 
+from asset_pipeline.mh import grooms
 from asset_pipeline.mh.dna import read_dna
 from asset_pipeline.mh.geometry import closest_point_on_triangles, closest_triangles, components
 from asset_pipeline.mh.grooms import (
     Binding,
     CardMesh,
+    GroomError,
     GroomHead,
+    GroomUnit,
     bind_cards,
 )
 
@@ -109,3 +113,52 @@ def test_groom_heads_match_the_dna_topology(archive: Path, ada_head_mesh, name: 
     offset = head.positions - ada_head_mesh.positions / 100.0
     spread = np.linalg.norm(offset - np.median(offset, axis=0), axis=1)
     assert np.percentile(spread, 99) < 0.04, "same head layout, only the shape differs"
+
+
+def _cardless_unit(tmp_path: Path, baked: bool) -> GroomUnit:
+    unit = tmp_path / "raw" / "grooms" / "Beards" / "Beard_S_Stubble"
+    (unit / "textures").mkdir(parents=True)
+    (unit / "cards.json").write_text("{}", encoding="utf-8")
+    Image.new("RGB", (64, 64), (90, 80, 70)).save(unit / "textures" / "Beard_S_Stubble_Thumb.png")
+    if baked:
+        pixels = np.zeros((64, 64, 4), dtype=np.uint8)
+        pixels[20:40, 10:50] = (128, 128, 40, 200)
+        Image.fromarray(pixels).save(unit / "textures" / "Beard_S_Stubble_baked.png")
+    return GroomUnit.load(unit)
+
+
+def test_cardless_grooms_are_painted_from_their_baked_map(tmp_path: Path, monkeypatch) -> None:
+    written: dict[str, np.ndarray] = {}
+
+    def fake_encode(image: np.ndarray, output: Path, settings: object) -> int:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"KTX2")
+        written[output.name] = image
+        return 4
+
+    monkeypatch.setattr(grooms, "encode_ktx2", fake_encode)
+    web = tmp_path / "web"
+    entry, outputs, stats = grooms.convert_groom(_cardless_unit(tmp_path, True), {}, None, web)
+    assert entry["painted"] == "grooms/beard/Beard_S_Stubble/baked.ktx2", entry
+    assert "glb" not in entry, "painted grooms have no cards"
+    assert written["baked.ktx2"].shape == (64, 64, 4), "coverage (alpha) is kept"
+    assert entry["thumbnail"] == "grooms/beard/Beard_S_Stubble/thumbnail.webp"
+    assert all(path.is_file() for path in outputs) and stats["painted"]
+
+
+def test_cardless_grooms_without_a_baked_map_fail(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(grooms, "encode_ktx2", lambda image, output, settings: 0)
+    with pytest.raises(GroomError, match="no baked"):
+        grooms.convert_groom(_cardless_unit(tmp_path, False), {}, None, tmp_path / "web")
+
+
+def test_empty_skin_slots_point_at_a_skin_joint() -> None:
+    # Joint 0 of the head is not in the groom skin; empty slots (weight 0) carry it.
+    remap = np.array([-1, 0, 1, -1], dtype=np.int64)
+    joints = np.array([[1, 2, 0, 0], [2, 0, 0, 0]], dtype=np.int64)
+    weights = np.array([[0.7, 0.3, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]])
+    local = grooms._local_joints(remap, joints, weights)
+    assert local.dtype == np.uint16
+    np.testing.assert_array_equal(local, [[0, 1, 0, 0], [1, 0, 0, 0]])
+    with pytest.raises(ValueError):
+        grooms._local_joints(remap, np.array([[3, 0, 0, 0]]), np.array([[1.0, 0, 0, 0]]))

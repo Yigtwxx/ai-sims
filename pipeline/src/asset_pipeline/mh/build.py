@@ -431,6 +431,9 @@ class Builder:
                 state["setup"] = self._groom_setup(reference)
             heads, head = state["setup"]
             entry, outputs, stats = convert_groom(groom, heads, head, self.web)
+            if stats.get("painted"):
+                detail = f"painted on the skin ({', '.join(stats['textures'])})"
+                return outputs, {"groom": entry, "stats": stats}, detail
             lods = ", ".join(f"{lod['source']} {lod['vertices']}v" for lod in stats["lods"])
             detail = (
                 f"{stats['bytes'] / 1e6:.1f} MB glb ({lods}), on {stats['head']}, roots "

@@ -430,7 +430,8 @@ def groom_groups(
     by_slot: dict[str, list[tuple[Item, Shape]]] = {}
     for entry in manifest.get("grooms", []):
         slot = entry.get("slot")
-        if slot not in THRESHOLDS:
+        # Painted grooms (stubble, buzz cuts) have no cards to compare.
+        if slot not in THRESHOLDS or not entry.get("glb"):
             continue
         vertices, triangles = read_surface(web / entry["glb"], ("cards_lod0",))
         item = Item(entry["id"], slot, float(len(triangles)), _label(entry))

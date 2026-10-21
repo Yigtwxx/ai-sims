@@ -167,7 +167,7 @@ def catalogue(archive: Path) -> dict[str, Asset]:
         elif kind == "grooms" and isinstance(info.get("groom"), dict):
             groom = info["groom"]
             entry = asset(str(groom["id"]))
-            entry.home = "web/" + Path(str(groom["glb"])).parent.as_posix()
+            entry.home = "web/" + Path(str(groom.get("glb") or groom["painted"])).parent.as_posix()
             unit = grooms.get(rest.rsplit("/", 1)[-1])
             if unit is not None:
                 entry.sources.add(rel(unit))

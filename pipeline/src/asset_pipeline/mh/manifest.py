@@ -144,7 +144,9 @@ def validate(manifest: Mapping[str, Any], web_root: Path | None = None) -> list[
         where = f"groom {groom.get('id')}"
         need(groom.get("slot") in GROOM_SLOTS, f"{where}: slot")
         need(groom.get("compat", "unisex") in COMPAT, f"{where}: compat")
-        file(groom.get("glb"), where)
+        # Cards (`glb`) or a head-UV map painted on the skin (`painted`), never both.
+        need(bool(groom.get("glb")) != bool(groom.get("painted")), f"{where}: glb or painted")
+        file(groom.get("glb") or groom.get("painted"), where)
         file(groom.get("thumbnail"), where, optional=True)
         for value in groom.get("textures", {}).values():
             file(value, f"{where} textures")
