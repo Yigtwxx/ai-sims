@@ -47,6 +47,12 @@ UNUSED_SOURCES = (
     "raw/characters/*/textures/body/T_Body_Body_Basecolor.png",
     # Groom FBX exports: the converter reads the glTF twin of every mesh.
     "raw/grooms/*.fbx",
+    # Outfit exports (traced on a full outfit conversion, 2026-10-21): the FBX twins of
+    # the glTF meshes, and the KhaosMDF322 UDIM tiles its UVs never reach (the shared
+    # Size6 texture set ships 34 tiles; the garment lies on 1001 and 1002).
+    "raw/outfits/*/*/*.fbx",
+    "raw/outfits/*/WI_KhaosMDF322/textures/*.100[3-9].png",
+    "raw/outfits/*/WI_KhaosMDF322/textures/*.10[1-9]?.png",
     # MetaHuman Creator's skin-region masks (uncompressed 8K TGA), only used by its
     # own texture synthesis.
     "raw/statics/MetaHumanCharacter/Lookdev_UHM/Skin/*",

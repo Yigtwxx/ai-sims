@@ -176,6 +176,23 @@ def test_build_index_leaves_out_unused_preset_sources(tmp_path: Path):
     assert len(build_index(root, ("raw",))) == 5, "no patterns keeps every file"
 
 
+def test_build_index_leaves_out_unused_outfit_sources(tmp_path: Path):
+    root = tmp_path / "archive"
+    outfit = root / "raw" / "outfits" / "female" / "WI_KhaosMDF322"
+    (outfit / "textures").mkdir(parents=True)
+    (outfit / "OutfitBase_female_Outfits.fbx").write_bytes(b"fbx")
+    (outfit / "OutfitBase_female_Outfits.glb").write_bytes(b"glb")
+    for tile in ("1001", "1002", "1003", "1011", "1054"):
+        (outfit / "textures" / f"T_KhaosMDF322_Size6_BC.{tile}.png").write_bytes(b"tile")
+    kept = [f.path for f in build_index(root, ("raw",), UNUSED_SOURCES)]
+    base = "raw/outfits/female/WI_KhaosMDF322"
+    assert kept == [
+        f"{base}/OutfitBase_female_Outfits.glb",
+        f"{base}/textures/T_KhaosMDF322_Size6_BC.1001.png",
+        f"{base}/textures/T_KhaosMDF322_Size6_BC.1002.png",
+    ], kept
+
+
 def test_place_twin_copies_when_the_original_is_a_web_file(tmp_path: Path):
     dest = tmp_path / "mac"
     original = fetch_slim.RemoteFile("web/shared/micro_normal.png", 4, "x")
