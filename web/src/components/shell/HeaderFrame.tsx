@@ -27,7 +27,9 @@ export function HeaderFrame({ children }: { children: ReactNode }) {
       data-solid={solid || undefined}
       style={{ viewTransitionName: 'site-header' }}
       className={cn(
-        'ease-out-quint fixed inset-x-0 top-0 z-(--z-header) h-(--header-h) border-b border-transparent transition-[background-color,border-color] duration-300',
+        // `right-scroll-bar-position`: the dialog scroll lock (react-remove-scroll)
+        // pads this fixed bar by the removed scrollbar width, so it doesn't jump.
+        'right-scroll-bar-position ease-out-quint fixed inset-x-0 top-0 z-(--z-header) h-(--header-h) border-b border-transparent transition-[background-color,border-color] duration-300',
         solid &&
           'border-hairline/70 bg-backstage/92 supports-[backdrop-filter]:bg-backstage/80 supports-[backdrop-filter]:backdrop-blur-md',
       )}

@@ -366,7 +366,8 @@ export function TalkChat({
             </Button>
           )}
         </div>
-        <p id={hintId} className="text-label text-ink-faint mt-2">
+        {/* Keyboard shortcuts only: touch screens have no Enter/Esc to press. */}
+        <p id={hintId} className="text-label text-ink-faint mt-2 pointer-coarse:hidden">
           {busy ? t('chat.hintBusy') : t('chat.hint')}
         </p>
       </form>

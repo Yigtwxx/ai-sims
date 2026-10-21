@@ -615,7 +615,7 @@ function SelectionBar({
 }) {
   const t = useTranslations('Curate.selection');
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-(--z-header) flex justify-center px-4">
+    <div className="right-scroll-bar-position pointer-events-none fixed inset-x-0 bottom-6 z-(--z-header) flex justify-center px-4">
       <AnimatePresence>
         {count > 0 ? (
           <motion.div
