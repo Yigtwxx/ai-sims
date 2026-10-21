@@ -7,7 +7,7 @@ from typing import Any
 
 import unreal
 
-from mh_export import ue
+from mh_export import udim, ue
 
 TEXTURE_EXTENSIONS = (".png", ".tga", ".exr")
 CUBE_EXTENSIONS = (".hdr", ".exr", ".dds")
@@ -49,16 +49,33 @@ def texture_info(texture: unreal.Texture) -> dict[str, Any]:
 def export_texture(
     texture: unreal.Texture, out_dir: Path, stem: str | None = None
 ) -> dict[str, Any]:
-    """Try lossless formats in order; 16-bit and float sources may refuse PNG."""
+    """Try lossless formats in order; 16-bit and float sources may refuse PNG.
+
+    A UDIM texture writes one file per tile (`<stem>.1001.png`, ...) instead of the
+    requested file: those are recorded under `udim` (tile -> file), and no further format
+    is tried (each would write every tile again; uncompressed TGA tiles made up most of
+    the 1.15 GB KhaosMDF255 export). `size` is then the whole tile grid.
+    """
     extensions = CUBE_EXTENSIONS if isinstance(texture, unreal.TextureCube) else TEXTURE_EXTENSIONS
     for extension in extensions:
         path = out_dir / f"{stem or texture.get_name()}{extension}"
         if export_object(texture, path):
             return {"file": path.name, **texture_info(texture)}
+        tiles = udim.tile_files(path)
+        if tiles:
+            return {
+                "udim": {str(tile): file.name for tile, file in tiles.items()},
+                **texture_info(texture),
+            }
     raise RuntimeError(f"No exporter wrote {texture.get_path_name()}")
 
 
-BAKE_SIZE = 4096  # upper bound; auto-detect follows the largest map the graph samples
+# Fixed, not auto-detected: auto-detect takes the largest map the graph samples, uncapped,
+# and a UDIM texture reports its whole tile grid (KhaosMDF322: 6 x 6 tiles of 4096 px =
+# 24576 px). MaterialBaking clamps its render target to 16384 px but reads it back at the
+# requested size, which fails `check(SrcPitch > DstPitch)` (RHISurfaceDataConversion.h)
+# on a worker thread and kills the editor. The web keeps at most 2048 px per map.
+BAKE_SIZE = 4096
 
 
 def gltf_options(bake: bool = False) -> unreal.GLTFExportOptions:
@@ -83,7 +100,7 @@ def gltf_options(bake: bool = False) -> unreal.GLTFExportOptions:
     }
     if bake:
         settings["default_material_bake_size"] = unreal.GLTFMaterialBakeSize(
-            x=BAKE_SIZE, y=BAKE_SIZE, auto_detect=True
+            x=BAKE_SIZE, y=BAKE_SIZE, auto_detect=False
         )
     for name, value in settings.items():
         try:

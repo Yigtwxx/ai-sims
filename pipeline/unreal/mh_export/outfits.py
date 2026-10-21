@@ -21,6 +21,7 @@ import unreal
 from mh_export import bodies, characters, inventory, materials, ue
 from mh_export.archive import (
     Archive,
+    CrashGuard,
     JobLog,
     SkipList,
     Unit,
@@ -57,6 +58,11 @@ def outfit_items() -> list[str]:
     ]
 
 
+def outfit_id(item: str) -> str:
+    """The converter's catalogue id of a wardrobe item (`.../WI_OA_Jeans` is `outfit.OA_Jeans`)."""
+    return "outfit." + safe_name(item.rsplit(".", 1)[-1]).removeprefix("WI_")
+
+
 def base_character(gender: str) -> unreal.MetaHumanCharacter:
     """Rigged, textured copy of a preset with the neutral body; built once, then reused."""
     name = f"OutfitBase_{gender}"
@@ -90,12 +96,17 @@ def build(character: unreal.MetaHumanCharacter, build_path: str) -> str | None:
     return None
 
 
-def material_textures(mi: unreal.MaterialInstance) -> list[unreal.Texture]:
+def material_textures(material: unreal.MaterialInterface) -> list[unreal.Texture]:
+    """Texture parameter values of an instance, or the defaults of a base material."""
+    mel = unreal.MaterialEditingLibrary
+    value = (
+        mel.get_material_instance_texture_parameter_value
+        if isinstance(material, unreal.MaterialInstance)
+        else mel.get_material_default_texture_parameter_value
+    )
     found = []
-    for name in unreal.MaterialEditingLibrary.get_texture_parameter_names(mi):
-        texture = unreal.MaterialEditingLibrary.get_material_instance_texture_parameter_value(
-            mi, name
-        )
+    for name in mel.get_texture_parameter_names(material):
+        texture = value(material, name)
         if isinstance(texture, unreal.Texture):
             found.append(texture)
     return found
@@ -107,7 +118,7 @@ def master_of(mi: unreal.MaterialInterface, instances: dict[str, Any]) -> str:
     return str(parents[-1]).rsplit(".", 1)[-1] if parents else mi.get_name()
 
 
-def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
+def export_outfit(gender: str, item_path: str, work: Path, guard: CrashGuard) -> dict[str, Any]:
     character = base_character(gender)
     item = unreal.load_asset(item_path)
     build_path = f"{BUILD_ROOT}/{gender}"
@@ -132,8 +143,11 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
     textures: dict[str, Any] = {}
     instances: dict[str, Any] = {}
 
-    def add_instance(path: str, mi: unreal.MaterialInstance) -> None:
-        instances[path] = materials.dump_instance(mi)
+    def add_instance(path: str, mi: unreal.MaterialInterface) -> None:
+        if isinstance(mi, unreal.MaterialInstance):
+            instances[path] = materials.dump_instance(mi)
+        else:
+            instances[path] = materials.dump_base(mi)
         for texture in material_textures(mi):
             key = texture.get_path_name()
             if key in textures:
@@ -164,16 +178,26 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
         elif cls == "MaterialInstanceConstant":
             add_instance(inventory.object_path(asset), obj)
     # Some items (e.g. OA_Shirt_01/04) keep their own instances on the built
-    # mesh instead of copies under Clothing: dump those from the mesh slots.
+    # mesh instead of copies under Clothing, and some (ARCJ_JACKET) use base
+    # materials directly: dump those from the mesh slots, or the converter finds
+    # no entry for the slot and drops its baked maps.
     for mi in (m for slots in slot_materials.values() for m in slots):
-        if isinstance(mi, unreal.MaterialInstance):
+        if isinstance(mi, unreal.MaterialInstance | unreal.Material):
             path = mi.get_path_name()
             if path not in instances:
                 add_instance(path, mi)
     for name, slots in slot_materials.items():
         if any(master_of(mi, instances) not in NATIVE_MASTERS for mi in slots if mi):
+            key = f"bake:{gender}/{item_path}/{name}"
+            if guard.crashed(key):
+                # The editor died in this bake before: the converter keeps the plain
+                # material (no baked maps) rather than the job crashing on every rerun.
+                meshes[name]["baked_glb"] = None
+                meshes[name]["bake_skipped"] = f"editor crashed in this bake ({guard.path})"
+                continue
             baked = work / f"{name}.baked.glb"
-            exported = export_gltf(mesh_objects[name], baked, bake=True)
+            with guard.attempt(key):
+                exported = export_gltf(mesh_objects[name], baked, bake=True)
             meshes[name]["baked_glb"] = baked.name if exported else None
     if not any(m["glb"] for m in meshes.values()):
         raise RuntimeError(f"No fitted clothing mesh was built for {item_path}: {build_warning}")
@@ -219,10 +243,19 @@ def export_base_body(gender: str, work: Path) -> dict[str, Any]:
 
 
 def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
-    """Args: genders (list), only (item names), limit, force."""
+    """Args: genders (list), only (item names), limit, force.
+
+    Bakes the editor died in are listed in `archive.crash_file` and skipped on later runs.
+    """
     genders = args.get("genders") or list(BASE_PRESETS)
     only = set(args.get("only") or [])
-    items = [p for p in outfit_items() if not only or p.rsplit(".", 1)[-1] in only]
+    pruned = archive.pruned_ids()
+    guard = CrashGuard(archive.crash_file)
+    items = [
+        p
+        for p in outfit_items()
+        if (not only or p.rsplit(".", 1)[-1] in only) and outfit_id(p) not in pruned
+    ]
     units: list[Unit] = []
     for gender in genders:
         units.append(
@@ -238,7 +271,9 @@ def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
                 Unit(
                     name=f"outfits/{gender}/{name}",
                     directory=archive.unit_dir("outfits", gender, name),
-                    export=lambda work, gender=gender, item=item: export_outfit(gender, item, work),
+                    export=lambda work, gender=gender, item=item: export_outfit(
+                        gender, item, work, guard
+                    ),
                 )
             )
     log = JobLog(archive.logs, "outfits")

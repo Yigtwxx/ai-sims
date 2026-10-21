@@ -5,6 +5,7 @@ import pytest
 from mh_export.archive import (
     DONE_FILE,
     Archive,
+    CrashGuard,
     JobLog,
     SkipList,
     Unit,
@@ -40,6 +41,13 @@ def test_safe_name_rejects_names_with_nothing_usable():
 def test_unit_dir_sanitises_every_part(tmp_path):
     archive = Archive(tmp_path)
     assert archive.unit_dir("grooms", "Hair", "Bob Curly") == tmp_path / "raw/grooms/Hair/Bob_Curly"
+
+
+def test_pruned_ids_read_the_prune_list_or_nothing(tmp_path):
+    archive = Archive(tmp_path)
+    assert archive.pruned_ids() == frozenset()
+    _write(tmp_path, "raw/pruned.json", json.dumps({"ids": ["outfit.OA_Jeansakn"]}).encode())
+    assert archive.pruned_ids() == frozenset({"outfit.OA_Jeansakn"})
 
 
 def test_done_marker_lists_files_and_detects_size_changes(tmp_path):
@@ -201,3 +209,41 @@ def test_run_units_limit_defers_the_rest(tmp_path):
     again = run_units([make("one"), make("two"), make("three")], log, limit=1)
     assert again.skipped == ["one"] and again.done == ["two"], f"Resume broke: {again.as_dict()}"
     assert calls == ["one", "two"]
+
+
+def test_crash_guard_remembers_a_call_the_process_died_in(tmp_path):
+    path = Archive(tmp_path).crash_file
+    first = CrashGuard(path)
+    assert not first.crashed("bake:Ada")
+    # A native crash ends the process inside the call: the context never exits (keep a
+    # reference, or garbage collection closes the generator and runs its cleanup).
+    dying = first.attempt("bake:Ada")
+    dying.__enter__()
+    rerun = CrashGuard(path)
+    assert rerun.crashed("bake:Ada")
+    assert not rerun.crashed("bake:Bo")
+    assert CrashGuard(path).crashed("bake:Ada"), "a skipped call stays recorded for later runs"
+
+
+def test_crash_guard_forgets_calls_that_returned_or_raised(tmp_path):
+    path = tmp_path / "crashed.json"
+    guard = CrashGuard(path)
+    with guard.attempt("bake:Ada"):
+        pass
+    with pytest.raises(RuntimeError), guard.attempt("bake:Bo"):
+        raise RuntimeError("a Python error is not a crash")
+    rerun = CrashGuard(path)
+    assert not rerun.crashed("bake:Ada")
+    assert not rerun.crashed("bake:Bo")
+    assert json.loads(path.read_text(encoding="utf-8")) == []
+
+
+def test_crash_guard_keeps_other_unfinished_calls_and_ignores_a_broken_file(tmp_path):
+    path = tmp_path / "crashed.json"
+    path.write_text('["bake:Old"]', encoding="utf-8")
+    guard = CrashGuard(path)
+    with guard.attempt("bake:Ada"):
+        assert json.loads(path.read_text(encoding="utf-8")) == ["bake:Ada", "bake:Old"]
+    assert json.loads(path.read_text(encoding="utf-8")) == ["bake:Old"]
+    path.write_text('["bake:Ol', encoding="utf-8")
+    assert not CrashGuard(path).crashed("bake:Old")

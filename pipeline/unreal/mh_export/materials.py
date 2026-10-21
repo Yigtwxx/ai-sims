@@ -88,6 +88,34 @@ def dump_instance(mi: unreal.MaterialInstance) -> dict[str, Any]:
     }
 
 
+def dump_base(material: unreal.Material) -> dict[str, Any]:
+    """A base material used directly on a mesh (e.g. ARCJ_JACKET's `M_JACKET`), in the
+    `dump_instance` layout: it is its own master (readers take the master from the end of
+    `parents`), and its values are the parameter defaults."""
+    path = material.get_path_name()
+    textures = {}
+    for n in MEL.get_texture_parameter_names(material):
+        tex = _safe(MEL.get_material_default_texture_parameter_value, material, n)
+        textures[str(n)] = tex.get_path_name() if isinstance(tex, unreal.Texture) else None
+    return {
+        "class": material.get_class().get_name(),
+        "parents": [path],
+        "scalars": {
+            str(n): _safe(MEL.get_material_default_scalar_parameter_value, material, n)
+            for n in MEL.get_scalar_parameter_names(material)
+        },
+        "vectors": {
+            str(n): ue.to_text(_safe(MEL.get_material_default_vector_parameter_value, material, n))
+            for n in MEL.get_vector_parameter_names(material)
+        },
+        "textures": textures,
+        "static_switches": {
+            str(n): _safe(MEL.get_material_default_static_switch_parameter_value, material, n)
+            for n in MEL.get_static_switch_parameter_names(material)
+        },
+    }
+
+
 def _expression_record(expression: unreal.MaterialExpression) -> dict[str, Any]:
     record: dict[str, Any] = {"class": expression.get_class().get_name()}
     record.update(ue.dump_properties(expression))

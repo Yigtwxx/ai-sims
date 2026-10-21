@@ -17,7 +17,7 @@ import re
 import shutil
 import time
 import traceback
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -69,9 +69,23 @@ class Archive:
         """JSON list of unit names the user chose to leave out of the export."""
         return self.root / "skip.json"
 
+    @property
+    def crash_file(self) -> Path:
+        """JSON list of editor calls a run died in (see `CrashGuard`)."""
+        return self.root / "crashed.json"
+
     def unit_dir(self, kind: str, *parts: str) -> Path:
         """Final directory of one unit, e.g. `raw/characters/Ada`."""
         return self.raw.joinpath(safe_name(kind), *(safe_name(part) for part in parts))
+
+    def pruned_ids(self) -> frozenset[str]:
+        """Catalogue ids the user curated out (`raw/pruned.json`, written by mh-prune).
+        Their Fab content stays imported in the project, so jobs skip them by id."""
+        path = self.raw / "pruned.json"
+        if not path.is_file():
+            return frozenset()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return frozenset(str(i) for i in data.get("ids", []))
 
 
 def sha256_of(path: Path) -> str:
@@ -235,6 +249,40 @@ class SkipList:
         with contextlib.suppress(json.JSONDecodeError, TypeError):
             self._names = set(json.loads(self.path.read_text(encoding="utf-8")))
         return self._names
+
+
+class CrashGuard:
+    """Editor calls that took the whole process down in an earlier run.
+
+    An engine assertion kills the editor, so no Python handler runs and the next run
+    would crash in the same call again. `attempt(key)` lists the key in `path` before
+    the call and removes it once the call returns or raises; a key still listed when a
+    run starts is a call a process died in, and `crashed(key)` lets the job take its
+    fallback instead. The key stays listed, so later runs skip it too: remove it from
+    the file to retry (after an engine or setting change).
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._crashed = frozenset(self._unfinished())
+
+    def _unfinished(self) -> set[str]:
+        if not self.path.is_file():
+            return set()
+        with contextlib.suppress(json.JSONDecodeError, TypeError):
+            return {str(key) for key in json.loads(self.path.read_text(encoding="utf-8"))}
+        return set()
+
+    def crashed(self, key: str) -> bool:
+        return key in self._crashed
+
+    @contextlib.contextmanager
+    def attempt(self, key: str) -> Iterator[None]:
+        write_json(self.path, sorted(self._unfinished() | {key}))
+        try:
+            yield
+        finally:
+            write_json(self.path, sorted(self._unfinished() - {key}))
 
 
 def run_units(
