@@ -1,7 +1,0 @@
-{
-  "sources": {
-    "fem_vroid": { "gender": "female", "label": "Varsayılan" },
-    "masc_vroid": { "gender": "male", "label": "Varsayılan" },
-    "AvatarSample_B": { "gender": "female", "label": "Avatar B" }
-  }
-}

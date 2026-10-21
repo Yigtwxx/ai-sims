@@ -14,7 +14,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "fake-bpy-module-latest" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "swig" },
@@ -29,7 +28,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "fake-bpy-module-latest" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.14" },
     { name = "swig", specifier = ">=4.5.1" },
@@ -42,15 +40,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
-]
-
-[[package]]
-name = "fake-bpy-module-latest"
-version = "20261019"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/25/26/3c70f6f983127e9bd85b028f7b42cd399f8b17d862971cb860eb89ec1179/fake_bpy_module_latest-20261019.tar.gz", hash = "sha256:5b12986a68d58fb388b5ff0d4a300ee6715f54ba96ad5f26f4ae08576e59f4d8", size = 975346, upload-time = "2026-10-19T11:29:46.54Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/ef/eb869ccb66369e03a0cbe9af0edda9e9c0f8ca5578c921347a6210841d9c/fake_bpy_module_latest-20261019-py3-none-any.whl", hash = "sha256:d07d6e2649e56c9b7b570600aed978efe07b03ca21e313daa819fa270efb3e7f", size = 1123801, upload-time = "2026-10-19T11:29:44.981Z" },
 ]
 
 [[package]]

@@ -1,1 +1,1 @@
-"""Asset pipeline for AI Sims: drives headless Blender to build web-ready GLB assets."""
+"""Asset pipeline for AI Sims: exports MetaHumans from Unreal and converts them to web assets."""
