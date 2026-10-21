@@ -10,16 +10,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import type {
-  Camera,
-  Material,
-  Mesh,
-  Object3D,
-  Scene,
-  Texture,
-  WebGLRenderer,
-  WebGLRenderTarget,
-} from 'three';
+import type { Camera, Material, Mesh, Object3D, Scene, WebGLRenderTarget } from 'three';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -68,6 +59,7 @@ import {
   loadIrisTextures,
   loadSkinTextures,
 } from './skinTextures';
+import { warmUp } from './warmUp';
 import { compileWrinkleTable, computeWrinkleWeights, type AnimatedMaps } from './wrinkles';
 
 export interface MhCharacterHandle {
@@ -112,8 +104,11 @@ export interface MhCharacterProps {
   /**
    * Called once the skin, eyes and grooms of the current props are on (or
    * failed and were skipped); again after every change that reloads them.
+   * Never after the unmount, nor for a state a newer change overtook.
    */
-  onSettled?: () => void;
+  onSettled?: (handle: MhCharacterHandle) => void;
+  /** Called when a change starts reloading any of them (and on mount); onSettled follows. */
+  onUnsettled?: (handle: MhCharacterHandle) => void;
   /**
    * Upload every texture and compile every material before reporting settled,
    * a texture per frame. For a character assembled off screen: shown without
@@ -145,6 +140,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     outfits = NO_OUTFITS,
     onFrame,
     onSettled,
+    onUnsettled,
     prewarm = false,
     underwearTop = false,
   },
@@ -157,37 +153,19 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   // loading; thumbnails and the premiere wait for both parts to settle.
   const settled = useRef({ skin: false, grooms: false, outfits: false });
   const latestOnSettled = useRef(onSettled);
-  const warm = useRef<{ enabled: boolean; root: Object3D | null; camera: Camera; scene: Scene }>({
+  const latestOnUnsettled = useRef(onUnsettled);
+  const warm = useRef<{ enabled: boolean; camera: Camera; scene: Scene }>({
     enabled: prewarm,
-    root: null,
     camera,
     scene,
   });
   useLayoutEffect(() => {
     latestOnSettled.current = onSettled;
+    latestOnUnsettled.current = onUnsettled;
     warm.current.enabled = prewarm;
     warm.current.camera = camera;
     warm.current.scene = scene;
-  }, [onSettled, prewarm, camera, scene]);
-  // Counts settles, so a warm-up that a newer change overtook reports nothing.
-  const settles = useRef(0);
-  const settle = useCallback(
-    (part: keyof typeof settled.current) => {
-      settled.current[part] = true;
-      const { skin: skinDone, grooms: groomsDone, outfits: outfitsDone } = settled.current;
-      if (!skinDone || !groomsDone || !outfitsDone) return;
-      const run = ++settles.current;
-      const { enabled, root, camera: view, scene: world } = warm.current;
-      if (!enabled || !root) {
-        latestOnSettled.current?.();
-        return;
-      }
-      void warmUp(gl, root, view, world).then(() => {
-        if (run === settles.current) latestOnSettled.current?.();
-      });
-    },
-    [gl],
-  );
+  }, [onSettled, onUnsettled, prewarm, camera, scene]);
   const bodyGltf = useMhGltf(bodyUrl);
   const headGltf = useMhGltf(headUrl);
 
@@ -238,8 +216,47 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     };
   }, [bodyGltf, headGltf]);
 
+  // Numbers settled states. A change that reloads a part and the unmount bump
+  // it too, so a warm-up they overtook stops where it is and reports nothing.
+  const runs = useRef(0);
+  useEffect(
+    () => () => {
+      runs.current += 1;
+    },
+    [],
+  );
+  const unsettle = useCallback(
+    (part: keyof typeof settled.current) => {
+      settled.current[part] = false;
+      runs.current += 1;
+      latestOnUnsettled.current?.(assembled.handle);
+    },
+    [assembled],
+  );
+  const settle = useCallback(
+    (part: keyof typeof settled.current) => {
+      settled.current[part] = true;
+      const { skin: skinDone, grooms: groomsDone, outfits: outfitsDone } = settled.current;
+      if (!skinDone || !groomsDone || !outfitsDone) return;
+      const run = ++runs.current;
+      const current = () => run === runs.current;
+      const { enabled, camera: view, scene: world } = warm.current;
+      if (!enabled) {
+        latestOnSettled.current?.(assembled.handle);
+        return;
+      }
+      void warmUp(gl, assembled.root, view, world, current)
+        // A failed warm-up costs a slow first frame, not the swap: report anyway.
+        .catch((error: unknown) => console.warn('[mh] warm-up failed', error))
+        .then(() => {
+          if (current()) latestOnSettled.current?.(assembled.handle);
+        });
+    },
+    [gl, assembled],
+  );
+
   useEffect(() => {
-    settled.current.skin = false;
+    unsettle('skin');
     if (!skin && !iris) {
       settle('skin');
       return;
@@ -269,7 +286,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     return () => {
       live = false;
     };
-  }, [assembled, gl, skin, makeup, iris, settle]);
+  }, [assembled, gl, skin, makeup, iris, settle, unsettle]);
 
   useEffect(() => {
     let live = true;
@@ -356,7 +373,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   useEffect(() => () => swapGrooms([], [], null), [swapGrooms]);
   useEffect(() => {
     const head = assembled.headSkin;
-    settled.current.grooms = false;
+    unsettle('grooms');
     if (!groomKey || !head) {
       swapGrooms([], [], null);
       settle('grooms');
@@ -402,7 +419,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     return () => {
       live = false;
     };
-  }, [assembled, gl, groomKey, hairLod, settle, swapGrooms]);
+  }, [assembled, gl, groomKey, hairLod, settle, unsettle, swapGrooms]);
 
   useEffect(() => {
     for (const wear of grooms) {
@@ -453,7 +470,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   );
   useEffect(() => () => swapOutfits([]), [swapOutfits]);
   useEffect(() => {
-    settled.current.outfits = false;
+    unsettle('outfits');
     const wears = latestOutfits.current;
     if (!outfitKey) {
       swapOutfits([]);
@@ -482,7 +499,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     return () => {
       live = false;
     };
-  }, [assembled, gl, outfitKey, settle, swapOutfits]);
+  }, [assembled, gl, outfitKey, settle, unsettle, swapOutfits]);
 
   useEffect(() => {
     for (const wear of outfits) {
@@ -492,9 +509,6 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   }, [outfits]);
 
   useImperativeHandle(ref, () => assembled.handle, [assembled]);
-  useLayoutEffect(() => {
-    warm.current.root = assembled.root;
-  }, [assembled]);
 
   useLayoutEffect(() => {
     applyBodySliders(assembled.handle.body, sliders ?? {});
@@ -555,48 +569,6 @@ async function loadClips(urls: readonly string[]): Promise<MotionClip[]> {
 
 function attachMotion(handle: MhCharacterHandle, motion: MotionPlayer | null): void {
   handle.motion = motion;
-}
-
-/** Every texture a character's materials sample, uniforms of patched shaders included. */
-function texturesOf(root: Object3D): Set<Texture> {
-  const found = new Set<Texture>();
-  const take = (value: unknown) => {
-    if ((value as Texture | null)?.isTexture) found.add(value as Texture);
-    else if (Array.isArray(value)) value.forEach(take);
-  };
-  root.traverse((node) => {
-    const mesh = node as Mesh;
-    if (!mesh.isMesh) return;
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const material of materials) {
-      Object.values(material).forEach(take);
-      // Uniform groups the skin, hair and fabric shaders keep in userData.
-      for (const group of Object.values(material.userData)) {
-        if (group && typeof group === 'object') {
-          for (const uniform of Object.values(group as Record<string, { value?: unknown }>)) {
-            take(uniform?.value);
-          }
-        }
-      }
-    }
-  });
-  return found;
-}
-
-const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-
-/** Uploads a character's textures one per frame, then compiles its materials. */
-async function warmUp(
-  gl: WebGLRenderer,
-  root: Object3D,
-  camera: Camera,
-  scene: Scene,
-): Promise<void> {
-  for (const texture of texturesOf(root)) {
-    gl.initTexture(texture);
-    await nextFrame();
-  }
-  await gl.compileAsync(root, camera, scene);
 }
 
 function hasMaps(materials: readonly Material[]): boolean {

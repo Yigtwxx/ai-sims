@@ -26,6 +26,7 @@ import type { LifeMode } from './idle';
 import { MhCharacter, type MhCharacterHandle } from './MhCharacter';
 import { MhLighting } from './MhLighting';
 import { resolveCharacter, type ResolvedCharacter } from './resolve';
+import { StageSwap } from './swap';
 
 /**
  * Public interface of the photoreal MetaHuman stage. Pages (creator, talk, landing
@@ -66,6 +67,13 @@ export interface MhStageProps {
    * after every change that reloads them). Thumbnails capture on this.
    */
   onSettled?: () => void;
+  /**
+   * Fired with false when the stage starts catching up with `config` (a new
+   * face or body assembles off screen while the old one stays, or skin, hair or
+   * clothes reload), and with true once the character on screen is the one it
+   * asks for, settled and drawn. The creator captures its thumbnail on true.
+   */
+  onCaughtUp?: (caughtUp: boolean) => void;
   /** Render tier (default auto: starts high, steps down while frames drop). */
   quality?: QualityPreference;
   className?: string;
@@ -101,6 +109,7 @@ export const MhStage = memo(function MhStage({
   insetRight = 0,
   onReady,
   onSettled,
+  onCaughtUp,
   className,
   quality,
 }: MhStageProps) {
@@ -134,10 +143,45 @@ export const MhStage = memo(function MhStage({
   useLayoutEffect(() => {
     latestResolved.current = resolved;
   }, [resolved]);
-  const promote = useCallback((key: string) => {
-    const next = latestResolved.current;
-    if (next && characterKey(next) === key) setShown(next);
+  // Both characters by instance: a late settle from an incoming one that was
+  // unmounted (faces browsed back and forth) must not promote its remount.
+  const swap = useRef(new StageSwap<MhCharacterHandle>());
+  const latestOnCaughtUp = useRef(onCaughtUp);
+  useLayoutEffect(() => {
+    latestOnCaughtUp.current = onCaughtUp;
+  }, [onCaughtUp]);
+  const caughtUp = useRef<boolean | null>(null);
+  // Behind is reported at once; caught up two frames later, once it has been drawn.
+  const reportCaughtUp = useCallback(() => {
+    const tell = (value: boolean) => {
+      if (caughtUp.current === value) return;
+      caughtUp.current = value;
+      latestOnCaughtUp.current?.(value);
+    };
+    if (!swap.current.caughtUp) tell(false);
+    else if (caughtUp.current !== true) {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (swap.current.caughtUp) tell(true);
+        }),
+      );
+    }
   }, []);
+  const requestedKey = resolved ? characterKey(resolved) : null;
+  useLayoutEffect(() => {
+    swap.current.request(requestedKey, swapping);
+    reportCaughtUp();
+  }, [requestedKey, swapping, reportCaughtUp]);
+  const attachIncoming = useCallback((handle: MhCharacterHandle | null) => {
+    swap.current.setIncoming(handle);
+  }, []);
+  const attachOnScreen = useCallback(
+    (handle: MhCharacterHandle | null) => {
+      swap.current.setOnScreen(handle);
+      reportCaughtUp();
+    },
+    [reportCaughtUp],
+  );
 
   // One life per character: the incoming one is posed while it assembles.
   // Life reads the latest mode and speech without re-creating the frame callback.
@@ -217,6 +261,28 @@ export const MhStage = memo(function MhStage({
   const handleSettled = useCallback(() => {
     requestAnimationFrame(() => requestAnimationFrame(() => latestOnSettled.current?.()));
   }, []);
+  const slotSettled = useCallback(
+    (handle: MhCharacterHandle, key: string, incoming: boolean) => {
+      swap.current.settle(handle, key);
+      if (incoming) {
+        // Only the incoming instance mounted now, and only while its character
+        // is still the one asked for, replaces the one on screen.
+        const next = latestResolved.current;
+        if (!next || !swap.current.canPromote(handle, key)) return;
+        setShown(next);
+      }
+      handleSettled();
+      reportCaughtUp();
+    },
+    [handleSettled, reportCaughtUp],
+  );
+  const slotUnsettled = useCallback(
+    (handle: MhCharacterHandle) => {
+      swap.current.unsettle(handle);
+      reportCaughtUp();
+    },
+    [reportCaughtUp],
+  );
 
   const idleFace = resolved?.faceClips.idle ?? null;
   const smileFace = resolved?.faceClips.smile ?? null;
@@ -267,6 +333,7 @@ export const MhStage = memo(function MhStage({
             <group key={key} visible={!incoming}>
               <Suspense fallback={null}>
                 <MhCharacter
+                  ref={incoming ? attachIncoming : attachOnScreen}
                   bodyUrl={character.bodyUrl}
                   headUrl={character.headUrl}
                   sliders={character.sliders}
@@ -284,14 +351,8 @@ export const MhStage = memo(function MhStage({
                   underwearTop={character.underwearTop}
                   onFrame={incoming ? onIncomingFrame : onFrame}
                   prewarm={incoming}
-                  onSettled={
-                    incoming
-                      ? () => {
-                          promote(key);
-                          handleSettled();
-                        }
-                      : handleSettled
-                  }
+                  onSettled={(handle) => slotSettled(handle, key, incoming)}
+                  onUnsettled={slotUnsettled}
                 />
                 {!incoming && <FirstFrame onReady={onReady} />}
               </Suspense>

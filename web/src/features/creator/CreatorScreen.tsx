@@ -57,6 +57,7 @@ import { SlidingIndicator } from './ui/controls';
 import { NameField } from './ui/NameField';
 import { useAutosave } from './useAutosave';
 import { useMhManifest, wantsFixture, type ManifestState } from './useMhManifest';
+import { createWaitFlag } from './waitFlag';
 
 export const CATEGORIES = [
   'identity',
@@ -106,6 +107,9 @@ const isTyping = (target: EventTarget | null) =>
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
+/** At most this long for a face picked just before "Bitti" to reach the stage. */
+const STAGE_CATCH_UP_MS = 8000;
+
 export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
   const t = useTranslations('Creator');
   const locale = useLocale();
@@ -130,6 +134,23 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
   // Something is on the stage: the character, dressed and drawn, or the failure note.
   const [stageShown, setStageShown] = useState(false);
   const markStageShown = useCallback(() => setStageShown(true), []);
+  // Whether the stage shows the character the config asks for, dressed and
+  // drawn: a new face assembles off screen while the old one stays on.
+  const stageCaughtUp = useRef(createWaitFlag());
+  const onStageCaughtUp = useCallback(
+    (caughtUp: boolean) => stageCaughtUp.current.set(caughtUp),
+    [],
+  );
+  // A failed stage has nothing to catch up with; "Bitti" must not wait for it.
+  const markStageFailed = useCallback(() => {
+    setStageShown(true);
+    stageCaughtUp.current.set(true);
+  }, []);
+  // A retry mounts the stage afresh: the loading caption returns until it settles.
+  const retryStage = (retry: () => void) => {
+    setStageShown(false);
+    retry();
+  };
 
   const panel = useRef<HTMLElement>(null);
   const panelBody = useRef<HTMLDivElement>(null);
@@ -212,8 +233,11 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
     setCharacterId(result.id);
     setStatus('finalized');
 
-    // Frame a portrait, let the camera settle, then keep the card thumbnail.
+    // Frame a portrait. A face picked just now may still be assembling off
+    // screen behind the old one: wait for it, let the camera settle (it frames
+    // the new height too), then keep the card thumbnail.
     setFocusOverride('torso');
+    await stageCaughtUp.current.wait(STAGE_CATCH_UP_MS);
     await wait(reduceMotion ? 150 : 1100);
     const canvas = stage.current?.querySelector('canvas');
     const snapshot = canvas ? captureThumbnail(canvas, panelWidth) : undefined;
@@ -282,8 +306,11 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
           <StageBoundary
             fallback={(retry) => (
               <>
-                <StageFailed retry={retry} insetLeft={premiere ? 0 : panelWidth} />
-                <OnMount run={markStageShown} />
+                <StageFailed
+                  retry={() => retryStage(retry)}
+                  insetLeft={premiere ? 0 : panelWidth}
+                />
+                <OnMount run={markStageFailed} />
               </>
             )}
           >
@@ -292,6 +319,7 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
               focus={focus}
               insetLeft={premiere ? 0 : panelWidth}
               onSettled={markStageShown}
+              onCaughtUp={onStageCaughtUp}
             />
           </StageBoundary>
         ) : (
@@ -542,11 +570,13 @@ function CreatorStage({
   focus,
   insetLeft,
   onSettled,
+  onCaughtUp,
 }: {
   manifest: MhManifest;
   focus: CameraFocus;
   insetLeft: number;
   onSettled: () => void;
+  onCaughtUp: (caughtUp: boolean) => void;
 }) {
   const config = useDeferredValue(useCreatorStore((state) => state.config));
   return (
@@ -557,6 +587,7 @@ function CreatorStage({
       focus={focus}
       insetLeft={insetLeft}
       onSettled={onSettled}
+      onCaughtUp={onCaughtUp}
       className="size-full"
     />
   );
