@@ -71,10 +71,24 @@ export interface IdleInput {
    * shift), so the arms and head here stay, the procedural sway does not.
    */
   mocap?: MocapLayer | null;
+  /**
+   * Over a `body` layer: the share of the arms and head a full-body clip (a
+   * gesture fading in or out) drives now, 0..1. Our arms give way to it.
+   */
+  upper?: number;
 }
 
+const scaled = (rotations: BoneRotation[], factor: number): BoneRotation[] =>
+  rotations.map((rotation) => ({ ...rotation, angle: rotation.angle * factor }));
+
 /** Body rotations for this instant. Every value is a pure function of the input. */
-export function idlePose({ t, mode, loudness = 0, mocap = null }: IdleInput): BoneRotation[] {
+export function idlePose({
+  t,
+  mode,
+  loudness = 0,
+  mocap = null,
+  upper = 0,
+}: IdleInput): BoneRotation[] {
   const inhale = breath(t);
   const sway = Math.sin((t / 9.5) * Math.PI * 2);
   const lively = mode === 'speaking' ? 1.6 : mode === 'listening' ? 1.15 : 1;
@@ -90,10 +104,8 @@ export function idlePose({ t, mode, loudness = 0, mocap = null }: IdleInput): Bo
     { bone: 'head', axis: X, angle: headPitch * 0.6 - thinking * 4 * DEG },
     { bone: 'head', axis: Z, angle: headRoll + thinking * 3 * DEG },
   ];
-  if (mocap === 'full') {
-    // The clip carries its own head motion; ours stays a small reactive layer.
-    return head.map((rotation) => ({ ...rotation, angle: rotation.angle * 0.5 }));
-  }
+  // The clip carries its own head motion; ours stays a small reactive layer.
+  if (mocap === 'full') return scaled(head, 0.5);
 
   const arms: BoneRotation[] = [
     // Arms hang naturally; a breath and the sway move them a little.
@@ -119,7 +131,10 @@ export function idlePose({ t, mode, loudness = 0, mocap = null }: IdleInput): Bo
     { bone: 'spine_03', axis: X, angle: -inhale * 0.7 * DEG },
     { bone: 'spine_05', axis: X, angle: inhale * 0.5 * DEG },
   ];
-  if (mocap === 'body') return [...arms, ...chest, ...head];
+  if (mocap === 'body') {
+    const free = 1 - Math.min(1, Math.max(0, upper));
+    return [...scaled(arms, free), ...scaled(chest, free), ...scaled(head, 1 - 0.5 * (1 - free))];
+  }
 
   return [
     ...arms,

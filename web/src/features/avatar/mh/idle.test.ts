@@ -61,6 +61,17 @@ describe('idlePose', () => {
     expect(bones.has('spine_01')).toBe(false);
   });
 
+  it('gives the arms over to a gesture fading in over a body-layer clip', () => {
+    const angle = (upper: number, bone: string) =>
+      idlePose({ t: 2, mode: 'speaking', mocap: 'body', upper })
+        .filter((r) => r.bone === bone)
+        .reduce((sum, r) => sum + Math.abs(r.angle), 0);
+    expect(angle(0.5, 'upperarm_l')).toBeCloseTo(angle(0, 'upperarm_l') / 2, 6);
+    expect(angle(1, 'upperarm_l')).toBe(0);
+    // Fully handed over, the head keeps the small reactive layer of a full-body clip.
+    expect(angle(1, 'head')).toBeCloseTo(angle(0, 'head') / 2, 6);
+  });
+
   it('adds only a head layer on top of a full-body clip', () => {
     const bones = new Set(idlePose({ t: 2, mode: 'idle', mocap: 'full' }).map((r) => r.bone));
     expect([...bones].sort()).toEqual(['head', 'neck_01']);

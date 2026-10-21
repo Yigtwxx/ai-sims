@@ -99,6 +99,10 @@ export interface MhCharacterProps {
   idleClips?: readonly string[];
   /** How much of the body the idle clips drive; the procedural layer does the rest. */
   idleLayer?: MocapLayer;
+  /** Full-body gestures played while the character speaks. */
+  talkClips?: readonly string[];
+  /** Full-body listening clips, mixed in with the idles while it listens. */
+  listenClips?: readonly string[];
   /** Hair and facial hair cards, fitted to this head; recolouring needs no reload. */
   grooms?: readonly GroomWear[];
   /** Garments bound to the body skeleton; recolouring needs no reload. */
@@ -135,6 +139,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     iris = null,
     idleClips = NO_CLIPS,
     idleLayer = 'full',
+    talkClips = NO_CLIPS,
+    listenClips = NO_CLIPS,
     grooms = NO_GROOMS,
     outfits = NO_OUTFITS,
     onFrame,
@@ -276,18 +282,22 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     };
   }, [assembled]);
 
-  const clipKey = idleClips.join('|');
+  // One key for all roles: the effect reloads when any set changes.
+  const clipKey = [idleClips, talkClips, listenClips].map((urls) => urls.join('|')).join('#');
   useEffect(() => {
-    if (!clipKey) return;
+    const [idle = [], talk = [], listen = []] = clipKey
+      .split('#')
+      .map((urls) => (urls ? urls.split('|') : []));
+    if (idle.length === 0) return;
     let live = true;
     let player: MotionPlayer | null = null;
-    void loadClips(clipKey.split('|'))
-      .then((clips) => {
-        if (!live || clips.length === 0) return;
+    void Promise.all([loadClips(idle), loadClips(talk), loadClips(listen)])
+      .then(([idleSet, talkSet, listenSet]) => {
+        if (!live || idleSet.length === 0) return;
         const body = assembled.handle.body;
         player = new MotionPlayer(
           assembled.root,
-          clips,
+          { idle: idleSet, talk: talkSet, listen: listenSet },
           body.bones.get('pelvis') ?? null,
           body.sliderPosition.get('pelvis') ?? null,
           idleLayer,

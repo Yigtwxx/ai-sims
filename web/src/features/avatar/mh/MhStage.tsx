@@ -276,6 +276,9 @@ export const MhStage = memo(function MhStage({
                   // A still takes the same pose every time: the first clip, not a random one.
                   idleClips={frozen ? character.idleClips.slice(0, 1) : character.idleClips}
                   idleLayer={character.idleLayer}
+                  // Gestures and listening only where the character converses.
+                  talkClips={talk ? character.talkClips : undefined}
+                  listenClips={talk ? character.listenClips : undefined}
                   grooms={character.grooms}
                   outfits={character.outfits}
                   underwearTop={character.underwearTop}

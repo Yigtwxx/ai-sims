@@ -28,6 +28,9 @@ export interface ResolvedCharacter {
   /** Body idle clips and how much of the body they drive (see idleSet). */
   idleClips: string[];
   idleLayer: MocapLayer;
+  /** Full-body clips for speaking (gestures) and listening (see gestureSet). */
+  talkClips: string[];
+  listenClips: string[];
   /** Hair, eyebrows, beard and mustache the manifest has, with their colour. */
   grooms: GroomWear[];
   /** Outfit items with a mesh for this body, one-piece first, with their colours. */
@@ -79,6 +82,7 @@ export function resolveCharacter(
       manifest.irises[0] ??
       null,
     ...idleSet(manifest),
+    ...gestureSet(manifest),
     grooms: groomWears(config, manifest),
     outfits: outfitWears(config, manifest),
     underwearTop: gender === 'female',
@@ -185,4 +189,15 @@ export function idleSet(manifest: MhManifest): Pick<ResolvedCharacter, 'idleClip
     idleClips: idles.filter((a) => a.tags.includes('standing')).map((a) => assetUrl(a.file)),
     idleLayer: 'body',
   };
+}
+
+/** Body clips tagged "talk" (speaking gestures) and "listen"; both drive the whole body. */
+export function gestureSet(
+  manifest: MhManifest,
+): Pick<ResolvedCharacter, 'talkClips' | 'listenClips'> {
+  const tagged = (tag: string) =>
+    manifest.animations
+      .filter((a) => a.kind === 'body' && a.tags.includes(tag))
+      .map((a) => assetUrl(a.file));
+  return { talkClips: tagged('talk'), listenClips: tagged('listen') };
 }

@@ -109,6 +109,7 @@ export class CharacterLife {
     const rig = this.rig!;
     resetPose(rig);
     const motion = handle.motion;
+    motion?.setRole(speaking ? 'talk' : lifeMode === 'listening' ? 'listen' : 'idle');
     motion?.update(delta);
     addRotations(
       rig,
@@ -118,6 +119,7 @@ export class CharacterLife {
         // A hint of the loudness only: the nods come from the stresses below.
         loudness: loudness * 0.3,
         mocap: motion?.active ? motion.layer : null,
+        upper: motion?.upper,
       }),
     );
 

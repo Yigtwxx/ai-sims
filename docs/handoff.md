@@ -160,7 +160,12 @@ uv run --no-sync python scripts/build_openriglogic.py   # macOS arm64'te RigLogi
   - Vücut morph'ları kıyafete aktarılır.
   - Ardından web'de kıyafet bağlama (`SkinnedMesh.bind`) ve bölge gizleme.
 - Küçük resimler: `/dev/thumbs` ile tüm yüz ve groom'lar web renderer'ından üretilir. Unreal küçük resimleri placeholder dokuyla çizilmişti.
-- Konuşma jestleri: MoCap Online / ActorCore ücretsiz paketleri sabah Epic Launcher'dan projeye eklenir (kullanıcı aksiyonu), sonra UE retarget.
+- Konuşma jestleri Unreal'sız, FBX'ten gelir. 2026-10-21 kararı: yalnızca ücretsiz paketler kullanılır. Fab'daki ücretsiz Unreal paketleri de en fazla ~3 konuşma klibi veriyor.
+  - Kullanılanlar (2026-10-21, hepsi ayakta, tam boy):
+    - Mocap.in Realistic Acting (Fab, Personal lisans): `talking_normal` (talk), `listening` (sakin idle).
+    - ActorCore ücretsiz hareketleri: `stand_talk` (talk), `relax` (sakin idle). İndirme ayarı: hedef "Unreal (UE 5 Skeleton)", 60 fps; kemik adları zaten UE5. Zip'ler `MetaHumanArchive/gestures/actorcore/zips/`.
+    - Elenenler: Female Idle-2 (kalça 17 cm kayıyor), Change Pose (61° dönüş, 38° eğilme), oturan ve yürüyen klipler.
+  - Hepsi `web/scripts/retarget-fbx.mjs` ile MetaHuman'a aktarılır. ActorCore FBX'leri önce hareketsiz bir A-pose take'i taşır; betik en çok hareket eden take'i seçer.
 - Kartsız 9 groom (stubble, buzz cut) kafa materyaline baked doku olarak eklenecek.
 - Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).
 - Baş ve gövde cildi arasında göğüste hafif ton farkı var.

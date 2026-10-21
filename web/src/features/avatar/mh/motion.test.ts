@@ -8,7 +8,7 @@ import {
 } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { IDLE_FADE, layerTracks, MotionPlayer } from './motion';
+import { IDLE_FADE, layerTracks, MotionPlayer, TALK_FADE, TALK_HOLD } from './motion';
 
 const QUAT = [0, 0, 0, 1, 0, 0, 0, 1];
 
@@ -51,7 +51,7 @@ describe('MotionPlayer', () => {
     const base = new Vector3(0, 0.9, 0);
     const player = new MotionPlayer(
       root,
-      [{ clip: clip('a', 2, [1.0, 1.1]), pelvisRest: new Vector3(0, 1, 0) }],
+      { idle: [{ clip: clip('a', 2, [1.0, 1.1]), pelvisRest: new Vector3(0, 1, 0) }] },
       pelvis,
       base,
     );
@@ -67,7 +67,7 @@ describe('MotionPlayer', () => {
       pelvisRest: new Vector3(0, 1, 0),
     }));
     // A random source of 0 is the worst case for repeats: the first clip, then step by one.
-    const player = new MotionPlayer(root, clips, pelvis, new Vector3(), 'full', () => 0);
+    const player = new MotionPlayer(root, { idle: clips }, pelvis, new Vector3(), 'full', () => 0);
     const seen: (string | null)[] = [];
     for (let i = 0; i < 4; i += 1) {
       // Each clip hands over IDLE_FADE before it ends (its 1 s of own time).
@@ -76,5 +76,95 @@ describe('MotionPlayer', () => {
     }
     expect(seen).toEqual(['a', 'b', 'c', 'a']);
     player.dispose();
+  });
+
+  const sets = (names: { idle: string[]; talk?: string[]; listen?: string[] }) => {
+    const motion = (name: string) => ({
+      clip: clip(name, 10, [1, 1]),
+      pelvisRest: new Vector3(0, 1, 0),
+    });
+    return {
+      idle: names.idle.map(motion),
+      talk: names.talk?.map(motion),
+      listen: names.listen?.map(motion),
+    };
+  };
+
+  it('gestures at once when speech starts and outlasts short pauses', () => {
+    const { root, pelvis } = rig();
+    const player = new MotionPlayer(
+      root,
+      sets({ idle: ['a', 'b'], talk: ['t'] }),
+      pelvis,
+      new Vector3(),
+      'body',
+      () => 0,
+    );
+    player.update(0.1);
+    expect(player.playing).toBe('a');
+    player.setRole('talk');
+    player.update(0.1);
+    expect(player.playing).toBe('t');
+    // A gap between two sentences keeps the gesture.
+    player.setRole('listen');
+    player.update(TALK_HOLD / 2);
+    expect(player.playing).toBe('t');
+    player.update(TALK_HOLD);
+    expect(player.playing).not.toBe('t');
+    player.dispose();
+  });
+
+  it('lets an idle play on when listening starts', () => {
+    const { root, pelvis } = rig();
+    const player = new MotionPlayer(
+      root,
+      sets({ idle: ['a', 'b'], listen: ['l'] }),
+      pelvis,
+      new Vector3(),
+      'body',
+      () => 0,
+    );
+    player.update(0.1);
+    player.setRole('listen');
+    player.update(0.1);
+    expect(player.playing).toBe('a');
+    player.dispose();
+  });
+
+  it('keeps idling while speaking when there are no gestures', () => {
+    const { root, pelvis } = rig();
+    const player = new MotionPlayer(root, sets({ idle: ['a'] }), pelvis, new Vector3(), 'body');
+    player.update(0.1);
+    player.setRole('talk');
+    player.update(0.1);
+    expect(player.playing).toBe('a');
+    player.dispose();
+  });
+
+  it('hands the arms to a gesture as it fades in over body-layer idles', () => {
+    const { root, pelvis } = rig();
+    const player = new MotionPlayer(
+      root,
+      sets({ idle: ['a'], talk: ['t'] }),
+      pelvis,
+      new Vector3(),
+      'body',
+      () => 0,
+    );
+    player.update(0.1);
+    expect(player.upper).toBe(0);
+    player.setRole('talk');
+    player.update(TALK_FADE / 2);
+    expect(player.upper).toBeGreaterThan(0.2);
+    expect(player.upper).toBeLessThan(0.8);
+    player.update(TALK_FADE);
+    expect(player.upper).toBeCloseTo(1, 5);
+    player.dispose();
+  });
+
+  it('drives the arms with full-layer idles', () => {
+    const { root, pelvis } = rig();
+    const player = new MotionPlayer(root, sets({ idle: ['a'] }), pelvis, new Vector3(), 'full');
+    expect(player.upper).toBe(1);
   });
 });
