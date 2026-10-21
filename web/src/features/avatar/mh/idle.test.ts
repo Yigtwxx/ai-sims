@@ -7,6 +7,7 @@ import {
   createGaze,
   eyeLookMorphs,
   idlePose,
+  PRONATION,
   stepGaze,
   type BoneRotation,
 } from './idle';
@@ -30,10 +31,15 @@ describe('idlePose', () => {
     expect(angleOf(pose, 'upperarm_r', 2)).toBeCloseTo(ARM_RELAX, 1);
   });
 
-  it('keeps every layer subtle apart from the arm relax', () => {
+  it('keeps every layer subtle apart from the arm relax and the pronation', () => {
     for (let t = 0; t < 30; t += 0.37) {
       for (const mode of ['idle', 'listening', 'speaking', 'thinking'] as const) {
         for (const r of idlePose({ t, mode, loudness: 1 })) {
+          if (r.axis === 'twist') {
+            // A fixed rest offset, not motion.
+            expect(r.angle).toBeLessThanOrEqual(PRONATION);
+            continue;
+          }
           const limit = r.bone.startsWith('upperarm') && r.axis[2] === 1 ? 0.6 : 0.2;
           expect(Math.abs(r.angle)).toBeLessThan(limit);
         }
@@ -141,6 +147,34 @@ describe('applyPose', () => {
       .clone()
       .applyQuaternion(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2));
     expect(after.distanceTo(expected)).toBeLessThan(1e-6);
+  });
+
+  it('twists a bone about its own length, leaving the length where it is', () => {
+    const root = new Group();
+    const parent = new Bone();
+    parent.name = 'parent';
+    parent.quaternion.setFromAxisAngle(new Vector3(0, 0, 1), -Math.PI / 2);
+    const forearm = new Bone();
+    forearm.name = 'forearm';
+    const wrist = new Bone();
+    wrist.position.set(1, 0, 0);
+    const thumb = new Bone();
+    thumb.position.set(1, 0, 1);
+    root.add(parent);
+    parent.add(forearm);
+    forearm.add(wrist, thumb);
+    const rig = createPoseRig(root, ['forearm']);
+
+    // The forearm hangs straight down (its +X is the character's -Y); the thumb
+    // starts in front and a quarter twist turns it to the character's -X.
+    applyPose(rig, [{ bone: 'forearm', axis: 'twist', angle: Math.PI / 2 }]);
+    root.updateMatrixWorld(true);
+    expect(wrist.getWorldPosition(new Vector3()).distanceTo(new Vector3(0, -1, 0))).toBeLessThan(
+      1e-6,
+    );
+    expect(thumb.getWorldPosition(new Vector3()).distanceTo(new Vector3(-1, -1, 0))).toBeLessThan(
+      1e-6,
+    );
   });
 
   it('starts from rest every frame so layers never accumulate', () => {

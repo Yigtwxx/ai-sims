@@ -14,7 +14,8 @@ export type Axis = readonly [number, number, number];
 
 export interface BoneRotation {
   bone: string;
-  axis: Axis;
+  /** A character-space axis, or `twist`: about the bone's own length (local +X on MetaHuman bones). */
+  axis: Axis | 'twist';
   /** Radians, right-handed about `axis`. */
   angle: number;
 }
@@ -28,6 +29,19 @@ const DEG = Math.PI / 180;
 
 /** Bind pose upper arms hang ~37° from vertical; relaxed arms hang ~6-8°. */
 export const ARM_RELAX = 30 * DEG;
+
+/**
+ * Lowered from the bind pose, the palms face forward and show their light
+ * skin; relaxed hands face the thighs. The forearm pronates like a real one:
+ * none at the elbow, the twist bones by where they sit along it (1/3, 2/3),
+ * the hand fully.
+ */
+export const PRONATION = 45 * DEG;
+const FOREARM_TWIST: readonly (readonly [string, number])[] = [
+  ['lowerarm_twist_02', 1 / 3],
+  ['lowerarm_twist_01', 2 / 3],
+  ['hand', 1],
+];
 
 /** Smooth pseudo-noise: a sum of incommensurate sines in -1..1. */
 export function drift(t: number, seed: number): number {
@@ -89,6 +103,13 @@ export function idlePose({ t, mode, loudness = 0, mocap = null }: IdleInput): Bo
     { bone: 'upperarm_r', axis: X, angle: -4 * DEG },
     { bone: 'lowerarm_l', axis: X, angle: -(6 + drift(t, 4)) * DEG },
     { bone: 'lowerarm_r', axis: X, angle: -(6 + drift(t, 5)) * DEG },
+    ...FOREARM_TWIST.flatMap(([bone, share]) =>
+      (['l', 'r'] as const).map((side) => ({
+        bone: `${bone}_${side}`,
+        axis: 'twist' as const,
+        angle: PRONATION * share,
+      })),
+    ),
     // Breathing lifts the shoulders slightly.
     { bone: 'clavicle_l', axis: Z, angle: inhale * 0.6 * DEG },
     { bone: 'clavicle_r', axis: Z, angle: -inhale * 0.6 * DEG },

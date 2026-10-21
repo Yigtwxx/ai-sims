@@ -36,6 +36,8 @@ export function createPoseRig(root: Object3D, names: Iterable<string>): PoseRig 
 }
 
 const axis = new Vector3();
+/** MetaHuman bones run along their local X axis. */
+const LENGTH = new Vector3(1, 0, 0);
 const delta = new Quaternion();
 const local = new Quaternion();
 
@@ -59,6 +61,10 @@ export function addRotations(rig: PoseRig, rotations: readonly BoneRotation[]): 
   for (const { bone: name, axis: a, angle } of rotations) {
     const bone = rig.bones.get(name);
     if (!bone || angle === 0) continue;
+    if (a === 'twist') {
+      bone.quaternion.multiply(delta.setFromAxisAngle(LENGTH, angle));
+      continue;
+    }
     const parent = rig.parentRest.get(name)!;
     // Character-space rotation expressed in the parent's frame: P⁻¹ · D · P.
     delta.setFromAxisAngle(axis.set(a[0], a[1], a[2]), angle);
