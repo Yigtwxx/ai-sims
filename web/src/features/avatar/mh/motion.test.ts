@@ -162,6 +162,88 @@ describe('MotionPlayer', () => {
     player.dispose();
   });
 
+  describe('a switch in the middle of a cross-fade', () => {
+    const FRAME = 1 / 60;
+    // Every clip lifts the pelvis by the same 0.1, so any blend of them must too.
+    const lifted = (name: string) => ({
+      clip: clip(name, 10, [1.1, 1.1]),
+      pelvisRest: new Vector3(0, 1, 0),
+    });
+
+    /** Plays frame by frame until `done`, returning each frame's weights and pelvis height. */
+    function record(player: MotionPlayer, pelvis: Bone, seconds: number) {
+      const frames: { blend: Record<string, number>; y: number }[] = [];
+      for (let i = 0; i < Math.round(seconds / FRAME); i += 1) {
+        player.update(FRAME);
+        frames.push({ blend: player.blend, y: pelvis.position.y });
+      }
+      return frames;
+    }
+
+    /** No weight moves faster than a `fade`-long ramp, and the weights keep summing to 1. */
+    function expectSmooth(frames: ReturnType<typeof record>, fade: number) {
+      frames.forEach(({ blend, y }, k) => {
+        const total = Object.values(blend).reduce((sum, w) => sum + w, 0);
+        expect(total).toBeCloseTo(1, 6);
+        expect(y).toBeCloseTo(0.1, 6);
+        if (k === 0) return;
+        const before = frames[k - 1]!.blend;
+        for (const name of new Set([...Object.keys(blend), ...Object.keys(before)])) {
+          const jump = Math.abs((blend[name] ?? 0) - (before[name] ?? 0));
+          expect(jump).toBeLessThanOrEqual(FRAME / fade + 1e-9);
+        }
+      });
+    }
+
+    /** Plays until `name` starts fading in, then `seconds` into that cross-fade. */
+    function into(player: MotionPlayer, name: string, seconds: number) {
+      while (player.playing !== name) player.update(FRAME);
+      record(player, new Bone(), seconds - FRAME);
+    }
+
+    it('keeps the weights continuous when speech starts during an idle blend', () => {
+      const { root, pelvis } = rig();
+      const player = new MotionPlayer(
+        root,
+        { idle: [lifted('a'), lifted('b')], talk: [lifted('t')] },
+        pelvis,
+        new Vector3(),
+        'full',
+        () => 0,
+      );
+      into(player, 'b', 0.4);
+      expect(player.blend.b).toBeCloseTo(0.4 / IDLE_FADE, 1);
+      const frames = record(player, pelvis, FRAME);
+      player.setRole('talk');
+      frames.push(...record(player, pelvis, IDLE_FADE));
+      expect(player.playing).toBe('t');
+      expect(player.blend).toEqual({ t: 1 });
+      expectSmooth(frames, TALK_FADE);
+      player.dispose();
+    });
+
+    it('brings back a clip that is still fading out from where it is', () => {
+      const { root, pelvis } = rig();
+      const player = new MotionPlayer(
+        root,
+        { idle: [lifted('a')], listen: [lifted('l')] },
+        pelvis,
+        new Vector3(),
+        'full',
+        () => 0,
+      );
+      player.setRole('listen');
+      into(player, 'l', 0.4);
+      const frames = record(player, pelvis, FRAME);
+      player.setRole('idle');
+      frames.push(...record(player, pelvis, 2 * IDLE_FADE));
+      expect(Object.keys(player.blend)).toEqual(['a']);
+      expect(player.blend.a).toBeCloseTo(1, 6);
+      expectSmooth(frames, IDLE_FADE);
+      player.dispose();
+    });
+  });
+
   it('drives the arms with full-layer idles', () => {
     const { root, pelvis } = rig();
     const player = new MotionPlayer(root, sets({ idle: ['a'] }), pelvis, new Vector3(), 'full');

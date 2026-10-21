@@ -64,6 +64,11 @@ interface PelvisPath {
  * when the role changes. The procedural life layer is applied on top of
  * whatever the mixer wrote this frame.
  *
+ * Fades are linear ramps from each clip's weight now, not three.js
+ * `crossFadeFrom`: that restarts a fade-out at full weight, so a switch landing
+ * mid-way through a cross-fade (speech starting during an idle blend) made the
+ * pose pop and the weights sum past 1.
+ *
  * Pelvis translation is applied relative to the body's current rest pose, so
  * the feet stay on the floor whatever the height and body sliders do.
  */
@@ -74,6 +79,10 @@ export class MotionPlayer {
   /** Clip indices each role picks from. */
   private readonly pools: Record<MotionRole, number[]>;
   private readonly pelvisPaths: (PelvisPath | null)[];
+  /** Per clip: its weight now, the weight it fades to and how fast (per second). */
+  private readonly weights: number[];
+  private readonly targets: number[];
+  private readonly rates: number[];
   private current = -1;
   private nextIn = 0;
   private role: MotionRole = 'idle';
@@ -118,6 +127,9 @@ export class MotionPlayer {
       action.setLoop(LoopRepeat, Infinity);
       return action;
     });
+    this.weights = this.actions.map(() => 0);
+    this.targets = this.actions.map(() => 0);
+    this.rates = this.actions.map(() => 0);
     const indices = (role: MotionRole) =>
       this.roles.flatMap((own, index) => (own === role ? [index] : []));
     const idle = indices('idle');
@@ -137,6 +149,15 @@ export class MotionPlayer {
   /** Name of the clip playing (or fading in) now. */
   get playing(): string | null {
     return this.current < 0 ? null : this.actions[this.current]!.getClip().name;
+  }
+
+  /** Weight of each clip now, by clip name (clips that are not playing are left out). */
+  get blend(): Record<string, number> {
+    const out: Record<string, number> = {};
+    this.actions.forEach((action, i) => {
+      if (this.weights[i]! > 0) out[action.getClip().name] = this.weights[i]!;
+    });
+    return out;
   }
 
   /**
@@ -163,6 +184,7 @@ export class MotionPlayer {
     this.nextIn -= dt;
     this.stepRole(dt);
     if (this.current < 0 || this.nextIn <= 0) this.switchTo(this.pickNext(), IDLE_FADE);
+    this.stepFades(dt);
     this.mixer.update(dt);
     this.applyPelvis();
   }
@@ -180,9 +202,24 @@ export class MotionPlayer {
     this.switchTo(this.pickNext(), this.role === 'talk' ? TALK_FADE : IDLE_FADE);
   }
 
+  /** Moves each clip's weight toward its target; a clip that has faded out stops. */
+  private stepFades(dt: number): void {
+    this.actions.forEach((action, i) => {
+      const [weight, target] = [this.weights[i]!, this.targets[i]!];
+      if (weight === target) return;
+      const step = this.rates[i]! * dt;
+      const now =
+        target > weight ? Math.min(target, weight + step) : Math.max(target, weight - step);
+      this.weights[i] = now;
+      action.setEffectiveWeight(now);
+      if (now === 0 && target === 0) action.stop();
+    });
+  }
+
   private applyPelvis(): void {
     if (!this.pelvis || !this.pelvisBase) return;
     this.offset.set(0, 0, 0);
+    let total = 0;
     this.actions.forEach((action, i) => {
       const path = this.pelvisPaths[i];
       const weight = action.isRunning() ? action.getEffectiveWeight() : 0;
@@ -190,7 +227,10 @@ export class MotionPlayer {
       const values = path.interpolant.evaluate(action.time);
       this.sample.set(values[0]!, values[1]!, values[2]!).sub(path.rest);
       this.offset.addScaledVector(this.sample, weight);
+      total += weight;
     });
+    // The mixer averages the bones once the weights sum past 1; so does the pelvis.
+    this.offset.divideScalar(Math.max(1, total));
     this.pelvis.position.copy(this.pelvisBase).add(this.offset);
   }
 
@@ -205,15 +245,27 @@ export class MotionPlayer {
 
   private switchTo(index: number, fade: number): void {
     const next = this.actions[index]!;
-    const previous = this.current >= 0 ? this.actions[this.current] : undefined;
     const duration = next.getClip().duration;
-    next.reset();
-    // Gesture and listening takes are long: start anywhere, so replies do not all open alike.
-    if (this.roles[index] !== 'idle') {
-      next.time = this.random() * Math.max(0, duration - fade - 2 * IDLE_FADE);
+    // A clip still fading out comes back from where it is: restarting it would pop the pose.
+    if (index === this.current || this.weights[index] === 0) {
+      next.reset();
+      // Gesture and listening takes are long: start anywhere, so replies do not all open alike.
+      if (this.roles[index] !== 'idle') {
+        next.time = this.random() * Math.max(0, duration - fade - 2 * IDLE_FADE);
+      }
     }
     next.play();
-    if (previous && previous !== next) next.crossFadeFrom(previous, fade, false);
+    if (this.current < 0) {
+      // The first clip starts at full weight, without a blend from the rest pose.
+      this.weights[index] = 1;
+      next.setEffectiveWeight(1);
+    }
+    // Every clip fades from the weight it has now, also in the middle of an earlier
+    // cross-fade: the weights stay continuous and their sum never grows past 1.
+    this.actions.forEach((_, i) => {
+      this.targets[i] = i === index ? 1 : 0;
+      this.rates[i] = Math.abs(this.targets[i]! - this.weights[i]!) / fade;
+    });
     this.current = index;
     // Leave before the clip ends: mocap takes do not loop cleanly.
     this.nextIn = Math.max(fade, duration - next.time - IDLE_FADE);
