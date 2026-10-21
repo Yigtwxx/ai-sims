@@ -15,7 +15,8 @@ import { timelineFromWords, type WordBoundary } from './wordAlign';
  * driver's smoothing reaches a closure ~15 ms late and a frame reaches the
  * screen ~25 ms after it is sampled; on top of that lips should lead the sound
  * by ~35 ms, as they do in real speech. Replays of recorded TTS speech put the
- * seen closures 30-40 ms ahead of the heard ones with this value.
+ * seen closures 30-40 ms ahead of the heard ones with this value. It is measured
+ * from the decoded audio, so every timing source is shifted onto that first.
  */
 export const VISUAL_LEAD = 0.07;
 
@@ -57,17 +58,18 @@ export class SpeechPlayer {
     const samples = buffer.getChannelData(0);
     this.buffer = buffer;
     this.envelope = computeEnvelope(samples, buffer.sampleRate);
-    if ('events' in script) this.timeline = timelineFromEvents(script.events, buffer.duration);
-    else {
-      // Word and text timings place letters evenly and may sit ahead of the decoded
-      // audio; the audio says where the speech and the lip closures really are.
-      const estimated =
-        'words' in script
+    // TTS timings are reported against the synthesized audio and may sit ahead of
+    // the decoded MP3; the audio says where the speech really is.
+    const estimated =
+      'events' in script
+        ? timelineFromEvents(script.events, buffer.duration)
+        : 'words' in script
           ? timelineFromWords(script.words)
           : alignTextToAudio(script.text, detectSpeechRegions(this.envelope), buffer.duration);
-      const shifted = shiftTimeline(estimated, estimateAudioLag(estimated, this.envelope));
-      this.timeline = snapClosuresToAudio(shifted, this.envelope);
-    }
+    const shifted = shiftTimeline(estimated, estimateAudioLag(estimated, this.envelope));
+    // Viseme events time each closure; word and text timings place letters evenly,
+    // so their closures move onto the audio's own.
+    this.timeline = 'events' in script ? shifted : snapClosuresToAudio(shifted, this.envelope);
   }
 
   async play(onEnded?: () => void): Promise<void> {

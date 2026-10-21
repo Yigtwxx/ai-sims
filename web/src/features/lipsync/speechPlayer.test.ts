@@ -4,7 +4,11 @@ import { SpeechPlayer } from './speechPlayer';
 
 // A 2 second clip of constant loudness: one speech region, full mouth opening.
 const DURATION = 2;
+// One sample per envelope frame.
 const SAMPLE_RATE = 100;
+
+/** What the fake decoder returns; a test may replace it before loading. */
+let pcm: Float32Array;
 
 class FakeAudioContext {
   state = 'running';
@@ -13,9 +17,9 @@ class FakeAudioContext {
   destination = {};
 
   decodeAudioData = async () => ({
-    duration: DURATION,
+    duration: pcm.length / SAMPLE_RATE,
     sampleRate: SAMPLE_RATE,
-    getChannelData: () => new Float32Array(DURATION * SAMPLE_RATE).fill(0.5),
+    getChannelData: () => pcm,
   });
 
   createBufferSource() {
@@ -33,6 +37,7 @@ class FakeAudioContext {
 let context: FakeAudioContext;
 
 beforeEach(() => {
+  pcm = new Float32Array(DURATION * SAMPLE_RATE).fill(0.5);
   context = new FakeAudioContext();
   vi.stubGlobal(
     'AudioContext',
@@ -88,6 +93,26 @@ describe('SpeechPlayer.load', () => {
     const withWords = await mouthAt({ words: everything.words, text: 'u' }, 1);
     expect(withWords.aa).toBeGreaterThan(0.5);
     expect(withWords.U).toBeUndefined();
+  });
+
+  it('moves viseme events onto the decoded audio when it starts late', async () => {
+    // "ama" three times; the MP3's decoder delay puts the audio 60 ms behind the events.
+    const events: { viseme: 'aa' | 'PP' | 'sil'; time: number }[] = [];
+    for (let k = 0; k < 3; k++) {
+      const t = 0.1 + k * 0.5;
+      events.push({ viseme: 'aa', time: t }, { viseme: 'PP', time: t + 0.15 });
+      events.push({ viseme: 'aa', time: t + 0.21 }, { viseme: 'sil', time: t + 0.35 });
+    }
+    const loud = (t: number) => {
+      const at = events.findLast((e) => e.time <= t);
+      return at?.viseme === 'aa' ? 0.5 : 0.01;
+    };
+    pcm = Float32Array.from({ length: DURATION * SAMPLE_RATE }, (_, f) =>
+      loud((f + 0.5) / SAMPLE_RATE - 0.06),
+    );
+    // The first closure is heard over [0.31, 0.37], not [0.25, 0.31] as reported.
+    expect((await mouthAt({ events }, 0.34)).PP).toBeGreaterThan(0.5);
+    expect((await mouthAt({ events }, 0.27)).PP ?? 0).toBeLessThan(0.5);
   });
 
   it('stays silent outside the spoken part of the clip', async () => {

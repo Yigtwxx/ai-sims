@@ -107,8 +107,13 @@ function pearson(xs: number[], ys: number[]): number {
  */
 export function estimateAudioLag(timeline: TimedViseme[], envelope: Envelope): number {
   if (timeline.length === 0) return 0;
-  const start = timeline[0].start;
-  const end = timeline.at(-1)!.end;
+  // Compare only where every candidate lag still lands inside the audio: past its
+  // ends the envelope reads silent, which a closure or pause there would match.
+  const start = Math.max(timeline[0].start, -LAG_RANGE.min);
+  const end = Math.min(
+    timeline.at(-1)!.end,
+    envelope.values.length / envelope.rate - LAG_RANGE.max,
+  );
   const shapes: number[] = [];
   const times: number[] = [];
   let index = 0;

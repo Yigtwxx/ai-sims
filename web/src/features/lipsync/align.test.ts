@@ -35,6 +35,18 @@ describe('envelope', () => {
     expect(sampleEnvelope(env, 0.35)).toBeGreaterThan(0.5);
   });
 
+  it('places each frame at its middle, not its start', () => {
+    const env: Envelope = { values: new Float32Array([0.2, 1, 0.5]), rate: 100 };
+    expect(sampleEnvelope(env, 0.015)).toBeCloseTo(1, 6);
+    expect(sampleEnvelope(env, 0.01)).toBeCloseTo(0.6, 6);
+    expect(sampleEnvelope(env, 0.02)).toBeCloseTo(0.75, 6);
+    // Before the first middle and after the last one: the edge frames hold.
+    expect(sampleEnvelope(env, 0)).toBeCloseTo(0.2, 6);
+    expect(sampleEnvelope(env, 0.029)).toBeCloseTo(0.5, 6);
+    expect(sampleEnvelope(env, 0.03)).toBe(0);
+    expect(sampleEnvelope(env, -0.001)).toBe(0);
+  });
+
   it('detects speech regions separated by pauses', () => {
     const { samples, sampleRate } = makeClip([
       [0.1, false],
@@ -106,10 +118,10 @@ describe('alignTextToAudio', () => {
   });
 });
 
-/** Envelope at 100 frames/s from a loudness function of time. */
+/** Envelope at 100 frames/s from a loudness function of time (each frame read at its middle). */
 function envelopeOf(duration: number, loudness: (t: number) => number): Envelope {
   const values = new Float32Array(Math.round(duration * 100));
-  for (let f = 0; f < values.length; f++) values[f] = loudness(f / 100);
+  for (let f = 0; f < values.length; f++) values[f] = loudness((f + 0.5) / 100);
   return { values, rate: 100 };
 }
 
@@ -143,7 +155,23 @@ describe('estimateAudioLag', () => {
 
   it('keeps an aligned timeline where it is', () => {
     expect(estimateAudioLag(timeline, envelopeOf(3.5, loudAt))).toBe(0);
-    expect(estimateAudioLag([], envelopeOf(1, () => 1))).toBe(0);
+    expect(
+      estimateAudioLag(
+        [],
+        envelopeOf(1, () => 1),
+      ),
+    ).toBe(0);
+  });
+
+  it('does not read the silence past the end of the audio as a fit', () => {
+    // Steady audio up to the end, and a closure held to the end: nothing to shift.
+    const held = [segment('aa', 0, 0.5), segment('PP', 0.5, 2)];
+    expect(
+      estimateAudioLag(
+        held,
+        envelopeOf(2, () => 1),
+      ),
+    ).toBe(0);
   });
 
   it('shifts every segment by the lag', () => {

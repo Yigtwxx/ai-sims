@@ -34,13 +34,15 @@ export function computeEnvelope(samples: Float32Array, sampleRate: number, rate 
   return { values, rate };
 }
 
-/** Envelope value at time `t` (seconds), linearly interpolated. */
+/** Envelope value at time `t` (seconds), linearly interpolated between frame middles. */
 export function sampleEnvelope(envelope: Envelope, t: number): number {
-  const x = t * envelope.rate;
+  const { values, rate } = envelope;
+  if (t < 0 || t * rate >= values.length) return 0;
+  // Frame f is the RMS of [f, f + 1) / rate, so its value belongs to the frame's middle.
+  const x = Math.min(Math.max(t * rate - 0.5, 0), values.length - 1);
   const i = Math.floor(x);
-  if (i < 0 || i >= envelope.values.length) return 0;
-  const a = envelope.values[i];
-  const b = envelope.values[Math.min(i + 1, envelope.values.length - 1)];
+  const a = values[i];
+  const b = values[Math.min(i + 1, values.length - 1)];
   return a + (b - a) * (x - i);
 }
 
