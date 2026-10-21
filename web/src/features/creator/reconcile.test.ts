@@ -61,9 +61,11 @@ describe('reconcileConfig', () => {
     expect(next.face.preset).toBe(facesFor(manifest, 'male')[0].id);
     expect(next.skin.set).toBe(next.face.preset);
     expect(next.hair.style).toBe(groomsFor(manifest, 'hair', 'male')[0].id);
+    // The stand-in garment wears its first colour, as if picked.
+    const standIn = outfitsFor(manifest, 'top', 'male')[0];
     expect(next.outfit.top).toEqual({
-      id: outfitsFor(manifest, 'top', 'male')[0].id,
-      tint: null,
+      id: standIn.id,
+      tint: standIn.tintPresets[0]?.id ?? null,
       colors: {},
     });
   });

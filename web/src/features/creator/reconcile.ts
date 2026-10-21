@@ -112,8 +112,10 @@ function reconcileOutfit(
   const outfit = options.find((option) => option.id === item.id) ?? options[0];
   if (!outfit) return null;
   const same = outfit.id === item.id;
-  const tint =
-    same && item.tint && outfit.tintPresets.some((preset) => preset.id === item.tint)
+  // A stand-in garment wears its first colour, as if picked; a kept one keeps a known tint.
+  const tint = !same
+    ? (outfit.tintPresets[0]?.id ?? null)
+    : item.tint && outfit.tintPresets.some((preset) => preset.id === item.tint)
       ? item.tint
       : null;
   const colorParams = new Set(

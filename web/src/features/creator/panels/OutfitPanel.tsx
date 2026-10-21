@@ -35,9 +35,11 @@ export function OutfitPanel({ manifest, slot, onSlotChange }: OutfitPanelProps) 
   const outfit = item ? manifest.outfits.find((candidate) => candidate.id === item.id) : undefined;
   const colorParams = outfit?.params.filter((param) => param.type === 'color') ?? [];
 
+  // A garment goes on in its first (curated) colour, the one its tile shows.
   const choose = (id: string | null) =>
     update((draft) => {
-      draft.outfit[slot] = id ? { id, tint: null, colors: {} } : null;
+      const tint = options.find((option) => option.id === id)?.tintPresets[0]?.id ?? null;
+      draft.outfit[slot] = id ? { id, tint, colors: {} } : null;
       if (id && slot === 'full') {
         draft.outfit.top = null;
         draft.outfit.bottom = null;
