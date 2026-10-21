@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { Camera } from 'three';
+import { Vector3, type Camera } from 'three';
 
 import type { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import type { MhManifest } from '@/lib/assets/manifest';
@@ -63,6 +63,7 @@ export interface MhStageProps {
 }
 
 const WHEEL_STEP = 0.0016;
+const headWorld = new Vector3();
 const PINCH_STEP = 0.004;
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -107,9 +108,23 @@ export function MhStage({
   useLayoutEffect(() => {
     input.current = { mode: lifeMode, speech };
   }, [lifeMode, speech]);
+  // How far the head has moved from where it stood when the character appeared:
+  // the talk close-up follows it so a swaying speaker stays framed.
+  const follow = useRef<Vector3 | null>(null);
+  const followRest = useRef<{ handle: MhCharacterHandle; head: Vector3 } | null>(null);
   const onFrame = useCallback(
-    (handle: MhCharacterHandle, delta: number, camera: Camera) =>
-      life.step(handle, delta, { ...input.current, viewer: camera.position }),
+    (handle: MhCharacterHandle, delta: number, camera: Camera) => {
+      life.step(handle, delta, { ...input.current, viewer: camera.position });
+      const head = handle.body.bones.get('head');
+      if (!head) return;
+      head.getWorldPosition(headWorld);
+      if (followRest.current?.handle !== handle) {
+        followRest.current = { handle, head: headWorld.clone() };
+      }
+      follow.current = (follow.current ?? new Vector3())
+        .copy(headWorld)
+        .sub(followRest.current.head);
+    },
     [life],
   );
 
@@ -143,6 +158,7 @@ export function MhStage({
         lighting={<MhLighting rig="studio" />}
         subjectHeight={resolved?.height}
         interactive={mode === 'creator' || talk}
+        follow={talk ? follow : undefined}
         className="size-full"
       >
         <Suspense fallback={null}>

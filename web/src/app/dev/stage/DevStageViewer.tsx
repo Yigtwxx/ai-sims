@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MhStage } from '@/features/avatar/mh/MhStage';
+import { fetchSpeechClip, speechScript, type SpeechScript } from '@/features/chat/ttsClient';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import {
   MANIFEST_URL,
@@ -35,6 +36,9 @@ const STAND_IDLES = [1, 2, 3].map((n) => ({
 const IDLE_SETS = { manifest: null, crowd: CROWD_IDLES, stand: STAND_IDLES } as const;
 type IdleSet = keyof typeof IDLE_SETS;
 const FACIAL: GroomSlot[] = ['eyebrows', 'beard', 'mustache'];
+/** Rich in closures (m, b, p) and rounded vowels, the hardest lip-sync cases. */
+const TTS_SAMPLE =
+  'Merhaba, ben buradayım. Bugün müzik mi dinlemek istersin, yoksa biraz sohbet mi edelim? Pazartesi programımız çok yoğun.';
 type Styles = Record<'hair' | 'eyebrows' | 'beard' | 'mustache', string>;
 
 function useManifest(): MhManifest | null {
@@ -91,18 +95,37 @@ export function DevStageViewer() {
     return value;
   }, [manifest, face, styles, melanin, redness, pattern]);
 
-  const speak = useCallback(async () => {
+  const play = useCallback(async (audio: ArrayBuffer, script: SpeechScript) => {
     await player.current?.dispose();
-    const [audio, text] = await Promise.all([
-      fetch('/assets/samples/tr-greeting.wav').then((r) => r.arrayBuffer()),
-      fetch('/assets/samples/tr-greeting.txt').then((r) => r.text()),
-    ]);
     const next = new SpeechPlayer();
-    await next.load(audio, { text });
+    await next.load(audio, script);
     player.current = next;
     setSpeech(next);
     await next.play(() => setSpeech(null));
   }, []);
+
+  const speak = useCallback(async () => {
+    const [audio, text] = await Promise.all([
+      fetch('/assets/samples/tr-greeting.wav').then((r) => r.arrayBuffer()),
+      fetch('/assets/samples/tr-greeting.txt').then((r) => r.text()),
+    ]);
+    await play(audio, { text });
+  }, [play]);
+
+  // Real synthesis through /api/tts (needs a session; Edge TTS needs no key).
+  const [ttsText, setTtsText] = useState(TTS_SAMPLE);
+  const [ttsSource, setTtsSource] = useState('');
+  const speakTts = useCallback(async () => {
+    const gender = manifest?.faces.find((f) => f.id === face)?.gender ?? 'female';
+    try {
+      const clip = await fetchSpeechClip({ text: ttsText, voice: gender, locale: 'tr' });
+      const script = speechScript(clip);
+      setTtsSource('events' in script ? 'visemes' : 'words' in script ? 'words' : 'text');
+      await play(clip.audio, script);
+    } catch (error) {
+      setTtsSource(`failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [manifest, face, ttsText, play]);
 
   useEffect(
     () => () => {
@@ -225,6 +248,22 @@ export function DevStageViewer() {
         >
           {speech ? 'speaking…' : 'speak tr sample'}
         </button>
+        <textarea
+          value={ttsText}
+          onChange={(e) => setTtsText(e.target.value)}
+          rows={3}
+          className="rounded bg-black/40 p-1"
+        />
+        <button
+          type="button"
+          data-testid="speak-tts"
+          onClick={speakTts}
+          disabled={speech !== null}
+          className="rounded bg-amber-400 px-2 py-1 text-black"
+        >
+          speak via /api/tts
+        </button>
+        <span data-testid="tts-source">{ttsSource}</span>
       </aside>
     </div>
   );

@@ -2,8 +2,8 @@
 
 import { ContactShadows } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { Suspense, type ReactNode } from 'react';
-import { AgXToneMapping, NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
+import { Suspense, type ReactNode, type RefObject } from 'react';
+import { AgXToneMapping, NoToneMapping, PCFShadowMap, SRGBColorSpace, type Vector3 } from 'three';
 
 import { Backlight } from './Backlight';
 import { CameraRig } from './CameraRig';
@@ -43,6 +43,8 @@ interface StageProps {
   lighting?: ReactNode;
   /** Called once the WebGL context exists. */
   onCreated?: () => void;
+  /** How far the subject's head moved from rest; close-up framing follows it. */
+  follow?: RefObject<Vector3 | null>;
 }
 
 const BACKDROPS = {
@@ -69,6 +71,7 @@ export function Stage({
   scenery,
   lighting,
   onCreated,
+  follow,
 }: StageProps) {
   const initial =
     zoom === undefined ? getCameraPose(focus, subjectHeight) : zoomPose(zoom, subjectHeight);
@@ -110,7 +113,13 @@ export function Stage({
         <Turntable>{children}</Turntable>
         {post && <PostEffects look={look} />}
       </Suspense>
-      <CameraRig focus={focus} height={subjectHeight} zoom={zoom} interactive={interactive} />
+      <CameraRig
+        focus={focus}
+        height={subjectHeight}
+        zoom={zoom}
+        interactive={interactive}
+        follow={follow}
+      />
       <ViewInset left={insetLeft} right={insetRight} />
     </Canvas>
   );
