@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 
 import { DURATION, EASE, ms, prefersReducedMotion } from '@/components/motion/tokens';
 import { SplitText } from '@/components/reactbits/SplitText';
+import { stageShades, stageSwatchBackground } from '@/features/creator/skinSwatch';
 import { cn } from '@/lib/utils';
 
 import {
@@ -18,7 +19,7 @@ import {
   IRIS_COLORS,
   JEWELRY_ITEMS,
   PREVIEW_LIGHT,
-  SKIN_TONES,
+  SKIN_SETS,
   WARDROBE_ITEMS,
   type Category,
 } from './options';
@@ -312,23 +313,23 @@ function irisBackground(color: string): string {
 }
 
 function SkinBoard() {
-  const t = useTranslations('Landing.customize.categories.skin');
-  const [selected, setSelected] = useState(4);
-  const tone = SKIN_TONES[selected];
+  const [selected, setSelected] = useState(7);
+  const current = SKIN_SETS[selected];
+  const tone = stageShades(current.albedo).lit;
 
   return (
     <BoardLayout
       options={
         <div
           data-deal=""
-          data-columns="6"
-          className="grid w-fit grid-cols-6 gap-2.5 sm:gap-3 md:gap-4"
+          data-columns="5"
+          className="grid w-fit grid-cols-5 gap-2.5 sm:gap-3 md:gap-4"
         >
-          {SKIN_TONES.map((hex, index) => (
+          {SKIN_SETS.map((skin, index) => (
             <SwatchButton
-              key={hex}
-              color={hex}
-              label={t('tone', { n: index + 1 })}
+              key={skin.name}
+              color={stageSwatchBackground(skin.albedo)}
+              label={skin.name}
               selected={index === selected}
               onSelect={() => setSelected(index)}
             />
@@ -347,7 +348,7 @@ function SkinBoard() {
             }}
           />
           <FloorShadow />
-          <PreviewCaption>{t('tone', { n: selected + 1 })}</PreviewCaption>
+          <PreviewCaption>{current.name}</PreviewCaption>
         </>
       }
     />

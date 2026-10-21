@@ -96,8 +96,7 @@
         },
         "skin": {
           "label": "Ten",
-          "hint": "Tona göre sıralı cilt setleri.",
-          "tone": "Ten tonu {n}"
+          "hint": "Gerçek cilt setleri, açıktan koyuya; renkler sahne ışığındaki hâlleri."
         },
         "eyes": {
           "label": "Gözler",

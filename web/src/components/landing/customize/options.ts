@@ -10,20 +10,32 @@ export type Category = (typeof CATEGORIES)[number];
 /** Two MetaHuman preset faces used to illustrate blending. Proper names, not translated. */
 export const FACE_PRESETS = ['Ada', 'Zuri'] as const;
 
-/** Skin sets sorted from fair to deep, as the creator sorts them. */
-export const SKIN_TONES = [
-  '#f2d4c2',
-  '#eac3a8',
-  '#dfb08f',
-  '#d29d78',
-  '#c48a64',
-  '#b37752',
-  '#9f6544',
-  '#8a5538',
-  '#74462e',
-  '#5f3925',
-  '#4a2c1d',
-  '#382117',
+/**
+ * The skin sets the creator offers, fair to deep: name and cheek albedo from the
+ * manifest (2026-10-21, after curation). The landing renders without the asset
+ * archive, so they are copied here; the swatches show them as lit on stage.
+ */
+export const SKIN_SETS = [
+  { name: 'Jelena', albedo: '#c48877' },
+  { name: 'Vivian', albedo: '#c0826f' },
+  { name: 'Aera', albedo: '#c58266' },
+  { name: 'Celeste', albedo: '#b37766' },
+  { name: 'Victor', albedo: '#b37660' },
+  { name: 'Kelvin', albedo: '#b57257' },
+  { name: 'Aoi', albedo: '#b67156' },
+  { name: 'Grace', albedo: '#a66a5b' },
+  { name: 'Walter', albedo: '#9c604f' },
+  { name: 'Etta', albedo: '#8d5844' },
+  { name: 'Tuya', albedo: '#8d5642' },
+  { name: 'Trey', albedo: '#85513c' },
+  { name: 'Sunita', albedo: '#834e40' },
+  { name: 'Asha', albedo: '#6c3a22' },
+  { name: 'Mateo', albedo: '#6e3f2a' },
+  { name: 'Omari', albedo: '#653827' },
+  { name: 'Dominic', albedo: '#673b2d' },
+  { name: 'Ada', albedo: '#663b2d' },
+  { name: 'Cameron', albedo: '#613525' },
+  { name: 'Isaiah', albedo: '#542b1d' },
 ] as const;
 
 export const IRIS_COLORS = [

@@ -96,8 +96,7 @@
         },
         "skin": {
           "label": "Skin",
-          "hint": "Skin sets sorted by tone.",
-          "tone": "Skin tone {n}"
+          "hint": "Real skin sets, fair to deep, shown as lit on stage."
         },
         "eyes": {
           "label": "Eyes",
