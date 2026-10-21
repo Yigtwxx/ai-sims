@@ -89,8 +89,12 @@ describe('bindNeckSeam', () => {
 
     expect(binding).toBeDefined();
     for (let i = 0; i < RING; i += 1) {
+      // Welded, then tucked 1.5 mm past the seam (away from the head) and
+      // 0.4 mm under the body skin, which here both point down the strip.
       const welded = worldOf(body, binding!.bodyVertex[i]!);
-      expect(worldOf(head, i).distanceTo(welded)).toBeLessThan(1e-6);
+      const skirt = worldOf(head, i).sub(welded);
+      expect(skirt.y).toBeCloseTo(-0.0019, 6);
+      expect(Math.hypot(skirt.x, skirt.z)).toBeLessThan(1e-6);
     }
     // An inner ring vertex (falloff 0.5) moves about half of the 1 cm outward offset of
     // its two nearest boundary vertices, and only outwards.

@@ -216,6 +216,8 @@ export interface NeckSeamBinding {
   blend: Float32Array;
   /** Per seam vertex: true when it lies on the boundary itself. */
   onBoundary: Uint8Array;
+  /** Per boundary seam vertex: unit direction across the seam, away from the head (rest space). */
+  outward: Float32Array;
   /** Per boundary slot: the body vertex it is welded to. */
   bodyVertex: Int32Array;
 }
@@ -223,6 +225,9 @@ export interface NeckSeamBinding {
 type Attribute = BufferAttribute | InterleavedBufferAttribute;
 
 const DNA_POSITION = '_dna_position';
+/** How far (m) the head boundary reaches past the seam, and how deep under the body skin. */
+const SEAM_SKIRT_OUT = 0.0015;
+const SEAM_SKIRT_IN = 0.0004;
 
 /** First primitive vertex of each DNA position (glTF splits positions at UV seams). */
 function vertexOfPosition(geometry: BufferGeometry): Map<number, number> {
@@ -354,6 +359,7 @@ export function bindNeckSeam(
     slotB: new Int32Array(count),
     blend: new Float32Array(count),
     onBoundary: new Uint8Array(count),
+    outward: new Float32Array(count * 3),
     bodyVertex,
   };
   const restBoundary = headBoundary.map((v) => new Vector3().fromBufferAttribute(position, v!));
@@ -381,10 +387,37 @@ export function bindNeckSeam(
     binding.slotB[i] = b;
     binding.blend[i] = da + db > 0 ? da / (da + db) : 0;
   }
+  setSeamOutward(binding);
 
   copyBoundarySkin(binding);
   snapNeckSeam(binding);
   return binding;
+}
+
+/**
+ * Direction across the seam for each boundary vertex: from the nearest ring
+ * vertex (head side) through the boundary vertex.
+ */
+function setSeamOutward(binding: NeckSeamBinding): void {
+  const { rest, onBoundary, outward } = binding;
+  const count = onBoundary.length;
+  const p = new Vector3();
+  const q = new Vector3();
+  for (let i = 0; i < count; i += 1) {
+    if (!onBoundary[i]) continue;
+    p.fromArray(rest, i * 3);
+    let nearest = -1;
+    let best = Infinity;
+    for (let j = 0; j < count; j += 1) {
+      if (onBoundary[j]) continue;
+      const d = p.distanceToSquared(q.fromArray(rest, j * 3));
+      if (d < best) [best, nearest] = [d, j];
+    }
+    if (nearest < 0) continue;
+    p.sub(q.fromArray(rest, nearest * 3))
+      .normalize()
+      .toArray(outward, i * 3);
+  }
 }
 
 /** Gives every head boundary vertex the skin of the body vertex it is welded to. */
@@ -435,6 +468,7 @@ export function snapNeckSeam(binding: NeckSeamBinding): void {
   const linear = new Matrix3();
   const target = new Vector3();
   const local = new Vector3();
+  const seamNormal = new Vector3();
   const offsets = new Float32Array(slots * 3);
   const targets: Vector3[] = [];
   const targetNormals: Vector3[] = [];
@@ -465,13 +499,19 @@ export function snapNeckSeam(binding: NeckSeamBinding): void {
       .copy(targets[slot]!)
       .sub(local.set(e[12]!, e[13]!, e[14]!))
       .applyMatrix3(linear);
-    position.setXYZ(vertex, target.x, target.y, target.z);
     for (let c = 0; c < 3; c += 1)
       offsets[slot * 3 + c] = target.getComponent(c) - binding.rest[i * 3 + c]!;
-    if (normal && bodyNormal) {
-      const n = local.copy(targetNormals[slot]!).applyMatrix3(linear).normalize();
-      normal.setXYZ(vertex, n.x, n.y, n.z);
+    const n = seamNormal.copy(targetNormals[slot]!).applyMatrix3(linear).normalize();
+    if (normal && bodyNormal) normal.setXYZ(vertex, n.x, n.y, n.z);
+    // Skirt: the head and body skin the shared edge with their own matrices,
+    // so it never matches to the bit and sub-pixel cracks show the backdrop.
+    // Tuck the head boundary just past the edge and under the body skin.
+    if (bodyNormal) {
+      target
+        .addScaledVector(local.fromArray(binding.outward, i * 3), SEAM_SKIRT_OUT)
+        .addScaledVector(n, -SEAM_SKIRT_IN);
     }
+    position.setXYZ(vertex, target.x, target.y, target.z);
   }
   // Rings: the offset of their two boundary neighbours, faded out by the falloff.
   for (let i = 0; i < binding.vertices.length; i += 1) {
