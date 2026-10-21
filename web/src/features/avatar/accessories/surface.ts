@@ -13,7 +13,7 @@ import {
 /**
  * Posed, world-space samples of a character's visible surface. Rig-agnostic:
  * which mesh is skin, hair or clothing is decided by a `RoleClassifier`
- * supplied by the rig adapter (see vroid.ts for the VRoid naming scheme).
+ * supplied by the rig adapter.
  * Skinned meshes are evaluated with their current morphs and bone transforms
  * (getVertexPosition), so a fit matches what is on screen.
  */

@@ -27,8 +27,7 @@
     "entering": "Signing in…",
     "signingOut": "Signing out…",
     "notConfigured": "Database not configured: set MONGODB_URI, BETTER_AUTH_SECRET and BETTER_AUTH_URL in web/.env.local.",
-    "signInFailed": "Could not sign in. Check your connection and try again.",
-    "guest": "Guest session"
+    "signInFailed": "Could not sign in. Check your connection and try again."
   },
   "Footer": {
     "tagline": "Photoreal characters that speak Turkish.",
@@ -211,8 +210,7 @@
     "actions": {
       "talk": "Talk",
       "edit": "Edit",
-      "delete": "Delete",
-      "more": "Actions for {name}"
+      "delete": "Delete"
     },
     "deleteDialog": {
       "title": "Delete {name}?",
@@ -532,16 +530,6 @@
       "wine": "Wine",
       "stone": "Stone"
     }
-  },
-  "Common": {
-    "save": "Save",
-    "done": "Done",
-    "cancel": "Cancel",
-    "randomize": "Randomize",
-    "undo": "Undo",
-    "redo": "Redo",
-    "delete": "Delete",
-    "edit": "Edit"
   },
   "Talk": {
     "back": "My characters",

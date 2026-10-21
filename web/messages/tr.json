@@ -27,8 +27,7 @@
     "entering": "Giriş yapılıyor…",
     "signingOut": "Çıkış yapılıyor…",
     "notConfigured": "Veritabanı yapılandırılmamış (Database not configured): MONGODB_URI, BETTER_AUTH_SECRET ve BETTER_AUTH_URL değerlerini web/.env.local dosyasına ekleyin.",
-    "signInFailed": "Giriş yapılamadı. Bağlantını kontrol edip tekrar dene.",
-    "guest": "Misafir oturumu"
+    "signInFailed": "Giriş yapılamadı. Bağlantını kontrol edip tekrar dene."
   },
   "Footer": {
     "tagline": "Fotogerçekçi karakterler, Türkçe konuşan.",
@@ -211,8 +210,7 @@
     "actions": {
       "talk": "Konuş",
       "edit": "Düzenle",
-      "delete": "Sil",
-      "more": "{name} için işlemler"
+      "delete": "Sil"
     },
     "deleteDialog": {
       "title": "{name} silinsin mi?",
@@ -532,16 +530,6 @@
       "wine": "Şarap",
       "stone": "Taş"
     }
-  },
-  "Common": {
-    "save": "Kaydet",
-    "done": "Bitti",
-    "cancel": "Vazgeç",
-    "randomize": "Rastgele",
-    "undo": "Geri al",
-    "redo": "İleri al",
-    "delete": "Sil",
-    "edit": "Düzenle"
   },
   "Talk": {
     "back": "Karakterlerim",

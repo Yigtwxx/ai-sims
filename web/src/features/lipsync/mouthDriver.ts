@@ -1,9 +1,9 @@
 import { MathUtils } from 'three';
 
-import { VISEMES, mpfbMorphName, type Viseme, type VisemeWeights } from './visemes';
+import { VISEMES, visemeMorphName, type Viseme, type VisemeWeights } from './visemes';
 
 /**
- * Applies viseme weights to morph-target meshes (MPFB / Oculus naming) with
+ * Applies viseme weights to morph-target meshes (Oculus viseme naming) with
  * per-channel smoothing, so frame-to-frame noise never makes the lips jitter.
  */
 
@@ -54,7 +54,7 @@ export function applyMouthToMorphs(meshes: MorphTarget[], state: MouthState): vo
     const influences = mesh.morphTargetInfluences;
     if (!dict || !influences) continue;
     for (const viseme of VISEMES) {
-      const index = dict[mpfbMorphName(viseme)];
+      const index = dict[visemeMorphName(viseme)];
       if (index !== undefined) influences[index] = state[viseme];
     }
   }

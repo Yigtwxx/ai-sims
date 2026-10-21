@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { buildTimeline, sampleTimeline, scaleWeights, timelineFromEvents } from './timeline';
 import { textToVisemes } from './turkish';
-import { toVrmMouth } from './visemes';
 
 describe('buildTimeline', () => {
   it('fills exactly the spoken part of the audio', () => {
@@ -72,18 +71,5 @@ describe('sampleTimeline', () => {
 describe('scaleWeights', () => {
   it('scales open shapes but keeps lip closure at full strength', () => {
     expect(scaleWeights({ aa: 1, PP: 0.8 }, 0.5)).toEqual({ aa: 0.5, PP: 0.8 });
-  });
-});
-
-describe('toVrmMouth', () => {
-  it('maps vowels to VRM expressions and bilabials to closure', () => {
-    expect(toVrmMouth({ aa: 1 }).aa).toBe(1);
-    expect(toVrmMouth({ U: 1 }).ou).toBe(1);
-    expect(toVrmMouth({ PP: 1 }).close).toBe(1);
-  });
-
-  it('clamps combined weights to 1', () => {
-    const mouth = toVrmMouth({ aa: 1, kk: 1, RR: 1 });
-    expect(mouth.aa).toBeLessThanOrEqual(1);
   });
 });
