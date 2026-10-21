@@ -5,12 +5,15 @@ groom). Each run is keyed by its output folder and fingerprinted from the source
 `done.json` plus the converter version (`stamps.py`); an asset whose fingerprint is
 unchanged and whose outputs exist is skipped, so the batch can be re-run as new presets
 land. The manifest is assembled from the build records of every asset that exists.
+Assets pruned after curation (`raw/pruned.json`, see prune.py) are never rebuilt nor
+listed.
 """
 
 import json
 import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal
 
@@ -84,6 +87,16 @@ EXPECTED_ERRORS = (
     ValueError,
 )
 FACE_REFERENCE = "Ada"  # head whose ARKit morphs face clips are fitted on
+PRUNED_FILE = Path("raw") / "pruned.json"  # ids curated out and deleted (prune.py)
+
+
+def read_pruned(archive: Path) -> frozenset[str]:
+    path = archive / PRUNED_FILE
+    if not path.is_file():
+        return frozenset()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    ids = data.get("ids", []) if isinstance(data, dict) else []
+    return frozenset(str(i) for i in ids)
 
 
 @dataclass(frozen=True)
@@ -111,6 +124,16 @@ class Builder:
     def stamps(self) -> Stamps:
         # Stamps sit beside web/ (archive/build/stamps for the real archive).
         return Stamps(self.web.parent)
+
+    @cached_property
+    def pruned(self) -> frozenset[str]:
+        return read_pruned(self.archive)
+
+    def _is_pruned(self, key: str, asset_id: str) -> bool:
+        if asset_id not in self.pruned:
+            return False
+        self.log(f"skip    {key}: pruned")
+        return True
 
     @property
     def mapping_path(self) -> Path:
@@ -150,7 +173,10 @@ class Builder:
         self.log(f"skip    characters/{name}: no finished export (done.json)")
         return False
 
-    def head(self, name: str) -> Outcome:
+    def head(self, name: str) -> Outcome | None:
+        if self._is_pruned(f"faces/{name}", f"face.{name}"):
+            return None
+
         def build() -> tuple[Iterable[Path], dict[str, Any], str]:
             result = convert_head(
                 name, self.archive, web_root=self.web_root, compress=self.compress
@@ -168,7 +194,10 @@ class Builder:
             return self._fail(f"faces/{name}", error)
         return self.run(f"faces/{name}", print_, build)
 
-    def skin(self, name: str) -> Outcome:
+    def skin(self, name: str) -> Outcome | None:
+        if self._is_pruned(f"skins/{name}", f"skin.{name}"):
+            return None
+
         def build() -> tuple[Iterable[Path], dict[str, Any], str]:
             entry = convert_skin(name, self.archive, web_root=self.web_root)
             outputs = [self.web / path for path in _entry_files(entry)]
@@ -185,7 +214,10 @@ class Builder:
             return self._fail(f"skins/{name}", error)
         return self.run(f"skins/{name}", print_, build)
 
-    def iris(self, name: str) -> Outcome:
+    def iris(self, name: str) -> Outcome | None:
+        if self._is_pruned(f"irises/{name}", f"iris.{name}"):
+            return None
+
         def build() -> tuple[Iterable[Path], dict[str, Any], str]:
             entry = convert_iris(name, self.archive, web_root=self.web_root)
             outputs = [self.web / entry["color"], self.web / entry["normal"]]
@@ -263,6 +295,8 @@ class Builder:
                 continue
             info = describe(unit.relative_to(clips_root), clip.kind)
             if only and info.id not in only:
+                continue
+            if self._is_pruned(f"animations/{info.file_stem}", info.id):
                 continue
             suffix = ".glb" if clip.kind == "body" else ".json"
             output = self.web / "animations" / f"{info.file_stem}{suffix}"
@@ -381,6 +415,8 @@ class Builder:
             key = f"grooms/{groom.slot}/{groom.style}"
             if only and groom.style not in only and key not in only:
                 continue
+            if self._is_pruned(key, f"groom.{groom.slot}.{groom.style}"):
+                continue
             print_ = fingerprint(
                 "groom-v3", unit / "done.json", head_done, reference_done, self.mapping_path
             )
@@ -412,6 +448,8 @@ class Builder:
         for unit in list_outfit_units(self.archive):
             key = f"outfits/{unit.name}/{unit.gender}"
             if only and unit.name not in only and key not in only:
+                continue
+            if self._is_pruned(key, f"outfit.{unit.name}"):
                 continue
             body_glb = self.web / "bodies" / unit.gender / "body.glb"
             base = base_body_path(self.archive, unit.gender)
@@ -453,7 +491,7 @@ class Builder:
     # ------------------------------------------------------------------------ manifest
 
     def records(self, prefix: str) -> list[dict[str, Any]]:
-        """Build infos of every current asset under `prefix` (e.g. `skins`)."""
+        """Build infos of every current, unpruned asset under `prefix` (e.g. `skins`)."""
         root = self.stamps.root / prefix
         infos = []
         if not root.is_dir():
@@ -462,7 +500,9 @@ class Builder:
             key = stamp.relative_to(self.stamps.root).with_suffix("").as_posix()
             data = self.stamps.read(key)
             if data and all((self.stamps.archive / o).is_file() for o in data.get("outputs", [])):
-                infos.append(data.get("info", {}))
+                info = data.get("info", {})
+                if not self.pruned & set(_ids(info)):
+                    infos.append(info)
         return infos
 
     def manifest(self) -> Path:
@@ -476,7 +516,7 @@ class Builder:
             bodies=[info["body"] for info in self.records("bodies") if "body" in info],
             animations=[
                 *(info["animation"] for info in self.records("animations") if "animation" in info),
-                *fab_animations(self.web),
+                *(a for a in fab_animations(self.web) if a["id"] not in self.pruned),
             ],
             lighting=[info["lighting"] for info in self.records("lighting") if "lighting" in info],
             grooms=[
@@ -547,6 +587,11 @@ def fab_animations(web: Path) -> list[dict[str, Any]]:
                 }
             )
     return entries
+
+
+def _ids(info: dict[str, Any]) -> list[str]:
+    """Catalogue ids a build info lists (`{"face": {"id": ...}, ...}`)."""
+    return [str(v["id"]) for v in info.values() if isinstance(v, dict) and "id" in v]
 
 
 def _entry_files(entry: dict[str, Any]) -> list[str]:

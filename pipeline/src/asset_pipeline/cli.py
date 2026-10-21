@@ -23,6 +23,7 @@ def _write_vrm_manifest(paths: Paths) -> None:
 def main(argv: list[str] | None = None) -> None:
     from asset_pipeline import transfer
     from asset_pipeline.mh import cli as mh_cli
+    from asset_pipeline.mh import prune, similar
 
     parser = argparse.ArgumentParser(prog="asset-pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -44,6 +45,8 @@ def main(argv: list[str] | None = None) -> None:
     ue.add_argument("--args", default="{}", help="Job options as a JSON object")
     ue.add_argument("--keep-open", action="store_true", help="Leave the editor open afterwards")
     mh_cli.add_parser(sub)
+    prune.add_parser(sub)
+    similar.add_parser(sub)
     transfer.add_parser(sub)
     ue.add_argument(
         "--until-done",
@@ -81,6 +84,10 @@ def main(argv: list[str] | None = None) -> None:
         _write_vrm_manifest(paths)
     elif args.command == mh_cli.COMMAND:
         raise SystemExit(mh_cli.run(args))
+    elif args.command == prune.COMMAND:
+        raise SystemExit(prune.run(args))
+    elif args.command == similar.COMMAND:
+        raise SystemExit(similar.run(args))
     elif args.command == "serve-slim":
         raise SystemExit(transfer.run(args))
     elif args.command == "ue":
