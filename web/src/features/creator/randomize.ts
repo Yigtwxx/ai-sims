@@ -14,6 +14,7 @@ import {
   presetsFor,
   presetSliders,
   reconcileAccessories,
+  skinsFor,
   type OutfitSlot,
 } from './reconcile';
 import { HAIR_DYES, HAIR_PATTERN_COLORS } from './palettes';
@@ -67,7 +68,7 @@ export function randomConfig(
     next.body.sliders.height = Number(Math.max(-1, Math.min(1, (random() - 0.5) * 1.2)).toFixed(2));
   }
 
-  const skin = pick(manifest.skins, random);
+  const skin = pick(skinsFor(manifest, base), random);
   if (skin) {
     next.skin = {
       set: skin.id,

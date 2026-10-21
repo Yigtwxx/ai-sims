@@ -77,6 +77,11 @@ const BodyMapsSchema = z.object({
 export const SkinSchema = z.object({
   id: Id,
   label: Label,
+  /**
+   * The body the preset was made for. Optional until the pipeline writes it;
+   * `skinGender()` in the creator falls back to other signals meanwhile.
+   */
+  gender: Gender.optional(),
   /** 0 (lightest) .. 1 (darkest), estimated from the albedo; the creator sorts by it. */
   tone: z.number().min(0).max(1),
   swatch: Hex,

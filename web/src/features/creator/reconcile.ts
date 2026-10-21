@@ -49,6 +49,29 @@ export function skinsByTone(manifest: MhManifest): MhSkin[] {
   return [...manifest.skins].sort((a, b) => a.tone - b.tone);
 }
 
+/**
+ * The body a skin set was made for: the manifest's own tag; else the gender of
+ * the face that defaults to it; else the face maps' underwear straps, which the
+ * converter only writes for presets wearing the women's underwear top.
+ */
+export function skinGender(manifest: MhManifest, skin: MhSkin): CharacterBase {
+  if (skin.gender) return skin.gender;
+  const face = manifest.faces.find((candidate) => candidate.defaultSkin === skin.id);
+  if (face) return face.gender;
+  return skin.face.underwear ? 'female' : 'male';
+}
+
+/**
+ * Skins for the base gender, lightest first (all skins if none match). A skin
+ * of the other gender carries its stubble, brow and chest detail and lacks the
+ * women's underwear straps, so it reads as a texture error on this body.
+ */
+export function skinsFor(manifest: MhManifest, base: CharacterBase): MhSkin[] {
+  const sorted = skinsByTone(manifest);
+  const matching = sorted.filter((skin) => skinGender(manifest, skin) === base);
+  return matching.length > 0 ? matching : sorted;
+}
+
 export function groomsFor(manifest: MhManifest, slot: GroomSlot, base: CharacterBase): MhGroom[] {
   return manifest.grooms.filter((groom) => groom.slot === slot && compatible(groom.compat, base));
 }
@@ -172,12 +195,12 @@ export function reconcileConfig(config: CharacterConfig, manifest: MhManifest): 
       .map(([id, weight]) => [id, clamp(weight, 0, 1)]),
   );
 
-  const skinIds = new Set(manifest.skins.map((skin) => skin.id));
+  // A skin of the other gender (or one the manifest lacks) falls back to the face's own.
+  const skins = skinsFor(manifest, base);
+  const skinIds = new Set(skins.map((skin) => skin.id));
   if (!skinIds.has(next.skin.set)) {
     next.skin.set =
-      face && skinIds.has(face.defaultSkin)
-        ? face.defaultSkin
-        : (skinsByTone(manifest)[0]?.id ?? next.skin.set);
+      face && skinIds.has(face.defaultSkin) ? face.defaultSkin : (skins[0]?.id ?? next.skin.set);
   }
   const skin = manifest.skins.find((candidate) => candidate.id === next.skin.set);
   if (next.skin.makeup && !skin?.makeupAlbedo) next.skin.makeup = false;
@@ -236,18 +259,41 @@ export function reconcileConfig(config: CharacterConfig, manifest: MhManifest): 
 /** Every accessory id in catalogue order (for randomize and the creator grid). */
 export const ACCESSORY_IDS = ACCESSORIES.map((def) => def.id);
 
-/**
- * A new character for this base: the defaults reconciled with the manifest,
- * wearing natural eyebrows (a bare brow ridge reads as uncanny, not as a choice).
- */
 /** Hair a new character starts with, preferred first (manifest groom ids). */
 const STARTING_HAIR: Record<CharacterBase, RegExp[]> = {
   female: [/Hair_M_BobStraight/, /Hair_M_Bob/, /Hair_L_Straight$/],
   male: [/Hair_S_Clean/, /Hair_S_Casual/, /Hair_S_/],
 };
 
+/** Slots a new character is dressed in (a one-piece outfit is a choice, not a start). */
+const STARTING_OUTFIT = ['top', 'bottom', 'shoes'] as const satisfies readonly OutfitCategory[];
+
+/**
+ * The first garment the (curated) manifest offers this base for a category, in
+ * its first colour, or null when the category has none.
+ */
+export function startingOutfit(
+  manifest: MhManifest,
+  category: OutfitCategory,
+  base: CharacterBase,
+): OutfitItem | null {
+  const outfit = outfitsFor(manifest, category, base)[0];
+  return outfit ? { id: outfit.id, tint: outfit.tintPresets[0]?.id ?? null, colors: {} } : null;
+}
+
+/**
+ * A new character for this base: the defaults reconciled with the manifest,
+ * dressed in the first top, bottom and shoes on offer (a character in
+ * underwear is not a demo start), wearing natural eyebrows (a bare brow ridge
+ * reads as uncanny, not as a choice) and an everyday haircut.
+ */
 export function startingConfig(base: CharacterBase, manifest: MhManifest): CharacterConfig {
   const config = reconcileConfig(createDefaultConfig(base), manifest);
+  if (config.outfit.full === null) {
+    for (const slot of STARTING_OUTFIT) {
+      config.outfit[slot] ??= startingOutfit(manifest, slot, base);
+    }
+  }
   if (config.eyebrows.style === null) {
     const brows = groomsFor(manifest, 'eyebrows', base);
     const natural = brows.find((groom) => /natural/i.test(groom.id)) ?? brows[0];

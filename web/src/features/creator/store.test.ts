@@ -8,18 +8,17 @@ import { presetSliders, startingConfig } from './reconcile';
 import { useCreatorStore } from './store';
 
 /**
- * The fixture with a male body that has no curvy preset (as the pipeline
- * exports it) and an average that is not all defaults, so the sliders show
- * which preset was applied.
+ * The fixture (its male body has no curvy preset, as the pipeline exports it)
+ * with a male average that is not all defaults, so the sliders show which
+ * preset was applied.
  */
 function maleWithoutCurvy(): MhManifest {
   const source = fixtureManifest();
-  const bodies = source.bodies.map((body) => {
-    if (body.gender !== 'male') return body;
-    const presets = { ...body.presets, average: { weight: 0.1 } };
-    delete presets.curvy;
-    return { ...body, presets };
-  });
+  const bodies = source.bodies.map((body) =>
+    body.gender === 'male'
+      ? { ...body, presets: { ...body.presets, average: { weight: 0.1 } } }
+      : body,
+  );
   return { ...source, bodies };
 }
 

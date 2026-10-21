@@ -5,7 +5,7 @@ import { useId } from 'react';
 
 import { Switch } from '@/components/ui/switch';
 
-import { skinsByTone } from '../reconcile';
+import { skinsFor } from '../reconcile';
 import { Hint, LabeledSlider, Section, SwatchPicker } from '../ui/controls';
 
 import { signedPercent, useConfig, useLabel, type PanelProps } from './shared';
@@ -17,7 +17,7 @@ export function SkinPanel({ manifest }: PanelProps) {
   const { config, update } = useConfig();
   const makeupId = useId();
 
-  const skins = skinsByTone(manifest);
+  const skins = skinsFor(manifest, config.base);
   const current = manifest.skins.find((skin) => skin.id === config.skin.set);
   const swatchOf = new Map(skins.map((skin) => [skin.swatch.toLowerCase(), skin.id]));
   const hasMakeup = Boolean(current?.makeupAlbedo);

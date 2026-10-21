@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 
-import { facesFor, MAX_FACE_BLENDS } from '../reconcile';
+import { facesFor, MAX_FACE_BLENDS, skinsFor } from '../reconcile';
 import { thumbnailSrc } from '../useMhManifest';
 import { OptionGrid, OptionTile } from '../ui/OptionGrid';
 import { Hint, LabeledSlider, Section } from '../ui/controls';
@@ -20,6 +20,7 @@ export function FacePanel({ manifest }: PanelProps) {
   const [picking, setPicking] = useState(false);
 
   const faces = facesFor(manifest, config.base);
+  const skinIds = new Set(skinsFor(manifest, config.base).map((skin) => skin.id));
   const byId = new Map(faces.map((face) => [face.id, face]));
   const blends = Object.entries(config.face.blend);
   const candidates = faces.filter(
@@ -41,7 +42,7 @@ export function FacePanel({ manifest }: PanelProps) {
                 update((draft) => {
                   draft.face.preset = face.id;
                   delete draft.face.blend[face.id];
-                  if (manifest.skins.some((skin) => skin.id === face.defaultSkin)) {
+                  if (skinIds.has(face.defaultSkin)) {
                     draft.skin.set = face.defaultSkin;
                   }
                 })

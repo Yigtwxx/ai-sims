@@ -80,10 +80,10 @@ const body = (gender: Gender) => ({
     slim: { weight: -0.6, muscle: -0.2, chest: -0.3, waist: -0.4, hips: -0.3, shoulders: -0.2 },
     average: {},
     athletic: { weight: 0.05, muscle: 0.75, chest: 0.3, waist: -0.25, shoulders: 0.45 },
-    curvy:
-      gender === 'female'
-        ? { weight: 0.35, chest: 0.55, waist: -0.1, hips: 0.75, shoulders: -0.05 }
-        : { weight: 0.55, chest: 0.3, waist: 0.4, hips: 0.35, shoulders: 0.15 },
+    // Curvy is female only, as the pipeline exports it.
+    ...(gender === 'female'
+      ? { curvy: { weight: 0.35, chest: 0.55, waist: -0.1, hips: 0.75, shoulders: -0.05 } }
+      : {}),
   },
 });
 

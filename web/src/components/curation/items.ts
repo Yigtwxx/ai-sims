@@ -3,7 +3,7 @@
  * groups near-duplicates (same label stem, e.g. "Long Straight 02" and
  * "Long Straight 03") so they can be culled together. Pure functions.
  */
-import { reconcileConfig } from '@/features/creator/reconcile';
+import { reconcileConfig, skinGender } from '@/features/creator/reconcile';
 import {
   labelFor,
   type AutoPick,
@@ -68,7 +68,7 @@ export function itemsFor(manifest: MhManifest, tab: CurationTab, locale: string)
           id: skin.id,
           label: labelFor(skin.label, locale),
           swatch: skin.swatch,
-          meta: [],
+          meta: [skinGender(manifest, skin)],
           tone: Math.round(skin.tone * 100),
           glyph: 'face',
         }));
@@ -266,8 +266,10 @@ export function previewConfig(
       break;
     }
     case 'skins': {
-      if (!manifest.skins.some((entry) => entry.id === id)) return null;
-      config = createDefaultConfig('female');
+      const skin = manifest.skins.find((entry) => entry.id === id);
+      if (!skin) return null;
+      // On its own body: the creator only offers a skin to its gender.
+      config = createDefaultConfig(skinGender(manifest, skin));
       config.skin.set = id;
       break;
     }
