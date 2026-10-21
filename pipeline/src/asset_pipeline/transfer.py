@@ -31,10 +31,11 @@ from urllib.parse import parse_qs, unquote, urlsplit
 INDEX_CACHE = ".transfer-index.json"
 """Per-root cache of file hashes, keyed by path, valid while size and mtime match."""
 
-DEFAULT_INCLUDE = ("web", "raw", "fab_anims", "logs")
+DEFAULT_INCLUDE = ("web", "raw", "fab_anims", "gestures", "logs")
 """Archive folders the Mac needs: web assets, Unreal sources for reconversion, the
-retargeted Fab animation sources and the run logs. Fab .mhpkg packages (`fab`) are
-Unreal-only and stay out unless asked for."""
+retargeted Fab animation sources, the gesture FBX sources (Mocap.in, ActorCore) that
+`web/scripts/retarget-fbx.mjs` reads and the run logs. Fab .mhpkg packages (`fab`)
+are Unreal-only and stay out unless asked for."""
 
 CHUNK = 1 << 20
 RANGE = re.compile(r"^bytes=(\d*)-(\d*)$")
