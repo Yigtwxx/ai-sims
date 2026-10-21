@@ -43,7 +43,13 @@ import {
 import { useQuality } from '../quality';
 import { applyEyeMaterials, bindIrisTextures } from './eyeMaterials';
 import { applyBodyHide } from './garments';
-import { densityFiles, packGroomDensity, setGroomDensity, setGroomTint } from './groomDensity';
+import {
+  densityFiles,
+  packGroomDensity,
+  paintedSlots,
+  setGroomDensity,
+  setGroomTint,
+} from './groomDensity';
 import { takeOffGroom, wearGroom, type GroomWear, type WornGroom } from './hair';
 import { setHairLook } from './hairMaterial';
 import { useMhGltf } from './loaders';
@@ -53,6 +59,7 @@ import {
   applySkinMaterials,
   loadSkinDetail,
   setSkinDetail,
+  setUnderwear,
   type WrinkleUniforms,
 } from './materials';
 import {
@@ -109,6 +116,8 @@ export interface MhCharacterProps {
    * it, its first frame uploads all its maps at once and the stage freezes.
    */
   prewarm?: boolean;
+  /** The body wears an underwear top where no top covers it (women); briefs always. */
+  underwearTop?: boolean;
 }
 
 /**
@@ -131,6 +140,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     onFrame,
     onSettled,
     prewarm = false,
+    underwearTop = false,
   },
   ref,
 ) {
@@ -304,7 +314,12 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   const density = useRef<WebGLRenderTarget | null>(null);
   const { hairLod } = useQuality();
   const swapGrooms = useCallback(
-    (next: WornGroom[], files: (string | null)[], layers: WebGLRenderTarget | null) => {
+    (
+      next: WornGroom[],
+      files: (string | null)[],
+      layers: WebGLRenderTarget | null,
+      painted: boolean[] = [],
+    ) => {
       for (const groom of worn.current.values()) {
         takeOffGroom(assembled.root, assembled.handle.faceMeshes, groom);
       }
@@ -321,6 +336,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         layers?.texture ?? null,
         files,
         latestGrooms.current[0]?.look,
+        painted,
       );
       density.current?.dispose();
       density.current = layers;
@@ -338,18 +354,22 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     }
     let live = true;
     const wears = latestGrooms.current;
-    const fitted = Promise.allSettled(wears.map((wear) => wearGroom(gl, wear, head, hairLod))).then(
-      (results) =>
-        results.flatMap((result, i) => {
-          if (result.status === 'fulfilled') return [result.value];
-          console.warn('[mh] groom failed to load', wears[i]?.groom.id, result.reason);
-          return [];
-        }),
+    // Painted grooms have no cards: the skin draws them from the density pack.
+    const carded = wears.filter((wear) => wear.groom.glb);
+    const fitted = Promise.allSettled(
+      carded.map((wear) => wearGroom(gl, wear, head, hairLod)),
+    ).then((results) =>
+      results.flatMap((result, i) => {
+        if (result.status === 'fulfilled') return [result.value];
+        console.warn('[mh] groom failed to load', carded[i]?.groom.id, result.reason);
+        return [];
+      }),
     );
     const files = densityFiles(wears);
+    const painted = paintedSlots(wears);
     const layers: Promise<WebGLRenderTarget | null> = files.some(Boolean)
       ? Promise.all(files.map((file) => (file ? loadAssetTexture(gl, file, 'data') : null))).then(
-          (textures) => packGroomDensity(gl, textures),
+          (textures) => packGroomDensity(gl, textures, painted.some(Boolean)),
           (error: unknown) => {
             console.warn('[mh] groom density failed to load', error);
             return null;
@@ -366,7 +386,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         const look = latestGrooms.current.find((wear) => wear.groom.id === groom.id)?.look;
         if (look) setHairLook(groom.materials, look);
       }
-      swapGrooms(next, files, packed);
+      swapGrooms(next, files, packed, painted);
       settle('grooms');
     });
     return () => {
@@ -411,8 +431,15 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         body.mesh,
         next.flatMap((worn) => (worn.hide ? [worn.hide] : [])),
       );
+      // In the same frame as the garments, so a change never flashes bare skin.
+      const worn = new Set(next.map((outfit) => outfit.category));
+      const full = worn.has('full');
+      setUnderwear(assembled.skins, {
+        top: underwearTop && !full && !worn.has('top'),
+        bottom: !full && !worn.has('bottom'),
+      });
     },
-    [assembled],
+    [assembled, underwearTop],
   );
   useEffect(() => () => swapOutfits([]), [swapOutfits]);
   useEffect(() => {

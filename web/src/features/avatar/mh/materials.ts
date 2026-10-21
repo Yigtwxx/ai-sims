@@ -4,6 +4,7 @@ import {
   RepeatWrapping,
   ShaderChunk,
   TextureLoader,
+  Vector2,
   type Material,
   type Mesh,
   type MeshStandardMaterial,
@@ -48,6 +49,12 @@ export interface SkinTuning {
   groomDensity: boolean;
   /** Discard skin under worn garments by the BODY_HIDDEN vertex attribute (body only). */
   bodyHide: boolean;
+  /**
+   * Draw the underwear over the bare skin where no garment covers it: `cloth`
+   * samples the shared cloth maps (body), `color` paints one colour (the top's
+   * straps on the head, which has no sampler units left for the cloth).
+   */
+  underwear: 'cloth' | 'color' | null;
 }
 
 export const HEAD_SKIN: SkinTuning = {
@@ -59,6 +66,7 @@ export const HEAD_SKIN: SkinTuning = {
   wrinkles: true,
   groomDensity: true,
   bodyHide: false,
+  underwear: 'color',
 };
 
 export const BODY_SKIN: SkinTuning = {
@@ -68,6 +76,7 @@ export const BODY_SKIN: SkinTuning = {
   wrinkles: false,
   groomDensity: false,
   bodyHide: true,
+  underwear: 'cloth',
 };
 
 const DIFFUSE_LINE =
@@ -143,15 +152,74 @@ const GROOM_DENSITY_PARS = /* glsl */ `
 uniform sampler2D skinGroomDensity;
 uniform vec4 skinGroomStrength;
 uniform vec3 skinGroomTint;
+uniform vec4 skinGroomPaint;
+uniform vec3 skinGroomColor;
 #endif
 `;
-// Skin under hair, brows and beard takes on the hair colour (see ./groomDensity.ts).
+// Skin under hair, brows and beard takes on the hair colour; painted grooms
+// (stubble, buzz cuts) are the hair itself, strand by strand (see ./groomDensity.ts).
 const GROOM_DENSITY = /* glsl */ `
 #if defined( MH_GROOM_DENSITY ) && defined( USE_MAP )
-  float groomCover = saturate( dot( texture2D( skinGroomDensity, vMapUv ), skinGroomStrength ) );
+  vec4 groomLayers = texture2D( skinGroomDensity, vMapUv );
+  float groomCover = saturate( dot( groomLayers, skinGroomStrength ) );
   diffuseColor.rgb *= mix( vec3( 1.0 ), skinGroomTint, groomCover );
+  float groomPaint = saturate( dot( groomLayers, skinGroomPaint ) );
+  diffuseColor.rgb = mix( diffuseColor.rgb, skinGroomColor, groomPaint );
 #endif
 `;
+
+const UNDERWEAR_PARS = /* glsl */ `
+#ifdef MH_UNDERWEAR
+uniform sampler2D skinUnderwearMask;
+uniform vec2 skinUnderwearShow;
+uniform vec3 skinUnderwearColor;
+#endif
+#ifdef MH_UNDERWEAR_CLOTH
+uniform sampler2D skinUnderwearAlbedo;
+uniform sampler2D skinUnderwearNormal;
+uniform float skinUnderwearHasNormal;
+#endif
+`;
+// The body albedo is bare skin; the underwear (mask R top, G briefs) is drawn
+// over it only where no garment covers that part (see setUnderwear).
+const UNDERWEAR = /* glsl */ `
+#ifdef MH_UNDERWEAR
+  float underwear = 0.0;
+  #ifdef USE_MAP
+  vec2 underwearCover = texture2D( skinUnderwearMask, vMapUv ).rg * skinUnderwearShow;
+  underwear = max( underwearCover.r, underwearCover.g );
+  #ifdef MH_UNDERWEAR_CLOTH
+  vec3 underwearCloth = texture2D( skinUnderwearAlbedo, vMapUv ).rgb;
+  #else
+  vec3 underwearCloth = skinUnderwearColor;
+  #endif
+  diffuseColor.rgb = mix( diffuseColor.rgb, underwearCloth, underwear );
+  #endif
+#endif
+`;
+// The cloth's normal (seams, folds) replaces the bare skin's where it is drawn.
+const UNDERWEAR_NORMAL = /* glsl */ `
+  #if defined( MH_UNDERWEAR_CLOTH ) && defined( USE_NORMALMAP_TANGENTSPACE )
+  if ( underwear * skinUnderwearHasNormal > 0.0 ) {
+    vec3 underwearN = texture2D( skinUnderwearNormal, vNormalMapUv ).xyz * 2.0 - 1.0;
+    underwearN.xy *= normalScale;
+    mapN = mix( mapN, underwearN, underwear );
+  }
+  #endif
+`;
+
+/** Underwear inputs of a skin; textures arrive with the skin set. */
+export interface UnderwearUniforms {
+  skinUnderwearMask: { value: Texture | null };
+  /** Linear cloth colour where there are no cloth maps (the head's straps). */
+  skinUnderwearColor: { value: Color };
+  skinUnderwearAlbedo: { value: Texture | null };
+  skinUnderwearNormal: { value: Texture | null };
+  /** 1 once the cloth normal is bound. */
+  skinUnderwearHasNormal: { value: number };
+  /** Shown parts: x the top, y the briefs (0 or 1). */
+  skinUnderwearShow: { value: Vector2 };
+}
 
 // Skin under a worn garment (see ./garments.ts): a face whose vertices are all
 // covered interpolates to 1 and is dropped, so the body never pokes through.
@@ -245,17 +313,30 @@ export function createSkinMaterial(
       }
     : null;
   const density = tuning.groomDensity ? createGroomDensityUniforms() : null;
+  const underwear: UnderwearUniforms | null = tuning.underwear
+    ? {
+        skinUnderwearMask: { value: null },
+        skinUnderwearColor: { value: new Color(0.25, 0.25, 0.25) },
+        skinUnderwearAlbedo: { value: null },
+        skinUnderwearNormal: { value: null },
+        skinUnderwearHasNormal: { value: 0 },
+        skinUnderwearShow: { value: new Vector2(0, 0) },
+      }
+    : null;
   material.defines = {
     ...(wrinkles ? { MH_WRINKLES: '' } : {}),
     ...(density ? { MH_GROOM_DENSITY: '' } : {}),
     ...(tuning.bodyHide ? { MH_BODY_HIDE: '' } : {}),
+    ...(underwear ? { MH_UNDERWEAR: '' } : {}),
+    ...(tuning.underwear === 'cloth' ? { MH_UNDERWEAR_CLOTH: '' } : {}),
   };
   material.userData.skinUniforms = uniforms;
   material.userData.wrinkleUniforms = wrinkles;
   material.userData.groomDensityUniforms = density;
+  material.userData.underwearUniforms = underwear;
   material.userData.skinTuning = tuning;
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms, wrinkles ?? {}, density ?? {});
+    Object.assign(shader.uniforms, uniforms, wrinkles ?? {}, density ?? {}, underwear ?? {});
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -285,10 +366,11 @@ ${BODY_HIDE_FRAGMENT}`,
           'uniform sampler2D skinCavity;',
           'uniform float skinCavityStrength;',
           GROOM_DENSITY_PARS,
+          UNDERWEAR_PARS,
           BODY_HIDE_FRAGMENT_PARS,
         ].join('\n'),
       )
-      .replace('#include <map_fragment>', `#include <map_fragment>\n${GROOM_DENSITY}`)
+      .replace('#include <map_fragment>', `#include <map_fragment>\n${GROOM_DENSITY}\n${UNDERWEAR}`)
       // After the normal map uniforms it reads (normalScale, vNormalMapUv).
       .replace(
         '#include <normalmap_pars_fragment>',
@@ -306,11 +388,14 @@ ${BODY_HIDE_FRAGMENT}`,
       )
       .replace(
         '#include <normal_fragment_maps>',
-        ShaderChunk.normal_fragment_maps.replace(NORMAL_SCALE_LINE, MICRO_NORMAL),
+        ShaderChunk.normal_fragment_maps.replace(
+          NORMAL_SCALE_LINE,
+          `${MICRO_NORMAL}\n${UNDERWEAR_NORMAL}`,
+        ),
       );
   };
   material.customProgramCacheKey = () =>
-    `mh-skin-v5${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}${tuning.bodyHide ? '-hide' : ''}`;
+    `mh-skin-v6${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}${tuning.bodyHide ? '-hide' : ''}${tuning.underwear ? `-underwear-${tuning.underwear}` : ''}`;
   return material;
 }
 
@@ -338,6 +423,20 @@ export function applySkinMaterials(root: Object3D, detail: SkinDetail): Material
     created.push(skin);
   });
   return created;
+}
+
+/**
+ * Which underwear the body shows: the briefs unless a bottom (or one-piece)
+ * covers them, the top on bodies that wear one unless a top covers it.
+ */
+export function setUnderwear(
+  materials: readonly Material[],
+  show: { top: boolean; bottom: boolean },
+): void {
+  for (const material of materials) {
+    const uniforms = material.userData.underwearUniforms as UnderwearUniforms | null | undefined;
+    uniforms?.skinUnderwearShow.value.set(show.top ? 1 : 0, show.bottom ? 1 : 0);
+  }
 }
 
 /** Shared detail textures (renderer-owned, next to the converted assets). */

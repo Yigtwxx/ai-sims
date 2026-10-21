@@ -53,13 +53,25 @@ const FaceMapsSchema = z.object({
   wrinkleColor: z.array(File).max(3).default([]),
   wrinkleNormal: z.array(File).max(3).default([]),
   wrinkleMasks: z.array(File).default([]),
+  /**
+   * The underwear top's straps where the head reaches the shoulders: a mask
+   * (R) and the cloth colour, drawn with the body's top.
+   */
+  underwear: z.object({ mask: File, color: Hex }).optional(),
 });
 
 const BodyMapsSchema = z.object({
+  /** Bare skin: the converter fills the underwear baked into the source albedo. */
   albedo: File,
   normal: File,
   cavity: File.optional(),
   srmf: File.optional(),
+  /**
+   * Shared underwear the shader draws over the bare skin where no garment
+   * covers it: mask R the top (women only), G the briefs; albedo and normal
+   * the cloth.
+   */
+  underwear: z.object({ mask: File, albedo: File, normal: File.optional() }).optional(),
 });
 
 export const SkinSchema = z.object({
@@ -105,7 +117,13 @@ export const GroomSchema = z.object({
   slot: z.enum(GROOM_SLOTS),
   label: Label,
   compat: Compat.default('unisex'),
-  glb: File,
+  /** Cards GLB; a painted groom has none. */
+  glb: File.optional(),
+  /**
+   * Head-UV map (A: coverage, strand by strand) of a groom Unreal draws from
+   * strands only (stubble, buzz cuts): the head skin paints it in the hair colour.
+   */
+  painted: File.optional(),
   thumbnail: File.optional(),
   textures: z.record(z.string(), File).default({}),
   params: z.array(ParamSchema).default([]),

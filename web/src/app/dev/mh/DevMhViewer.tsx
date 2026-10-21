@@ -173,6 +173,7 @@ export function DevMhViewer() {
             sliders={sliders}
             skin={skinSet}
             iris={iris}
+            underwearTop={gender === 'female'}
             onFrame={onFrame}
           />
         </Suspense>

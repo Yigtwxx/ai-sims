@@ -32,6 +32,8 @@ export interface ResolvedCharacter {
   grooms: GroomWear[];
   /** Outfit items with a mesh for this body, one-piece first, with their colours. */
   outfits: OutfitWear[];
+  /** The body wears an underwear top where no top covers it (the female body). */
+  underwearTop: boolean;
   /** Face loops under the live face: the idle loop and a happy loop for the smile. */
   faceClips: { idle: string | null; smile: string | null };
   /** Approximate standing height (m), for camera framing. */
@@ -79,6 +81,7 @@ export function resolveCharacter(
     ...idleSet(manifest),
     grooms: groomWears(config, manifest),
     outfits: outfitWears(config, manifest),
+    underwearTop: gender === 'female',
     faceClips: faceClipSet(manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };

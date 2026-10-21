@@ -9,7 +9,7 @@ import {
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
-import { assetUrl, type MhOutfit } from '@/lib/assets/manifest';
+import { assetUrl, type MhOutfit, type OutfitCategory } from '@/lib/assets/manifest';
 
 import { mhExtras, type BodyRig } from './assembly';
 import { acquireChannelPack } from './channelPack';
@@ -35,6 +35,7 @@ export interface OutfitWear {
 /** An outfit put on one character. */
 export interface WornOutfit {
   id: string;
+  category: OutfitCategory;
   meshes: SkinnedMesh[];
   /** Fabric materials by glTF material name (jeans and plain parts keep the GLB's). */
   fabrics: Map<string, FabricMaterial>;
@@ -162,6 +163,7 @@ export async function wearOutfit(
   const bodyVertices = (body.mesh.geometry.getAttribute('position') as BufferAttribute).count;
   return {
     id: wear.outfit.id,
+    category: wear.outfit.category,
     meshes,
     fabrics,
     hide: bitset ? decodeHideBitset(bitset, bodyVertices) : null,

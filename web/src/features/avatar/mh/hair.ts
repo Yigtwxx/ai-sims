@@ -127,6 +127,7 @@ export async function wearGroom(
   lod: 0 | 1 = 0,
 ): Promise<WornGroom> {
   const { groom } = wear;
+  if (!groom.glb) throw new Error(`${groom.id} has no cards (it is painted on the skin)`);
   const atlas = cardAtlas(groom);
   const [cards, attribute, tangent] = await Promise.all([
     loadCards(renderer, assetUrl(groom.glb), lod),

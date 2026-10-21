@@ -277,6 +277,7 @@ export const MhStage = memo(function MhStage({
                   idleLayer={character.idleLayer}
                   grooms={character.grooms}
                   outfits={character.outfits}
+                  underwearTop={character.underwearTop}
                   onFrame={incoming ? onIncomingFrame : onFrame}
                   prewarm={incoming}
                   onSettled={

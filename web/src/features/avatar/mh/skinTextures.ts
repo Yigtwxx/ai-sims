@@ -1,4 +1,5 @@
 import {
+  Color,
   RepeatWrapping,
   SRGBColorSpace,
   TextureLoader,
@@ -13,7 +14,7 @@ import { assetUrl, type MhIris, type MhSkin } from '@/lib/assets/manifest';
 
 import { ktx2LoaderFor } from './loaders';
 import { packMaskArray } from './maskArray';
-import type { WrinkleUniforms } from './materials';
+import type { UnderwearUniforms, WrinkleUniforms } from './materials';
 import { WRINKLE_MASK_LAYERS } from './wrinkles';
 
 /**
@@ -24,6 +25,8 @@ import { WRINKLE_MASK_LAYERS } from './wrinkles';
 
 export interface SkinTextures {
   face: {
+    /** The underwear top's straps where the head reaches the shoulders. */
+    underwear: { mask: Texture; color: Color } | null;
     albedo: Texture;
     normal: Texture;
     srmf: Texture | null;
@@ -36,6 +39,8 @@ export interface SkinTextures {
     normal: Texture;
     srmf: Texture | null;
     cavity: Texture | null;
+    /** Shared underwear mask (R top, G briefs), cloth albedo and normal. */
+    underwear: { mask: Texture; albedo: Texture; normal: Texture | null } | null;
   };
   /** The ten region masks packed into one array texture (shared across skins). */
   masks: Texture | null;
@@ -128,6 +133,8 @@ export async function loadSkinTextures(
     bodySrmf,
     bodyCavity,
     masks,
+    underwear,
+    straps,
   ] = await Promise.all([
     loadTexture(renderer, makeup && skin.makeupAlbedo ? skin.makeupAlbedo : face.albedo, 'color'),
     loadTexture(renderer, face.normal, 'data'),
@@ -141,10 +148,29 @@ export async function loadSkinTextures(
     optional(renderer, skin.body.srmf, 'data'),
     optional(renderer, skin.body.cavity, 'data'),
     wrinkleFiles ? (maskArray(renderer, face.wrinkleMasks) ?? Promise.resolve(null)) : null,
+    skin.body.underwear
+      ? Promise.all([
+          loadTexture(renderer, skin.body.underwear.mask, 'data'),
+          loadTexture(renderer, skin.body.underwear.albedo, 'color'),
+          optional(renderer, skin.body.underwear.normal, 'data'),
+        ]).then(([mask, albedo, normal]) => ({ mask, albedo, normal }))
+      : Promise.resolve(null),
+    face.underwear
+      ? loadTexture(renderer, face.underwear.mask, 'data').then((mask) => ({
+          mask,
+          color: new Color(face.underwear!.color),
+        }))
+      : Promise.resolve(null),
   ]);
   return {
-    face: { albedo, normal, srmf, cavity, wrinkleNormals },
-    body: { albedo: bodyAlbedo, normal: bodyNormal, srmf: bodySrmf, cavity: bodyCavity },
+    face: { albedo, normal, srmf, cavity, wrinkleNormals, underwear: straps },
+    body: {
+      albedo: bodyAlbedo,
+      normal: bodyNormal,
+      srmf: bodySrmf,
+      cavity: bodyCavity,
+      underwear,
+    },
     masks,
   };
 }
@@ -178,6 +204,18 @@ export function bindSkinTextures(materials: readonly Material[], textures: SkinT
     skin.roughness = set.srmf ? 1 : 0.5;
     uniforms.skinCavity.value = set.cavity;
     uniforms.skinCavityStrength.value = set.cavity ? CAVITY_STRENGTH : 0;
+    const underwear = skin.userData.underwearUniforms as UnderwearUniforms | null | undefined;
+    if (underwear && isHead) {
+      underwear.skinUnderwearMask.value = textures.face.underwear?.mask ?? null;
+      // Color(hex) is sRGB in, linear out under three's colour management.
+      if (textures.face.underwear)
+        underwear.skinUnderwearColor.value.copy(textures.face.underwear.color);
+    } else if (underwear) {
+      underwear.skinUnderwearMask.value = textures.body.underwear?.mask ?? null;
+      underwear.skinUnderwearAlbedo.value = textures.body.underwear?.albedo ?? null;
+      underwear.skinUnderwearNormal.value = textures.body.underwear?.normal ?? null;
+      underwear.skinUnderwearHasNormal.value = textures.body.underwear?.normal ? 1 : 0;
+    }
     const wrinkles = skin.userData.wrinkleUniforms as WrinkleUniforms | null | undefined;
     if (isHead && wrinkles) {
       const normals = textures.face.wrinkleNormals;

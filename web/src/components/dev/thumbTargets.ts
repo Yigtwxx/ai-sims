@@ -46,7 +46,7 @@ export function thumbnailTargets(manifest: MhManifest): ThumbTarget[] {
     .map((groom) => ({
       id: groom.id,
       kind: groom.slot,
-      file: groom.thumbnail ?? besides(groom.glb),
+      file: groom.thumbnail ?? besides((groom.glb ?? groom.painted)!),
       inManifest: groom.thumbnail !== undefined,
     }));
   const outfits = manifest.outfits.flatMap((outfit) => {
