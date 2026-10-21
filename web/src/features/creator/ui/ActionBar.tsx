@@ -3,6 +3,7 @@
 import {
   ArrowClockwiseIcon,
   ArrowCounterClockwiseIcon,
+  ArrowRightIcon,
   ShuffleIcon,
   SpinnerGapIcon,
 } from '@phosphor-icons/react';
@@ -10,6 +11,7 @@ import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface ActionBarProps {
   labels: { undo: string; redo: string; randomize: string; done: string; saving: string };
@@ -37,12 +39,14 @@ function IconAction({
   shortcut,
   disabled,
   onClick,
+  className,
   children,
 }: {
   label: string;
   shortcut: 'undo' | 'redo' | 'random';
   disabled?: boolean;
   onClick: () => void;
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -62,7 +66,7 @@ function IconAction({
           }
           disabled={disabled}
           onClick={onClick}
-          className="size-11"
+          className={cn('size-11', className)}
         >
           {children}
         </Button>
@@ -75,7 +79,10 @@ function IconAction({
   );
 }
 
-/** Pinned to the bottom of the panel: history, randomize and the amber "Bitti". */
+/**
+ * Pinned to the bottom of the panel: history as one paired control, randomize,
+ * and the amber "Bitti" that opens the premiere.
+ */
 export function ActionBar({
   labels,
   canUndo,
@@ -88,23 +95,29 @@ export function ActionBar({
   onDone,
 }: ActionBarProps) {
   return (
-    <footer className="border-hairline bg-backstage flex items-center gap-2 border-t px-5 py-4">
-      <IconAction
-        label={labels.undo}
-        shortcut="undo"
-        disabled={!canUndo || disabled}
-        onClick={onUndo}
-      >
-        <ArrowCounterClockwiseIcon className="size-5" aria-hidden="true" />
-      </IconAction>
-      <IconAction
-        label={labels.redo}
-        shortcut="redo"
-        disabled={!canRedo || disabled}
-        onClick={onRedo}
-      >
-        <ArrowClockwiseIcon className="size-5" aria-hidden="true" />
-      </IconAction>
+    <footer className="border-hairline bg-backstage flex items-center gap-2.5 border-t px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {/* Undo and redo read as one control: a shared frame split by a hairline. */}
+      <div className="rounded-control border-hairline bg-backstage-raised flex shrink-0 items-center border shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
+        <IconAction
+          label={labels.undo}
+          shortcut="undo"
+          disabled={!canUndo || disabled}
+          onClick={onUndo}
+          className="hover:bg-backstage-lift rounded-r-none border-0 bg-transparent shadow-none"
+        >
+          <ArrowCounterClockwiseIcon className="size-5" aria-hidden="true" />
+        </IconAction>
+        <span aria-hidden="true" className="bg-hairline h-5 w-px" />
+        <IconAction
+          label={labels.redo}
+          shortcut="redo"
+          disabled={!canRedo || disabled}
+          onClick={onRedo}
+          className="hover:bg-backstage-lift rounded-l-none border-0 bg-transparent shadow-none"
+        >
+          <ArrowClockwiseIcon className="size-5" aria-hidden="true" />
+        </IconAction>
+      </div>
       <IconAction
         label={labels.randomize}
         shortcut="random"
@@ -120,7 +133,7 @@ export function ActionBar({
         onClick={onDone}
         disabled={saving || disabled}
         aria-busy={saving || undefined}
-        className="font-display text-subhead ml-2 h-13 flex-1"
+        className="group/done font-display ml-1.5 h-13 min-w-0 flex-1 text-[1.375rem]"
       >
         {saving ? (
           <>
@@ -128,7 +141,14 @@ export function ActionBar({
             <span className="text-ui font-sans">{labels.saving}</span>
           </>
         ) : (
-          labels.done
+          <>
+            {labels.done}
+            <ArrowRightIcon
+              weight="bold"
+              aria-hidden="true"
+              className="ease-out-expo size-5 transition-transform duration-300 group-hover/done:translate-x-1"
+            />
+          </>
         )}
       </Button>
     </footer>

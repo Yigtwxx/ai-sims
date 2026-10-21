@@ -45,7 +45,7 @@ function CharacterListSkeleton({ label }: { label: string }) {
   return (
     <div role="status" aria-live="polite" className="mt-12">
       <span className="sr-only">{label}</span>
-      <div className="grid grid-cols-2 gap-x-5 gap-y-10 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
         {Array.from({ length: 5 }, (_, index) => (
           <div key={index} className="flex flex-col gap-3">
             <Skeleton className="aspect-[3/4] w-full" />
@@ -91,7 +91,7 @@ async function CharacterList() {
       <p className="text-label text-ink-faint mt-10 tabular-nums">
         {t('count', { count: characters.length })}
       </p>
-      <ul className="mt-4 grid grid-cols-2 gap-x-5 gap-y-10 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
         {characters.map((character) => (
           <CharacterCard
             key={character.id}

@@ -17,9 +17,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, useRouter } from '@/i18n/navigation';
 import { deleteCharacterAction } from '@/lib/characters/actions';
-import { cn } from '@/lib/utils';
 
 export interface CharacterCardData {
   id: string;
@@ -30,7 +30,11 @@ export interface CharacterCardData {
   updated: string;
 }
 
-/** A saved character: its portrait, name, state and the three things you can do with it. */
+/**
+ * A saved character: its portrait, name, state and the three things you can do
+ * with it. "Konuş" is quiet until the card is pointed at or focused, then it
+ * takes the amber light: one lit card at a time, never a wall of amber buttons.
+ */
 export function CharacterCard({ character }: { character: CharacterCardData }) {
   const t = useTranslations('Characters');
   const router = useRouter();
@@ -38,6 +42,7 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
   const [removed, setRemoved] = useState(false);
   const [pending, startTransition] = useTransition();
   const [broken, setBroken] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const name = character.name || t('untitled');
 
   const remove = () =>
@@ -63,20 +68,35 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
       <Link
         href={`/characters/${character.id}/talk`}
         aria-label={`${name}, ${t('actions.talk')}`}
-        className="rounded-tile bg-backstage-raised ring-hairline hover:ring-ink-faint relative block aspect-[3/4] overflow-hidden ring-1 transition-[box-shadow] duration-300"
+        className="rounded-tile bg-backstage-raised ring-hairline group-hover:ring-ink-faint relative block aspect-[3/4] overflow-hidden ring-1 transition-[box-shadow] duration-300"
       >
         {character.hasThumbnail && !broken ? (
-          // Private, session-gated image: next/image optimization does not apply.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={`/api/characters/${character.id}/thumbnail`}
-            alt=""
-            width={480}
-            height={640}
-            loading="lazy"
-            onError={() => setBroken(true)}
-            className="ease-out-expo size-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-          />
+          <>
+            {loaded ? null : (
+              // Behind the image while it streams in: the slow tungsten sweep, not a blank box.
+              <span
+                aria-hidden="true"
+                className="after:animate-skeleton-sweep absolute inset-0 after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.06),transparent)]"
+              />
+            )}
+            {/* Private, session-gated image: next/image optimization does not apply. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              ref={(node) => {
+                // Server-rendered: the image may finish before hydration attaches onLoad.
+                if (node?.complete && node.naturalWidth > 0) setLoaded(true);
+              }}
+              src={`/api/characters/${character.id}/thumbnail`}
+              alt=""
+              width={480}
+              height={640}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setLoaded(true)}
+              onError={() => setBroken(true)}
+              className="ease-out-expo relative size-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+            />
+          </>
         ) : (
           <span aria-hidden="true" className="absolute inset-0">
             <span className="absolute inset-0 bg-[radial-gradient(70%_55%_at_50%_30%,rgb(255_226_176/0.14),transparent_72%)]" />
@@ -86,16 +106,12 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
             </span>
           </span>
         )}
-        <span
-          className={cn(
-            'text-label absolute top-3 left-3 rounded-full px-2.5 py-1',
-            character.status === 'finalized'
-              ? 'bg-backstage/80 text-ink'
-              : 'border-hairline bg-backstage/80 text-ink-muted border',
-          )}
-        >
-          {t(`status.${character.status}`)}
-        </span>
+        {/* Finished is the normal state; only an unfinished draft needs a label. */}
+        {character.status === 'draft' ? (
+          <span className="text-label border-hairline bg-backstage/85 text-ink-muted absolute top-3 left-3 rounded-full border px-2.5 py-1">
+            {t('status.draft')}
+          </span>
+        ) : null}
       </Link>
 
       <div className="mt-3 flex items-start justify-between gap-3">
@@ -107,31 +123,52 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <Button asChild variant="primary" size="sm" className="flex-1">
+      <div className="mt-3 flex items-center gap-1.5">
+        <Button
+          asChild
+          variant="quiet"
+          size="sm"
+          className="group-focus-within:border-marquee group-focus-within:bg-marquee group-focus-within:text-backstage group-hover:border-marquee group-hover:bg-marquee group-hover:text-backstage hover:bg-marquee-deep min-w-0 flex-1"
+        >
           <Link href={`/characters/${character.id}/talk`}>
-            <ChatCircleDotsIcon weight="fill" aria-hidden="true" />
+            <ChatCircleDotsIcon
+              weight="fill"
+              aria-hidden="true"
+              className="text-marquee group-focus-within:text-backstage group-hover:text-backstage hidden transition-colors duration-200 min-[480px]:block"
+            />
             {t('actions.talk')}
           </Link>
         </Button>
-        <Button asChild variant="quiet" size="sm" className="flex-1">
-          <Link href={`/characters/${character.id}/edit`}>
-            <PencilSimpleIcon aria-hidden="true" />
-            {t('actions.edit')}
-          </Link>
-        </Button>
-        <AlertDialog open={open} onOpenChange={setOpen}>
-          <AlertDialogTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="hover:text-alert size-9"
-              aria-label={`${t('actions.delete')}: ${name}`}
-            >
-              <TrashIcon aria-hidden="true" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button asChild variant="ghost" size="icon" className="size-9">
+              <Link
+                href={`/characters/${character.id}/edit`}
+                aria-label={`${t('actions.edit')}: ${name}`}
+              >
+                <PencilSimpleIcon aria-hidden="true" />
+              </Link>
             </Button>
-          </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>{t('actions.edit')}</TooltipContent>
+        </Tooltip>
+        <AlertDialog open={open} onOpenChange={setOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="hover:text-alert size-9"
+                  aria-label={`${t('actions.delete')}: ${name}`}
+                >
+                  <TrashIcon aria-hidden="true" />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>{t('actions.delete')}</TooltipContent>
+          </Tooltip>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t('deleteDialog.title', { name })}</AlertDialogTitle>

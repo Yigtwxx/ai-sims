@@ -49,7 +49,7 @@ export function OptionGrid({ label, children, className, columns }: OptionGridPr
       role="radiogroup"
       aria-label={label}
       onKeyDown={onGridKeyDown}
-      className={cn('grid gap-2.5', columns ?? 'grid-cols-3', className)}
+      className={cn('grid gap-x-2.5 gap-y-4', columns ?? 'grid-cols-3', className)}
     >
       {children}
     </div>
@@ -80,7 +80,10 @@ export function OptionTile({
   disabled,
 }: OptionTileProps) {
   const [broken, setBroken] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const showImage = Boolean(image) && !broken && !none;
+  // A single colourway is not a choice: dots only when there are several.
+  const dots = swatches && swatches.length > 1 ? swatches.slice(0, 5) : undefined;
 
   return (
     <button
@@ -89,23 +92,36 @@ export function OptionTile({
       aria-checked={selected}
       disabled={disabled}
       onClick={onSelect}
-      className="group/tile flex min-w-0 flex-col gap-1.5 text-left outline-none disabled:opacity-40"
+      className="group/tile flex min-w-0 flex-col gap-2 text-left outline-none disabled:opacity-40"
     >
       <span
         className={cn(
-          'rounded-tile bg-backstage-raised ease-out-expo group-focus-visible/tile:outline-marquee relative block aspect-[3/4] w-full overflow-hidden transition-[box-shadow,transform] duration-300 group-hover/tile:-translate-y-0.5 group-focus-visible/tile:outline-2 group-focus-visible/tile:outline-offset-2',
+          'rounded-tile bg-backstage-raised ease-out-expo group-focus-visible/tile:outline-marquee relative block aspect-[3/4] w-full overflow-hidden transition-[box-shadow,transform] duration-300 group-hover/tile:-translate-y-0.5 group-hover/tile:shadow-[0_10px_24px_rgb(5_5_4/0.45)] group-focus-visible/tile:outline-2 group-focus-visible/tile:outline-offset-2 group-active/tile:translate-y-0',
           selected ? 'ring-marquee ring-2' : 'ring-hairline group-hover/tile:ring-ink-faint ring-1',
+          // Until the art arrives the tile carries the slow tungsten sweep, not a blank box.
+          showImage &&
+            !loaded &&
+            'after:animate-skeleton-sweep after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.06),transparent)]',
         )}
       >
         {showImage ? (
           // eslint-disable-next-line @next/next/no-img-element -- local manifest art, no optimizer needed
           <img
+            ref={(node) => {
+              // Cached art can finish before React attaches onLoad.
+              if (node?.complete && node.naturalWidth > 0) setLoaded(true);
+            }}
             src={image}
             alt=""
             draggable={false}
             loading="lazy"
+            decoding="async"
+            onLoad={() => setLoaded(true)}
             onError={() => setBroken(true)}
-            className="ease-out-expo size-full object-cover transition-transform duration-500 group-hover/tile:scale-[1.03]"
+            className={cn(
+              'ease-out-expo size-full object-cover transition-[opacity,transform] duration-500 group-hover/tile:scale-[1.03]',
+              loaded ? 'opacity-100' : 'opacity-0',
+            )}
           />
         ) : none ? (
           <span className="text-ink-faint flex size-full items-center justify-center">
@@ -124,16 +140,16 @@ export function OptionTile({
       </span>
       <span
         className={cn(
-          'text-label line-clamp-2 leading-tight',
-          selected ? 'text-ink' : 'text-ink-muted group-hover/tile:text-ink',
+          'text-label line-clamp-2 leading-tight transition-colors duration-200',
+          selected ? 'text-ink font-medium' : 'text-ink-muted group-hover/tile:text-ink',
         )}
       >
         {label}
       </span>
-      {swatches && swatches.length > 0 ? (
-        <span className="flex gap-1" aria-hidden="true">
+      {dots ? (
+        <span className="-mt-0.5 flex gap-1" aria-hidden="true">
           {/* Colourways can repeat a colour: key by position. */}
-          {swatches.slice(0, 5).map((color, index) => (
+          {dots.map((color, index) => (
             <span
               key={`${index}-${color}`}
               className="ring-hairline size-2 rounded-full ring-1"

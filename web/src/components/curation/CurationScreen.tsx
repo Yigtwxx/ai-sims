@@ -69,7 +69,11 @@ export function CurationScreen() {
         </Link>
         <div className="mt-5 flex flex-wrap items-end justify-between gap-x-10 gap-y-3">
           <div>
-            <p className="text-label text-marquee tracking-[0.14em] uppercase">{t('devOnly')}</p>
+            {/* Sentence case (DESIGN.md): a quiet tag, not a tracked uppercase eyebrow. */}
+            <p className="text-label border-hairline text-ink-muted inline-flex items-center gap-2 rounded-full border px-2.5 py-1">
+              <span aria-hidden="true" className="bg-marquee size-1.5 rounded-full" />
+              {t('devOnly')}
+            </p>
             <h1 className="font-headline text-headline text-ink mt-2">{t('title')}</h1>
           </div>
           <p className="text-body-sm text-ink-muted max-w-[60ch] pb-1">{t('lede')}</p>

@@ -124,6 +124,9 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
   const [status, setStatus] = useState<CharacterStatus>(initial?.status ?? 'draft');
   const [panelWidth, setPanelWidth] = useState(0);
   const [focusOverride, setFocusOverride] = useState<CameraFocus>();
+  // Something is on the stage: the character, dressed and drawn, or the failure note.
+  const [stageShown, setStageShown] = useState(false);
+  const markStageShown = useCallback(() => setStageShown(true), []);
 
   const panel = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -234,11 +237,25 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [manifest, phase]);
 
+  // On the narrow strip, keep the active category in view (centred) when it changes.
+  useEffect(() => {
+    const tab = tabs.current[CATEGORIES.indexOf(category)];
+    const strip = tab?.parentElement;
+    if (!tab || !strip || strip.scrollWidth <= strip.clientWidth) return;
+    const offset = tab.getBoundingClientRect().left - strip.getBoundingClientRect().left;
+    strip.scrollTo({
+      left: strip.scrollLeft + offset - (strip.clientWidth - tab.offsetWidth) / 2,
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+  }, [category, reduceMotion]);
+
+  // The rail is vertical beside the panel on desktop and a horizontal strip
+  // on narrow screens; both arrow pairs move between the tabs.
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const delta =
-      event.key === 'ArrowDown'
+      event.key === 'ArrowDown' || event.key === 'ArrowRight'
         ? 1
-        : event.key === 'ArrowUp'
+        : event.key === 'ArrowUp' || event.key === 'ArrowLeft'
           ? -1
           : event.key === 'Home'
             ? -index
@@ -260,20 +277,38 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
         {manifest && ready ? (
           <StageBoundary
             fallback={(retry) => (
-              <StageFailed retry={retry} insetLeft={premiere ? 0 : panelWidth} />
+              <>
+                <StageFailed retry={retry} insetLeft={premiere ? 0 : panelWidth} />
+                <OnMount run={markStageShown} />
+              </>
             )}
           >
-            <CreatorStage manifest={manifest} focus={focus} insetLeft={premiere ? 0 : panelWidth} />
+            <CreatorStage
+              manifest={manifest}
+              focus={focus}
+              insetLeft={premiere ? 0 : panelWidth}
+              onSettled={markStageShown}
+            />
           </StageBoundary>
         ) : (
           <div
-            className="absolute inset-0 [--stage-floor:82%] [--stage-x:calc(50%+var(--panel,0px)/2)]"
-            style={{ ['--panel' as string]: `${panelWidth}px` }}
+            // Before the panel is measured, assume its CSS width on desktop so the
+            // spotlight does not jump sideways once it is.
+            className="absolute inset-0 [--stage-floor:82%] [--stage-x:calc(50%+var(--panel,0px)/2)] lg:[--panel:clamp(420px,34vw,560px)]"
+            style={panelWidth ? { ['--panel' as string]: `${panelWidth}px` } : undefined}
           >
             <StagePoster />
           </div>
         )}
       </div>
+
+      <StageLoading
+        show={
+          !stageShown && (manifestState.status === 'loading' || manifestState.status === 'ready')
+        }
+        left={panelWidth}
+        label={t('loadingStage')}
+      />
 
       <StageOverlay
         left={premiere ? 0 : panelWidth}
@@ -286,12 +321,14 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
       <motion.aside
         ref={panel}
         aria-label={t('title')}
-        initial={reduceMotion ? false : { x: -24, opacity: 0 }}
+        // The entrance is CSS (animate-panel-in), so the panel is visible from the
+        // first paint instead of waiting for hydration; Motion owns the exit.
+        initial={false}
         animate={premiere ? { x: '-100%', opacity: 0 } : { x: 0, opacity: 1 }}
         transition={{ duration: premiere ? 0.8 : 0.6, ease: [0.16, 1, 0.3, 1] }}
         // Inert while the finalizing save runs, so nothing is edited mid-save.
         inert={premiere || phase === 'saving'}
-        className="border-hairline bg-backstage absolute inset-x-0 bottom-0 z-20 flex h-[64dvh] flex-col border-t shadow-[0_-18px_40px_rgb(5_5_4/0.45)] lg:inset-y-0 lg:right-auto lg:h-auto lg:w-[clamp(420px,34vw,560px)] lg:border-t-0 lg:border-r lg:shadow-[24px_0_60px_rgb(5_5_4/0.35)]"
+        className="border-hairline bg-backstage animate-panel-in absolute inset-x-0 bottom-0 z-20 flex h-[64dvh] flex-col border-t shadow-[0_-18px_40px_rgb(5_5_4/0.45)] lg:inset-y-0 lg:right-auto lg:h-auto lg:w-[clamp(420px,34vw,560px)] lg:border-t-0 lg:border-r lg:shadow-[24px_0_60px_rgb(5_5_4/0.35)]"
       >
         <div className="flex items-center justify-between gap-3 px-6 pt-5">
           <Link
@@ -318,12 +355,12 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
           error={nameError}
         />
 
-        <div className="border-hairline flex min-h-0 flex-1 border-t">
+        <div className="border-hairline flex min-h-0 flex-1 flex-col border-t lg:flex-row">
           <div
             role="tablist"
             aria-label={t('categoriesLabel')}
-            aria-orientation="vertical"
-            className="border-hairline flex w-[8.5rem] shrink-0 scrollbar-none flex-col gap-0.5 overflow-y-auto border-r py-3"
+            aria-orientation={panelWidth > 0 ? 'vertical' : 'horizontal'}
+            className="border-hairline scroll-fade-x lg:scroll-fade-y flex shrink-0 scrollbar-none gap-1 overflow-x-auto border-b px-4 py-2.5 [--fade-end:2rem] [--fade-start:0.75rem] lg:w-[9rem] lg:flex-col lg:gap-0.5 lg:overflow-x-hidden lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-1.5 lg:py-4"
           >
             {CATEGORIES.map((id, index) => {
               const active = id === category;
@@ -343,14 +380,17 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
                   onClick={() => setCategory(id)}
                   onKeyDown={(event) => onTabKey(event, index)}
                   className={cn(
-                    'group text-ui relative flex min-h-10 items-center gap-2.5 px-4 py-2 text-left leading-tight transition-colors duration-200 disabled:opacity-40',
-                    active ? 'text-ink' : 'text-ink-muted hover:text-ink',
+                    'group rounded-tile text-ui relative flex h-9 shrink-0 items-center gap-2 px-3 text-left leading-tight whitespace-nowrap transition-colors duration-200 focus-visible:outline-offset-0 disabled:opacity-40 lg:h-auto lg:min-h-10 lg:items-start lg:px-2.5 lg:py-2.5 lg:whitespace-normal',
+                    active
+                      ? 'bg-backstage-raised text-ink'
+                      : 'text-ink-muted hover:bg-backstage-raised/60 hover:text-ink',
                   )}
                 >
+                  {/* Amber rule: before the label on the rail, under it on the strip. */}
                   <span
                     aria-hidden="true"
                     className={cn(
-                      'bg-marquee ease-out-expo h-px w-3 shrink-0 origin-left transition-transform duration-300',
+                      'bg-marquee ease-out-expo absolute inset-x-3 bottom-0 h-px origin-left transition-transform duration-300 lg:static lg:mt-[calc(0.5lh-0.5px)] lg:w-2.5 lg:shrink-0',
                       active ? 'scale-x-100' : 'scale-x-0',
                     )}
                   />
@@ -365,7 +405,7 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
             id="creator-panel"
             aria-labelledby={`creator-tab-${category}`}
             tabIndex={0}
-            className="min-w-0 flex-1 scrollbar-none overflow-y-auto px-5 pt-4 pb-8 outline-none"
+            className="scroll-fade-y min-w-0 flex-1 scrollbar-none overflow-y-auto px-5 pt-5 pb-12 outline-none [--fade-end:3rem] lg:pt-6"
           >
             {manifest && ready ? (
               <AnimatePresence mode="wait" initial={false}>
@@ -475,10 +515,12 @@ function CreatorStage({
   manifest,
   focus,
   insetLeft,
+  onSettled,
 }: {
   manifest: MhManifest;
   focus: CameraFocus;
   insetLeft: number;
+  onSettled: () => void;
 }) {
   const config = useDeferredValue(useCreatorStore((state) => state.config));
   return (
@@ -488,8 +530,48 @@ function CreatorStage({
       mode="creator"
       focus={focus}
       insetLeft={insetLeft}
+      onSettled={onSettled}
       className="size-full"
     />
+  );
+}
+
+/** Runs `run` once when mounted (a render-function fallback cannot set state itself). */
+function OnMount({ run }: { run: () => void }) {
+  useEffect(() => run(), [run]);
+  return null;
+}
+
+/**
+ * Until the character first stands there dressed: a quiet caption with a
+ * tungsten light crossing a hairline, at the floor of the uncovered stage. It
+ * never blocks the stage and does not come back for later edits.
+ */
+function StageLoading({ show, left, label }: { show: boolean; left: number; label: string }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <AnimatePresence>
+      {show ? (
+        <motion.div
+          key="stage-loading"
+          role="status"
+          aria-live="polite"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1, transition: { delay: 0.3, duration: 0.6 } }}
+          exit={{ opacity: 0, transition: { duration: 0.4 } }}
+          className="pointer-events-none absolute top-0 right-0 left-0 z-10 flex h-[36dvh] items-center justify-center lg:bottom-0 lg:left-[clamp(420px,34vw,560px)] lg:h-auto lg:items-end lg:pb-[14vh]"
+          style={left ? { left } : undefined}
+        >
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-label text-ink-muted">{label}</span>
+            <span
+              aria-hidden="true"
+              className="bg-hairline after:animate-skeleton-sweep relative h-px w-24 overflow-hidden after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.85),transparent)]"
+            />
+          </div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -503,11 +585,12 @@ function AutosaveNote({ status }: { status: ReturnType<typeof useAutosave>['stat
     saved: t('saved'),
     error: t('error'),
   }[status];
+  const busy = status === 'pending' || status === 'saving';
   return (
     <p
       role="status"
       className={cn(
-        'text-label max-w-[60%] truncate text-right',
+        'text-label flex max-w-[62%] min-w-0 items-center justify-end gap-2',
         status === 'error'
           ? 'text-alert'
           : status === 'saved'
@@ -515,7 +598,17 @@ function AutosaveNote({ status }: { status: ReturnType<typeof useAutosave>['stat
             : 'text-ink-faint',
       )}
     >
-      {text}
+      {status === 'needsName' ? null : (
+        // A small tally light: steady when saved, breathing while a save is on its way.
+        <span
+          aria-hidden="true"
+          className={cn(
+            'size-1.5 shrink-0 rounded-full',
+            status === 'error' ? 'bg-alert' : busy ? 'bg-marquee animate-pulse' : 'bg-ink-faint',
+          )}
+        />
+      )}
+      <span className="truncate">{text}</span>
     </p>
   );
 }
@@ -524,12 +617,16 @@ function ManifestPlaceholder({ state }: { state: ManifestState }) {
   const t = useTranslations('Creator.manifest');
   if (state.status === 'loading' || state.status === 'ready') {
     return (
-      <div role="status" aria-live="polite" className="flex flex-col gap-3">
+      <div role="status" aria-live="polite" className="flex flex-col gap-3.5">
         <span className="sr-only">{t('loading')}</span>
         <Skeleton className="h-4 w-24 rounded-full" />
-        <div className="grid grid-cols-3 gap-2.5">
+        {/* Same shape as the option grid: 3:4 tiles with a label line under each. */}
+        <div className="grid grid-cols-3 gap-x-2.5 gap-y-4">
           {Array.from({ length: 6 }, (_, index) => (
-            <Skeleton key={index} className="aspect-[3/4] w-full" />
+            <div key={index} className="flex flex-col gap-2">
+              <Skeleton className="aspect-[3/4] w-full" />
+              <Skeleton className="h-3 w-2/3 rounded-full" />
+            </div>
           ))}
         </div>
       </div>

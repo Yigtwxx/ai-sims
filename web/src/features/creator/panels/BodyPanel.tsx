@@ -50,7 +50,7 @@ export function BodyPanel({ manifest }: PanelProps) {
 
       <Section title={t('sliders')}>
         {body ? (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             {BODY_SLIDERS.map((id) => {
               const def = body.sliders.find((slider) => slider.id === id);
               if (!def) return null;

@@ -53,7 +53,7 @@ export function HairPanel({ manifest }: PanelProps) {
       </Section>
 
       <Section title={t('natural')}>
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           <LabeledSlider
             label={t('melanin')}
             value={melanin}
@@ -95,7 +95,7 @@ export function HairPanel({ manifest }: PanelProps) {
           onChange={(type) => update((draft) => void (draft.hair.pattern.type = type))}
         />
         {pattern.type !== 'none' ? (
-          <div className="flex flex-col gap-5 pt-2">
+          <div className="flex flex-col gap-6 pt-2">
             <SwatchPicker
               label={t('patternColor')}
               size="sm"

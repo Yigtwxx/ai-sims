@@ -36,9 +36,10 @@ export function SkinPanel({ manifest }: PanelProps) {
         />
       </Section>
 
-      <Section title={t('tone')}>
+      <Section title={t('tone')} aside={signedPercent(config.skin.tone, neutral)}>
         <LabeledSlider
           label={t('tone')}
+          labelHidden
           value={config.skin.tone}
           min={-1}
           max={1}
@@ -50,8 +51,8 @@ export function SkinPanel({ manifest }: PanelProps) {
       </Section>
 
       <Section title={t('makeup')}>
-        <div className="flex items-center justify-between gap-4">
-          <label htmlFor={makeupId} className="text-body-sm text-ink-muted">
+        <div className="flex items-center justify-between gap-6">
+          <label htmlFor={makeupId} className="text-body-sm text-ink-muted max-w-[34ch]">
             {hasMakeup ? t('makeupHint') : t('makeupUnavailable')}
           </label>
           <Switch

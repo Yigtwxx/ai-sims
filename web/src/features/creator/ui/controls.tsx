@@ -24,12 +24,17 @@ export function Section({
 }) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className={cn('flex flex-col gap-3 pt-7 first:pt-1', className)}>
-      <header className="flex items-baseline justify-between gap-3">
+    <section
+      aria-labelledby={id}
+      className={cn('flex flex-col gap-3.5 pt-9 first:pt-0', className)}
+    >
+      <header className="flex min-h-5 items-baseline justify-between gap-3">
         <h3 id={id} className="text-ui text-ink font-semibold">
           {title}
         </h3>
-        {aside ? <span className="text-label text-ink-faint tabular-nums">{aside}</span> : null}
+        {aside ? (
+          <span className="text-label text-ink-faint min-w-0 truncate tabular-nums">{aside}</span>
+        ) : null}
       </header>
       {children}
     </section>
@@ -68,6 +73,11 @@ interface LabeledSliderProps {
   disabled?: boolean;
   /** Extra content beside the value (a colour preview). */
   adornment?: ReactNode;
+  /**
+   * The section title already names this slider: keep the label for screen
+   * readers only and drop the value row (the section shows it instead).
+   */
+  labelHidden?: boolean;
 }
 
 export function LabeledSlider({
@@ -82,20 +92,28 @@ export function LabeledSlider({
   centered,
   disabled,
   adornment,
+  labelHidden = false,
 }: LabeledSliderProps) {
   const id = useId();
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between gap-3">
-        <label id={id} className="text-label text-ink-muted font-medium">
+    <div className="flex flex-col">
+      {labelHidden ? (
+        <label id={id} className="sr-only">
           {label}
         </label>
-        <span className="text-label text-ink flex items-center gap-2 tabular-nums">
-          {adornment}
-          {valueText}
-        </span>
-      </div>
+      ) : (
+        <div className="flex items-baseline justify-between gap-3">
+          <label id={id} className="text-label text-ink-muted font-medium">
+            {label}
+          </label>
+          <span className="text-label text-ink flex items-center gap-2 font-medium tabular-nums">
+            {adornment}
+            {valueText}
+          </span>
+        </div>
+      )}
       <Slider
+        className={labelHidden ? undefined : 'mt-1'}
         aria-labelledby={id}
         aria-valuetext={valueText}
         value={[value]}
@@ -114,7 +132,11 @@ export function LabeledSlider({
         onValueCommit={endGesture}
       />
       {ends ? (
-        <div className="text-label text-ink-faint flex justify-between" aria-hidden="true">
+        // Pulled up to the track: the ends belong to this slider, not the next row.
+        <div
+          className="text-label text-ink-faint -mt-0.5 flex justify-between leading-tight"
+          aria-hidden="true"
+        >
           <span>{ends[0]}</span>
           <span>{ends[1]}</span>
         </div>
@@ -166,8 +188,10 @@ export function Segmented<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-tile text-ui h-9 min-w-0 flex-1 truncate px-3 transition-colors duration-200',
-              active ? 'bg-backstage-lift text-ink' : 'text-ink-muted hover:text-ink',
+              'rounded-tile text-ui h-9 min-w-0 flex-1 truncate px-2 transition-[background-color,color,box-shadow] duration-200',
+              active
+                ? 'bg-backstage-lift text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_1px_2px_rgb(5_5_4/0.4)]'
+                : 'text-ink-muted hover:bg-backstage-raised hover:text-ink',
             )}
           >
             {option.label}
@@ -282,7 +306,7 @@ export function ChipRadio<T extends string>({
   onChange,
 }: ChipRadioProps<T>) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
+    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5">
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -294,7 +318,7 @@ export function ChipRadio<T extends string>({
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-tile text-ui h-9 border px-3.5 transition-colors duration-200 disabled:opacity-40',
+              'rounded-tile text-ui h-9 border px-3 transition-colors duration-200 disabled:opacity-40',
               active
                 ? 'border-marquee bg-backstage-lift text-ink'
                 : 'border-hairline text-ink-muted hover:border-ink-faint hover:text-ink',

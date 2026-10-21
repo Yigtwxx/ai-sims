@@ -199,8 +199,7 @@
     "untitled": "İsimsiz",
     "updated": "{time} güncellendi",
     "status": {
-      "draft": "Taslak",
-      "finalized": "Hazır"
+      "draft": "Taslak"
     },
     "empty": {
       "title": "Sahne henüz boş.",

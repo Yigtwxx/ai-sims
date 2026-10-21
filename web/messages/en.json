@@ -199,8 +199,7 @@
     "untitled": "Untitled",
     "updated": "Updated {time}",
     "status": {
-      "draft": "Draft",
-      "finalized": "Ready"
+      "draft": "Draft"
     },
     "empty": {
       "title": "The stage is still empty.",
