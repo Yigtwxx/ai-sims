@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 import en from '../messages/en.json';
 import tr from '../messages/tr.json';
@@ -60,4 +60,32 @@ export async function mockConversation(page: Page, reply: string): Promise<ChatC
     });
   });
   return calls;
+}
+
+/** Signs in as a guest from the landing header and waits for the character list. */
+export async function enterAsGuest(page: Page): Promise<void> {
+  await page.goto('/tr');
+  await page.getByRole('banner').getByRole('button', { name: tr.Session.enter }).click();
+  await page.waitForURL(/\/tr\/characters$/, { timeout: 60_000 });
+}
+
+/** The creator page can stall while its software-rendered stage warms up (headless). */
+const CREATOR_TIMEOUT = { timeout: 30_000 };
+
+/** Opens a creator category tab and returns its panel. */
+export async function openCategory(page: Page, name: string) {
+  const tab = page.getByRole('tab', { name, exact: true });
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true', CREATOR_TIMEOUT);
+  return page.getByRole('tabpanel', { name, exact: true });
+}
+
+/** Switches the body base on the identity tab (the creator re-dresses and re-skins it). */
+export async function chooseBase(page: Page, base: 'female' | 'male'): Promise<void> {
+  const panel = await openCategory(page, tr.Creator.categories.identity);
+  const choice = panel
+    .getByRole('radiogroup', { name: tr.Creator.identity.base, exact: true })
+    .getByRole('radio', { name: tr.Creator.identity.bases[base], exact: true });
+  await choice.click();
+  await expect(choice).toHaveAttribute('aria-checked', 'true', CREATOR_TIMEOUT);
 }

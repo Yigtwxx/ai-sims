@@ -69,10 +69,14 @@ test('guest creates a character, talks to it and finds it again', async ({ page 
   await expect(card).toBeVisible({ timeout: 60_000 });
 
   // Clean up through the UI, which also covers deleting.
-  await page.getByRole('button', { name: `${tr.Characters.actions.delete}: ${name}` }).click();
   const dialog = page.getByRole('alertdialog', {
     name: format(tr.Characters.deleteDialog.title, { name }),
   });
+  // The reloaded list is server-rendered: a click before hydration opens nothing.
+  await expect(async () => {
+    await page.getByRole('button', { name: `${tr.Characters.actions.delete}: ${name}` }).click();
+    await expect(dialog).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   await dialog.getByRole('button', { name: tr.Characters.deleteDialog.confirm }).click();
   await expect(card).toBeHidden({ timeout: 30_000 });
 });
