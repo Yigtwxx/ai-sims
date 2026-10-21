@@ -78,3 +78,60 @@ def duplicate(source: str, destination: str) -> unreal.Object:
     if asset is None:
         raise RuntimeError(f"Could not load {destination}")
     return asset
+
+
+# --------------------------------------------------------------------- wardrobe
+
+_PRINCIPAL_ASSET = re.compile(r'Asset="([^"]+)"')
+GROOM_SLOTS = ("Eyebrows", "Eyelashes", "Peachfuzz", "Mustache", "Beard", "Hair")
+
+
+def principal_asset_path(item: unreal.MetaHumanWardrobeItem) -> str | None:
+    """Object path of the asset a wardrobe item wraps (groom binding, outfit, ...)."""
+    match = _PRINCIPAL_ASSET.search(str(to_text(item.get_editor_property("principal_asset"))))
+    return match.group(1) if match else None
+
+
+def groom_slot(item: unreal.MetaHumanWardrobeItem) -> str | None:
+    """The groom slot of an item that wraps a groom binding, else None (an outfit).
+
+    Fab grooms do not live under a .../Bindings/<Slot>/ folder, so the slot comes
+    from the wrapped asset's class and the item name.
+    """
+    path = principal_asset_path(item)
+    if not path:
+        return None
+    data = unreal.EditorAssetLibrary.find_asset_data(path)
+    cls = str(data.asset_class_path.asset_name) if data.is_valid() else ""
+    if "Groom" not in cls and not path.rsplit("/", 1)[-1].startswith("GB_"):
+        return None
+    name = item.get_name()
+    return next((slot for slot in GROOM_SLOTS if slot in name), "Hair")
+
+
+def palette_key(
+    character: unreal.MetaHumanCharacter, slot: str, item: unreal.MetaHumanWardrobeItem
+) -> unreal.MetaHumanPaletteItemKey:
+    """The character's palette key for `item`, adding the item only the first time.
+
+    UE 5.8 has no API to remove palette items, so re-adding on every use would
+    grow the character (and the editor's memory) without bound.
+    """
+    collection = character.internal_collection
+    keys = collection.get_item_keys_for_wardrobe_item(item)
+    if keys:
+        return keys[0]
+    key = collection.try_add_item_from_wardrobe_item(slot, item)
+    if not key:
+        raise RuntimeError(f"{item.get_path_name()} could not be added to the {slot} slot")
+    return key
+
+
+def select_only(
+    character: unreal.MetaHumanCharacter,
+    slot: str,
+    key: unreal.MetaHumanPaletteItemKey | None = None,
+) -> None:
+    """Select exactly `key` in `slot`, or nothing when `key` is None."""
+    instance = character.internal_collection.default_instance
+    instance.set_single_slot_selection(slot, key or unreal.MetaHumanPaletteItemKey())

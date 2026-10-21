@@ -39,12 +39,18 @@ BASE_PRESETS = {"female": "Ada", "male": "Bruce"}
 
 
 def outfit_items() -> list[str]:
-    """Wardrobe items that are not grooms, from the plugin and the Fab imports."""
+    """Wardrobe items that are not grooms, from the plugin and the Fab imports.
+
+    Fab hair packages sit next to the outfits under /Game/Fab, so grooms are told
+    apart by the asset each item wraps, not by folder.
+    """
     inventory.scan(ROOTS)
     return [
         p
         for p in inventory.find_assets({"MetaHumanWardrobeItem"}, ROOTS)
-        if "/Grooms/" not in p and "/Bindings/" not in p
+        if "/Grooms/" not in p
+        and "/Bindings/" not in p
+        and ue.groom_slot(unreal.load_asset(p)) is None
     ]
 
 
@@ -65,16 +71,6 @@ def base_character(gender: str) -> unreal.MetaHumanCharacter:
     if not unreal.EditorAssetLibrary.save_loaded_asset(character, False):
         raise RuntimeError(f"Could not save {path}")
     return character
-
-
-def clear_slot(character: unreal.MetaHumanCharacter) -> None:
-    """Remove every item currently in the outfits slot (selection and palette entry)."""
-    collection = character.internal_collection
-    instance = collection.default_instance
-    for selection in list(instance.get_editor_property("slot_selections") or []):
-        if str(selection.slot_name) == SLOT:
-            instance.try_remove_slot_selection(selection)
-            collection.try_remove_item(selection.selected_item)
 
 
 def build(character: unreal.MetaHumanCharacter, build_path: str) -> str | None:
@@ -110,12 +106,8 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
     for stale in inventory.assets_under(clothing_dir):
         unreal.EditorAssetLibrary.delete_asset(inventory.object_path(stale))
     with ue.editing(character):
-        clear_slot(character)
-        key = character.internal_collection.try_add_item_from_wardrobe_item(SLOT, item)
-        if not key:
-            raise RuntimeError(f"{item_path} could not be added to the {SLOT} slot")
-        selection = unreal.MetaHumanPipelineSlotSelection(slot_name=SLOT, selected_item=key)
-        character.internal_collection.default_instance.try_add_slot_selection(selection)
+        key = ue.palette_key(character, SLOT, item)
+        ue.select_only(character, SLOT, key)
         params = [
             ue.dump_properties(p)
             for p in character.internal_collection.default_instance.get_instance_parameters(
@@ -123,7 +115,7 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
             )
         ]
         build_warning = build(character, build_path)
-        clear_slot(character)
+        ue.select_only(character, SLOT)
 
     inventory.scan((clothing_dir,))
     built = inventory.assets_under(clothing_dir)
@@ -144,8 +136,14 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
             instances[inventory.object_path(asset)] = materials.dump_instance(obj)
             for texture in material_textures(obj):
                 key = texture.get_path_name()
-                if key not in textures:
+                if key in textures:
+                    continue
+                try:
                     textures[key] = export_texture(texture, work / "textures")
+                except RuntimeError as exc:
+                    # Constant helper maps (e.g. DefaultMaps/black_masks) have no
+                    # source art to export; the material dump still names them.
+                    textures[key] = {"error": str(exc)}
     if not any(m["glb"] for m in meshes.values()):
         raise RuntimeError(f"No fitted clothing mesh was built for {item_path}: {build_warning}")
     write_json(
@@ -169,7 +167,7 @@ def export_base_body(gender: str, work: Path) -> dict[str, Any]:
     character = base_character(gender)
     build_path = f"{BUILD_ROOT}/{gender}"
     with ue.editing(character):
-        clear_slot(character)
+        ue.select_only(character, SLOT)
         warning = build(character, build_path)
     body_dir = f"{build_path}/{character.get_name()}/Body"
     inventory.scan((body_dir,))
