@@ -33,10 +33,16 @@ materials`, plus a plain glTF PBR approximation (normal map; the "AO" map is an 
 Only the maps the material's static switches sample are written; tiling maps go to
 `outfits/shared/`, named by content so items and genders share them. No TANGENT: like the
 heads and bodies, the runtime derives the tangent frame from UV derivatives.
+
+Materials on other (custom) masters stay "plain" glTF PBR. When the export also wrote a
+baked GLB for the mesh (`<mesh>.baked.glb`, every material input rendered to textures on
+UV0), its base colour, normal and occlusion + metallic/roughness (packed as one ORM map)
+become the plain material's maps.
 """
 
 import base64
 import hashlib
+import io
 import json
 import re
 from collections.abc import Callable, Mapping, Sequence
@@ -63,6 +69,7 @@ from asset_pipeline.mh.glb import (
     quantize_unorm16,
     quantize_weights,
     read_glb,
+    view_bytes,
 )
 from asset_pipeline.mh.gltf import MAX_INFLUENCES, merge_influences
 from asset_pipeline.mh.ktx import Ktx2Settings, encode_ktx2
@@ -78,7 +85,7 @@ F64 = NDArray[np.float64]
 I64 = NDArray[np.int64]
 Bool = NDArray[np.bool_]
 
-OUTFITS_VERSION = "outfit-v4"  # v4: template blue second colour follows colour 1
+OUTFITS_VERSION = "outfit-v5"  # v5: plain materials take Unreal's baked maps
 TEXTURE_RECIPE = "outfit-v1"  # part of every map's content name; bump to re-encode all maps
 GENERATOR = "ai-sims mh-convert (outfits)"
 GENDERS = ("female", "male")
@@ -1102,12 +1109,13 @@ JEANS_SLOTS: dict[str, tuple[Role, bool]] = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class TextureSource:
-    path: Path
+    path: Path  # the file, or a name for `pixels` (its stem names the output)
     srgb: bool
     sha256: str
     size: int
+    pixels: NDArray[np.uint8] | None = None  # decoded already (maps taken from a GLB)
 
 
 def _texture_source(
@@ -1219,7 +1227,7 @@ class TextureWriter:
         folder = self.web_root / "outfits" / ("shared" if tile else item)
         output = folder / f"{stem}-{digest}.ktx2"
         info: dict[str, Any] = {"srgb": srgb, "tiling": tile}
-        pixels = _load_pixels(source.path)
+        pixels = source.pixels if source.pixels is not None else _load_pixels(source.path)
         flat = pixels.reshape(-1, 1 if pixels.ndim == 2 else pixels.shape[2])
         if flat.min(axis=0).tolist() == flat.max(axis=0).tolist():
             value = flat[0].astype(np.float32) / 255.0
@@ -1278,6 +1286,68 @@ def _switches(material: Mapping[str, Any]) -> dict[str, bool]:
     }
 
 
+def _baked_glb(unit: OutfitUnit) -> Path | None:
+    """The baked twin of the unit's garment GLB, when the export wrote one."""
+    entry = unit.info.get("meshes", {}).get(unit.glb.stem)
+    name = entry.get("baked_glb") if isinstance(entry, dict) else None
+    path = unit.folder / str(name) if name else None
+    return path if path is not None and path.is_file() else None
+
+
+def baked_maps(unit: OutfitUnit, instance: str) -> dict[Role, TextureSource]:
+    """Maps Unreal baked for one material instance: colour (sRGB), normal, and an ORM map
+    packed from the occlusion (R) and metallic/roughness (G, B) textures. Empty when the
+    unit has no baked GLB or it has no material of that name."""
+    path = _baked_glb(unit)
+    if path is None:
+        return {}
+    document, binary = read_glb(path.read_bytes())
+    material = next((m for m in document.get("materials", []) if m.get("name") == instance), None)
+    if material is None:
+        return {}
+    pbr = material.get("pbrMetallicRoughness", {})
+
+    def image(slot: Mapping[str, Any] | None) -> tuple[str, bytes] | None:
+        if not slot or "index" not in slot:
+            return None
+        source = document["images"][document["textures"][slot["index"]]["source"]]
+        if "bufferView" not in source:
+            return None
+        return str(source.get("name", instance)), view_bytes(document, binary, source["bufferView"])
+
+    def decode(data: bytes, mode: str) -> NDArray[np.uint8]:
+        Image.MAX_IMAGE_PIXELS = None
+        with Image.open(io.BytesIO(data)) as opened:
+            return np.asarray(opened.convert(mode))
+
+    def source(name: str, data: bytes, pixels: NDArray[np.uint8], srgb: bool) -> TextureSource:
+        digest = hashlib.sha256(data).hexdigest()
+        return TextureSource(path.parent / f"{name}.png", srgb, digest, pixels.shape[0], pixels)
+
+    maps: dict[Role, TextureSource] = {}
+    color = image(pbr.get("baseColorTexture"))
+    if color:
+        maps["color"] = source(*color, decode(color[1], "RGB"), srgb=True)
+    normal = image(material.get("normalTexture"))
+    if normal:
+        maps["normal"] = source(*normal, decode(normal[1], "RGB"), srgb=False)
+    rough = image(pbr.get("metallicRoughnessTexture"))
+    if rough:
+        packed = decode(rough[1], "RGB").copy()
+        occlusion = image(material.get("occlusionTexture"))
+        if occlusion:
+            occlusion_red = decode(occlusion[1], "RGB")[..., 0]
+            if occlusion_red.shape == packed.shape[:2]:
+                packed[..., 0] = occlusion_red
+            else:
+                packed[..., 0] = 255
+        else:
+            packed[..., 0] = 255
+        data = rough[1] + (occlusion[1] if occlusion else b"")
+        maps["data"] = source(f"{instance}_ORM", data, packed, srgb=False)
+    return maps
+
+
 @dataclass
 class MaterialResult:
     key: str
@@ -1321,6 +1391,10 @@ def convert_material(
     else:
         slots, shader = {}, "plain"
     textures: dict[str, Any] = {}
+    baked_glb = _baked_glb(unit) if shader == "plain" else None
+    baked = baked_maps(unit, instance) if baked_glb else {}
+    for role, baked_source in baked.items():
+        textures[f"baked_{role}"] = writer.write(baked_source, role, False, unit.name)
     for slot, (role, tile) in slots.items():
         reference = material.get("textures", {}).get(slot)
         if not reference:
@@ -1362,6 +1436,24 @@ def convert_material(
     orm = textures.get("AO") or {}
     if orm.get("file"):
         gltf_textures["orm"] = orm["file"]
+    if baked and baked_glb is not None:
+        extras["baked"] = baked_glb.name
+        pbr.update(baseColorFactor=[1.0, 1.0, 1.0, 1.0], metallicFactor=1.0, roughnessFactor=1.0)
+        for role, gltf_role, factor in (
+            ("color", "color", "baseColorFactor"),
+            ("normal", "normal", None),
+            ("data", "orm", None),
+        ):
+            info = textures.get(f"baked_{role}") or {}
+            if info.get("file"):
+                gltf_textures[gltf_role] = info["file"]
+            elif factor and info.get("constant"):
+                pbr[factor] = [*info["constant"][:3], 1.0]
+        if "orm" not in gltf_textures:
+            orm_constant = (textures.get("baked_data") or {}).get("constant")
+            if orm_constant:
+                pbr["roughnessFactor"] = float(orm_constant[1])
+                pbr["metallicFactor"] = float(orm_constant[2])
     if shader == "mh-jeans-v1":
         color = textures.get("Diffuse") or {}
         if color.get("file"):
@@ -1370,6 +1462,8 @@ def convert_material(
         pbr["roughnessFactor"] = min(1.0, scalars.get("roughness", 0.9))
         pbr["metallicFactor"] = 0.0
     gltf = {"name": key, "pbrMetallicRoughness": pbr, "doubleSided": True}
+    if "normal" in gltf_textures and not normal.get("file"):
+        gltf["normalTexture"] = {"scale": 1.0}
     if normal.get("file"):
         gltf["normalTexture"] = {
             "scale": float(scalars.get("normal_strength", scalars.get("normal gain", 1.0)))

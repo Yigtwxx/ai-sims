@@ -1,11 +1,14 @@
 """Outfit garments: body correspondence, cap removal, transfer, body_hide and materials."""
 
 import base64
+import io
 import json
+import struct
 from pathlib import Path
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from asset_pipeline.mh import outfits
 from asset_pipeline.mh.geometry import vertex_normals
@@ -389,3 +392,97 @@ def test_real_outfit_converts(archive: Path, tmp_path: Path, monkeypatch) -> Non
     assert json.dumps(mh["materials"])  # serialisable, keyed by material
     names = {node.get("name") for node in document["nodes"]}
     assert "foot_l" in names and "foot_r" in names
+
+
+# ---------------------------------------------------------------------------- baked maps
+
+
+def _png(pixels: np.ndarray) -> bytes:
+    buffer = io.BytesIO()
+    Image.fromarray(pixels.astype(np.uint8)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _baked_unit(folder: Path) -> "outfits.OutfitUnit":
+    """A unit on a custom master whose export also baked its maps (8x8 test images)."""
+    ramp = np.arange(64, dtype=np.uint8).reshape(8, 8) * 3
+    color = np.stack([ramp, ramp // 2, np.full_like(ramp, 40)], axis=-1)
+    rough = np.stack([np.zeros_like(ramp), 200 - ramp, np.zeros_like(ramp)], axis=-1)
+    normal = np.stack([np.full_like(ramp, 128), ramp // 4 + 100, np.full_like(ramp, 255)], -1)
+    occlusion = np.stack([255 - ramp] * 3, axis=-1)
+    blobs = [_png(image) for image in (color, rough, normal, occlusion)]
+    views, offset, binary = [], 0, b""
+    for blob in blobs:
+        views.append({"buffer": 0, "byteOffset": offset, "byteLength": len(blob)})
+        padded = blob + b"\0" * (-len(blob) % 4)
+        binary += padded
+        offset += len(padded)
+    document = {
+        "asset": {"version": "2.0"},
+        "buffers": [{"byteLength": len(binary)}],
+        "bufferViews": views,
+        "images": [
+            {"name": f"MI_Custom_{n}", "mimeType": "image/png", "bufferView": i}
+            for i, n in enumerate(("BaseColor", "MetallicRoughness", "Normal", "Occlusion"))
+        ],
+        "textures": [{"source": i} for i in range(4)],
+        "materials": [
+            {
+                "name": "MI_Custom",
+                "pbrMetallicRoughness": {
+                    "baseColorTexture": {"index": 0},
+                    "metallicRoughnessTexture": {"index": 1},
+                },
+                "normalTexture": {"index": 2},
+                "occlusionTexture": {"index": 3},
+            }
+        ],
+    }
+    text = json.dumps(document).encode()
+    text += b" " * (-len(text) % 4)
+    glb = struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(text) + 8 + len(binary))
+    glb += struct.pack("<I4s", len(text), b"JSON") + text
+    glb += struct.pack("<I4s", len(binary), b"BIN\0") + binary
+    folder.mkdir(parents=True)
+    (folder / "OutfitBase_female_Outfits.baked.glb").write_bytes(glb)
+    info = {
+        "materials": {
+            "/Game/X/MI_Custom.MI_Custom": {"parents": ["/Game/X/M_Shirt_01.M_Shirt_01"]}
+        },
+        "meshes": {
+            "OutfitBase_female_Outfits": {"baked_glb": "OutfitBase_female_Outfits.baked.glb"}
+        },
+    }
+    (folder / "outfit.json").write_text(json.dumps(info), encoding="utf-8")
+    (folder / "done.json").write_text(json.dumps({"files": []}), encoding="utf-8")
+    return outfits.OutfitUnit.load(folder, "female")
+
+
+def test_custom_master_takes_the_maps_unreal_baked(tmp_path: Path, monkeypatch) -> None:
+    encoded: dict[str, np.ndarray] = {}
+
+    def fake_encode(image: np.ndarray, output: Path, settings: object) -> int:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"KTX2")
+        encoded[output.name] = image
+        return 4
+
+    monkeypatch.setattr(outfits, "encode_ktx2", fake_encode)
+    unit = _baked_unit(tmp_path / "raw" / "WI_OA_Custom")
+    maps = outfits.baked_maps(unit, "MI_Custom")
+    assert set(maps) == {"color", "normal", "data"}
+    orm = maps["data"].pixels
+    assert orm is not None
+    # Occlusion red into R, roughness and metallic stay in G and B.
+    assert orm[0, 1].tolist() == [252, 197, 0]
+
+    writer = outfits.TextureWriter(tmp_path / "web")
+    result = outfits.convert_material(unit, "MI_Custom", writer, {})
+    assert result.extras["shader"] == "plain"
+    assert result.extras["baked"] == "OutfitBase_female_Outfits.baked.glb"
+    assert set(result.textures) == {"color", "normal", "orm"}
+    assert all(f.startswith("outfits/OA_Custom/") for f in result.textures.values())
+    pbr = result.gltf["pbrMetallicRoughness"]
+    assert pbr["baseColorFactor"] == [1.0, 1.0, 1.0, 1.0] and pbr["metallicFactor"] == 1.0
+    assert result.gltf["normalTexture"] == {"scale": 1.0}
+    assert outfits.baked_maps(unit, "MI_Other") == {}
