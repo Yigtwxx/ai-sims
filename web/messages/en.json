@@ -619,7 +619,14 @@
       "label": "Show",
       "all": "All",
       "visible": "Kept",
-      "hidden": "Hidden"
+      "hidden": "Hidden",
+      "auto": "Pre-pass hidden"
+    },
+    "auto": {
+      "notice": "{count, plural, one {# very similar item was} other {# very similar items were}} hidden in the pre-pass.",
+      "restored": "{count, plural, one {# of them is kept again} other {# of them are kept again}}",
+      "view": "View them",
+      "leave": "Back to kept"
     },
     "outfitCategory": {
       "label": "Outfit category",
@@ -652,7 +659,10 @@
       "hide": "Hide {name}",
       "show": "Keep {name}",
       "preview": "Preview {name}",
-      "hidden": "Hidden"
+      "hidden": "Hidden",
+      "similarTo": "Very similar to {label}",
+      "distanceMm": "{value} mm apart",
+      "distanceDeg": "{value}° apart"
     },
     "selection": {
       "label": "Selection",
@@ -704,7 +714,7 @@
   },
   "DevThumbs": {
     "title": "Thumbnail renders",
-    "lede": "Renders every face and groom on the MetaHuman stage and writes thumbnail.webp next to its asset. Development only.",
+    "lede": "Renders every face, groom and outfit on the MetaHuman stage and writes thumbnail.webp next to its asset. Development only.",
     "renderAll": "Render all",
     "renderMissing": "Render missing only",
     "stop": "Stop",
@@ -715,7 +725,11 @@
     "running": "Rendering {label}",
     "finished": "Finished",
     "stageLabel": "Render stage",
-    "listLabel": "Faces and grooms",
+    "listLabel": "Faces, grooms and outfits",
+    "kindFilter": {
+      "label": "Kinds",
+      "all": "All"
+    },
     "kinds": {
       "face": "Faces",
       "hair": "Hair",
@@ -723,7 +737,8 @@
       "beard": "Beards",
       "mustache": "Mustaches",
       "eyelashes": "Eyelashes",
-      "peachfuzz": "Peach fuzz"
+      "peachfuzz": "Peach fuzz",
+      "outfit": "Outfits"
     },
     "status": {
       "idle": "Not rendered",

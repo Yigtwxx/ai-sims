@@ -3,12 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { fixtureManifest } from '@/features/creator/fixtures/manifest';
 
 import {
+  CURATION_TABS,
   groupNearDuplicates,
   itemsFor,
+  keptLabel,
   labelStem,
   matchesQuery,
+  matchesVisibility,
   previewConfig,
+  summarizeAuto,
   type CurationItem,
+  type CurationTab,
 } from './items';
 
 const item = (id: string, label: string): CurationItem => ({
@@ -71,5 +76,54 @@ describe('itemsFor', () => {
   it('sorts skins from light to dark', () => {
     const tones = itemsFor(manifest, 'skins', 'en').map((entry) => entry.tone ?? -1);
     expect(tones).toEqual([...tones].sort((a, b) => a - b));
+  });
+});
+
+describe('pre-pass helpers', () => {
+  const manifest = fixtureManifest();
+  const pick = (keep: string, keepLabel = 'Kept') =>
+    ({ keep, keepLabel, distance: 0.4, unit: 'mm' }) as const;
+  const auto = { A: pick('K'), B: pick('K') };
+
+  it('filters by visibility, the pre-pass filter keeping restored picks', () => {
+    const hidden = new Set(['A', 'C']);
+    const ids = ['A', 'B', 'C', 'D'];
+    const shown = (filter: Parameters<typeof matchesVisibility>[1]) =>
+      ids.filter((id) => matchesVisibility(id, filter, hidden, auto));
+    expect(shown('all')).toEqual(ids);
+    expect(shown('visible')).toEqual(['B', 'D']);
+    expect(shown('hidden')).toEqual(['A', 'C']);
+    expect(shown('auto')).toEqual(['A', 'B']);
+  });
+
+  it('does not treat inherited object keys as picks', () => {
+    expect(matchesVisibility('toString', 'auto', new Set(), {})).toBe(false);
+  });
+
+  it('counts picks per tab, in all and still hidden, ignoring ids not in the manifest', () => {
+    const byTab = Object.fromEntries(
+      CURATION_TABS.map((tab) => [tab, itemsFor(manifest, tab, 'en')]),
+    ) as Record<CurationTab, CurationItem[]>;
+    const [brow] = byTab.eyebrows;
+    const [beard] = byTab.beards;
+    const summary = summarizeAuto(
+      byTab,
+      { [brow.id]: pick('x'), [beard.id]: pick('y'), 'groom.hair.Gone': pick('z') },
+      new Set([brow.id]),
+    );
+    expect(summary.total).toBe(2);
+    expect(summary.hidden).toBe(1);
+    expect(summary.perTab.eyebrows).toBe(1);
+    expect(summary.perTab.beards).toBe(1);
+    expect(summary.perTab.hair).toBe(0);
+  });
+
+  it('names the kept item from the manifest, falling back to the English label', () => {
+    const outfit = manifest.outfits.find((entry) => entry.id === 'Top_Hoodie')!;
+    expect(keptLabel(manifest, pick(outfit.id, 'Hoodie EN'), 'tr')).toBe('Kapüşonlu');
+    expect(keptLabel(manifest, pick(outfit.id, 'Hoodie EN'), 'en')).toBe('Hoodie');
+    expect(keptLabel(manifest, pick('groom.gone.Gone', 'Gone Groom'), 'tr')).toBe('Gone Groom');
+    const animation = manifest.animations[0];
+    expect(keptLabel(manifest, pick(animation.id), 'en')).toBe(animation.id.replace(/[_-]+/g, ' '));
   });
 });

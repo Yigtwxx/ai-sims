@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { CurationSchema } from '@/lib/assets/manifest';
+import { CurationSchema, type AutoPick } from '@/lib/assets/manifest';
 
 const ENDPOINT = '/api/dev/curation';
 const NONE: ReadonlySet<string> = new Set();
+const NO_PICKS: Readonly<Record<string, AutoPick>> = {};
 
 export type CurationLoad = 'loading' | 'ready' | 'error';
 
@@ -13,6 +14,8 @@ export interface CurationDraft {
   load: CurationLoad;
   /** Hidden ids as edited on screen (saved ids plus unsaved changes). */
   hidden: ReadonlySet<string>;
+  /** Similarity pre-pass picks by id, as saved (read-only: the pipeline owns them). */
+  auto: Readonly<Record<string, AutoPick>>;
   /** Ids whose visibility differs from the saved curation. */
   changes: number;
   saving: boolean;
@@ -32,6 +35,7 @@ export interface CurationDraft {
 export function useCuration(): CurationDraft {
   const [load, setLoad] = useState<CurationLoad>('loading');
   const [saved, setSaved] = useState<ReadonlySet<string>>(NONE);
+  const [auto, setAuto] = useState<Readonly<Record<string, AutoPick>>>(NO_PICKS);
   const [draft, setDraft] = useState<ReadonlySet<string> | null>(null);
   const [saving, setSaving] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -44,6 +48,7 @@ export function useCuration(): CurationDraft {
         if (!response.ok) throw new Error(`Curation request failed: ${response.status}`);
         const curation = CurationSchema.parse(await response.json());
         setSaved(new Set(curation.hidden));
+        setAuto(curation.auto);
         setLoad('ready');
       } catch {
         if (!controller.signal.aborted) setLoad('error');
@@ -102,6 +107,7 @@ export function useCuration(): CurationDraft {
       if (!response.ok) return false;
       const curation = CurationSchema.parse(await response.json());
       setSaved(new Set(curation.hidden));
+      setAuto(curation.auto);
       setDraft(null);
       return true;
     } catch {
@@ -116,5 +122,5 @@ export function useCuration(): CurationDraft {
     setAttempt((value) => value + 1);
   }, []);
 
-  return { load, hidden, changes, saving, setHidden, toggle, discard, save, retry };
+  return { load, hidden, auto, changes, saving, setHidden, toggle, discard, save, retry };
 }

@@ -4,7 +4,12 @@
  * "Long Straight 03") so they can be culled together. Pure functions.
  */
 import { reconcileConfig } from '@/features/creator/reconcile';
-import { labelFor, type MhManifest, type OutfitCategory } from '@/lib/assets/manifest';
+import {
+  labelFor,
+  type AutoPick,
+  type MhManifest,
+  type OutfitCategory,
+} from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import type { CharacterBase, CharacterConfig } from '@/lib/character/schema';
 
@@ -93,11 +98,94 @@ export function itemsFor(manifest: MhManifest, tab: CurationTab, locale: string)
     case 'animations':
       return manifest.animations.map((animation) => ({
         id: animation.id,
-        label: animation.id.replace(/[_-]+/g, ' '),
+        label: animationLabel(animation.id),
         meta: [animation.kind, ...animation.tags.slice(0, 2)],
         glyph: animation.kind === 'face' ? 'faceMotion' : 'bodyMotion',
       }));
   }
+}
+
+/** Animations carry no label: their id, spaced out. */
+const animationLabel = (id: string) => id.replace(/[_-]+/g, ' ');
+
+/**
+ * The visibility filter of the sheet. `auto` shows every pick of the
+ * similarity pre-pass, the restored ones included, so a restore can be undone
+ * in place.
+ */
+export type VisibilityFilter = 'all' | 'visible' | 'hidden' | 'auto';
+
+export function matchesVisibility(
+  id: string,
+  filter: VisibilityFilter,
+  hidden: ReadonlySet<string>,
+  auto: Readonly<Record<string, AutoPick>>,
+): boolean {
+  switch (filter) {
+    case 'all':
+      return true;
+    case 'visible':
+      return !hidden.has(id);
+    case 'hidden':
+      return hidden.has(id);
+    case 'auto':
+      return Object.hasOwn(auto, id);
+  }
+}
+
+export interface AutoSummary {
+  /** Pre-pass picks per tab (items in the manifest only). */
+  perTab: Record<CurationTab, number>;
+  total: number;
+  /** Picks that are still hidden in the draft. */
+  hidden: number;
+}
+
+/** Counts the pre-pass picks the manifest still has, per tab and in all. */
+export function summarizeAuto(
+  byTab: Readonly<Record<CurationTab, readonly CurationItem[]>>,
+  auto: Readonly<Record<string, AutoPick>>,
+  hidden: ReadonlySet<string>,
+): AutoSummary {
+  const perTab = Object.fromEntries(CURATION_TABS.map((tab) => [tab, 0])) as Record<
+    CurationTab,
+    number
+  >;
+  let total = 0;
+  let stillHidden = 0;
+  for (const tab of CURATION_TABS) {
+    for (const item of byTab[tab]) {
+      if (!Object.hasOwn(auto, item.id)) continue;
+      perTab[tab] += 1;
+      total += 1;
+      if (hidden.has(item.id)) stillHidden += 1;
+    }
+  }
+  return { perTab, total, hidden: stillHidden };
+}
+
+/**
+ * The label of the item a pre-pass pick was hidden in favour of: from the
+ * manifest in the active locale, or the pipeline's English `keepLabel` when the
+ * kept item is not in the manifest.
+ */
+export function keptLabel(manifest: MhManifest, pick: AutoPick, locale: string): string {
+  const labelled: readonly { id: string; label: Parameters<typeof labelFor>[0] }[][] = [
+    manifest.faces,
+    manifest.skins,
+    manifest.grooms,
+    manifest.outfits,
+    manifest.irises,
+    manifest.lighting,
+  ];
+  for (const list of labelled) {
+    const entry = list.find((candidate) => candidate.id === pick.keep);
+    if (entry) return labelFor(entry.label, locale);
+  }
+  if (manifest.animations.some((animation) => animation.id === pick.keep)) {
+    return animationLabel(pick.keep);
+  }
+  return pick.keepLabel;
 }
 
 /**

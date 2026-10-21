@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ApproximateEqualsIcon,
   ArrowsOutSimpleIcon,
   CheckIcon,
   EyeIcon,
@@ -13,7 +14,7 @@ import {
   type Icon,
 } from '@phosphor-icons/react';
 import { useTranslations } from 'next-intl';
-import type { MouseEvent } from 'react';
+import { useId, type MouseEvent } from 'react';
 
 import { thumbnailSrc } from '@/features/creator/useMhManifest';
 import { cn } from '@/lib/utils';
@@ -97,10 +98,20 @@ export function ItemPicture({
   );
 }
 
+/** Why the similarity pre-pass picked an item, ready to print. */
+export interface SimilarCaption {
+  /** Label of the item kept in its place, in the active locale. */
+  label: string;
+  /** How far apart the two are, formatted with its unit. */
+  distance: string;
+}
+
 interface CurationTileProps {
   item: CurationItem;
   meta: string;
   hidden: boolean;
+  /** Set for a pick of the similarity pre-pass. */
+  similar?: SimilarCaption;
   selected: boolean;
   onSelect: (id: string, event: MouseEvent<HTMLButtonElement>) => void;
   onToggle: (id: string) => void;
@@ -111,18 +122,22 @@ export function CurationTile({
   item,
   meta,
   hidden,
+  similar,
   selected,
   onSelect,
   onToggle,
   onPreview,
 }: CurationTileProps) {
   const t = useTranslations('Curate.item');
+  const captionId = useId();
+  const caption = similar ? t('similarTo', { label: similar.label }) : null;
   return (
     <li className="relative">
       <button
         type="button"
         aria-pressed={selected}
         aria-label={t('select', { name: item.label })}
+        aria-describedby={caption ? captionId : undefined}
         onClick={(event) => onSelect(item.id, event)}
         className={cn(
           'rounded-tile bg-backstage-raised relative block w-full overflow-hidden border text-left transition-[border-color,box-shadow] duration-200',
@@ -156,6 +171,16 @@ export function CurationTile({
             {item.label}
           </span>
           {meta ? <span className="text-label text-ink-faint block truncate">{meta}</span> : null}
+          {similar && caption ? (
+            <span
+              id={captionId}
+              title={`${caption} · ${similar.distance}`}
+              className="text-label text-ink-muted mt-1.5 flex items-start gap-1"
+            >
+              <ApproximateEqualsIcon className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+              <span className="line-clamp-3">{caption}</span>
+            </span>
+          ) : null}
         </span>
       </button>
       <span className="absolute right-1.5 bottom-1.5 flex gap-1">

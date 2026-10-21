@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyCuration, assetUrl, labelFor, MhManifestSchema, type MhManifest } from './manifest';
+import {
+  applyCuration,
+  assetUrl,
+  CurationSchema,
+  labelFor,
+  MhManifestSchema,
+  type MhManifest,
+} from './manifest';
 
 const minimal = {
   version: 2,
@@ -58,6 +65,37 @@ describe('applyCuration', () => {
     const curated = applyCuration(manifest, { hidden: ['Bruce'] });
     expect(curated.faces.map((face) => face.id)).toEqual(['Ada']);
     expect(curated.skins).toHaveLength(1);
+  });
+});
+
+describe('CurationSchema', () => {
+  const pick = {
+    keep: 'groom.eyebrows.Eyebrows_M_SlightArch',
+    keepLabel: 'Medium Slight Arch Eyebrows',
+    distance: 0.31,
+    unit: 'mm',
+  };
+
+  it('reads a file written before the pre-pass existed', () => {
+    expect(CurationSchema.parse({ hidden: ['Bruce'] })).toEqual({ hidden: ['Bruce'], auto: {} });
+    expect(CurationSchema.parse({})).toEqual({ hidden: [], auto: {} });
+  });
+
+  it('keeps the pre-pass picks', () => {
+    const curation = CurationSchema.parse({
+      hidden: ['groom.eyebrows.Eyebrows_M_Thin'],
+      auto: {
+        'groom.eyebrows.Eyebrows_M_Thin': pick,
+        'anim.Idle_02': { ...pick, keep: 'anim.Idle_01', unit: 'deg' },
+      },
+    });
+    expect(curation.auto['groom.eyebrows.Eyebrows_M_Thin']).toEqual(pick);
+    expect(curation.auto['anim.Idle_02']?.unit).toBe('deg');
+  });
+
+  it('refuses a pick with an unknown unit or a missing field', () => {
+    expect(CurationSchema.safeParse({ auto: { a: { ...pick, unit: 'cm' } } }).success).toBe(false);
+    expect(CurationSchema.safeParse({ auto: { a: { keep: 'b' } } }).success).toBe(false);
   });
 });
 

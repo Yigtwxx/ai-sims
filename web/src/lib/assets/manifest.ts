@@ -161,7 +161,29 @@ export const MhManifestSchema = z.object({
   lighting: z.array(LightingSchema).default([]),
 });
 
-export const CurationSchema = z.object({ hidden: z.array(z.string()).default([]) });
+/**
+ * Why the similarity pre-pass (`asset-pipeline mh-similar --apply`) hid an item:
+ * the item kept in its place and how far apart the two are.
+ */
+export const AutoPickSchema = z.object({
+  keep: z.string(),
+  /** English label of the kept item, written by the pipeline. */
+  keepLabel: z.string(),
+  distance: z.number(),
+  unit: z.enum(['mm', 'deg']),
+});
+
+export const CurationSchema = z.object({
+  hidden: z.array(z.string()).default([]),
+  /**
+   * Pre-pass picks by id. A pick is normally also in `hidden`; one the curator
+   * restored has left `hidden` but stays here, so the pre-pass will not hide it again.
+   */
+  auto: z.record(z.string(), AutoPickSchema).default({}),
+});
+
+/** The part of the curation the creator needs; a malformed `auto` never drops the hidden list. */
+const HiddenOnlySchema = CurationSchema.pick({ hidden: true });
 
 export type MhManifest = z.infer<typeof MhManifestSchema>;
 export type MhFace = z.infer<typeof FaceSchema>;
@@ -175,6 +197,7 @@ export type MhLighting = z.infer<typeof LightingSchema>;
 export type GroomSlot = (typeof GROOM_SLOTS)[number];
 export type OutfitCategory = (typeof OUTFIT_CATEGORIES)[number];
 export type Curation = z.infer<typeof CurationSchema>;
+export type AutoPick = z.infer<typeof AutoPickSchema>;
 
 /** Absolute URL of a manifest-relative file. */
 export function assetUrl(file: string): string {
@@ -188,7 +211,10 @@ export function labelFor(label: z.infer<typeof Label>, locale: string): string {
 }
 
 /** Drops curated-out items from every list. Ids are unique across categories. */
-export function applyCuration(manifest: MhManifest, curation: Curation): MhManifest {
+export function applyCuration(
+  manifest: MhManifest,
+  curation: Pick<Curation, 'hidden'>,
+): MhManifest {
   if (curation.hidden.length === 0) return manifest;
   const hidden = new Set(curation.hidden);
   const keep = <T extends { id: string }>(items: T[]) =>
@@ -224,7 +250,7 @@ export async function loadMhManifest({ curated = true } = {}): Promise<MhManifes
   const manifest = await pending;
   if (!curated) return manifest;
   const curation = await fetch(CURATION_URL, { cache: 'no-cache' })
-    .then(async (response) => (response.ok ? CurationSchema.parse(await response.json()) : null))
+    .then(async (response) => (response.ok ? HiddenOnlySchema.parse(await response.json()) : null))
     .catch(() => null);
   return curation ? applyCuration(manifest, curation) : manifest;
 }

@@ -7,6 +7,7 @@
 'use client';
 
 import {
+  ApproximateEqualsIcon,
   ArrowLeftIcon,
   CoatHangerIcon,
   EyeIcon,
@@ -14,7 +15,7 @@ import {
   FilmSlateIcon,
 } from '@phosphor-icons/react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { toast } from 'sonner';
 
@@ -28,18 +29,21 @@ import { OUTFIT_CATEGORIES, type MhManifest, type OutfitCategory } from '@/lib/a
 import { cn } from '@/lib/utils';
 
 import { CurationPreview } from './CurationPreview';
-import { CurationTile, useMetaText } from './CurationTile';
+import { CurationTile, useMetaText, type SimilarCaption } from './CurationTile';
 import {
   CURATION_TABS,
   groupNearDuplicates,
   itemsFor,
+  keptLabel,
   matchesQuery,
+  matchesVisibility,
+  summarizeAuto,
   type CurationItem,
   type CurationTab,
+  type VisibilityFilter,
 } from './items';
 import { useCuration, type CurationDraft } from './useCuration';
 
-type VisibilityFilter = 'all' | 'visible' | 'hidden';
 type CategoryFilter = 'all' | OutfitCategory;
 
 const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3';
@@ -135,17 +139,20 @@ interface BoardProps {
 
 function CurationBoard({ manifest, fixture, curation }: BoardProps) {
   const t = useTranslations('Curate');
+  const tItem = useTranslations('Curate.item');
+  const format = useFormatter();
   const locale = useLocale();
   const metaText = useMetaText();
   const [tab, setTab] = useState<CurationTab>('faces');
   const [query, setQuery] = useState('');
-  const [visibility, setVisibility] = useState<VisibilityFilter>('all');
+  // Null until the curator picks one: the default follows the loaded curation.
+  const [visibilityChoice, setVisibility] = useState<VisibilityFilter | null>(null);
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [grouped, setGrouped] = useState(false);
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
   const [previewId, setPreviewId] = useState<string | null>(null);
   const anchor = useRef<string | null>(null);
-  const { hidden, setHidden, toggle } = curation;
+  const { hidden, auto, setHidden, toggle } = curation;
 
   const byTab = useMemo(
     () =>
@@ -155,15 +162,19 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
     [manifest, locale],
   );
 
+  const autoSummary = useMemo(() => summarizeAuto(byTab, auto, hidden), [byTab, auto, hidden]);
+  // With pre-pass picks the sheet starts from what is left after them.
+  const visibility = visibilityChoice ?? (autoSummary.total > 0 ? 'visible' : 'all');
+
   const shown = useMemo(
     () =>
       byTab[tab].filter(
         (item) =>
           (category === 'all' || tab !== 'outfits' || item.category === category) &&
-          (visibility === 'all' || (visibility === 'hidden') === hidden.has(item.id)) &&
+          matchesVisibility(item.id, visibility, hidden, auto) &&
           matchesQuery(item, query),
       ),
-    [byTab, tab, category, visibility, hidden, query],
+    [byTab, tab, category, visibility, hidden, auto, query],
   );
 
   const groups = useMemo(() => {
@@ -207,6 +218,23 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
       return next;
     });
     anchor.current = id;
+  };
+
+  const viewAuto = () => {
+    setVisibility('auto');
+    if (autoSummary.perTab[tab] > 0) return;
+    const next = CURATION_TABS.find((key) => autoSummary.perTab[key] > 0);
+    if (next) changeTab(next);
+  };
+
+  const similarOf = (item: CurationItem): SimilarCaption | undefined => {
+    const pick = auto[item.id];
+    if (!pick) return undefined;
+    const value = format.number(pick.distance, { maximumFractionDigits: 2 });
+    return {
+      label: keptLabel(manifest, pick, locale),
+      distance: tItem(pick.unit === 'deg' ? 'distanceDeg' : 'distanceMm', { value }),
+    };
   };
 
   const applyToSelection = (hide: boolean) => {
@@ -254,6 +282,7 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
       item={item}
       meta={metaText(item)}
       hidden={hidden.has(item.id)}
+      similar={similarOf(item)}
       selected={selection.has(item.id)}
       onSelect={select}
       onToggle={toggle}
@@ -382,8 +411,12 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
               { value: 'all', label: t('filter.all') },
               { value: 'visible', label: t('filter.visible') },
               { value: 'hidden', label: t('filter.hidden') },
+              ...(autoSummary.total > 0
+                ? [{ value: 'auto' as const, label: t('filter.auto') }]
+                : []),
             ]}
-            className="w-64"
+            // The longer pre-pass label sizes its own segment instead of truncating.
+            className={autoSummary.total > 0 ? '[&>[role=radio]]:flex-auto' : 'w-64'}
           />
           {/* Look-alike grouping: the switch is labelled by its visible text. */}
           <label className="text-ui text-ink-muted flex cursor-pointer items-center gap-2.5">
@@ -421,6 +454,16 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
               ]}
             />
           </div>
+        ) : null}
+
+        {autoSummary.total > 0 && byTab[tab].length > 0 ? (
+          <AutoNotice
+            total={autoSummary.total}
+            restored={autoSummary.total - autoSummary.hidden}
+            viewing={visibility === 'auto'}
+            onView={viewAuto}
+            onLeave={() => setVisibility('visible')}
+          />
         ) : null}
 
         <div className="mt-6">
@@ -502,6 +545,40 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
         onClose={() => setPreviewId(null)}
       />
     </>
+  );
+}
+
+/**
+ * One quiet line above the sheet: how many items the similarity pre-pass
+ * picked, and how many of those the curator has kept again.
+ */
+function AutoNotice({
+  total,
+  restored,
+  viewing,
+  onView,
+  onLeave,
+}: {
+  total: number;
+  restored: number;
+  viewing: boolean;
+  onView: () => void;
+  onLeave: () => void;
+}) {
+  const t = useTranslations('Curate.auto');
+  return (
+    <div className="border-hairline mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 border-l-2 py-1 pl-3">
+      <ApproximateEqualsIcon className="text-ink-faint size-4 shrink-0" aria-hidden="true" />
+      <p className="text-body-sm text-ink-muted">
+        {t('notice', { count: total })}
+        {restored > 0 ? (
+          <span className="text-ink-faint"> {t('restored', { count: restored })}</span>
+        ) : null}
+      </p>
+      <Button type="button" variant="ghost" size="sm" onClick={viewing ? onLeave : onView}>
+        {viewing ? t('leave') : t('view')}
+      </Button>
+    </div>
   );
 }
 

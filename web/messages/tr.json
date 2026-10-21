@@ -619,7 +619,14 @@
       "label": "Göster",
       "all": "Tümü",
       "visible": "Açık",
-      "hidden": "Gizli"
+      "hidden": "Gizli",
+      "auto": "Ön elemede gizlenenler"
+    },
+    "auto": {
+      "notice": "Ön elemede {count} çok benzer öğe gizlendi.",
+      "restored": "{count} tanesi yeniden açık",
+      "view": "Gizlenenleri gör",
+      "leave": "Açıklara dön"
     },
     "outfitCategory": {
       "label": "Kıyafet kategorisi",
@@ -652,7 +659,10 @@
       "hide": "{name} öğesini gizle",
       "show": "{name} öğesini aç",
       "preview": "{name} önizlemesi",
-      "hidden": "Gizli"
+      "hidden": "Gizli",
+      "similarTo": "{label} ile çok benzer",
+      "distanceMm": "Aradaki fark {value} mm",
+      "distanceDeg": "Aradaki fark {value}°"
     },
     "selection": {
       "label": "Seçim",
@@ -704,7 +714,7 @@
   },
   "DevThumbs": {
     "title": "Küçük resim üretimi",
-    "lede": "Her yüzü, saçı ve kılı MetaHuman sahnesinde çizer ve varlığın yanına thumbnail.webp yazar. Yalnızca geliştirmede.",
+    "lede": "Her yüzü, saçı, kılı ve kıyafeti MetaHuman sahnesinde çizer ve varlığın yanına thumbnail.webp yazar. Yalnızca geliştirmede.",
     "renderAll": "Hepsini çiz",
     "renderMissing": "Yalnız eksikleri çiz",
     "stop": "Durdur",
@@ -715,7 +725,11 @@
     "running": "{label} çiziliyor",
     "finished": "Bitti",
     "stageLabel": "Çizim sahnesi",
-    "listLabel": "Yüzler, saçlar ve kıllar",
+    "listLabel": "Yüzler, saçlar, kıllar ve kıyafetler",
+    "kindFilter": {
+      "label": "Türler",
+      "all": "Tümü"
+    },
     "kinds": {
       "face": "Yüzler",
       "hair": "Saçlar",
@@ -723,7 +737,8 @@
       "beard": "Sakallar",
       "mustache": "Bıyıklar",
       "eyelashes": "Kirpikler",
-      "peachfuzz": "Ayva tüyü"
+      "peachfuzz": "Ayva tüyü",
+      "outfit": "Kıyafetler"
     },
     "status": {
       "idle": "Çizilmedi",
