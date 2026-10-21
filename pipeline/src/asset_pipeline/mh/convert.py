@@ -191,11 +191,32 @@ def gender_record(archive: Path, name: str) -> dict[str, Any] | None:
     return entry if isinstance(entry, dict) else None
 
 
+ANDROGYNOUS_BAND = 0.3
+"""Masculine/feminine body values closer to 0 than this say little: Asha (-0.13) is a woman
+by her preset's look, yet the sign alone made her a man. Inside the band the body's shape
+decides (`estimate_gender`), which in turn misreads clear cases such as Aoi (-0.59)."""
+
+
+def axis_gender(record: dict[str, Any] | None) -> str | None:
+    """Gender from a preset's masculine/feminine body value, None when it is too close to
+    the middle of the axis to tell (or the record has neither value nor gender)."""
+    if not record:
+        return None
+    axis = record.get("masculine_feminine")
+    if isinstance(axis, int | float):
+        if abs(axis) < ANDROGYNOUS_BAND:
+            return None
+        return "female" if axis > 0 else "male"
+    gender = record.get("gender")
+    return str(gender) if gender in ("female", "male") else None
+
+
 def preset_gender(archive: Path, name: str, body_dna: Path) -> tuple[str | None, str]:
-    """(gender, where it came from): the presets' gender list first, else the estimate."""
-    record = gender_record(archive, name)
-    if record and record.get("gender") in ("female", "male"):
-        return str(record["gender"]), GENDER_FILE_SOURCE
+    """(gender, where it came from): the presets' body values first, the shape estimate for
+    presets near the middle of the masculine/feminine axis or missing from the list."""
+    gender = axis_gender(gender_record(archive, name))
+    if gender:
+        return gender, GENDER_FILE_SOURCE
     estimate = estimate_gender(body_dna, archive)
     return estimate, GENDER_SOURCE if estimate else "unknown"
 
@@ -280,8 +301,8 @@ def head_maps_source(archive: Path, name: str, gender: str | None) -> PresetMaps
         return own
     for other in list_characters(archive):
         source = CharacterSource.find(archive, other).maps
-        record = gender_record(archive, other) or {}
-        if source.has_head_maps and (gender is None or record.get("gender") == gender):
+        same = gender is None or axis_gender(gender_record(archive, other)) == gender
+        if source.has_head_maps and same:
             return source
     return None
 
