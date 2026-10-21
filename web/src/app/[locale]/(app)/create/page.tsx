@@ -1,21 +1,18 @@
 import { connection } from 'next/server';
-import { getTranslations } from 'next-intl/server';
 import { Suspense } from 'react';
 
 import { PageTransition } from '@/components/shell/PageTransition';
+import { CreatorScreen } from '@/features/creator/CreatorScreen';
 import { requireUserId } from '@/lib/auth/session';
 
-// Placeholder while the MetaHuman creator is assembled; it replaces the VRM creator.
-export default async function CreatePage() {
-  const t = await getTranslations('Creator');
+/** New character: the creator starts from a default for the manifest's first face. */
+export default function CreatePage() {
   return (
     <PageTransition>
       <Suspense>
         <AuthGate />
       </Suspense>
-      <main className="grid min-h-dvh place-items-center px-6 text-center">
-        <p className="text-ink-muted max-w-md text-balance">{t('preparing')}</p>
-      </main>
+      <CreatorScreen />
     </PageTransition>
   );
 }

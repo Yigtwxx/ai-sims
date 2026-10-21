@@ -14,7 +14,10 @@ export type SessionUser = { id: string; isAnonymous: boolean };
  */
 export async function getSession(): Promise<SessionUser | null> {
   if (!isDatabaseConfigured()) return null;
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  // Read the request first: creating the auth client reads the clock, which a
+  // prerender (Cache Components) must not reach.
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
   if (!session) return null;
   return { id: session.user.id, isAnonymous: session.user.isAnonymous === true };
 }

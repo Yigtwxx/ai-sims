@@ -5,6 +5,7 @@ import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 
 import { AppProviders } from '@/components/shell/AppProviders';
+import { InlineScript } from '@/components/shell/InlineScript';
 import { routing } from '@/i18n/routing';
 import { fontVariables } from '@/styles/fonts';
 import '../globals.css';
@@ -41,10 +42,8 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
       suppressHydrationWarning
     >
       <head>
-        <script
-          // Runs before first paint: lets CSS hide titles that JS is about to reveal.
-          dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }}
-        />
+        {/* Runs before first paint: lets CSS hide titles that JS is about to reveal. */}
+        <InlineScript html="document.documentElement.classList.add('js')" />
       </head>
       <body className="flex min-h-full flex-col">
         <NextIntlClientProvider>

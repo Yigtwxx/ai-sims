@@ -43,6 +43,7 @@
     "errorTitle": "Something went wrong.",
     "errorBody": "We can try to set the stage again. If it keeps happening, reload the page.",
     "retry": "Try again",
+    "stageFailed": "The stage could not be drawn. Everything else keeps working.",
     "errorCode": "Error code: {digest}",
     "notifications": "Notifications"
   },
@@ -192,95 +193,345 @@
   },
   "Characters": {
     "title": "My characters",
+    "lede": "Characters you have saved. Open one to edit it or talk to it.",
     "loading": "Loading characters…",
-    "empty": "You have no characters yet.",
-    "createFirst": "Create your first character",
+    "count": "{count, plural, one {# character} other {# characters}}",
+    "newCharacter": "New character",
     "untitled": "Untitled",
+    "updated": "Updated {time}",
     "status": {
       "draft": "Draft",
-      "finalized": "Finalized"
+      "finalized": "Ready"
     },
-    "style": {
-      "anime": "Anime",
-      "realistic": "Realistic"
+    "empty": {
+      "title": "The stage is still empty.",
+      "body": "Create your first character: pick a face, hair and clothes, then talk to it.",
+      "cta": "Create your first character"
     },
-    "lede": "Characters you have saved. Open one to edit it or talk to it."
+    "actions": {
+      "talk": "Talk",
+      "edit": "Edit",
+      "delete": "Delete",
+      "more": "Actions for {name}"
+    },
+    "deleteDialog": {
+      "title": "Delete {name}?",
+      "body": "The character and its thumbnail are deleted for good. This cannot be undone.",
+      "confirm": "Delete for good",
+      "cancel": "Cancel",
+      "deleting": "Deleting…"
+    },
+    "deleted": "{name} was deleted.",
+    "deleteFailed": "Could not delete. Check your connection and try again."
   },
   "Creator": {
     "title": "Character creator",
-    "comingSoon": "The full creator is coming soon. For now, create a draft character.",
+    "back": "My characters",
+    "nameLabel": "Character's name",
+    "namePlaceholder": "Give it a name",
+    "nameRequired": "Give your character a name first.",
+    "categoriesLabel": "Categories",
     "categories": {
+      "identity": "Identity",
       "face": "Face",
+      "body": "Body",
       "skin": "Skin",
       "eyes": "Eyes",
       "hair": "Hair",
-      "facialHair": "Facial hair",
-      "top": "Top",
-      "bottom": "Bottom",
-      "shoes": "Shoes"
-    },
-    "name": "Name",
-    "style": "Style",
-    "base": "Base",
-    "submit": "Create draft",
-    "creating": "Creating…",
-    "styles": {
-      "anime": "Anime",
-      "realistic": "Realistic"
-    },
-    "bases": {
-      "male": "Male",
-      "female": "Female"
-    },
-    "invalid": "Please enter a name of 1 to 40 characters.",
-    "failed": "Could not create the character. Please try again.",
-    "nameLabel": "Character name",
-    "namePlaceholder": "Give a name",
-    "nameRequired": "Give your character a name first.",
-    "rows": {
-      "gender": "Gender",
-      "face": "Face",
-      "body": "Body type",
-      "skin": "Skin tone",
-      "eyes": "Eyes",
-      "hair": "Hair",
-      "top": "Top",
-      "bottom": "Bottom",
-      "shoes": "Shoes",
-      "jewelry": "Jewellery",
+      "facialHair": "Brows and beard",
+      "outfit": "Wardrobe",
+      "jewelry": "Jewellery and piercings",
       "tattoos": "Tattoos"
     },
-    "builds": {
-      "slim": "Slim",
-      "average": "Average",
-      "athletic": "Athletic",
-      "curvy": "Curvy"
+    "identity": {
+      "base": "Body base",
+      "bases": {
+        "female": "Female",
+        "male": "Male"
+      },
+      "baseHint": "Changing the base re-picks face, hair and clothes from what fits that base.",
+      "voice": "Voice",
+      "voices": {
+        "female": "Female voice",
+        "male": "Male voice"
+      },
+      "voiceHint": "The voice used when it talks. The language follows the site language."
     },
-    "height": "Height",
-    "heightShort": "Short",
-    "heightTall": "Tall",
-    "color": "Colour",
-    "original": "Original colour",
-    "none": "None",
-    "own": "Own hair",
-    "count": "{count, plural, one {# option} other {# options}}",
-    "undo": "Undo",
-    "redo": "Redo",
-    "randomize": "Randomize",
-    "done": "Done",
-    "saving": "Saving…",
-    "saveFailed": "Couldn't save. Check your connection and try again.",
+    "face": {
+      "presets": "Ready-made faces",
+      "blend": "Blend",
+      "blendHint": "Blend the selected face towards up to three others.",
+      "addBlend": "Add a blend",
+      "pickBlend": "Pick a face to blend towards",
+      "cancelBlend": "Cancel",
+      "blendTowards": "Towards {name}",
+      "removeBlend": "Remove the {name} blend",
+      "blendFull": "Up to three faces can be blended."
+    },
+    "body": {
+      "presets": "Body type",
+      "presetNames": {
+        "slim": "Slim",
+        "average": "Average",
+        "athletic": "Athletic",
+        "curvy": "Curvy"
+      },
+      "sliders": "Fine tuning",
+      "custom": "Adjusted by hand.",
+      "reset": "Back to the type",
+      "sliderNames": {
+        "height": "Height",
+        "weight": "Weight",
+        "muscle": "Muscle",
+        "chest": "Chest",
+        "waist": "Waist",
+        "hips": "Hips",
+        "shoulders": "Shoulders"
+      },
+      "ends": {
+        "height": {
+          "min": "Short",
+          "max": "Tall"
+        },
+        "weight": {
+          "min": "Lean",
+          "max": "Full"
+        },
+        "muscle": {
+          "min": "Soft",
+          "max": "Muscular"
+        },
+        "chest": {
+          "min": "Narrow",
+          "max": "Broad"
+        },
+        "waist": {
+          "min": "Slim",
+          "max": "Wide"
+        },
+        "hips": {
+          "min": "Narrow",
+          "max": "Wide"
+        },
+        "shoulders": {
+          "min": "Narrow",
+          "max": "Broad"
+        }
+      },
+      "neutral": "Centre",
+      "unavailable": "The body sliders for this base have not been exported yet."
+    },
+    "skin": {
+      "sets": "Skin",
+      "tone": "Tone fine-tuning",
+      "lighter": "Lighter",
+      "darker": "Darker",
+      "makeup": "Makeup",
+      "makeupHint": "Uses this skin set's made-up face texture.",
+      "makeupUnavailable": "This skin set has no makeup."
+    },
+    "eyes": {
+      "iris": "Iris",
+      "default": "The face's own eyes",
+      "tint": "Tint",
+      "noTint": "No tint"
+    },
+    "hair": {
+      "styles": "Hairstyle",
+      "none": "No hair",
+      "natural": "Natural colour",
+      "melanin": "Darkness",
+      "blond": "Blond",
+      "black": "Black",
+      "redness": "Redness",
+      "neutral": "Neutral",
+      "red": "Red",
+      "dye": "Dye",
+      "noDye": "No dye",
+      "pattern": "Dye pattern",
+      "patterns": {
+        "none": "None",
+        "ombre": "Ombre",
+        "roots": "Roots",
+        "highlights": "Highlights",
+        "underlayer": "Underlayer"
+      },
+      "patternColor": "Pattern colour",
+      "amount": "Strength"
+    },
+    "facialHair": {
+      "eyebrows": "Brows",
+      "beard": "Beard",
+      "mustache": "Moustache",
+      "none": "None",
+      "unavailable": "No options for this base.",
+      "sharedColor": "Brows, beard and moustache use the hair colour."
+    },
+    "outfit": {
+      "slotsLabel": "Wardrobe section",
+      "slots": {
+        "top": "Top",
+        "bottom": "Bottom",
+        "shoes": "Shoes",
+        "full": "One-piece"
+      },
+      "none": "None",
+      "tints": "Colourways",
+      "authored": "Original",
+      "colors": "Custom colour",
+      "params": {
+        "PrimaryColor": "Main colour",
+        "SecondaryColor": "Secondary colour"
+      },
+      "fullReplaces": "A one-piece outfit replaces the top and bottom.",
+      "empty": "No clothes in this section for this base.",
+      "comingSoon": "The wardrobe is on its way.",
+      "comingSoonBody": "Clothes appear here once they are exported into the library. Until then the character wears the MetaHuman base outfit."
+    },
+    "jewelry": {
+      "count": "{count}/{max} pieces",
+      "hint": "One piece per spot; picking another swaps it.",
+      "limit": "Up to {max} pieces can be worn.",
+      "slots": {
+        "ears": "Ears",
+        "neck": "Neck",
+        "face": "Eyewear",
+        "hair": "Hair accessory",
+        "wrist": "Wrist",
+        "nose": "Nose",
+        "brow": "Brow",
+        "lip": "Lip",
+        "helix": "Cartilage",
+        "navel": "Navel"
+      },
+      "items": {
+        "ear-stud-pearl": "Pearl stud",
+        "ear-stud-gem": "Gem stud",
+        "ear-hoop-small": "Small hoop",
+        "ear-hoop-large": "Large hoop",
+        "ear-drop-crystal": "Crystal drop",
+        "ear-dangle-star": "Star dangle",
+        "neck-chain-fine": "Fine chain",
+        "neck-pendant-heart": "Heart pendant",
+        "neck-pendant-moon": "Moon pendant",
+        "neck-pearls": "Pearls",
+        "neck-choker-velvet": "Velvet choker",
+        "neck-choker-chain": "Chain choker",
+        "face-glasses-round": "Round glasses",
+        "face-glasses-square": "Square glasses",
+        "face-glasses-halfrim": "Half-rim glasses",
+        "face-sunglasses": "Sunglasses",
+        "hair-pins-cross": "Cross pins",
+        "hair-clip-star": "Star clip",
+        "hair-bow-ribbon": "Ribbon bow",
+        "hair-flower": "Flower",
+        "wrist-bangle": "Bangle",
+        "wrist-chain": "Chain bracelet",
+        "wrist-watch": "Watch",
+        "wrist-beads": "Bead bracelet",
+        "nose-stud": "Nose stud",
+        "nose-ring": "Nose ring",
+        "nose-septum": "Septum",
+        "brow-bar": "Brow bar",
+        "brow-ring": "Brow ring",
+        "lip-labret": "Labret",
+        "lip-ring": "Lip ring",
+        "lip-monroe": "Monroe",
+        "helix-ring": "Helix ring",
+        "helix-studs": "Helix studs",
+        "industrial-bar": "Industrial",
+        "tragus-stud": "Tragus",
+        "navel-ring": "Navel ring"
+      }
+    },
+    "tattoos": {
+      "design": "Design",
+      "placement": "Placement",
+      "add": "Add tattoo",
+      "list": "Added tattoos",
+      "empty": "No tattoos yet. Pick a small design and where it goes.",
+      "limit": "Up to {max} small tattoos.",
+      "taken": "There is already a tattoo there.",
+      "entry": "{design}, {placement}",
+      "remove": "Remove the {design} tattoo",
+      "designs": {
+        "wave": "Wave",
+        "star": "Star",
+        "moon": "Moon",
+        "leaf": "Leaf",
+        "bird": "Bird",
+        "heart": "Heart",
+        "feather": "Feather",
+        "compass": "Compass"
+      },
+      "placements": {
+        "innerWrist": "Inner wrist",
+        "forearm": "Forearm",
+        "collarbone": "Collarbone",
+        "behindEar": "Behind the ear",
+        "ankle": "Ankle",
+        "shoulderBlade": "Shoulder blade",
+        "nape": "Nape"
+      }
+    },
+    "actions": {
+      "undo": "Undo",
+      "redo": "Redo",
+      "randomize": "Randomize",
+      "done": "Done",
+      "saving": "Saving…"
+    },
+    "autosave": {
+      "needsName": "Name it and the draft saves itself.",
+      "pending": "Changes will be saved…",
+      "saving": "Saving draft…",
+      "saved": "Draft saved",
+      "error": "Could not save the draft. Will retry."
+    },
+    "saveFailed": "Could not save. Check your connection and try again.",
     "dragHint": "Drag to turn",
     "loadingStage": "Setting the stage",
-    "manifestFailed": "Couldn't load the parts list.",
-    "retry": "Try again",
-    "backToList": "My characters",
+    "manifest": {
+      "loading": "Loading the parts library",
+      "missingTitle": "The MetaHuman library is not on this machine.",
+      "missingBody": "The creator opens once the exported assets are copied to web/public/assets/mh/.",
+      "useFixture": "Open with sample data",
+      "errorTitle": "The parts list could not be loaded.",
+      "retry": "Try again",
+      "fixtureBadge": "Sample data"
+    },
     "premiere": {
       "tagline": "The stage is yours.",
       "start": "Start talking",
       "edit": "Back to editing"
     },
-    "preparing": "The creator is being prepared for the new MetaHuman characters."
+    "colors": {
+      "burgundy": "Burgundy",
+      "brick": "Brick",
+      "copper": "Copper",
+      "sand": "Sand",
+      "champagne": "Champagne",
+      "plum": "Plum",
+      "petrol": "Petrol",
+      "sage": "Sage",
+      "honey": "Honey",
+      "platinum": "Platinum",
+      "chestnut": "Chestnut",
+      "brown": "Brown",
+      "hazel": "Hazel",
+      "green": "Green",
+      "blue": "Blue",
+      "grey": "Grey",
+      "amber": "Amber",
+      "black": "Black",
+      "white": "White",
+      "charcoal": "Charcoal",
+      "navy": "Navy",
+      "olive": "Olive",
+      "cognac": "Cognac",
+      "wine": "Wine",
+      "stone": "Stone"
+    }
   },
   "Common": {
     "save": "Save",
@@ -291,5 +542,214 @@
     "redo": "Redo",
     "delete": "Delete",
     "edit": "Edit"
+  },
+  "Talk": {
+    "back": "My characters",
+    "edit": "Edit",
+    "stageLabel": "{name}, full body",
+    "dragHint": "Drag to turn, scroll to zoom",
+    "zoom": {
+      "label": "Zoom",
+      "in": "Zoom in",
+      "out": "Zoom out",
+      "reset": "Full body"
+    },
+    "chat": {
+      "title": "Chat",
+      "log": "Conversation",
+      "you": "You",
+      "inputLabel": "Your message",
+      "placeholder": "Talk to {name}…",
+      "send": "Send",
+      "stop": "Stop",
+      "hint": "Enter sends, Shift+Enter adds a line.",
+      "voice": "Voice",
+      "voiceOn": "Voice on",
+      "voiceOff": "Voice off",
+      "empty": {
+        "title": "{name} is listening.",
+        "body": "Ask anything, or try one of these."
+      },
+      "suggestions": ["How are you?", "Tell me a bit about yourself.", "What shall we do today?"]
+    },
+    "status": {
+      "connecting": "Connecting…",
+      "thinking": "{name} is thinking…",
+      "writing": "{name} is writing…",
+      "speaking": "{name} is speaking…",
+      "idle": "Ready"
+    },
+    "errors": {
+      "unauthenticated": "Your session has ended. Sign in again from the home page.",
+      "notConfigured": "No AI provider is configured. Add a provider key to web/.env.local.",
+      "unavailable": "The services are busy or rate-limited right now. Try again in a few seconds.",
+      "invalid": "This message could not be sent. Shorten it a little and try again.",
+      "network": "Could not reach the server. Check your connection.",
+      "interrupted": "The reply was cut off. You can ask again."
+    },
+    "voice": {
+      "notConfigured": "Voice is not configured; replies will arrive as text.",
+      "unavailable": "The voice could not be generated; the reply arrived as text.",
+      "failed": "A sentence could not be spoken."
+    },
+    "retry": "Try again",
+    "manifestMissing": "The MetaHuman library is not on this machine; chat still works.",
+    "manifestError": "The parts list could not be loaded; the chat still works."
+  },
+  "Curate": {
+    "title": "Curation",
+    "lede": "Choose what the creator offers. Hidden items stay in the export but never reach the people making characters.",
+    "devOnly": "Developer tool",
+    "back": "Home",
+    "tabsLabel": "Asset categories",
+    "tabs": {
+      "faces": "Faces",
+      "skins": "Skins",
+      "hair": "Hair",
+      "eyebrows": "Eyebrows",
+      "beards": "Beards",
+      "mustaches": "Mustaches",
+      "outfits": "Outfits",
+      "animations": "Animations"
+    },
+    "tabCount": "{visible} of {total} kept",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Name or id",
+    "filter": {
+      "label": "Show",
+      "all": "All",
+      "visible": "Kept",
+      "hidden": "Hidden"
+    },
+    "outfitCategory": {
+      "label": "Outfit category",
+      "all": "All",
+      "top": "Tops",
+      "bottom": "Bottoms",
+      "shoes": "Shoes",
+      "full": "One-piece"
+    },
+    "group": "Group look-alikes",
+    "groups": {
+      "lookAlikes": "Look-alikes",
+      "others": "Everything else",
+      "count": "{count, plural, one {# item} other {# items}}",
+      "hide": "Hide group",
+      "show": "Keep group",
+      "select": "Select group"
+    },
+    "meta": {
+      "female": "Female",
+      "male": "Male",
+      "unisex": "Unisex",
+      "body": "Body",
+      "face": "Face",
+      "tone": "Tone {value}",
+      "tints": "{count, plural, one {# colourway} other {# colourways}}"
+    },
+    "item": {
+      "select": "Select {name}",
+      "hide": "Hide {name}",
+      "show": "Keep {name}",
+      "preview": "Preview {name}",
+      "hidden": "Hidden"
+    },
+    "selection": {
+      "label": "Selection",
+      "count": "{count, plural, one {# selected} other {# selected}}",
+      "selectAll": "Select all shown",
+      "clear": "Clear",
+      "hide": "Hide",
+      "show": "Keep",
+      "shortcuts": "H hides, K keeps, Esc clears"
+    },
+    "status": {
+      "unsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
+      "clean": "Everything is saved",
+      "fixture": "Fixture data: saving is off"
+    },
+    "save": "Save",
+    "saving": "Saving",
+    "discard": "Discard",
+    "saved": "Curation saved. The creator uses it the next time it loads.",
+    "saveFailed": "The curation could not be saved. Try again.",
+    "loadFailed": "The current curation could not be read, so nothing is hidden yet.",
+    "retry": "Try again",
+    "empty": {
+      "title": "Nothing in this category yet",
+      "body": "Run the export for this category, then reload the page.",
+      "outfitsTitle": "Outfits are not exported yet",
+      "outfitsBody": "They will appear here as soon as the pipeline delivers them."
+    },
+    "noResults": "Nothing matches “{query}”.",
+    "noFilterResults": "Nothing to show with this filter.",
+    "preview": {
+      "close": "Close preview",
+      "previous": "Previous item",
+      "next": "Next item",
+      "position": "{index} of {total}",
+      "unavailable": "Animations have no still preview. Their kind and tags are listed instead.",
+      "failed": "The preview could not be rendered.",
+      "fixture": "Fixture data has no 3D files, so the thumbnail is shown.",
+      "keyboard": "← → to browse, H hides, K keeps"
+    },
+    "manifest": {
+      "loading": "Loading the asset list",
+      "missingTitle": "No export on this machine yet",
+      "missingBody": "Run the MetaHuman export so web/public/assets/mh/manifest.json exists, then reload.",
+      "errorTitle": "The asset list could not be read",
+      "errorBody": "The manifest is there but did not validate. Check the export log.",
+      "fixture": "Open with fixture data"
+    }
+  },
+  "DevThumbs": {
+    "title": "Thumbnail renders",
+    "lede": "Renders every face and groom on the MetaHuman stage and writes thumbnail.webp next to its asset. Development only.",
+    "renderAll": "Render all",
+    "renderMissing": "Render missing only",
+    "stop": "Stop",
+    "progress": "{done} of {total}",
+    "failedCount": "{count, plural, one {# failed} other {# failed}}",
+    "notInManifestCount": "{count, plural, one {# path not in the manifest} other {# paths not in the manifest}}",
+    "idle": "Ready",
+    "running": "Rendering {label}",
+    "finished": "Finished",
+    "stageLabel": "Render stage",
+    "listLabel": "Faces and grooms",
+    "kinds": {
+      "face": "Faces",
+      "hair": "Hair",
+      "eyebrows": "Eyebrows",
+      "beard": "Beards",
+      "mustache": "Mustaches",
+      "eyelashes": "Eyelashes",
+      "peachfuzz": "Peach fuzz"
+    },
+    "status": {
+      "idle": "Not rendered",
+      "queued": "Queued",
+      "rendering": "Rendering",
+      "done": "Written",
+      "failed": "Failed"
+    },
+    "badges": {
+      "noFile": "No file yet",
+      "notInManifest": "Not in manifest",
+      "backup": ".bak kept"
+    },
+    "errors": {
+      "timeout": "The stage did not settle in time (waiting for: {code}).",
+      "stage": "The stage failed to render.",
+      "capture": "The canvas could not be read.",
+      "upload": "The server refused the image ({code}).",
+      "network": "The server could not be reached.",
+      "config": "No compatible model face in the manifest."
+    },
+    "retry": "Retry",
+    "render": "Render",
+    "loading": "Loading the manifest",
+    "manifestMissing": "No MetaHuman manifest on this machine yet.",
+    "listFailed": "The thumbnail list could not be read.",
+    "reload": "Try again"
   }
 }

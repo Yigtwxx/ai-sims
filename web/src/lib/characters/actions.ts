@@ -6,7 +6,7 @@ import { routing } from '@/i18n/routing';
 import { requireUserId } from '@/lib/auth/session';
 import { CHARACTER_BASES } from '@/lib/character/schema';
 import { createDefaultConfig } from '@/lib/character/defaults';
-import { createCharacter } from '@/lib/characters/repository';
+import { createCharacter, deleteCharacter } from '@/lib/characters/repository';
 import { z } from 'zod';
 
 export type CreateCharacterState = { error: 'invalid' | 'failed' } | null;
@@ -42,4 +42,18 @@ export async function createCharacterAction(
     locale: hasLocale(routing.locales, locale) ? locale : routing.defaultLocale,
   });
   return null; // unreachable: redirect() throws
+}
+
+export type DeleteCharacterResult = { ok: true } | { ok: false; error: 'not_found' | 'failed' };
+
+/** Deletes one of the signed-in user's characters (and its thumbnail). */
+export async function deleteCharacterAction(id: string): Promise<DeleteCharacterResult> {
+  // Server actions are public endpoints: always re-verify the session.
+  const userId = await requireUserId();
+  if (typeof id !== 'string' || id.length === 0) return { ok: false, error: 'not_found' };
+  try {
+    return (await deleteCharacter(userId, id)) ? { ok: true } : { ok: false, error: 'not_found' };
+  } catch {
+    return { ok: false, error: 'failed' };
+  }
 }

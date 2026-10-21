@@ -43,6 +43,7 @@
     "errorTitle": "Bir şeyler ters gitti.",
     "errorBody": "Sahneyi yeniden kurmayı deneyebiliriz. Sorun sürerse sayfayı yenile.",
     "retry": "Tekrar dene",
+    "stageFailed": "Sahne çizilemedi. Geri kalan her şey çalışmaya devam ediyor.",
     "errorCode": "Hata kodu: {digest}",
     "notifications": "Bildirimler"
   },
@@ -192,95 +193,345 @@
   },
   "Characters": {
     "title": "Karakterlerim",
+    "lede": "Kaydettiğin karakterler. Birini aç, düzenle ya da onunla konuş.",
     "loading": "Karakterler yükleniyor…",
-    "empty": "Henüz karakterin yok.",
-    "createFirst": "İlk karakterini oluştur",
+    "count": "{count, plural, one {# karakter} other {# karakter}}",
+    "newCharacter": "Yeni karakter",
     "untitled": "İsimsiz",
+    "updated": "{time} güncellendi",
     "status": {
       "draft": "Taslak",
-      "finalized": "Tamamlandı"
+      "finalized": "Hazır"
     },
-    "style": {
-      "anime": "Anime",
-      "realistic": "Gerçekçi"
+    "empty": {
+      "title": "Sahne henüz boş.",
+      "body": "İlk karakterini oluştur; yüzünü, saçını, kıyafetini seç ve onunla konuş.",
+      "cta": "İlk karakterini oluştur"
     },
-    "lede": "Kaydettiğin karakterler. Birini aç, düzenle ya da onunla konuş."
+    "actions": {
+      "talk": "Konuş",
+      "edit": "Düzenle",
+      "delete": "Sil",
+      "more": "{name} için işlemler"
+    },
+    "deleteDialog": {
+      "title": "{name} silinsin mi?",
+      "body": "Karakter ve küçük resmi kalıcı olarak silinir. Bu geri alınamaz.",
+      "confirm": "Kalıcı olarak sil",
+      "cancel": "Vazgeç",
+      "deleting": "Siliniyor…"
+    },
+    "deleted": "{name} silindi.",
+    "deleteFailed": "Silinemedi. Bağlantını kontrol edip tekrar dene."
   },
   "Creator": {
     "title": "Karakter oluşturucu",
-    "comingSoon": "Tam karakter oluşturucu yakında. Şimdilik taslak bir karakter oluşturabilirsin.",
-    "categories": {
-      "face": "Yüz",
-      "skin": "Cilt",
-      "eyes": "Gözler",
-      "hair": "Saç",
-      "facialHair": "Sakal",
-      "top": "Üst",
-      "bottom": "Alt",
-      "shoes": "Ayakkabı"
-    },
-    "name": "İsim",
-    "style": "Stil",
-    "base": "Base",
-    "submit": "Taslak oluştur",
-    "creating": "Oluşturuluyor…",
-    "styles": {
-      "anime": "Anime",
-      "realistic": "Gerçekçi"
-    },
-    "bases": {
-      "male": "Erkek",
-      "female": "Kadın"
-    },
-    "invalid": "Lütfen 1 ile 40 karakter arasında bir isim gir.",
-    "failed": "Karakter oluşturulamadı. Lütfen tekrar dene.",
+    "back": "Karakterlerim",
     "nameLabel": "Karakterin adı",
     "namePlaceholder": "Bir isim ver",
     "nameRequired": "Önce karakterine bir isim ver.",
-    "rows": {
-      "gender": "Cinsiyet",
+    "categoriesLabel": "Kategoriler",
+    "categories": {
+      "identity": "Kimlik",
       "face": "Yüz",
-      "body": "Vücut tipi",
-      "skin": "Ten rengi",
+      "body": "Vücut",
+      "skin": "Ten",
       "eyes": "Gözler",
       "hair": "Saç",
-      "top": "Üst",
-      "bottom": "Alt",
-      "shoes": "Ayakkabı",
-      "jewelry": "Takı",
+      "facialHair": "Kaş ve sakal",
+      "outfit": "Kıyafet",
+      "jewelry": "Takı ve piercing",
       "tattoos": "Dövme"
     },
-    "builds": {
-      "slim": "İnce",
-      "average": "Normal",
-      "athletic": "Atletik",
-      "curvy": "Kıvrımlı"
+    "identity": {
+      "base": "Vücut tabanı",
+      "bases": {
+        "female": "Kadın",
+        "male": "Erkek"
+      },
+      "baseHint": "Taban değişince yüz, saç ve kıyafet bu tabana uygun seçeneklerle yeniden seçilir.",
+      "voice": "Ses",
+      "voices": {
+        "female": "Kadın sesi",
+        "male": "Erkek sesi"
+      },
+      "voiceHint": "Konuşurken kullanılacak ses. Dil, sitenin diline göre seçilir."
     },
-    "height": "Boy",
-    "heightShort": "Kısa",
-    "heightTall": "Uzun",
-    "color": "Renk",
-    "original": "Orijinal renk",
-    "none": "Yok",
-    "own": "Kendi saçı",
-    "count": "{count, plural, one {# seçenek} other {# seçenek}}",
-    "undo": "Geri al",
-    "redo": "İleri al",
-    "randomize": "Rastgele",
-    "done": "Bitti",
-    "saving": "Kaydediliyor…",
+    "face": {
+      "presets": "Hazır yüzler",
+      "blend": "Karışım",
+      "blendHint": "Seçili yüzü en fazla üç yüze doğru karıştır.",
+      "addBlend": "Karışım ekle",
+      "pickBlend": "Karıştırılacak yüzü seç",
+      "cancelBlend": "Vazgeç",
+      "blendTowards": "{name} oranı",
+      "removeBlend": "{name} karışımını kaldır",
+      "blendFull": "En fazla üç yüz karıştırılabilir."
+    },
+    "body": {
+      "presets": "Vücut tipi",
+      "presetNames": {
+        "slim": "İnce",
+        "average": "Normal",
+        "athletic": "Atletik",
+        "curvy": "Kıvrımlı"
+      },
+      "sliders": "İnce ayar",
+      "custom": "Ayarlar elle değiştirildi.",
+      "reset": "Tipe geri dön",
+      "sliderNames": {
+        "height": "Boy",
+        "weight": "Kilo",
+        "muscle": "Kas",
+        "chest": "Göğüs",
+        "waist": "Bel",
+        "hips": "Kalça",
+        "shoulders": "Omuz"
+      },
+      "ends": {
+        "height": {
+          "min": "Kısa",
+          "max": "Uzun"
+        },
+        "weight": {
+          "min": "Zayıf",
+          "max": "Dolgun"
+        },
+        "muscle": {
+          "min": "Yumuşak",
+          "max": "Kaslı"
+        },
+        "chest": {
+          "min": "Dar",
+          "max": "Geniş"
+        },
+        "waist": {
+          "min": "İnce",
+          "max": "Geniş"
+        },
+        "hips": {
+          "min": "Dar",
+          "max": "Geniş"
+        },
+        "shoulders": {
+          "min": "Dar",
+          "max": "Geniş"
+        }
+      },
+      "neutral": "Ortada",
+      "unavailable": "Bu tabanın vücut ayarları henüz dışa aktarılmadı."
+    },
+    "skin": {
+      "sets": "Cilt",
+      "tone": "Ton ince ayarı",
+      "lighter": "Daha açık",
+      "darker": "Daha koyu",
+      "makeup": "Makyaj",
+      "makeupHint": "Bu cilt setinin makyajlı yüz dokusunu kullanır.",
+      "makeupUnavailable": "Bu cilt setinde makyaj yok."
+    },
+    "eyes": {
+      "iris": "İris",
+      "default": "Yüzün kendi gözü",
+      "tint": "Renk tonu",
+      "noTint": "Ton yok"
+    },
+    "hair": {
+      "styles": "Saç modeli",
+      "none": "Saçsız",
+      "natural": "Doğal renk",
+      "melanin": "Koyuluk",
+      "blond": "Sarı",
+      "black": "Siyah",
+      "redness": "Kızıllık",
+      "neutral": "Nötr",
+      "red": "Kızıl",
+      "dye": "Boya",
+      "noDye": "Boya yok",
+      "pattern": "Boya deseni",
+      "patterns": {
+        "none": "Yok",
+        "ombre": "Ombre",
+        "roots": "Kökler",
+        "highlights": "Röfle",
+        "underlayer": "İç katman"
+      },
+      "patternColor": "Desen rengi",
+      "amount": "Yoğunluk"
+    },
+    "facialHair": {
+      "eyebrows": "Kaş",
+      "beard": "Sakal",
+      "mustache": "Bıyık",
+      "none": "Yok",
+      "unavailable": "Bu taban için seçenek yok.",
+      "sharedColor": "Kaş, sakal ve bıyık saç rengini kullanır."
+    },
+    "outfit": {
+      "slotsLabel": "Kıyafet bölümü",
+      "slots": {
+        "top": "Üst",
+        "bottom": "Alt",
+        "shoes": "Ayakkabı",
+        "full": "Tek parça"
+      },
+      "none": "Yok",
+      "tints": "Renk seçenekleri",
+      "authored": "Orijinal",
+      "colors": "Özel renk",
+      "params": {
+        "PrimaryColor": "Ana renk",
+        "SecondaryColor": "İkincil renk"
+      },
+      "fullReplaces": "Tek parça kıyafet, üst ve altın yerine geçer.",
+      "empty": "Bu bölümde bu taban için kıyafet yok.",
+      "comingSoon": "Gardırop hazırlanıyor.",
+      "comingSoonBody": "Kıyafetler dışa aktarılıp kütüphaneye eklenince burada görünecek. Şimdilik karakter MetaHuman taban kıyafetiyle görünür."
+    },
+    "jewelry": {
+      "count": "{count}/{max} parça",
+      "hint": "Her bölgede bir parça; seçtiğin yenisiyle değişir.",
+      "limit": "En fazla {max} parça takılabilir.",
+      "slots": {
+        "ears": "Kulak",
+        "neck": "Boyun",
+        "face": "Gözlük",
+        "hair": "Saç aksesuarı",
+        "wrist": "Bilek",
+        "nose": "Burun",
+        "brow": "Kaş",
+        "lip": "Dudak",
+        "helix": "Kıkırdak",
+        "navel": "Göbek"
+      },
+      "items": {
+        "ear-stud-pearl": "İnci küpe",
+        "ear-stud-gem": "Taşlı küpe",
+        "ear-hoop-small": "Küçük halka",
+        "ear-hoop-large": "Büyük halka",
+        "ear-drop-crystal": "Kristal sallantı",
+        "ear-dangle-star": "Yıldız sallantı",
+        "neck-chain-fine": "İnce zincir",
+        "neck-pendant-heart": "Kalp kolye",
+        "neck-pendant-moon": "Ay kolye",
+        "neck-pearls": "İnci kolye",
+        "neck-choker-velvet": "Kadife choker",
+        "neck-choker-chain": "Zincir choker",
+        "face-glasses-round": "Yuvarlak gözlük",
+        "face-glasses-square": "Kare gözlük",
+        "face-glasses-halfrim": "Yarım çerçeve",
+        "face-sunglasses": "Güneş gözlüğü",
+        "hair-pins-cross": "Çapraz toka",
+        "hair-clip-star": "Yıldız toka",
+        "hair-bow-ribbon": "Kurdele",
+        "hair-flower": "Çiçek",
+        "wrist-bangle": "Bilezik",
+        "wrist-chain": "Zincir bileklik",
+        "wrist-watch": "Saat",
+        "wrist-beads": "Boncuk bileklik",
+        "nose-stud": "Burun taşı",
+        "nose-ring": "Burun halkası",
+        "nose-septum": "Septum",
+        "brow-bar": "Kaş barı",
+        "brow-ring": "Kaş halkası",
+        "lip-labret": "Labret",
+        "lip-ring": "Dudak halkası",
+        "lip-monroe": "Monroe",
+        "helix-ring": "Helix halka",
+        "helix-studs": "Helix taşları",
+        "industrial-bar": "Industrial",
+        "tragus-stud": "Tragus",
+        "navel-ring": "Göbek halkası"
+      }
+    },
+    "tattoos": {
+      "design": "Desen",
+      "placement": "Yer",
+      "add": "Dövmeyi ekle",
+      "list": "Eklenen dövmeler",
+      "empty": "Henüz dövme yok. Küçük bir desen seç, yerini belirle.",
+      "limit": "En fazla {max} küçük dövme.",
+      "taken": "Bu yerde zaten bir dövme var.",
+      "entry": "{design}, {placement}",
+      "remove": "{design} dövmesini kaldır",
+      "designs": {
+        "wave": "Dalga",
+        "star": "Yıldız",
+        "moon": "Ay",
+        "leaf": "Yaprak",
+        "bird": "Kuş",
+        "heart": "Kalp",
+        "feather": "Tüy",
+        "compass": "Pusula"
+      },
+      "placements": {
+        "innerWrist": "Bilek içi",
+        "forearm": "Ön kol",
+        "collarbone": "Köprücük",
+        "behindEar": "Kulak arkası",
+        "ankle": "Ayak bileği",
+        "shoulderBlade": "Kürek kemiği",
+        "nape": "Ense"
+      }
+    },
+    "actions": {
+      "undo": "Geri al",
+      "redo": "İleri al",
+      "randomize": "Rastgele",
+      "done": "Bitti",
+      "saving": "Kaydediliyor…"
+    },
+    "autosave": {
+      "needsName": "İsim verince taslak kendiliğinden kaydedilir.",
+      "pending": "Değişiklikler kaydedilecek…",
+      "saving": "Taslak kaydediliyor…",
+      "saved": "Taslak kaydedildi",
+      "error": "Taslak kaydedilemedi. Tekrar denenecek."
+    },
     "saveFailed": "Kaydedilemedi. Bağlantını kontrol edip tekrar dene.",
     "dragHint": "Sürükle ve döndür",
     "loadingStage": "Sahne hazırlanıyor",
-    "manifestFailed": "Parça listesi yüklenemedi.",
-    "retry": "Tekrar dene",
-    "backToList": "Karakterlerim",
+    "manifest": {
+      "loading": "Parça kütüphanesi yükleniyor",
+      "missingTitle": "MetaHuman kütüphanesi bu makinede yok.",
+      "missingBody": "Dışa aktarılan varlıklar web/public/assets/mh/ klasörüne kopyalanınca oluşturucu açılır.",
+      "useFixture": "Örnek veriyle aç",
+      "errorTitle": "Parça listesi yüklenemedi.",
+      "retry": "Tekrar dene",
+      "fixtureBadge": "Örnek veri"
+    },
     "premiere": {
       "tagline": "Sahne senin.",
       "start": "Sohbete başla",
       "edit": "Düzenlemeye dön"
     },
-    "preparing": "Oluşturucu yeni MetaHuman karakterleri için hazırlanıyor."
+    "colors": {
+      "burgundy": "Bordo",
+      "brick": "Kiremit",
+      "copper": "Bakır",
+      "sand": "Kum",
+      "champagne": "Şampanya",
+      "plum": "Mürdüm",
+      "petrol": "Petrol",
+      "sage": "Adaçayı",
+      "honey": "Bal",
+      "platinum": "Platin",
+      "chestnut": "Kestane",
+      "brown": "Kahve",
+      "hazel": "Ela",
+      "green": "Yeşil",
+      "blue": "Mavi",
+      "grey": "Gri",
+      "amber": "Kehribar",
+      "black": "Siyah",
+      "white": "Beyaz",
+      "charcoal": "Antrasit",
+      "navy": "Lacivert",
+      "olive": "Haki",
+      "cognac": "Konyak",
+      "wine": "Şarap",
+      "stone": "Taş"
+    }
   },
   "Common": {
     "save": "Kaydet",
@@ -291,5 +542,214 @@
     "redo": "İleri al",
     "delete": "Sil",
     "edit": "Düzenle"
+  },
+  "Talk": {
+    "back": "Karakterlerim",
+    "edit": "Düzenle",
+    "stageLabel": "{name}, tam boy",
+    "dragHint": "Sürükleyerek döndür, kaydırarak yaklaş",
+    "zoom": {
+      "label": "Yakınlık",
+      "in": "Yaklaş",
+      "out": "Uzaklaş",
+      "reset": "Tam boy"
+    },
+    "chat": {
+      "title": "Sohbet",
+      "log": "Konuşma geçmişi",
+      "you": "Sen",
+      "inputLabel": "Mesajın",
+      "placeholder": "{name} ile konuş…",
+      "send": "Gönder",
+      "stop": "Durdur",
+      "hint": "Enter gönderir, Shift+Enter yeni satır.",
+      "voice": "Ses",
+      "voiceOn": "Ses açık",
+      "voiceOff": "Ses kapalı",
+      "empty": {
+        "title": "{name} seni dinliyor.",
+        "body": "Bir şey sor ya da bunlardan birini dene."
+      },
+      "suggestions": ["Nasılsın?", "Biraz kendinden bahset.", "Bugün ne yapalım?"]
+    },
+    "status": {
+      "connecting": "Bağlanıyor…",
+      "thinking": "{name} düşünüyor…",
+      "writing": "{name} yazıyor…",
+      "speaking": "{name} konuşuyor…",
+      "idle": "Hazır"
+    },
+    "errors": {
+      "unauthenticated": "Oturumun kapanmış. Ana sayfadan yeniden giriş yap.",
+      "notConfigured": "Yapay zekâ servisi yapılandırılmamış. web/.env.local dosyasına bir sağlayıcı anahtarı ekle.",
+      "unavailable": "Servisler şu an yoğun ya da kullanım sınırında. Birkaç saniye sonra tekrar dene.",
+      "invalid": "Bu mesaj gönderilemedi. Biraz kısaltıp tekrar dene.",
+      "network": "Sunucuya ulaşılamadı. Bağlantını kontrol et.",
+      "interrupted": "Yanıt yarıda kesildi. Tekrar sorabilirsin."
+    },
+    "voice": {
+      "notConfigured": "Ses servisi yapılandırılmamış; yanıtlar yazı olarak gelecek.",
+      "unavailable": "Ses şu an üretilemedi; yanıt yazı olarak geldi.",
+      "failed": "Bir cümle seslendirilemedi."
+    },
+    "retry": "Tekrar dene",
+    "manifestMissing": "MetaHuman kütüphanesi bu makinede yok; sohbet yine de çalışır.",
+    "manifestError": "Parça listesi yüklenemedi; sohbet yine de çalışır."
+  },
+  "Curate": {
+    "title": "Kürasyon",
+    "lede": "Oluşturucunun neler sunacağını seç. Gizlenen öğeler dışa aktarımda kalır ama karakter yapan kişilere hiç görünmez.",
+    "devOnly": "Geliştirici aracı",
+    "back": "Ana sayfa",
+    "tabsLabel": "Varlık kategorileri",
+    "tabs": {
+      "faces": "Yüzler",
+      "skins": "Tenler",
+      "hair": "Saçlar",
+      "eyebrows": "Kaşlar",
+      "beards": "Sakallar",
+      "mustaches": "Bıyıklar",
+      "outfits": "Kıyafetler",
+      "animations": "Animasyonlar"
+    },
+    "tabCount": "{total} öğeden {visible} tanesi açık",
+    "searchLabel": "Ara",
+    "searchPlaceholder": "Ad veya kimlik",
+    "filter": {
+      "label": "Göster",
+      "all": "Tümü",
+      "visible": "Açık",
+      "hidden": "Gizli"
+    },
+    "outfitCategory": {
+      "label": "Kıyafet kategorisi",
+      "all": "Tümü",
+      "top": "Üst",
+      "bottom": "Alt",
+      "shoes": "Ayakkabı",
+      "full": "Tek parça"
+    },
+    "group": "Benzerleri grupla",
+    "groups": {
+      "lookAlikes": "Benzerler",
+      "others": "Diğerleri",
+      "count": "{count, plural, one {# öğe} other {# öğe}}",
+      "hide": "Grubu gizle",
+      "show": "Grubu aç",
+      "select": "Grubu seç"
+    },
+    "meta": {
+      "female": "Kadın",
+      "male": "Erkek",
+      "unisex": "Ortak",
+      "body": "Vücut",
+      "face": "Yüz",
+      "tone": "Ton {value}",
+      "tints": "{count, plural, one {# renk seçeneği} other {# renk seçeneği}}"
+    },
+    "item": {
+      "select": "{name} öğesini seç",
+      "hide": "{name} öğesini gizle",
+      "show": "{name} öğesini aç",
+      "preview": "{name} önizlemesi",
+      "hidden": "Gizli"
+    },
+    "selection": {
+      "label": "Seçim",
+      "count": "{count, plural, one {# seçili} other {# seçili}}",
+      "selectAll": "Görünenleri seç",
+      "clear": "Temizle",
+      "hide": "Gizle",
+      "show": "Aç",
+      "shortcuts": "H gizler, K açar, Esc temizler"
+    },
+    "status": {
+      "unsaved": "{count, plural, one {# kaydedilmemiş değişiklik} other {# kaydedilmemiş değişiklik}}",
+      "clean": "Her şey kaydedildi",
+      "fixture": "Örnek veri: kaydetme kapalı"
+    },
+    "save": "Kaydet",
+    "saving": "Kaydediliyor",
+    "discard": "Vazgeç",
+    "saved": "Kürasyon kaydedildi. Oluşturucu bir sonraki açılışta kullanır.",
+    "saveFailed": "Kürasyon kaydedilemedi. Tekrar dene.",
+    "loadFailed": "Mevcut kürasyon okunamadı; şimdilik hiçbir öğe gizli değil.",
+    "retry": "Tekrar dene",
+    "empty": {
+      "title": "Bu kategoride henüz öğe yok",
+      "body": "Bu kategorinin dışa aktarımını çalıştır, sonra sayfayı yenile.",
+      "outfitsTitle": "Kıyafetler henüz dışa aktarılmadı",
+      "outfitsBody": "Pipeline teslim eder etmez burada görünecekler."
+    },
+    "noResults": "“{query}” ile eşleşen öğe yok.",
+    "noFilterResults": "Bu filtreyle gösterilecek öğe yok.",
+    "preview": {
+      "close": "Önizlemeyi kapat",
+      "previous": "Önceki öğe",
+      "next": "Sonraki öğe",
+      "position": "{index} / {total}",
+      "unavailable": "Animasyonların durağan önizlemesi yok; türü ve etiketleri listelenir.",
+      "failed": "Önizleme çizilemedi.",
+      "fixture": "Örnek veride 3B dosya yok, bu yüzden küçük resim gösteriliyor.",
+      "keyboard": "← → ile gez, H gizler, K açar"
+    },
+    "manifest": {
+      "loading": "Varlık listesi yükleniyor",
+      "missingTitle": "Bu makinede henüz dışa aktarım yok",
+      "missingBody": "MetaHuman dışa aktarımını çalıştır; web/public/assets/mh/manifest.json oluşsun, sonra sayfayı yenile.",
+      "errorTitle": "Varlık listesi okunamadı",
+      "errorBody": "Manifest var ama doğrulanamadı. Dışa aktarım günlüğüne bak.",
+      "fixture": "Örnek veriyle aç"
+    }
+  },
+  "DevThumbs": {
+    "title": "Küçük resim üretimi",
+    "lede": "Her yüzü, saçı ve kılı MetaHuman sahnesinde çizer ve varlığın yanına thumbnail.webp yazar. Yalnızca geliştirmede.",
+    "renderAll": "Hepsini çiz",
+    "renderMissing": "Yalnız eksikleri çiz",
+    "stop": "Durdur",
+    "progress": "{total} öğeden {done}",
+    "failedCount": "{count, plural, one {# başarısız} other {# başarısız}}",
+    "notInManifestCount": "{count, plural, one {# yol manifestte yok} other {# yol manifestte yok}}",
+    "idle": "Hazır",
+    "running": "{label} çiziliyor",
+    "finished": "Bitti",
+    "stageLabel": "Çizim sahnesi",
+    "listLabel": "Yüzler, saçlar ve kıllar",
+    "kinds": {
+      "face": "Yüzler",
+      "hair": "Saçlar",
+      "eyebrows": "Kaşlar",
+      "beard": "Sakallar",
+      "mustache": "Bıyıklar",
+      "eyelashes": "Kirpikler",
+      "peachfuzz": "Ayva tüyü"
+    },
+    "status": {
+      "idle": "Çizilmedi",
+      "queued": "Sırada",
+      "rendering": "Çiziliyor",
+      "done": "Yazıldı",
+      "failed": "Başarısız"
+    },
+    "badges": {
+      "noFile": "Dosya yok",
+      "notInManifest": "Manifestte yok",
+      "backup": ".bak saklandı"
+    },
+    "errors": {
+      "timeout": "Sahne zamanında oturmadı (beklenen: {code}).",
+      "stage": "Sahne çizilemedi.",
+      "capture": "Tuval okunamadı.",
+      "upload": "Sunucu resmi reddetti ({code}).",
+      "network": "Sunucuya ulaşılamadı.",
+      "config": "Manifestte uyumlu bir model yüz yok."
+    },
+    "retry": "Tekrar dene",
+    "render": "Çiz",
+    "loading": "Manifest yükleniyor",
+    "manifestMissing": "Bu makinede henüz MetaHuman manifesti yok.",
+    "listFailed": "Küçük resim listesi okunamadı.",
+    "reload": "Tekrar dene"
   }
 }
