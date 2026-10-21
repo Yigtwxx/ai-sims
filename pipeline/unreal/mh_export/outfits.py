@@ -122,6 +122,21 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
     meshes: dict[str, Any] = {}
     textures: dict[str, Any] = {}
     instances: dict[str, Any] = {}
+
+    def add_instance(path: str, mi: unreal.MaterialInstance) -> None:
+        instances[path] = materials.dump_instance(mi)
+        for texture in material_textures(mi):
+            key = texture.get_path_name()
+            if key in textures:
+                continue
+            try:
+                textures[key] = export_texture(texture, work / "textures")
+            except RuntimeError as exc:
+                # Constant helper maps (e.g. DefaultMaps/black_masks) have no
+                # source art to export; the material dump still names them.
+                textures[key] = {"error": str(exc)}
+
+    slot_materials: list[unreal.MaterialInterface] = []
     for asset in built:
         cls = inventory.class_name(asset)
         obj = asset.get_asset()
@@ -132,18 +147,16 @@ def export_outfit(gender: str, item_path: str, work: Path) -> dict[str, Any]:
                 "glb": glb.name if export_gltf(obj, glb) else None,
                 "fbx": fbx.name if export_object(obj, fbx, fbx_options()) else None,
             }
+            slot_materials += [s.material_interface for s in obj.get_editor_property("materials")]
         elif cls == "MaterialInstanceConstant":
-            instances[inventory.object_path(asset)] = materials.dump_instance(obj)
-            for texture in material_textures(obj):
-                key = texture.get_path_name()
-                if key in textures:
-                    continue
-                try:
-                    textures[key] = export_texture(texture, work / "textures")
-                except RuntimeError as exc:
-                    # Constant helper maps (e.g. DefaultMaps/black_masks) have no
-                    # source art to export; the material dump still names them.
-                    textures[key] = {"error": str(exc)}
+            add_instance(inventory.object_path(asset), obj)
+    # Some items (e.g. OA_Shirt_01/04) keep their own instances on the built
+    # mesh instead of copies under Clothing: dump those from the mesh slots.
+    for mi in slot_materials:
+        if isinstance(mi, unreal.MaterialInstance):
+            path = mi.get_path_name()
+            if path not in instances:
+                add_instance(path, mi)
     if not any(m["glb"] for m in meshes.values()):
         raise RuntimeError(f"No fitted clothing mesh was built for {item_path}: {build_warning}")
     write_json(
