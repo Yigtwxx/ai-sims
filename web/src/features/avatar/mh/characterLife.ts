@@ -9,6 +9,7 @@ import type { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import { Quaternion, Vector3, type Object3D } from 'three';
 
 import { stepBlink, type BlinkState } from '../life';
+import { createEmphasis, stepEmphasis, type EmphasisState } from './emphasis';
 import { addFaceClip, type FaceClip } from './faceClips';
 import {
   createGaze,
@@ -48,6 +49,14 @@ const SMILE: Record<LifeMode, number> = {
 };
 /** Seconds for the smile to settle into a new mode. */
 const SMILE_EASE = 1.5;
+/** Head pitch of a full-strength stress nod (split neck 0.3, head 0.7). */
+const NOD_ANGLE = 3.5 * DEG;
+/** Brow raise of a full-strength stress, per morph. */
+const BROW_RAISE: [string, number][] = [
+  ['browInnerUp', 0.3],
+  ['browOuterUpLeft', 0.22],
+  ['browOuterUpRight', 0.22],
+];
 
 /** Face loops the life layer plays under blinks, gaze and lip-sync. */
 export interface FaceLayers {
@@ -74,6 +83,7 @@ export class CharacterLife {
   private rig: PoseRig | undefined;
   private rigFor: MhCharacterHandle | undefined;
   private smile = 0;
+  private emphasis: EmphasisState = createEmphasis();
   private readonly face = new Map<string, number>();
   private faceDriven = new Set<string>();
   /** Set when the stage has loaded them; the character lives without them too. */
@@ -105,7 +115,8 @@ export class CharacterLife {
       idlePose({
         t: this.t,
         mode: lifeMode,
-        loudness,
+        // A hint of the loudness only: the nods come from the stresses below.
+        loudness: loudness * 0.3,
         mocap: motion?.active ? motion.layer : null,
       }),
     );
@@ -116,11 +127,14 @@ export class CharacterLife {
     const off = aimAtViewer(handle.body.root, rig, viewer);
     const yaw = clamp(off.yaw * follow, HEAD_LIMIT.yaw);
     const pitch = clamp(off.pitch * follow, HEAD_LIMIT.pitch);
+    // Stressed syllables: a short nod (and below, often a brow raise).
+    this.emphasis = stepEmphasis(this.emphasis, loudness, delta, speaking, this.random);
+    const nod = this.emphasis.nod * NOD_ANGLE;
     addRotations(rig, [
       { bone: 'neck_01', axis: [0, 1, 0], angle: yaw * 0.4 },
       { bone: 'head', axis: [0, 1, 0], angle: yaw * 0.6 },
-      { bone: 'neck_01', axis: [1, 0, 0], angle: -pitch * 0.4 },
-      { bone: 'head', axis: [1, 0, 0], angle: -pitch * 0.6 },
+      { bone: 'neck_01', axis: [1, 0, 0], angle: -pitch * 0.4 + nod * 0.3 },
+      { bone: 'head', axis: [1, 0, 0], angle: -pitch * 0.6 + nod * 0.7 },
     ]);
 
     // Face loops first; gaze, blinks and the jaw below write over or add to them.
@@ -175,6 +189,11 @@ export class CharacterLife {
     // The smile breathes (comes and goes over ~30 s) rather than holding.
     const breathing = 0.6 + 0.4 * Math.sin(this.t * 0.21);
     if (smile) addFaceClip(smile, this.t, this.smile * breathing, face, mouth);
+    const brow = this.emphasis.brow;
+    if (brow > 0.001) {
+      for (const [name, amount] of BROW_RAISE)
+        face.set(name, (face.get(name) ?? 0) + brow * amount);
+    }
     for (const name of this.faceDriven) if (!face.has(name)) handle.setFaceMorph(name, 0);
     for (const [name, weight] of face) handle.setFaceMorph(name, Math.min(1, weight));
     this.faceDriven = new Set(face.keys());
