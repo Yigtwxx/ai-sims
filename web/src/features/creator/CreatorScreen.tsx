@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { useStore } from 'zustand';
 
 import { EASE, SPRING_SOFT } from '@/components/motion/tokens';
+import { StageLoading } from '@/components/shell/StageLoading';
 import { StageBoundary, StageFailed } from '@/components/stage/StageBoundary';
 import { StagePoster } from '@/components/stage/StagePoster';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -305,12 +306,14 @@ export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
         )}
       </div>
 
+      {/* At the floor of the uncovered stage; it does not come back for later edits. */}
       <StageLoading
         show={
           !stageShown && (manifestState.status === 'loading' || manifestState.status === 'ready')
         }
-        left={panelWidth}
         label={t('loadingCharacter')}
+        className="absolute top-0 right-0 left-0 z-10 h-[36dvh] justify-center lg:bottom-0 lg:left-[clamp(420px,34vw,560px)] lg:h-auto lg:justify-end lg:pb-[14vh]"
+        style={panelWidth ? { left: panelWidth } : undefined}
       />
 
       <StageOverlay
@@ -563,39 +566,6 @@ function CreatorStage({
 function OnMount({ run }: { run: () => void }) {
   useEffect(() => run(), [run]);
   return null;
-}
-
-/**
- * Until the character first stands there dressed: a quiet caption with a
- * tungsten light crossing a hairline, at the floor of the uncovered stage. It
- * never blocks the stage and does not come back for later edits.
- */
-function StageLoading({ show, left, label }: { show: boolean; left: number; label: string }) {
-  const reduceMotion = useReducedMotion();
-  return (
-    <AnimatePresence>
-      {show ? (
-        <motion.div
-          key="stage-loading"
-          role="status"
-          aria-live="polite"
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1, transition: { delay: 0.3, duration: 0.6 } }}
-          exit={{ opacity: 0, transition: { duration: 0.4 } }}
-          className="pointer-events-none absolute top-0 right-0 left-0 z-10 flex h-[36dvh] items-center justify-center lg:bottom-0 lg:left-[clamp(420px,34vw,560px)] lg:h-auto lg:items-end lg:pb-[14vh]"
-          style={left ? { left } : undefined}
-        >
-          <div className="flex flex-col items-center gap-3">
-            <span className="text-label text-ink-muted">{label}</span>
-            <span
-              aria-hidden="true"
-              className="bg-hairline after:animate-skeleton-sweep relative h-px w-24 overflow-hidden after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.85),transparent)]"
-            />
-          </div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
-  );
 }
 
 function AutosaveNote({ status }: { status: ReturnType<typeof useAutosave>['status'] }) {
