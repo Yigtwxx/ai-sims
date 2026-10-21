@@ -251,7 +251,8 @@ export const MhStage = memo(function MhStage({
         insetRight={insetRight}
         backdrop="dark"
         lighting={STUDIO_LIGHTING}
-        subjectHeight={resolved?.height}
+        // Frame the character on screen; an incoming one is still hidden.
+        subjectHeight={(shown ?? resolved)?.height}
         interactive={mode === 'creator' || talk}
         follow={talk ? follow : undefined}
         anchor={closeUp ? anchor : undefined}
