@@ -23,9 +23,14 @@ space rather than copied:
    4) and its slider morphs, so a garment follows the skin it covers.
 4. Clearance. Vertices that end up closer than 2 mm to the skin are pushed out along the
    skin normal (tight bands sit slightly inside the body in Unreal, which hides the body).
+   Each slider morph gets the same check at its end (body and garment morphed), since a
+   loose vertex averages the deltas of a wide skin patch and can sink further than the
+   skin right under it (a collar over the neck and back at weight -1).
 5. `body_hide`. Body vertices that cannot see out: thirteen rays around the skin normal
    (up to 60 degrees) all run into the garment or the body within 10 cm, and the vertex
-   is not near an exposed garment opening (collars, cuffs, hems).
+   is not near an exposed garment opening (collars, cuffs, hems). A closed shoe (one that
+   already hides most of the toes) hides all of them: a foot longer than the shoe's toe box
+   otherwise shows its toe tips through the cap, and they can see out.
 
 Materials follow the graph of Unreal's `M_fabric_simpler` (read from the engine plugin's
 asset): the GLB keeps the parameters and texture slots by their Unreal names in `extras.mh.
@@ -57,6 +62,7 @@ from PIL import Image
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.spatial import cKDTree
 
+from asset_pipeline.mh.compat import COMPAT_FILE, curated_compat
 from asset_pipeline.mh.geometry import closest_triangles, vertex_normals
 from asset_pipeline.mh.glb import (
     ARRAY_BUFFER,
@@ -115,6 +121,7 @@ EXACT_RADIUS = 0.02  # closest-point weights fade out over this distance
 CLEARANCE = 0.002  # metres between skin and garment after the fit
 PUSH_DEPTH_LIMIT = 0.02  # deeper vertices are inner layers or leftovers: not pushed
 MORPH_EPSILON = 1e-4  # metres: transferred morphs smaller than this are left out
+FACE_ON_SHARE = 0.9  # |signed| / distance of an offset taken as along the skin normal
 
 # body_hide.
 HIDE_DISTANCE = 0.10  # metres along each visibility ray
@@ -728,6 +735,7 @@ def fit_garment(garment: Garment, body: BodyFit) -> Fit:
     moved[push] += (CLEARANCE - signed[push])[:, None] * normal[push]
     joints, weights = _blend_skin(transfer.matrix, body)
     morphs = {name: transfer.matrix @ delta for name, delta in body.morphs.items()}
+    morphs, cleared = clear_morphs(moved, morphs, body, outside=push | (signed > 0.0))
     parts = []
     start = 0
     for part in garment.parts:
@@ -760,12 +768,46 @@ def fit_garment(garment: Garment, body: BodyFit) -> Fit:
             "p95": _mm(np.percentile(transfer.distance, 95)),
         },
         "pushed_out": int(push.sum()),
+        "morph_cleared": cleared,
         "inside_after_fit": int(
             np.sum((signed < -0.001) & (transfer.signed > -PUSH_DEPTH_LIMIT) & ~push)
         ),
         "uv_match_error": body.match_error,
     }
     return Fit(parts=parts, stats=stats)
+
+
+def clear_morphs(
+    positions: F64, morphs: Mapping[str, F64], body: BodyFit, *, outside: Bool
+) -> tuple[dict[str, F64], dict[str, int]]:
+    """Keep the garment outside the skin at every slider end.
+
+    A garment vertex's morph is the weighted mean of the body deltas around it, over a
+    wider patch the looser the cloth. At a slider end it can therefore move further in
+    than the skin right under it, and the body shows through. Each morph is checked at its
+    end: vertices `outside` the skin at rest that end closer than CLEARANCE to the morphed
+    skin are pushed back out along its normal. Returns the morphs and the vertices fixed
+    per morph.
+    """
+    cleared: dict[str, F64] = {}
+    counts: dict[str, int] = {}
+    for name, delta in morphs.items():
+        skin = body.positions + body.morphs[name]
+        normals = vertex_normals(skin, body.triangles)
+        distance, signed, triangle, _, normal = _signed_distance(
+            positions + delta, skin, normals, body.triangles
+        )
+        # By the neck seam the closest point may lie on the open edge, where the signed
+        # distance means nothing; trust it there only when the offset is along the normal
+        # (collars sit right over that edge and sink most).
+        near_seam = body.boundary[body.triangles[triangle]].any(axis=1)
+        on_face = np.abs(signed) >= FACE_ON_SHARE * distance
+        fix = outside & (signed < CLEARANCE) & (~near_seam | on_face)
+        fixed = delta.copy()
+        fixed[fix] += (CLEARANCE - signed[fix])[:, None] * normal[fix]
+        cleared[name] = fixed
+        counts[name] = int(fix.sum())
+    return cleared, counts
 
 
 def _mm(value: float) -> float:
@@ -957,6 +999,8 @@ REGION_RULES = (
     ("torso", re.compile(r"^(spine|clavicle)", re.I)),
 )
 REGION_HIDE_SHARE = 0.6
+CLOSED_TOE_SHARE = 0.4  # share of the toes a shoe hides by itself to count as closed
+TOE_JOINT = re.compile(r"^(ball|.*toe)", re.I)
 
 
 def body_regions(body: BodyFit) -> list[str | None]:
@@ -970,6 +1014,22 @@ def body_regions(body: BodyFit) -> list[str | None]:
             (region for region, rule in REGION_RULES if rule.search(name)), None
         )
     return [lookup[int(j)] for j in strongest]
+
+
+def toe_vertices(body: BodyFit) -> Bool:
+    """Body vertices whose strongest joint is a toe (or the ball of the foot)."""
+    strongest = body.joints[np.arange(len(body.joints)), np.argmax(body.weights, axis=1)]
+    toes = np.array([bool(TOE_JOINT.search(name)) for name in body.skeleton.names])
+    return toes[strongest]
+
+
+def hide_closed_toes(hidden: Bool, body: BodyFit) -> tuple[Bool, bool]:
+    """Hide every toe vertex when the garment already hides most of them (a closed shoe);
+    sandals and bare feet keep their toes. Returns the mask and whether it grew."""
+    toes = toe_vertices(body)
+    if not toes.any() or hidden[toes].mean() < CLOSED_TOE_SHARE:
+        return hidden, False
+    return hidden | toes, True
 
 
 def region_coverage(hidden: Bool, regions: Sequence[str | None]) -> dict[str, float]:
@@ -1701,6 +1761,39 @@ def outfit_label(name: str) -> dict[str, str]:
     return {"tr": words, "en": words}
 
 
+# {colors: {id: {en, tr}}, outfits: {name: [{id, values: {param: sRGB hex}}]}}
+TINTS_FILE = Path(__file__).with_name("outfit_tints.json")
+
+
+def curated_tints(
+    name: str, params: Sequence[Mapping[str, Any]], tints_file: Path = TINTS_FILE
+) -> list[dict[str, Any]] | None:
+    """The outfit's curated colour presets from outfit_tints.json (first = the colour it is
+    put on and photographed in), or None when it has none. The template colours are a flat
+    grey with debug-blue trims on nearly every item, so the catalogue reads as one garment
+    without them. A preset naming a colour or param the garment lacks is a data error."""
+    data = json.loads(tints_file.read_text(encoding="utf-8"))
+    presets = data["outfits"].get(name)
+    if presets is None:
+        return None
+    colors: Mapping[str, Mapping[str, str]] = data["colors"]
+    known = {str(p["name"]) for p in params if p.get("type") == "color"}
+    entries = []
+    for preset in presets:
+        identifier = str(preset["id"])
+        if identifier not in colors:
+            raise ValueError(f"{TINTS_FILE.name}: {name} uses unknown colour {identifier!r}")
+        values = {str(k): str(v) for k, v in preset["values"].items()}
+        unknown = sorted(values.keys() - known)
+        if unknown:
+            raise ValueError(f"{TINTS_FILE.name}: {name}/{identifier} sets unknown {unknown}")
+        label = colors[identifier]
+        entries.append(
+            {"id": identifier, "label": {"tr": label["tr"], "en": label["en"]}, "values": values}
+        )
+    return entries
+
+
 @dataclass
 class OutfitResult:
     record: dict[str, Any]  # per-gender manifest record (merged by manifest_entries)
@@ -1722,6 +1815,9 @@ def convert_outfit(
     hidden, hide_stats = body_hide(fit, body)
     coverage = region_coverage(hidden, body_regions(body))
     category = outfit_category(unit.name, coverage)
+    if category == "shoes":
+        hidden, closed = hide_closed_toes(hidden, body)
+        hide_stats = {**hide_stats, "closed_toes": closed, "hidden": int(hidden.sum())}
     label = outfit_label(unit.name)
     writer = TextureWriter(web_root, log)
     hashes = unit.hashes()
@@ -1805,8 +1901,9 @@ def convert_outfit(
 
 def manifest_entries(records: Sequence[Mapping[str, Any]], web_root: Path) -> list[dict[str, Any]]:
     """Manifest `outfits[]` from per-gender records: one entry per item, files per gender.
-    Params and tint presets come from the female garment when both exist; the coarse
-    regions are those both garments hide."""
+    Params and tint presets come from the female garment when both exist (curated presets,
+    see curated_tints, replace the authored one); the coarse regions are those both
+    garments hide. An item gender_compat.json gives one gender is offered to it only."""
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     for record in records:
         grouped.setdefault(str(record["id"]), []).append(record)
@@ -1815,6 +1912,9 @@ def manifest_entries(records: Sequence[Mapping[str, Any]], web_root: Path) -> li
         items = sorted(items, key=lambda r: GENDERS.index(str(r["gender"])))
         first = items[0]
         genders = [str(r["gender"]) for r in items]
+        compat = curated_compat("outfits", str(first["name"]))
+        if compat and compat not in genders:
+            raise ValueError(f"{COMPAT_FILE.name}: {first['name']} is for {compat}, no such mesh")
         regions = set(first["hidesBodyRegions"])
         for other in items[1:]:
             regions &= set(other["hidesBodyRegions"])
@@ -1822,10 +1922,11 @@ def manifest_entries(records: Sequence[Mapping[str, Any]], web_root: Path) -> li
             "id": identifier,
             "category": first["category"],
             "label": first["label"],
-            "compat": "unisex" if len(set(genders)) == 2 else genders[0],
+            "compat": compat or ("unisex" if len(set(genders)) == 2 else genders[0]),
             "files": {str(r["gender"]): str(r["file"]) for r in items},
             "params": list(first["params"]),
-            "tintPresets": list(first["tintPresets"]),
+            "tintPresets": curated_tints(str(first["name"]), first["params"])
+            or list(first["tintPresets"]),
             "hidesBodyRegions": sorted(regions),
         }
         thumbnail = web_root / "outfits" / str(first["name"]) / "thumbnail.webp"

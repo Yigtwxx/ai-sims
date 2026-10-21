@@ -1,0 +1,28 @@
+{
+  "grooms": {
+    "Hair_L_Straight": "female",
+    "Hair_M_BobBangs": "female",
+    "Hair_M_BobCurly": "female",
+    "Hair_M_BobStraight": "female",
+    "Hair_M_Layered": "female",
+    "Hair_M_SideSweptFringe": "female",
+    "Hair_M_TwistedBraids": "female",
+    "Hair_S_LowPonytail": "female",
+    "Hair_S_Pixie": "female",
+    "Hair_S_Updo": "female",
+    "Hair_S_UpdoBraids": "female",
+    "Hair_S_360Waves": "male",
+    "Hair_S_AfroFade": "male",
+    "Hair_S_BrushCut": "male",
+    "Hair_S_Casual": "male",
+    "Hair_S_Clean": "male",
+    "Hair_S_HairLoss": "male",
+    "Hair_S_Messy": "male",
+    "Hair_S_SlickBack": "male"
+  },
+  "outfits": {
+    "OA_Flats": "female",
+    "OA_TCrop3QSlv": "female",
+    "OA_Yogaful": "female"
+  }
+}

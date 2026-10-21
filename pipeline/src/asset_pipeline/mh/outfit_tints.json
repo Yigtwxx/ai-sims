@@ -1,0 +1,796 @@
+{
+  "_doc": "Curated colour presets per outfit (sRGB hex per colour param; params a preset leaves out keep the garment's authored value). The first preset is the one an outfit is put on and photographed in. Labels come from `colors`.",
+  "colors": {
+    "white": {
+      "en": "White",
+      "tr": "Beyaz"
+    },
+    "ecru": {
+      "en": "Ecru",
+      "tr": "Ekru"
+    },
+    "cream": {
+      "en": "Cream",
+      "tr": "Krem"
+    },
+    "oatmeal": {
+      "en": "Oatmeal",
+      "tr": "Bej"
+    },
+    "sand": {
+      "en": "Sand",
+      "tr": "Kum"
+    },
+    "heather": {
+      "en": "Heather grey",
+      "tr": "Gri melanj"
+    },
+    "charcoal": {
+      "en": "Charcoal",
+      "tr": "Antrasit"
+    },
+    "black": {
+      "en": "Black",
+      "tr": "Siyah"
+    },
+    "navy": {
+      "en": "Navy",
+      "tr": "Lacivert"
+    },
+    "sky": {
+      "en": "Light blue",
+      "tr": "Açık mavi"
+    },
+    "olive": {
+      "en": "Olive",
+      "tr": "Haki"
+    },
+    "forest": {
+      "en": "Forest green",
+      "tr": "Koyu yeşil"
+    },
+    "sage": {
+      "en": "Sage",
+      "tr": "Adaçayı"
+    },
+    "burgundy": {
+      "en": "Burgundy",
+      "tr": "Bordo"
+    },
+    "red": {
+      "en": "Red",
+      "tr": "Kırmızı"
+    },
+    "rust": {
+      "en": "Rust",
+      "tr": "Kiremit"
+    },
+    "camel": {
+      "en": "Camel",
+      "tr": "Deve tüyü"
+    },
+    "brown": {
+      "en": "Brown",
+      "tr": "Kahverengi"
+    },
+    "cognac": {
+      "en": "Cognac",
+      "tr": "Konyak"
+    },
+    "blush": {
+      "en": "Blush",
+      "tr": "Pudra"
+    },
+    "mustard": {
+      "en": "Mustard",
+      "tr": "Hardal"
+    }
+  },
+  "outfits": {
+    "OA_Crewneckt": [
+      {
+        "id": "white",
+        "values": {
+          "diffuse_color_1": "#e6e2da",
+          "diffuse_color_2": "#e6e2da"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#1d1d1f"
+        }
+      },
+      {
+        "id": "heather",
+        "values": {
+          "diffuse_color_1": "#8a8987",
+          "diffuse_color_2": "#8a8987"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#1f2941"
+        }
+      },
+      {
+        "id": "olive",
+        "values": {
+          "diffuse_color_1": "#5a5c39",
+          "diffuse_color_2": "#5a5c39"
+        }
+      },
+      {
+        "id": "burgundy",
+        "values": {
+          "diffuse_color_1": "#5b1f2a",
+          "diffuse_color_2": "#5b1f2a"
+        }
+      },
+      {
+        "id": "sky",
+        "values": {
+          "diffuse_color_1": "#9cb6cf",
+          "diffuse_color_2": "#9cb6cf"
+        }
+      }
+    ],
+    "OA_TCrop3QSlv": [
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#1d1d1f"
+        }
+      },
+      {
+        "id": "white",
+        "values": {
+          "diffuse_color_1": "#e6e2da",
+          "diffuse_color_2": "#e6e2da"
+        }
+      },
+      {
+        "id": "blush",
+        "values": {
+          "diffuse_color_1": "#d1a89c",
+          "diffuse_color_2": "#d1a89c"
+        }
+      },
+      {
+        "id": "sage",
+        "values": {
+          "diffuse_color_1": "#8b9982",
+          "diffuse_color_2": "#8b9982"
+        }
+      },
+      {
+        "id": "rust",
+        "values": {
+          "diffuse_color_1": "#91472b",
+          "diffuse_color_2": "#91472b"
+        }
+      },
+      {
+        "id": "heather",
+        "values": {
+          "diffuse_color_1": "#8a8987",
+          "diffuse_color_2": "#8a8987"
+        }
+      }
+    ],
+    "OA_Hoodie": [
+      {
+        "id": "forest",
+        "values": {
+          "diffuse_color_1": "#2f4535",
+          "diffuse_color_2": "#2f4535",
+          "B_diffuse_color_1": "#e9dfcb"
+        }
+      },
+      {
+        "id": "heather",
+        "values": {
+          "diffuse_color_1": "#8a8987",
+          "diffuse_color_2": "#8a8987",
+          "B_diffuse_color_1": "#e6e2da"
+        }
+      },
+      {
+        "id": "charcoal",
+        "values": {
+          "diffuse_color_1": "#3a3a3c",
+          "diffuse_color_2": "#3a3a3c",
+          "B_diffuse_color_1": "#d8cfbd"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#1f2941",
+          "B_diffuse_color_1": "#e6e2da"
+        }
+      },
+      {
+        "id": "burgundy",
+        "values": {
+          "diffuse_color_1": "#5b1f2a",
+          "diffuse_color_2": "#5b1f2a",
+          "B_diffuse_color_1": "#e9dfcb"
+        }
+      },
+      {
+        "id": "sand",
+        "values": {
+          "diffuse_color_1": "#bea886",
+          "diffuse_color_2": "#bea886",
+          "B_diffuse_color_1": "#c9bba2"
+        }
+      }
+    ],
+    "OA_Sweater": [
+      {
+        "id": "oatmeal",
+        "values": {
+          "diffuse_color_1": "#c9bba2",
+          "diffuse_color_2": "#c9bba2"
+        }
+      },
+      {
+        "id": "camel",
+        "values": {
+          "diffuse_color_1": "#a47a4f",
+          "diffuse_color_2": "#a47a4f"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#1f2941"
+        }
+      },
+      {
+        "id": "burgundy",
+        "values": {
+          "diffuse_color_1": "#5b1f2a",
+          "diffuse_color_2": "#5b1f2a"
+        }
+      },
+      {
+        "id": "charcoal",
+        "values": {
+          "diffuse_color_1": "#3a3a3c",
+          "diffuse_color_2": "#3a3a3c"
+        }
+      },
+      {
+        "id": "forest",
+        "values": {
+          "diffuse_color_1": "#2f4535",
+          "diffuse_color_2": "#2f4535"
+        }
+      },
+      {
+        "id": "cream",
+        "values": {
+          "diffuse_color_1": "#e9dfcb",
+          "diffuse_color_2": "#e9dfcb"
+        }
+      }
+    ],
+    "OA_Cargopants": [
+      {
+        "id": "olive",
+        "values": {
+          "diffuse_color_1": "#5a5c39",
+          "diffuse_color_2": "#45472b"
+        }
+      },
+      {
+        "id": "sand",
+        "values": {
+          "diffuse_color_1": "#bea886",
+          "diffuse_color_2": "#9c8868"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#2a2a2c"
+        }
+      },
+      {
+        "id": "charcoal",
+        "values": {
+          "diffuse_color_1": "#3a3a3c",
+          "diffuse_color_2": "#2a2a2c"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#171f33"
+        }
+      }
+    ],
+    "OA_Shorts": [
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#e6e2da"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#e6e2da"
+        }
+      },
+      {
+        "id": "heather",
+        "values": {
+          "diffuse_color_1": "#8a8987",
+          "diffuse_color_2": "#3a3a3c"
+        }
+      },
+      {
+        "id": "olive",
+        "values": {
+          "diffuse_color_1": "#5a5c39",
+          "diffuse_color_2": "#bea886"
+        }
+      },
+      {
+        "id": "red",
+        "values": {
+          "diffuse_color_1": "#9b2a2b",
+          "diffuse_color_2": "#e6e2da"
+        }
+      }
+    ],
+    "OA_Yogaful": [
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#2a2a2c"
+        }
+      },
+      {
+        "id": "charcoal",
+        "values": {
+          "diffuse_color_1": "#3a3a3c",
+          "diffuse_color_2": "#2a2a2c"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#171f33"
+        }
+      },
+      {
+        "id": "forest",
+        "values": {
+          "diffuse_color_1": "#2f4535",
+          "diffuse_color_2": "#24362a"
+        }
+      },
+      {
+        "id": "burgundy",
+        "values": {
+          "diffuse_color_1": "#5b1f2a",
+          "diffuse_color_2": "#3c141c"
+        }
+      },
+      {
+        "id": "heather",
+        "values": {
+          "diffuse_color_1": "#8a8987",
+          "diffuse_color_2": "#6f6e6c"
+        }
+      }
+    ],
+    "OA_Boots": [
+      {
+        "id": "brown",
+        "values": {
+          "diffuse_color_1": "#4a3427",
+          "diffuse_color_2": "#33241b",
+          "B_diffuse_color_1": "#2a2724"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#1d1d1f",
+          "B_diffuse_color_1": "#2a2724"
+        }
+      },
+      {
+        "id": "cognac",
+        "values": {
+          "diffuse_color_1": "#78452a",
+          "diffuse_color_2": "#4a3427",
+          "B_diffuse_color_1": "#2a2724"
+        }
+      },
+      {
+        "id": "sand",
+        "values": {
+          "diffuse_color_1": "#a58a63",
+          "diffuse_color_2": "#6b5640",
+          "B_diffuse_color_1": "#2a2724"
+        }
+      }
+    ],
+    "OA_CasualSneakers": [
+      {
+        "id": "white",
+        "values": {
+          "diffuse_color_1": "#e6e2da",
+          "diffuse_color_2": "#c9c4ba"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#3a3a3c"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#e6e2da"
+        }
+      },
+      {
+        "id": "heather",
+        "values": {
+          "diffuse_color_1": "#8a8987",
+          "diffuse_color_2": "#e6e2da"
+        }
+      }
+    ],
+    "OA_Chelseaboots": [
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#141415"
+        }
+      },
+      {
+        "id": "brown",
+        "values": {
+          "diffuse_color_1": "#4a3427",
+          "diffuse_color_2": "#2a211b"
+        }
+      },
+      {
+        "id": "cognac",
+        "values": {
+          "diffuse_color_1": "#78452a",
+          "diffuse_color_2": "#4a3427"
+        }
+      },
+      {
+        "id": "sand",
+        "values": {
+          "diffuse_color_1": "#a58a63",
+          "diffuse_color_2": "#5b4a38"
+        }
+      }
+    ],
+    "OA_Flats": [
+      {
+        "id": "blush",
+        "values": {
+          "diffuse_color_1": "#d1a89c",
+          "diffuse_color_2": "#e0dbd1"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#e0dbd1"
+        }
+      },
+      {
+        "id": "burgundy",
+        "values": {
+          "diffuse_color_1": "#5b1f2a",
+          "diffuse_color_2": "#e0dbd1"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#e0dbd1"
+        }
+      },
+      {
+        "id": "camel",
+        "values": {
+          "diffuse_color_1": "#a47a4f",
+          "diffuse_color_2": "#e0dbd1"
+        }
+      }
+    ],
+    "OA_Flipflops": [
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#e0dbd1"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#3a3a3c"
+        }
+      },
+      {
+        "id": "cognac",
+        "values": {
+          "diffuse_color_1": "#78452a",
+          "diffuse_color_2": "#bea886"
+        }
+      },
+      {
+        "id": "red",
+        "values": {
+          "diffuse_color_1": "#9b2a2b",
+          "diffuse_color_2": "#e0dbd1"
+        }
+      }
+    ],
+    "OA_Hightop": [
+      {
+        "id": "ecru",
+        "values": {
+          "diffuse_color_1": "#d8cfbd",
+          "diffuse_color_2": "#d8cfbd"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#1d1d1f"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#1f2941"
+        }
+      },
+      {
+        "id": "red",
+        "values": {
+          "diffuse_color_1": "#9b2a2b",
+          "diffuse_color_2": "#9b2a2b"
+        }
+      },
+      {
+        "id": "olive",
+        "values": {
+          "diffuse_color_1": "#5a5c39",
+          "diffuse_color_2": "#5a5c39"
+        }
+      }
+    ],
+    "OA_Loafers": [
+      {
+        "id": "burgundy",
+        "values": {
+          "diffuse_color_1": "#5b1f2a",
+          "diffuse_color_2": "#3c141c",
+          "B_diffuse_color_1": "#1c1916"
+        }
+      },
+      {
+        "id": "brown",
+        "values": {
+          "diffuse_color_1": "#4a3427",
+          "diffuse_color_2": "#33241b",
+          "B_diffuse_color_1": "#1c1916"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#2a2a2c",
+          "B_diffuse_color_1": "#1c1916"
+        }
+      },
+      {
+        "id": "cognac",
+        "values": {
+          "diffuse_color_1": "#78452a",
+          "diffuse_color_2": "#4a3427",
+          "B_diffuse_color_1": "#1c1916"
+        }
+      }
+    ],
+    "OA_Oxfords": [
+      {
+        "id": "cognac",
+        "values": {
+          "diffuse_color_1": "#78452a",
+          "diffuse_color_2": "#78452a",
+          "B_diffuse_color_1": "#2b2622"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#1d1d1f",
+          "B_diffuse_color_1": "#2b2622"
+        }
+      },
+      {
+        "id": "brown",
+        "values": {
+          "diffuse_color_1": "#4a3427",
+          "diffuse_color_2": "#4a3427",
+          "B_diffuse_color_1": "#2b2622"
+        }
+      },
+      {
+        "id": "burgundy",
+        "values": {
+          "diffuse_color_1": "#5b1f2a",
+          "diffuse_color_2": "#5b1f2a",
+          "B_diffuse_color_1": "#2b2622"
+        }
+      }
+    ],
+    "OA_Runningshoes": [
+      {
+        "id": "heather",
+        "values": {
+          "diffuse_color_1": "#8a8987",
+          "diffuse_color_2": "#e6e2da",
+          "B_diffuse_color_1": "#e6e2da"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#3a3a3c",
+          "B_diffuse_color_1": "#e6e2da"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#e6e2da",
+          "B_diffuse_color_1": "#e6e2da"
+        }
+      },
+      {
+        "id": "white",
+        "values": {
+          "diffuse_color_1": "#e6e2da",
+          "diffuse_color_2": "#c9c4ba",
+          "B_diffuse_color_1": "#e6e2da"
+        }
+      },
+      {
+        "id": "red",
+        "values": {
+          "diffuse_color_1": "#9b2a2b",
+          "diffuse_color_2": "#e6e2da",
+          "B_diffuse_color_1": "#e6e2da"
+        }
+      }
+    ],
+    "DefaultGarment": [
+      {
+        "id": "white",
+        "values": {
+          "DG_Shirt.diffuse_color_1": "#e6e2da",
+          "DG_Shirt.diffuse_color_2": "#e6e2da",
+          "DG_Short.diffuse_color_1": "#e6e2da",
+          "DG_Short.diffuse_color_2": "#e6e2da"
+        }
+      },
+      {
+        "id": "heather",
+        "values": {
+          "DG_Shirt.diffuse_color_1": "#8a8987",
+          "DG_Shirt.diffuse_color_2": "#8a8987",
+          "DG_Short.diffuse_color_1": "#3a3a3c",
+          "DG_Short.diffuse_color_2": "#3a3a3c"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "DG_Shirt.diffuse_color_1": "#1d1d1f",
+          "DG_Shirt.diffuse_color_2": "#1d1d1f",
+          "DG_Short.diffuse_color_1": "#1d1d1f",
+          "DG_Short.diffuse_color_2": "#1d1d1f"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "DG_Short.diffuse_color_1": "#1f2941",
+          "DG_Short.diffuse_color_2": "#1f2941",
+          "DG_Shirt.diffuse_color_1": "#e6e2da",
+          "DG_Shirt.diffuse_color_2": "#e6e2da"
+        }
+      }
+    ],
+    "OA_techwearOutfit": [
+      {
+        "id": "mustard",
+        "values": {
+          "techwear_MH_Jacket.diffuse_color_2": "#eccf50",
+          "techwear_MH_Jacket.diffuse_color_1": "#797979",
+          "techwear_MH_Jacket.B_diffuse_color_1": "#eccf50"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "techwear_MH_Jacket.diffuse_color_1": "#1d1d1f",
+          "techwear_MH_Jacket.diffuse_color_2": "#3a3a3c",
+          "techwear_MH_Jacket.B_diffuse_color_1": "#3a3a3c",
+          "techwear_MH_Jacket.C_color": "#55555a",
+          "Tecwear_MH_Pants.diffuse_color_1": "#1d1d1f",
+          "Tecwear_MH_Pants.diffuse_color_2": "#3a3a3c",
+          "Tecwear_MH_Shoes.diffuse_color_1": "#1d1d1f",
+          "Tecwear_MH_Shoes.diffuse_color_2": "#3a3a3c"
+        }
+      },
+      {
+        "id": "olive",
+        "values": {
+          "techwear_MH_Jacket.diffuse_color_1": "#5a5c39",
+          "techwear_MH_Jacket.diffuse_color_2": "#bea886",
+          "techwear_MH_Jacket.B_diffuse_color_1": "#bea886",
+          "Tecwear_MH_Pants.diffuse_color_1": "#3a3a3c",
+          "Tecwear_MH_Pants.diffuse_color_2": "#2a2a2c",
+          "Tecwear_MH_Shoes.diffuse_color_1": "#3a3a3c",
+          "Tecwear_MH_Shoes.diffuse_color_2": "#bea886"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "techwear_MH_Jacket.diffuse_color_1": "#1f2941",
+          "techwear_MH_Jacket.diffuse_color_2": "#e6e2da",
+          "techwear_MH_Jacket.B_diffuse_color_1": "#e6e2da",
+          "Tecwear_MH_Pants.diffuse_color_1": "#3a3a3c",
+          "Tecwear_MH_Shoes.diffuse_color_2": "#e6e2da"
+        }
+      }
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 """Outfit garments: body correspondence, cap removal, transfer, body_hide and materials."""
 
 import base64
+import dataclasses
 import io
 import json
 import struct
@@ -11,6 +12,7 @@ import pytest
 from PIL import Image
 
 from asset_pipeline.mh import outfits
+from asset_pipeline.mh.compat import curated_compat
 from asset_pipeline.mh.geometry import vertex_normals
 from asset_pipeline.mh.outfits import (
     BodyFit,
@@ -204,6 +206,57 @@ def test_fit_moves_scales_and_clears_the_skin() -> None:
     np.testing.assert_allclose(fit.parts[0].weights[:, 0], 1.0)
 
 
+def test_fit_keeps_the_garment_outside_the_skin_at_a_slider_end() -> None:
+    limb, triangles = _tube(0.1, 0.0, 1.0)
+    body = _body(limb, triangles)
+    # The skin grows 1 cm at the morph's end; a sleeve 5 mm out would end inside it if
+    # its own morph moved it less (here: not at all).
+    grow = limb * np.array([0.1, 0.0, 0.1])
+    body.morphs["body_weight_max"] = grow
+    sleeve, _ = _tube(0.105, 0.3, 0.7, rings=10, segments=24)
+    morphs = {"body_weight_max": np.zeros_like(sleeve)}
+    cleared, counts = outfits.clear_morphs(
+        sleeve, morphs, body, outside=np.ones(len(sleeve), dtype=bool)
+    )
+    end = sleeve + cleared["body_weight_max"]
+    radius = np.linalg.norm(end[:, [0, 2]], axis=1)
+    assert np.all(radius >= 0.11 + outfits.CLEARANCE - 1e-3), "pushed out of the grown skin"
+    assert counts["body_weight_max"] == len(sleeve)
+    # A morph that keeps the clearance is left alone.
+    morphs = {"body_weight_max": sleeve * np.array([0.1, 0.0, 0.1])}
+    cleared, counts = outfits.clear_morphs(
+        sleeve, morphs, body, outside=np.ones(len(sleeve), dtype=bool)
+    )
+    np.testing.assert_allclose(cleared["body_weight_max"], morphs["body_weight_max"])
+    assert counts["body_weight_max"] == 0
+
+
+def test_closed_shoes_hide_every_toe_and_sandals_none() -> None:
+    limb, triangles = _tube(0.05, 0.0, 1.0, rings=11, segments=8)
+    body = _body(limb, triangles)
+    # Two joints: the lower half of the tube is a toe, the upper half the foot.
+    body = dataclasses.replace(
+        body,
+        skeleton=Skeleton(
+            names=("foot_l", "ball_l"),
+            parents=np.array([-1, 0]),
+            translations=np.zeros((2, 3)),
+            rotations=np.tile([0.0, 0.0, 0.0, 1.0], (2, 1)),
+            scales=np.ones((2, 3)),
+            inverse_binds=np.tile(np.eye(4), (2, 1, 1)),
+        ),
+    )
+    toes = limb[:, 1] < 0.5
+    body.joints[toes, 0] = 1
+    closed = toes & (limb[:, 1] > 0.15)  # the cap hides all but the tips
+    hidden, grew = outfits.hide_closed_toes(closed, body)
+    assert grew and hidden[toes].all()
+    sandal = toes & (limb[:, 1] > 0.4)
+    hidden, grew = outfits.hide_closed_toes(sandal, body)
+    assert not grew
+    np.testing.assert_array_equal(hidden, sandal)
+
+
 # ---------------------------------------------------------------------------- body_hide
 
 
@@ -358,6 +411,72 @@ def test_manifest_entries_merge_genders(tmp_path: Path) -> None:
     }
     assert entry["hidesBodyRegions"] == ["thighs"]
     assert entry["thumbnail"] == "outfits/OA_Jeans/thumbnail.webp"
+
+
+def _yoga_record(gender: str) -> dict:
+    return {
+        "id": "outfit.OA_Yogaful",
+        "name": "OA_Yogaful",
+        "gender": gender,
+        "category": "bottom",
+        "label": {"tr": "Tayt", "en": "Yoga pants"},
+        "file": f"outfits/OA_Yogaful/{gender}.glb",
+        "params": [
+            {"name": name, "type": "color", "default": "#444444"}
+            for name in ("diffuse_color_1", "diffuse_color_2")
+        ],
+        "tintPresets": [],
+        "hidesBodyRegions": [],
+    }
+
+
+def test_manifest_entries_offer_a_curated_item_to_its_gender_only(tmp_path: Path) -> None:
+    entries = manifest_entries([_yoga_record("female"), _yoga_record("male")], tmp_path)
+    assert entries[0]["compat"] == "female", entries[0]["compat"]
+
+
+def test_manifest_entries_reject_a_curated_gender_without_its_mesh(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="OA_Yogaful is for female"):
+        manifest_entries([_yoga_record("male")], tmp_path)
+
+
+def test_curated_compat_reads_the_list_and_rejects_unknown_genders(tmp_path: Path) -> None:
+    listed = tmp_path / "compat.json"
+    listed.write_text(
+        json.dumps({"grooms": {"Hair_S_Pixie": "female", "Hair_Typo": "woman"}, "outfits": {}}),
+        encoding="utf-8",
+    )
+    assert curated_compat("grooms", "Hair_S_Pixie", listed) == "female"
+    assert curated_compat("grooms", "Hair_L_Straight", listed) is None
+    with pytest.raises(ValueError, match="Hair_Typo"):
+        curated_compat("grooms", "Hair_Typo", listed)
+
+
+def test_curated_tints_label_presets_and_reject_unknown_params(tmp_path: Path) -> None:
+    tints = tmp_path / "tints.json"
+    tints.write_text(
+        json.dumps(
+            {
+                "colors": {"navy": {"en": "Navy", "tr": "Lacivert"}},
+                "outfits": {
+                    "OA_Tee": [{"id": "navy", "values": {"diffuse_color_1": "#1f2941"}}],
+                    "OA_Typo": [{"id": "navy", "values": {"diffuse_colour_1": "#1f2941"}}],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    params = [{"name": "diffuse_color_1", "type": "color", "default": "#444444"}]
+    assert outfits.curated_tints("OA_Tee", params, tints) == [
+        {
+            "id": "navy",
+            "label": {"tr": "Lacivert", "en": "Navy"},
+            "values": {"diffuse_color_1": "#1f2941"},
+        }
+    ]
+    assert outfits.curated_tints("OA_Jeans", params, tints) is None
+    with pytest.raises(ValueError, match="diffuse_colour_1"):
+        outfits.curated_tints("OA_Typo", params, tints)
 
 
 # ---------------------------------------------------------------------------- archive

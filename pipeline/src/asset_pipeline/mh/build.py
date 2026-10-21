@@ -29,6 +29,7 @@ from asset_pipeline.mh.anim import (
     leg_length,
     list_clip_units,
 )
+from asset_pipeline.mh.compat import curated_compat
 from asset_pipeline.mh.convert import (
     CharacterSource,
     ConversionError,
@@ -520,7 +521,11 @@ class Builder:
             ],
             lighting=[info["lighting"] for info in self.records("lighting") if "lighting" in info],
             grooms=[
-                with_thumbnail(info["groom"], "glb", self.web)
+                with_compat(
+                    with_thumbnail(
+                        info["groom"], "glb" if "glb" in info["groom"] else "painted", self.web
+                    )
+                )
                 for info in self.records("grooms")
                 if "groom" in info
             ],
@@ -543,6 +548,14 @@ class Builder:
         counts = ", ".join(f"{k} {len(v)}" for k, v in manifest.items() if isinstance(v, list))
         self.log(f"wrote   {path}  ({counts})")
         return path
+
+
+def with_compat(groom: dict[str, Any]) -> dict[str, Any]:
+    """The groom entry offered to the gender gender_compat.json gives its style, if any
+    (`groom.hair.Hair_S_Pixie` -> `Hair_S_Pixie`); read at manifest time, so a changed list
+    needs no reconversion."""
+    compat = curated_compat("grooms", str(groom["id"]).split(".", 2)[-1])
+    return {**groom, "compat": compat} if compat else groom
 
 
 def with_thumbnail(entry: dict[str, Any], file_key: str, web: Path) -> dict[str, Any]:

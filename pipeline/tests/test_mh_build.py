@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from asset_pipeline.mh.build import Builder, fab_animations, with_thumbnail
+from asset_pipeline.mh.build import Builder, fab_animations, with_compat, with_thumbnail
 from asset_pipeline.mh.convert import ConversionError
 from asset_pipeline.mh.stamps import Stamps, fingerprint
 
@@ -98,3 +98,10 @@ def test_thumbnails_are_listed_exactly_when_the_file_exists(tmp_path: Path) -> N
     stale = {"id": "face.Bo", "head": "faces/Bo/head.glb", "thumbnail": "faces/Bo/thumbnail.webp"}
     assert "thumbnail" not in with_thumbnail(stale, "head", tmp_path)
     assert "thumbnail" not in face, "the build record is not modified"
+
+
+def test_grooms_take_the_curated_gender_or_keep_their_own() -> None:
+    pixie = {"id": "groom.hair.Hair_S_Pixie", "slot": "hair", "compat": "unisex"}
+    beard = {"id": "groom.beard.Beard_M_Curly", "slot": "beard", "compat": "male"}
+    assert with_compat(pixie)["compat"] == "female"
+    assert with_compat(beard) == beard
