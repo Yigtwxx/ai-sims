@@ -45,6 +45,15 @@ type Role = 'color' | 'data';
 
 const textures = new Map<string, Promise<Texture>>();
 
+/** One manifest texture (path relative to the asset root), loaded once per page. */
+export function loadAssetTexture(
+  renderer: WebGLRenderer,
+  file: string,
+  role: Role,
+): Promise<Texture> {
+  return loadTexture(renderer, file, role);
+}
+
 function loadTexture(renderer: WebGLRenderer, file: string, role: Role): Promise<Texture> {
   const url = assetUrl(file);
   let pending = textures.get(url);

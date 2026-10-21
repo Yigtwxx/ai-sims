@@ -1,6 +1,11 @@
+import { Color } from 'three';
+
 import { assetUrl, type MhIris, type MhManifest, type MhSkin } from '@/lib/assets/manifest';
 import type { BodySlider, CharacterConfig } from '@/lib/character/schema';
 
+import type { GroomWear } from './hair';
+import type { Rgb } from './hairColor';
+import type { HairLook } from './hairMaterial';
 import type { MocapLayer } from './motion';
 
 /** Standing heights (m) of the neutral MetaHuman bodies (pipeline bodies job). */
@@ -22,6 +27,8 @@ export interface ResolvedCharacter {
   /** Body idle clips and how much of the body they drive (see idleSet). */
   idleClips: string[];
   idleLayer: MocapLayer;
+  /** Hair, eyebrows, beard and mustache the manifest has, with their colour. */
+  grooms: GroomWear[];
   /** Approximate standing height (m), for camera framing. */
   height: number;
 }
@@ -60,8 +67,51 @@ export function resolveCharacter(
       manifest.irises.find((i) => i.id === face.id) ??
       null,
     ...idleSet(manifest),
+    grooms: groomWears(config, manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };
+}
+
+/** sRGB hex as a linear colour (three converts on parse). */
+function linear(hex: string): Rgb {
+  const color = new Color(hex);
+  return [color.r, color.g, color.b];
+}
+
+/**
+ * Grooms to wear. Facial hair shares the hair colour (natural or dyed) but not
+ * its pattern: ombre eyebrows are not a look. Styles the manifest lacks are
+ * skipped.
+ */
+export function groomWears(config: CharacterConfig, manifest: MhManifest): GroomWear[] {
+  const { color, pattern } = config.hair;
+  const natural = {
+    melanin: color.melanin,
+    redness: color.redness,
+    dye: color.dye ? linear(color.dye) : null,
+  };
+  const hair: HairLook = {
+    ...natural,
+    pattern: pattern.type,
+    patternColor: linear(pattern.color),
+    patternAmount: pattern.amount,
+  };
+  const facial: HairLook = {
+    ...natural,
+    pattern: 'none',
+    patternColor: [1, 1, 1],
+    patternAmount: 0,
+  };
+  const picks: [string | null, HairLook][] = [
+    [config.hair.style, hair],
+    [config.eyebrows.style, facial],
+    [config.beard.style, facial],
+    [config.mustache.style, facial],
+  ];
+  return picks.flatMap(([id, look]) => {
+    const groom = id ? manifest.grooms.find((g) => g.id === id) : undefined;
+    return groom ? [{ groom, look }] : [];
+  });
 }
 
 /** Fewer calm clips than this would loop visibly; the body layer of standing ones is used then. */

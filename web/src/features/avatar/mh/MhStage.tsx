@@ -138,6 +138,7 @@ export function MhStage({
                 iris={resolved.iris}
                 idleClips={resolved.idleClips}
                 idleLayer={resolved.idleLayer}
+                grooms={resolved.grooms}
                 onFrame={onFrame}
               />
               <FirstFrame onReady={onReady} />

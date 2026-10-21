@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { MhManifestSchema } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 
-import { BASE_HEIGHT, HEIGHT_RANGE, idleSet, MIN_CALM_IDLES, resolveCharacter } from './resolve';
+import {
+  BASE_HEIGHT,
+  groomWears,
+  HEIGHT_RANGE,
+  idleSet,
+  MIN_CALM_IDLES,
+  resolveCharacter,
+} from './resolve';
 
 const manifest = MhManifestSchema.parse({
   version: 2,
@@ -118,5 +125,43 @@ describe('resolveCharacter', () => {
 
   it('returns null when the manifest has no body for the gender', () => {
     expect(resolveCharacter(createDefaultConfig('male'), manifest)).toBeNull();
+  });
+});
+
+describe('groomWears', () => {
+  const withGrooms = MhManifestSchema.parse({
+    ...manifest,
+    grooms: [
+      { id: 'groom.hair.Bob', slot: 'hair', label: 'Bob', glb: 'grooms/hair/Bob/cards.glb' },
+      {
+        id: 'groom.eyebrows.Fine',
+        slot: 'eyebrows',
+        label: 'Fine',
+        glb: 'grooms/eyebrows/Fine/cards.glb',
+      },
+    ],
+  });
+
+  it('wears the configured styles the manifest has and skips the rest', () => {
+    const config = createDefaultConfig('female');
+    config.hair.style = 'groom.hair.Bob';
+    config.eyebrows.style = 'groom.eyebrows.Fine';
+    config.beard.style = 'groom.beard.Gone';
+    expect(groomWears(config, withGrooms).map((wear) => wear.groom.id)).toEqual([
+      'groom.hair.Bob',
+      'groom.eyebrows.Fine',
+    ]);
+  });
+
+  it('gives facial hair the hair colour without the hair pattern', () => {
+    const config = createDefaultConfig('female');
+    config.hair.style = 'groom.hair.Bob';
+    config.eyebrows.style = 'groom.eyebrows.Fine';
+    config.hair.color = { melanin: 0.2, redness: 0.6, dye: '#ffffff' };
+    config.hair.pattern = { type: 'ombre', color: '#000000', amount: 0.8 };
+    const [hair, brows] = groomWears(config, withGrooms);
+    expect(hair!.look).toMatchObject({ melanin: 0.2, pattern: 'ombre', patternAmount: 0.8 });
+    expect(brows!.look).toMatchObject({ melanin: 0.2, redness: 0.6, pattern: 'none' });
+    for (const channel of brows!.look.dye!) expect(channel).toBeCloseTo(1);
   });
 });

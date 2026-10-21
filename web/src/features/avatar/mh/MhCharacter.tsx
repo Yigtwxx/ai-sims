@@ -1,8 +1,16 @@
 'use client';
 
 import { useFrame, useThree } from '@react-three/fiber';
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import type { Camera, Material, Mesh, Object3D } from 'three';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
@@ -22,6 +30,8 @@ import {
   type NeckSeamExtras,
 } from './assembly';
 import { applyEyeMaterials, bindIrisTextures } from './eyeMaterials';
+import { takeOffGroom, wearGroom, type GroomWear, type WornGroom } from './hair';
+import { setHairLook } from './hairMaterial';
 import { useMhGltf } from './loaders';
 import { MotionPlayer, type MocapLayer, type MotionClip } from './motion';
 import {
@@ -62,6 +72,8 @@ export interface MhCharacterProps {
   idleClips?: readonly string[];
   /** How much of the body the idle clips drive; the procedural layer does the rest. */
   idleLayer?: MocapLayer;
+  /** Hair and facial hair cards, fitted to this head; recolouring needs no reload. */
+  grooms?: readonly GroomWear[];
   /** Called every frame after the mixer and before rendering (life, lip-sync). */
   onFrame?: (handle: MhCharacterHandle, delta: number, camera: Camera) => void;
 }
@@ -81,6 +93,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     iris = null,
     idleClips = NO_CLIPS,
     idleLayer = 'full',
+    grooms = NO_GROOMS,
     onFrame,
   },
   ref,
@@ -96,6 +109,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     const headExtras = mhExtras(headGltf.scene, headGltf.parser.json as { extras?: unknown });
     const body = createBodyRig(bodyRoot, (extras.body_joint_deltas ?? {}) as JointDeltas);
     const headMeshes = attachHead(headRoot, body);
+    // The skin primitive: grooms are fitted to its DNA positions and joints.
+    const headSkin = headMeshes.find((mesh) => (mesh.material as Material).name === 'head');
     for (const mesh of headMeshes) bodyRoot.add(mesh);
     bodyRoot.updateMatrixWorld(true);
     body.seam = bindNeckSeam(
@@ -123,6 +138,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     return {
       root: bodyRoot,
       handle,
+      headSkin,
       skins,
       eyes,
       wrinkles: wrinkleDriver(bodyRoot, skins, headExtras),
@@ -193,6 +209,56 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     };
   }, [assembled, clipKey, idleLayer]);
 
+  // Grooms load in the background (the character never waits for its hair);
+  // changing one groom re-fits all of them from the loader cache.
+  const groomKey = grooms.map((wear) => wear.groom.id).join('|');
+  const latestGrooms = useRef(grooms);
+  useLayoutEffect(() => {
+    latestGrooms.current = grooms;
+  }, [grooms]);
+  const worn = useRef(new Map<string, WornGroom>());
+  useEffect(() => {
+    const head = assembled.headSkin;
+    if (!groomKey || !head) return;
+    let live = true;
+    const wearing = worn.current;
+    const mine: WornGroom[] = [];
+    const wears = latestGrooms.current;
+    void Promise.allSettled(wears.map((wear) => wearGroom(gl, wear, head))).then((results) => {
+      results.forEach((result, i) => {
+        if (result.status === 'rejected') {
+          console.warn('[mh] groom failed to load', wears[i]?.groom.id, result.reason);
+          return;
+        }
+        const groom = result.value;
+        if (!live) {
+          groom.dispose();
+          return;
+        }
+        for (const mesh of groom.meshes) assembled.root.add(mesh);
+        assembled.handle.faceMeshes.push(...groom.meshes);
+        const look = latestGrooms.current.find((wear) => wear.groom.id === groom.id)?.look;
+        if (look) setHairLook(groom.materials, look);
+        wearing.set(groom.id, groom);
+        mine.push(groom);
+      });
+    });
+    return () => {
+      live = false;
+      for (const groom of mine) {
+        takeOffGroom(assembled.root, assembled.handle.faceMeshes, groom);
+        wearing.delete(groom.id);
+      }
+    };
+  }, [assembled, gl, groomKey]);
+
+  useEffect(() => {
+    for (const wear of grooms) {
+      const groom = worn.current.get(wear.groom.id);
+      if (groom) setHairLook(groom.materials, wear.look);
+    }
+  }, [grooms]);
+
   useImperativeHandle(ref, () => assembled.handle, [assembled]);
 
   useLayoutEffect(() => {
@@ -217,6 +283,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
 });
 
 const NO_CLIPS: readonly string[] = [];
+const NO_GROOMS: readonly GroomWear[] = [];
 
 const clipCache = new Map<string, Promise<MotionClip[]>>();
 
@@ -229,10 +296,14 @@ async function loadClips(urls: readonly string[]): Promise<MotionClip[]> {
     urls.map((url) => {
       let pending = clipCache.get(url);
       if (!pending) {
-        pending = new GLTFLoader().loadAsync(url).then((gltf) => {
-          const pelvisRest = gltf.scene.getObjectByName('pelvis')?.position.clone() ?? null;
-          return gltf.animations.map((clip) => ({ clip, pelvisRest }));
-        });
+        // Converter clips are meshopt-compressed; they carry no textures.
+        pending = new GLTFLoader()
+          .setMeshoptDecoder(MeshoptDecoder)
+          .loadAsync(url)
+          .then((gltf) => {
+            const pelvisRest = gltf.scene.getObjectByName('pelvis')?.position.clone() ?? null;
+            return gltf.animations.map((clip) => ({ clip, pelvisRest }));
+          });
         pending.catch(() => clipCache.delete(url));
         clipCache.set(url, pending);
       }
