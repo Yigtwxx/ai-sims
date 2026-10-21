@@ -327,7 +327,12 @@
       "makeup": "Makyaj",
       "makeupHint": "Bu cilt setinin makyajlı yüz dokusunu kullanır.",
       "makeupUnavailable": "Bu cilt setinde makyaj yok.",
-      "setsHint": "Tona göre sıralı gerçek cilt dokuları."
+      "setsHint": "Gerçek cilt dokuları; renkler sahne ışığındaki hâlleri.",
+      "bands": {
+        "light": "Açık",
+        "medium": "Orta",
+        "deep": "Koyu"
+      }
     },
     "eyes": {
       "iris": "İris",
@@ -484,7 +489,7 @@
       "saving": "Kaydediliyor…"
     },
     "autosave": {
-      "needsName": "İsim verince taslak kendini kaydeder.",
+      "needsName": "Bu sekmede duruyor. İsim verince kaydedilir.",
       "pending": "Kaydedilecek…",
       "saving": "Taslak kaydediliyor…",
       "saved": "Taslak kaydedildi",
@@ -535,7 +540,11 @@
       "stone": "Taş"
     },
     "loadingCharacter": "Karakter sahneye hazırlanıyor",
-    "updatingCharacter": "Değişiklik sahneye geliyor"
+    "updatingCharacter": "Değişiklik sahneye geliyor",
+    "localDraft": {
+      "restored": "İsimsiz taslağın geri yüklendi.",
+      "startOver": "Baştan başla"
+    }
   },
   "Talk": {
     "back": "Karakterlerim",

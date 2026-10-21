@@ -327,7 +327,12 @@
       "makeup": "Makeup",
       "makeupHint": "Uses this skin set's made-up face texture.",
       "makeupUnavailable": "This skin set has no makeup.",
-      "setsHint": "Real skin textures, sorted by tone."
+      "setsHint": "Real skin textures, shown as they look under the stage light.",
+      "bands": {
+        "light": "Light",
+        "medium": "Medium",
+        "deep": "Deep"
+      }
     },
     "eyes": {
       "iris": "Iris",
@@ -484,7 +489,7 @@
       "saving": "Saving…"
     },
     "autosave": {
-      "needsName": "Name it and the draft saves itself.",
+      "needsName": "Kept in this tab. Name it to save the draft.",
       "pending": "Saving shortly…",
       "saving": "Saving draft…",
       "saved": "Draft saved",
@@ -535,7 +540,11 @@
       "stone": "Stone"
     },
     "loadingCharacter": "Bringing your character on stage",
-    "updatingCharacter": "Bringing your change on stage"
+    "updatingCharacter": "Bringing your change on stage",
+    "localDraft": {
+      "restored": "Your unnamed draft is back.",
+      "startOver": "Start over"
+    }
   },
   "Talk": {
     "back": "My characters",

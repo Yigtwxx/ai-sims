@@ -25,7 +25,7 @@ const RING = 'rounded-tile inset-0 shadow-[inset_0_0_0_2px_var(--color-marquee)]
  * Arrow keys move between the radios of a grid (visual order), Home/End jump
  * to the ends; Space/Enter select through the native button.
  */
-function onGridKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+export function onGridKeyDown(event: KeyboardEvent<HTMLDivElement>) {
   const keys = ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'];
   if (!keys.includes(event.key)) return;
   const radios = Array.from(

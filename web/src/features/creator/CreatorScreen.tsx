@@ -50,13 +50,15 @@ import { JewelryPanel } from './panels/JewelryPanel';
 import { OutfitPanel } from './panels/OutfitPanel';
 import { SkinPanel } from './panels/SkinPanel';
 import { TattooPanel } from './panels/TattooPanel';
-import { MAX_NAME_LENGTH, useCreatorStore } from './store';
+import { MAX_NAME_LENGTH, snapshotOf, useCreatorStore } from './store';
 import { startingConfig } from './reconcile';
+import { clearLocalDraft, mayRestoreLocalDraft, readLocalDraft } from './localDraft';
 import { captureThumbnail } from './thumbnail';
 import { ActionBar } from './ui/ActionBar';
 import { SlidingIndicator } from './ui/controls';
 import { NameField } from './ui/NameField';
 import { useAutosave } from './useAutosave';
+import { useLocalDraft } from './useLocalDraft';
 import { useMhManifest, wantsFixture, type ManifestState } from './useMhManifest';
 import { createWaitFlag } from './waitFlag';
 
@@ -108,6 +110,9 @@ const isTyping = (target: EventTarget | null) =>
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
+/** The "draft restored" notice, dismissed once the server holds the character. */
+const LOCAL_DRAFT_TOAST = 'creator-local-draft';
+
 /** At most this long for a face picked just before "Bitti" to reach the stage. */
 const STAGE_CATCH_UP_MS = 8000;
 
@@ -119,10 +124,10 @@ const STAGE_CATCH_UP_MS = 8000;
  */
 export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
   const { bfcacheId } = useNextRouter();
-  return <CreatorEditor key={bfcacheId} initial={initial} />;
+  return <CreatorEditor key={bfcacheId} visit={bfcacheId} initial={initial} />;
 }
 
-function CreatorEditor({ initial }: { initial?: CreatorInitial }) {
+function CreatorEditor({ initial, visit }: { initial?: CreatorInitial; visit: string }) {
   const t = useTranslations('Creator');
   const locale = useLocale();
   const router = useRouter();
@@ -176,14 +181,19 @@ function CreatorEditor({ initial }: { initial?: CreatorInitial }) {
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Start editing once the parts are known: every id is reconciled with them.
+  // A new character reloaded before it had a server copy comes back from the
+  // tab's local draft; any other new visit starts over and drops that draft.
   const loadedFor = useRef<MhManifest | null>(null);
   useEffect(() => {
     if (!manifest || loadedFor.current === manifest) return;
     loadedFor.current = manifest;
+    const draft = !initial && mayRestoreLocalDraft(visit) ? readLocalDraft() : null;
+    if (!initial && !draft) clearLocalDraft();
+    const fresh = startingConfig('female', manifest);
     const store = useCreatorStore.getState();
     store.load(
-      initial?.name ?? '',
-      initial?.config ?? startingConfig('female', manifest),
+      initial?.name ?? draft?.name ?? '',
+      initial?.config ?? draft?.config ?? fresh,
       manifest,
     );
     // A saved character starts clean; a new one waits for its first change.
@@ -191,7 +201,25 @@ function CreatorEditor({ initial }: { initial?: CreatorInitial }) {
     else useCreatorStore.setState({ savedSnapshot: null });
     useCreatorStore.temporal.getState().clear();
     queueMicrotask(() => setReady(true));
-  }, [manifest, initial]);
+    // Say so only when the draft holds work (not an untouched start).
+    const loaded = useCreatorStore.getState();
+    if (draft && snapshotOf(loaded.name, loaded.config) !== snapshotOf('', fresh)) {
+      toast(t('localDraft.restored'), {
+        id: LOCAL_DRAFT_TOAST,
+        // Long enough to read and change one's mind while the stage still loads.
+        duration: 8000,
+        action: {
+          label: t('localDraft.startOver'),
+          onClick: () => {
+            clearLocalDraft();
+            useCreatorStore.getState().load('', fresh, manifest);
+            useCreatorStore.setState({ savedSnapshot: null });
+            useCreatorStore.temporal.getState().clear();
+          },
+        },
+      });
+    }
+  }, [manifest, initial, visit, t]);
 
   useEffect(() => {
     const el = panel.current;
@@ -207,6 +235,9 @@ function CreatorEditor({ initial }: { initial?: CreatorInitial }) {
   const onCreated = useCallback(
     (id: string) => {
       setCharacterId(id);
+      // The server copy takes over from the tab's draft (and its "start over").
+      clearLocalDraft();
+      toast.dismiss(LOCAL_DRAFT_TOAST);
       // Keep the URL reloadable without remounting the editor.
       window.history.replaceState(
         null,
@@ -223,6 +254,9 @@ function CreatorEditor({ initial }: { initial?: CreatorInitial }) {
     status,
     onCreated,
   });
+  // Until the first server save, the tab keeps the work (a nameless draft is
+  // not autosaved, and a reload would otherwise lose it).
+  useLocalDraft(!initial && !characterId && ready && phase === 'editing');
 
   const focus: CameraFocus =
     phase === 'premiere'
