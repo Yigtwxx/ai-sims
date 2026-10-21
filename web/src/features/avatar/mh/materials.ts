@@ -11,6 +11,7 @@ import {
   type Texture,
 } from 'three';
 
+import { BODY_HIDDEN } from './garments';
 import { createGroomDensityUniforms } from './groomDensity';
 import { WRINKLE_MASK_LAYERS, WRINKLE_WEIGHT_COUNT } from './wrinkles';
 
@@ -45,6 +46,8 @@ export interface SkinTuning {
   wrinkles: boolean;
   /** Tint the skin under hair, brows and beard by groom density (head only). */
   groomDensity: boolean;
+  /** Discard skin under worn garments by the BODY_HIDDEN vertex attribute (body only). */
+  bodyHide: boolean;
 }
 
 export const HEAD_SKIN: SkinTuning = {
@@ -55,6 +58,7 @@ export const HEAD_SKIN: SkinTuning = {
   sheen: 0.1,
   wrinkles: true,
   groomDensity: true,
+  bodyHide: false,
 };
 
 export const BODY_SKIN: SkinTuning = {
@@ -63,6 +67,7 @@ export const BODY_SKIN: SkinTuning = {
   microStrength: 0.3,
   wrinkles: false,
   groomDensity: false,
+  bodyHide: true,
 };
 
 const DIFFUSE_LINE =
@@ -148,6 +153,30 @@ const GROOM_DENSITY = /* glsl */ `
 #endif
 `;
 
+// Skin under a worn garment (see ./garments.ts): a face whose vertices are all
+// covered interpolates to 1 and is dropped, so the body never pokes through.
+const BODY_HIDE_VERTEX_PARS = /* glsl */ `
+#ifdef MH_BODY_HIDE
+attribute float ${BODY_HIDDEN};
+varying float vBodyHidden;
+#endif
+`;
+const BODY_HIDE_VERTEX = /* glsl */ `
+#ifdef MH_BODY_HIDE
+  vBodyHidden = ${BODY_HIDDEN};
+#endif
+`;
+const BODY_HIDE_FRAGMENT_PARS = /* glsl */ `
+#ifdef MH_BODY_HIDE
+varying float vBodyHidden;
+#endif
+`;
+const BODY_HIDE_FRAGMENT = /* glsl */ `
+#ifdef MH_BODY_HIDE
+  if ( vBodyHidden > 0.5 ) discard;
+#endif
+`;
+
 /** Wrinkle inputs of a head skin; textures arrive asynchronously. */
 export interface WrinkleUniforms {
   wrinkleNormal1: { value: Texture | null };
@@ -219,6 +248,7 @@ export function createSkinMaterial(
   material.defines = {
     ...(wrinkles ? { MH_WRINKLES: '' } : {}),
     ...(density ? { MH_GROOM_DENSITY: '' } : {}),
+    ...(tuning.bodyHide ? { MH_BODY_HIDE: '' } : {}),
   };
   material.userData.skinUniforms = uniforms;
   material.userData.wrinkleUniforms = wrinkles;
@@ -226,7 +256,23 @@ export function createSkinMaterial(
   material.userData.skinTuning = tuning;
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms, wrinkles ?? {}, density ?? {});
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+${BODY_HIDE_VERTEX_PARS}`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+${BODY_HIDE_VERTEX}`,
+      );
     shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <clipping_planes_fragment>',
+        `#include <clipping_planes_fragment>
+${BODY_HIDE_FRAGMENT}`,
+      )
       .replace(
         '#include <common>',
         [
@@ -239,6 +285,7 @@ export function createSkinMaterial(
           'uniform sampler2D skinCavity;',
           'uniform float skinCavityStrength;',
           GROOM_DENSITY_PARS,
+          BODY_HIDE_FRAGMENT_PARS,
         ].join('\n'),
       )
       .replace('#include <map_fragment>', `#include <map_fragment>\n${GROOM_DENSITY}`)
@@ -263,7 +310,7 @@ export function createSkinMaterial(
       );
   };
   material.customProgramCacheKey = () =>
-    `mh-skin-v4${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}`;
+    `mh-skin-v5${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}${tuning.bodyHide ? '-hide' : ''}`;
   return material;
 }
 

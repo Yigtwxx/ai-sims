@@ -1,3 +1,4 @@
+import { syncGarmentMorphs } from './garments';
 import {
   BufferGeometry,
   Matrix3,
@@ -40,6 +41,8 @@ export interface BodyRig {
   jointDeltas: JointDeltas;
   /** Head neck snapped to this body's neck; re-snapped whenever the sliders move it. */
   seam?: NeckSeamBinding;
+  /** Worn garments: they share the body skeleton and follow its slider morphs. */
+  garments: SkinnedMesh[];
 }
 
 export function collectBones(root: Object3D): Map<string, Bone> {
@@ -87,7 +90,16 @@ export function createBodyRig(root: Object3D, jointDeltas: JointDeltas): BodyRig
     restQuaternion.set(name, bone.quaternion.clone());
   }
   const sliderPosition = new Map([...restPosition].map(([name, p]) => [name, p.clone()]));
-  return { root, mesh, bones, restPosition, restQuaternion, sliderPosition, jointDeltas };
+  return {
+    root,
+    mesh,
+    bones,
+    restPosition,
+    restQuaternion,
+    sliderPosition,
+    jointDeltas,
+    garments: [],
+  };
 }
 
 /**
@@ -181,6 +193,8 @@ export function applyBodySliders(
   // Re-bake the rest pose: inverse bind matrices from the moved joints. In
   // three's attached bind mode this is valid even while the turntable is turned.
   mesh.bind(mesh.skeleton);
+  // Garments share the skeleton, so the new inverse binds are theirs already.
+  for (const garment of body.garments) syncGarmentMorphs(garment, body);
   if (body.seam) snapNeckSeam(body.seam);
 }
 
