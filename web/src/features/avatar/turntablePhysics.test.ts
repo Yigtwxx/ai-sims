@@ -4,7 +4,9 @@ import {
   DEFAULT_TURNTABLE_OPTIONS,
   applyDrag,
   createTurntableState,
+  nearestFront,
   release,
+  stepHome,
   stepTurntable,
 } from './turntablePhysics';
 
@@ -39,5 +41,29 @@ describe('turntable', () => {
     let state = release(applyDrag(createTurntableState(), 10));
     for (let i = 0; i < 600; i++) state = stepTurntable(state, 1 / 60);
     expect(state.velocity).toBe(0);
+  });
+});
+
+describe('turning back to the viewer', () => {
+  it('picks the nearest whole turn, never the long way round', () => {
+    expect(nearestFront(0.4)).toBe(0);
+    expect(nearestFront(-2)).toBe(0);
+    expect(nearestFront(Math.PI * 2 - 0.3)).toBeCloseTo(Math.PI * 2);
+    expect(nearestFront(-Math.PI * 2 - 1)).toBeCloseTo(-Math.PI * 2);
+  });
+
+  it('glides there and settles exactly, without coasting', () => {
+    let state = { ...createTurntableState(1.2), velocity: 0.05 };
+    state = stepHome(state, 0, 1 / 60);
+    expect(state.angle).toBeLessThan(1.2);
+    expect(state.angle).toBeGreaterThan(0);
+    expect(state.velocity).toBe(0);
+    for (let i = 0; i < 240; i++) state = stepHome(state, 0, 1 / 60);
+    expect(state.angle).toBe(0);
+  });
+
+  it('gives way to a drag', () => {
+    const dragging = applyDrag(createTurntableState(1), 10);
+    expect(stepHome(dragging, 0, 1 / 60)).toBe(dragging);
   });
 });

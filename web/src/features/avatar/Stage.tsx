@@ -62,6 +62,8 @@ interface StageProps {
   anchor?: RefObject<Vector3 | null>;
   /** Render tier; `auto` starts high and steps down while frames drop. */
   quality?: QualityPreference;
+  /** When this changes, a turned subject glides back to face the viewer. */
+  turnHome?: unknown;
 }
 
 const BACKDROPS = {
@@ -91,6 +93,7 @@ export function Stage({
   follow,
   anchor,
   quality = 'auto',
+  turnHome,
 }: StageProps) {
   const [autoTier, setAutoTier] = useState<RenderQuality>('high');
   const tier = quality === 'auto' ? autoTier : quality;
@@ -136,7 +139,7 @@ export function Stage({
             scenery={scenery}
             subjectHeight={subjectHeight}
           />
-          <Turntable>{children}</Turntable>
+          <Turntable home={turnHome}>{children}</Turntable>
           {post && <PostEffects look={look} ao={settings.ao} />}
         </Suspense>
       </QualityContext.Provider>

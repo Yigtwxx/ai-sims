@@ -56,3 +56,26 @@ export function stepTurntable(
   const velocity = state.velocity * Math.pow(options.damping, frames);
   return { ...state, angle: state.angle + velocity * frames, velocity };
 }
+
+const TURN = Math.PI * 2;
+
+/** The facing-the-viewer angle nearest to `angle`: a whole number of turns. */
+export function nearestFront(angle: number): number {
+  const turns = Math.round(angle / TURN);
+  return turns === 0 ? 0 : turns * TURN;
+}
+
+/**
+ * Glide toward `target` (radians) without coasting, frame-rate independent;
+ * snaps onto it once within a hundredth of a degree.
+ */
+export function stepHome(
+  state: TurntableState,
+  target: number,
+  dt: number,
+  rate = 4,
+): TurntableState {
+  if (state.dragging) return state;
+  const angle = target + (state.angle - target) * Math.exp(-rate * dt);
+  return { ...state, angle: Math.abs(angle - target) < 0.0002 ? target : angle, velocity: 0 };
+}

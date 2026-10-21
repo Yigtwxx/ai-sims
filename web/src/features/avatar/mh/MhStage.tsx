@@ -22,6 +22,7 @@ import type { QualityPreference } from '../quality';
 import { Stage } from '../Stage';
 import { CharacterLife, type FaceLayers, type LifeInput } from './characterLife';
 import { loadFaceClip } from './faceClips';
+import { keepFacing } from './facing';
 import type { LifeMode } from './idle';
 import { MhCharacter, type MhCharacterHandle } from './MhCharacter';
 import { MhLighting } from './MhLighting';
@@ -207,6 +208,8 @@ export const MhStage = memo(function MhStage({
   const followRest = useRef<{ handle: MhCharacterHandle; head: Vector3 } | null>(null);
   // Thumbnails are stills: life holds its first pose (no blink, no glance).
   const frozen = mode === 'thumbnail';
+  // The creator frames close-ups: an idle that turns the body away is turned back.
+  const facing = mode === 'creator';
   // The eye centre, for the close-up framings (brows, mouth) to aim at.
   const closeUp = isCloseUp(focus);
   const anchor = useRef<Vector3 | null>(null);
@@ -217,8 +220,9 @@ export const MhStage = memo(function MhStage({
         ...input.current,
         viewer: camera.position,
       });
+      if (facing) faceViewer(handle, delta);
     },
-    [lifeOf, frozen],
+    [lifeOf, frozen, facing],
   );
   const onFrame = useCallback(
     (handle: MhCharacterHandle, delta: number, camera: Camera) => {
@@ -226,6 +230,7 @@ export const MhStage = memo(function MhStage({
         ...input.current,
         viewer: camera.position,
       });
+      if (facing) faceViewer(handle, delta);
       if (closeUp) {
         if (eyes.current?.handle !== handle) {
           const bones = EYE_BONES.flatMap((name) => {
@@ -251,7 +256,7 @@ export const MhStage = memo(function MhStage({
         .copy(headWorld)
         .sub(followRest.current.head);
     },
-    [lifeOf, frozen, closeUp],
+    [lifeOf, frozen, facing, closeUp],
   );
   const latestOnSettled = useRef(onSettled);
   useLayoutEffect(() => {
@@ -322,6 +327,8 @@ export const MhStage = memo(function MhStage({
         interactive={mode === 'creator' || talk}
         follow={talk ? follow : undefined}
         anchor={closeUp ? anchor : undefined}
+        // Every new creator framing starts with the character facing the viewer.
+        turnHome={mode === 'creator' ? focus : undefined}
         quality={quality}
         className="size-full"
       >
@@ -363,6 +370,12 @@ export const MhStage = memo(function MhStage({
     </div>
   );
 });
+
+/** Turns the character back toward the viewer when its idle has turned the chest away. */
+function faceViewer(handle: MhCharacterHandle, delta: number) {
+  const { bones } = handle.body;
+  keepFacing(bones.get('root'), bones.get('clavicle_l'), bones.get('clavicle_r'), delta);
+}
 
 /** Calls `onReady` on the first rendered frame after the character mounted. */
 function FirstFrame({ onReady }: { onReady?: () => void }) {
