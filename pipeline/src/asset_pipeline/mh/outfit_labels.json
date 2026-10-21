@@ -1,7 +1,39 @@
 {
+  "ARCJ_JACKET": {
+    "en": "Jacket",
+    "tr": "Ceket"
+  },
+  "Casual_F_Outfit": {
+    "en": "Casual outfit, women's",
+    "tr": "Günlük kombin, kadın"
+  },
+  "Casual_M_Outfit": {
+    "en": "Casual outfit, men's",
+    "tr": "Günlük kombin, erkek"
+  },
   "DefaultGarment": {
     "en": "Basic tee and shorts",
     "tr": "Basic tişört ve şort"
+  },
+  "KhaosMDF255": {
+    "en": "Vernal jumpsuit",
+    "tr": "Vernal tulum"
+  },
+  "KhaosMDF322": {
+    "en": "Marilla top",
+    "tr": "Marilla bluz"
+  },
+  "KhaosMDF492": {
+    "en": "Altena blouse",
+    "tr": "Altena bluz"
+  },
+  "KhaosMDF503": {
+    "en": "Clarkston carpenter pants",
+    "tr": "Clarkston işçi pantolonu"
+  },
+  "MiniDress01": {
+    "en": "Mini dress",
+    "tr": "Mini elbise"
   },
   "OA_Boots": {
     "en": "Boots",
@@ -146,5 +178,13 @@
   "OA_techwearOutfit": {
     "en": "Techwear outfit",
     "tr": "Techwear kombin"
+  },
+  "SleevelessTurtleneck": {
+    "en": "Sleeveless turtleneck",
+    "tr": "Kolsuz balıkçı yaka"
+  },
+  "Street_Wear_01": {
+    "en": "Streetwear set",
+    "tr": "Sokak stili kombin"
   }
 }

@@ -21,8 +21,15 @@
     "Hair_S_SlickBack": "male"
   },
   "outfits": {
+    "Casual_F_Outfit": "female",
+    "KhaosMDF255": "female",
+    "KhaosMDF322": "female",
+    "KhaosMDF492": "female",
+    "MiniDress01": "female",
     "OA_Flats": "female",
     "OA_TCrop3QSlv": "female",
-    "OA_Yogaful": "female"
+    "OA_Yogaful": "female",
+    "SleevelessTurtleneck": "female",
+    "Casual_M_Outfit": "male"
   }
 }
