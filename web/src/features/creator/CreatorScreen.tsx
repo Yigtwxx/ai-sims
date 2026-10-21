@@ -13,6 +13,7 @@
 import { ArrowLeftIcon, HandGrabbingIcon } from '@phosphor-icons/react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLocale, useTranslations } from 'next-intl';
+import { useRouter as useNextRouter } from 'next/navigation';
 import {
   useCallback,
   useDeferredValue,
@@ -110,7 +111,18 @@ const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve,
 /** At most this long for a face picked just before "Bitti" to reach the stage. */
 const STAGE_CATCH_UP_MS = 8000;
 
+/**
+ * Next keeps visited pages alive (Activity), so a new visit to a kept editor
+ * would reopen it as it was left: mid-premiere, on the last category, with the
+ * old draft in the store. Each new visit (a push; back and forward keep
+ * bfcacheId) mounts a fresh editor that loads the character from `initial`.
+ */
 export function CreatorScreen({ initial }: { initial?: CreatorInitial }) {
+  const { bfcacheId } = useNextRouter();
+  return <CreatorEditor key={bfcacheId} initial={initial} />;
+}
+
+function CreatorEditor({ initial }: { initial?: CreatorInitial }) {
   const t = useTranslations('Creator');
   const locale = useLocale();
   const router = useRouter();
