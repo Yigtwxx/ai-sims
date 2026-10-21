@@ -244,7 +244,7 @@ def test_khaos_atlas_builds_every_tile_and_reports_missing_ones(tmp_path):
 # ---------------------------------------------------------------------------- real export
 
 
-@pytest.mark.parametrize("item", ["KhaosMDF322", "KhaosMDF503"])
+@pytest.mark.parametrize("item", ["KhaosMDF492", "KhaosMDF503"])
 def test_khaos_recipe_matches_unreal_tile_1001_bake_real(item):
     unit = archive_root() / "raw" / "outfits" / "female" / f"WI_{item}"
     if not (unit / "done.json").is_file():
