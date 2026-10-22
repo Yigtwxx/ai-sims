@@ -6,7 +6,7 @@
  *
  * Method: per frame, each source bone's world rotation relative to its rest
  * pose is carried over to the target bone's rest pose, after aligning the two
- * skeletons' rest frames (up = pelvis->head, side = right->left upper arm).
+ * skeletons' rest frames (up = the scene vertical, side = right->left upper arm).
  * Bones the source does not animate keep their rest pose; pelvis translation
  * is scaled by the ratio of hip heights. This is the FK part of what Unreal's
  * IK Retargeter does, sufficient for idles and gestures (no foot IK).
@@ -175,11 +175,24 @@ const REQUIRED_JOINTS = ['pelvis', 'head', 'upperarm_l', 'upperarm_r'];
 const worldPosition = (object) => object.getWorldPosition(new Vector3());
 const worldQuaternion = (object) => object.getWorldQuaternion(new Quaternion());
 
-/** Rest frame of a skeleton: columns side (right->left), up (pelvis->head), forward. */
+/**
+ * A skeleton's up: the scene axis nearest its pelvis->head line, not the line
+ * itself. A take whose rest pose is its first frame (Mocap.in) leans the torso
+ * 7.5° forward there; aligning on that line tilted every limb by the lean, so
+ * the legs stood slanted and the heels sank into the floor.
+ */
+function uprightAxis(byName) {
+  const spine = worldPosition(byName.get('head')).sub(worldPosition(byName.get('pelvis')));
+  const axis = [1, 2].reduce(
+    (best, i) => (Math.abs(spine.getComponent(i)) > Math.abs(spine.getComponent(best)) ? i : best),
+    0,
+  );
+  return new Vector3().setComponent(axis, Math.sign(spine.getComponent(axis)));
+}
+
+/** Rest frame of a skeleton: columns side (right->left), up (scene vertical), forward. */
 function restFrame(byName) {
-  const up = worldPosition(byName.get('head'))
-    .sub(worldPosition(byName.get('pelvis')))
-    .normalize();
+  const up = uprightAxis(byName);
   const side = worldPosition(byName.get('upperarm_l'))
     .sub(worldPosition(byName.get('upperarm_r')))
     .normalize();
@@ -191,6 +204,63 @@ function restFrame(byName) {
 function hipHeight(byName) {
   const root = byName.get('root') ?? byName.get('pelvis').parent;
   return worldPosition(byName.get('pelvis')).distanceTo(worldPosition(root));
+}
+
+/**
+ * Where the target's feet meet the floor, as points their joints carry: each
+ * ball joint, and the floor under the back of each ankle (the heel). Call with
+ * the skeleton at rest; `rest` is the point's height there (the floor is y = 0).
+ */
+function footContacts(byName) {
+  return ['l', 'r'].flatMap((side) => {
+    const foot = byName.get(`foot_${side}`);
+    const ball = byName.get(`ball_${side}`);
+    if (!foot || !ball) return [];
+    const heel = worldPosition(byName.get(`ankle_bck_${side}`) ?? foot).setY(0);
+    return [
+      { joint: ball, local: new Vector3(), rest: worldPosition(ball).y },
+      { joint: foot, local: foot.worldToLocal(heel), rest: 0 },
+    ];
+  });
+}
+
+/** How far a foot contact point is above its rest height in the current pose (m). */
+const contactHeight = ({ joint, local, rest }) => joint.localToWorld(local.clone()).y - rest;
+
+/**
+ * The floor under each big toe's tip, as a point its ball joint (which carries
+ * the toes) holds. The tip lies one toe segment past the last toe joint. Call
+ * with the skeleton at rest.
+ */
+function toeTips(byName) {
+  return ['l', 'r'].flatMap((side) => {
+    const ball = byName.get(`ball_${side}`);
+    const base = byName.get(`bigtoe_01_${side}`);
+    const end = byName.get(`bigtoe_02_${side}`);
+    if (!ball || !base || !end) return [];
+    const tip = worldPosition(end).multiplyScalar(2).sub(worldPosition(base)).setY(0);
+    return [{ ball, local: ball.worldToLocal(tip) }];
+  });
+}
+
+const toeAxis = new Vector3();
+
+/**
+ * The world turn that lifts the toes about their ball joint until the tip
+ * point rests on the floor (y = 0); null while the tip is not below it.
+ */
+function toeLift({ ball, local }) {
+  const pivot = worldPosition(ball);
+  const reach = ball.localToWorld(local.clone());
+  if (reach.y >= 0) return null;
+  reach.sub(pivot);
+  const along = Math.hypot(reach.x, reach.z);
+  // Once on the floor the tip is pivot.y below the joint, `reach` away from it.
+  const sine = Math.min(1, Math.max(-1, -pivot.y / reach.length()));
+  const angle = Math.asin(sine) - Math.atan2(reach.y, along);
+  // Horizontal, across the toes: turning about it raises a forward reach.
+  toeAxis.set(-reach.z, 0, reach.x).normalize();
+  return new Quaternion().setFromAxisAngle(toeAxis, angle);
 }
 
 /** Depth-first order so parents are solved before children. */
@@ -274,6 +344,8 @@ const LIMB_CHILD = {
   calf: 'foot',
   foot: 'ball',
 };
+/** Feet: their rest fix turns them about the vertical only (see `retarget`). */
+const FLAT_FOOT = /^foot_[lr]$/;
 
 /** The joint a limb or finger bone points at (undefined for the spine and head). */
 function chainChild(name) {
@@ -305,7 +377,7 @@ function retarget(source, target, fps) {
   const scale = hipHeight(target.byName) / hipHeight(source.byName);
   const order = hierarchyOrder(target.joints);
 
-  const sourceUp = worldPosition(source.byName.get('head')).sub(sourcePelvisRest).normalize();
+  const sourceUp = uprightAxis(source.byName);
   const hipsRest = hipsSide(source.byName, sourceUp);
 
   // The rest poses differ (an A-pose against a relaxed stance, say): turn each
@@ -320,6 +392,14 @@ function retarget(source, target, fps) {
       .sub(worldPosition(source.byName.get(joint.name)))
       .applyQuaternion(align)
       .normalize();
+    // Both rest poses stand flat-footed, but the ankle and toe joints sit
+    // differently in the foot (ActorCore's ankle->toe line runs 12° flatter
+    // than MetaHuman's): turn the foot about the vertical only, or matching
+    // that line lifts the toes and sinks the heel through the floor.
+    if (FLAT_FOOT.test(joint.name)) {
+      from.projectOnPlane(UP).normalize();
+      to.projectOnPlane(UP).normalize();
+    }
     restFix.set(joint.name, new Quaternion().setFromUnitVectors(from, to));
   }
   // Joints with no chain of their own (twist and corrective bones, finger
@@ -392,8 +472,8 @@ function retarget(source, target, fps) {
   const handRight = target.byName.get('hand_r');
   const chestHeight = worldPosition(target.byName.get('spine_03')).y;
   const headJoint = target.byName.get('head');
-  const balls = ['ball_l', 'ball_r'].map((name) => target.byName.get(name)).filter(Boolean);
-  const ballRest = Math.min(...balls.map((ball) => worldPosition(ball).y));
+  const contacts = footContacts(target.byName);
+  const toes = toeTips(target.byName);
   let handsUp = 0;
   let crossed = 0;
   let handsFront = 0;
@@ -449,11 +529,25 @@ function retarget(source, target, fps) {
     pose();
     // Plant the feet: leg proportions and rest stances differ, so the copied
     // leg angles leave the feet above or below the floor. One foot carries the
-    // weight in an idle, so the lower toe joint goes back to its rest height.
-    const lowest = Math.min(...balls.map((ball) => worldPosition(ball).y)) - ballRest;
+    // weight in an idle: its lowest point, heel or ball, goes back to its rest
+    // height. The balls alone let a heel the take rocks back onto sink in.
+    const lowest = Math.min(...contacts.map(contactHeight));
     stats.floor = [Math.min(stats.floor[0], lowest), Math.max(stats.floor[1], lowest)];
     moved.y -= lowest;
     pose();
+    // Toes bend on the floor rather than pass through it: the take's toe
+    // joint (mocap noise, or a heel lifting over the ball) can put the tips
+    // below it. Turn the toes up about the ball until the tips touch.
+    for (const toe of toes) {
+      const values = rotations.get(toe.ball.name);
+      const turn = values && toeLift(toe);
+      if (!turn) continue;
+      turn.multiply(worldQuaternion(toe.ball));
+      local.copy(worldQuaternion(toe.ball.parent)).invert().multiply(turn);
+      local.toArray(values, frame * 4);
+      toe.ball.quaternion.copy(local);
+      toe.ball.updateMatrixWorld(true);
+    }
 
     // Where the hands go: conversation idles keep them low and apart.
     const left = worldPosition(handLeft);
@@ -628,7 +722,7 @@ for (const file of args.files) {
     // Deepest pelvis drop (share of its rest height) and largest pelvis->head tilt (degrees).
     crouch: round(crouch, 3),
     lean: round(lean, 1),
-    // Lower toe joint height against the floor before planting, [min, max] metres.
+    // Lowest heel or ball point against the floor before planting, [min, max] metres.
     floor: floor.map((height) => round(height, 3)),
     handsUp: round(handsUp, 2),
     crossed: round(crossed, 2),
