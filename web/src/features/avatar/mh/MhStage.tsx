@@ -322,6 +322,8 @@ export const MhStage = memo(function MhStage({
         insetRight={insetRight}
         backdrop="dark"
         lighting={STUDIO_LIGHTING}
+        // Thumbnails show the item alone, without the plinth.
+        platform={mode !== 'thumbnail'}
         // Frame the character on screen; an incoming one is still hidden.
         subjectHeight={(shown ?? resolved)?.height}
         interactive={mode === 'creator' || talk}

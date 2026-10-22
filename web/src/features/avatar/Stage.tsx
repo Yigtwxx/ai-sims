@@ -15,6 +15,7 @@ import { Backlight } from './Backlight';
 import { CameraRig } from './CameraRig';
 import { getCameraPose, zoomPose, type CameraFocus } from './cameraFocus';
 import { Cyclorama } from './Cyclorama';
+import { Platform, PLATFORM_HEIGHT } from './Platform';
 import { PostEffects, type RenderLook } from './PostEffects';
 import {
   QUALITY,
@@ -64,6 +65,8 @@ interface StageProps {
   quality?: QualityPreference;
   /** When this changes, a turned subject glides back to face the viewer. */
   turnHome?: unknown;
+  /** Stand the subject on a low plinth (the floor drops to meet its base). */
+  platform?: boolean;
 }
 
 const BACKDROPS = {
@@ -94,6 +97,7 @@ export function Stage({
   anchor,
   quality = 'auto',
   turnHome,
+  platform = false,
 }: StageProps) {
   const [autoTier, setAutoTier] = useState<RenderQuality>('high');
   const tier = quality === 'auto' ? autoTier : quality;
@@ -138,6 +142,7 @@ export function Stage({
             lighting={lighting}
             scenery={scenery}
             subjectHeight={subjectHeight}
+            platform={platform}
           />
           <Turntable home={turnHome}>{children}</Turntable>
           {post && <PostEffects look={look} ao={settings.ao} />}
@@ -168,19 +173,25 @@ const StudioSet = memo(function StudioSet({
   lighting,
   scenery,
   subjectHeight,
+  platform,
 }: {
   backdrop: 'light' | 'dark';
   lighting?: ReactNode;
   scenery?: ReactNode;
   subjectHeight?: number;
+  platform: boolean;
 }) {
   const theme = BACKDROPS[backdrop];
   return (
     <>
       <color attach="background" args={[theme.background]} />
       {lighting ?? <StudioLighting />}
-      <Cyclorama color={theme.cyc} glow={theme.glow} />
-      {backdrop === 'dark' && <Backlight height={subjectHeight} />}
+      {/* The feet stay at y = 0; with a plinth, the floor drops to its base. */}
+      <group position-y={platform ? -PLATFORM_HEIGHT : 0}>
+        <Cyclorama color={theme.cyc} glow={theme.glow} />
+        {backdrop === 'dark' && <Backlight height={subjectHeight} />}
+      </group>
+      {platform && <Platform />}
       {scenery}
     </>
   );
