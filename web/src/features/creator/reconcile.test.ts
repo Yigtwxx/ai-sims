@@ -15,6 +15,7 @@ import {
   reconcileConfig,
   skinsByTone,
   startingConfig,
+  startingFace,
 } from './reconcile';
 
 // Its male body has no curvy preset, as the pipeline exports it.
@@ -150,6 +151,25 @@ describe('startingConfig', () => {
     for (const base of ['female', 'male'] as const) {
       const style = startingConfig(base, manifest).hair.style;
       expect(manifest.grooms.some((g) => g.slot === 'hair' && g.id === style)).toBe(true);
+    }
+  });
+
+  it('starts on the preset face and its skin, matching a prefixed manifest id', () => {
+    const named = {
+      ...manifest,
+      faces: manifest.faces.map((face) =>
+        face.id === 'Hana' ? { ...face, id: 'face.Jelena' } : face,
+      ),
+    };
+    expect(startingFace(named, 'female')?.id).toBe('face.Jelena');
+    const config = startingConfig('female', named);
+    expect(config.face.preset).toBe('face.Jelena');
+    expect(config.skin.set).toBe('Hana');
+  });
+
+  it('falls back to the first face of the base without the preset', () => {
+    for (const base of ['female', 'male'] as const) {
+      expect(startingFace(manifest, base)?.id).toBe(facesFor(manifest, base)[0]?.id);
     }
   });
 

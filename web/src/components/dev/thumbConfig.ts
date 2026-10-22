@@ -2,9 +2,8 @@
  * Neutral characters for thumbnails: one item on an otherwise bare figure, so
  * every image in a grid reads the same way.
  */
-import { reconcileConfig, startingConfig } from '@/features/creator/reconcile';
+import { reconcileConfig, startingConfig, startingFace } from '@/features/creator/reconcile';
 import type { MhFace, MhManifest, MhOutfit } from '@/lib/assets/manifest';
-import { createDefaultConfig } from '@/lib/character/defaults';
 import type { CharacterBase, CharacterConfig } from '@/lib/character/schema';
 
 import type { ThumbTarget } from './thumbTargets';
@@ -55,9 +54,8 @@ export function outfitBase(outfit: MhOutfit): CharacterBase | null {
 function outfitConfig(manifest: MhManifest, outfit: MhOutfit): CharacterConfig | null {
   const base = outfitBase(outfit);
   if (!base) return null;
-  // The base's default face, as a new character of that base starts with.
-  const preset = reconcileConfig(createDefaultConfig(base), manifest).face.preset;
-  const face = manifest.faces.find((entry) => entry.id === preset);
+  // The face a new character of that base starts with.
+  const face = startingFace(manifest, base);
   if (!face) return null;
   const config = wearing(manifest, face);
   // A one-piece is framed head to toe: give it the base's starting cut. The

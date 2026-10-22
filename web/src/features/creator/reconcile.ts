@@ -15,7 +15,7 @@ import type {
   MhSkin,
   OutfitCategory,
 } from '@/lib/assets/manifest';
-import { createDefaultConfig } from '@/lib/character/defaults';
+import { createDefaultConfig, STARTING_PRESET } from '@/lib/character/defaults';
 import {
   BODY_PRESETS,
   BODY_SLIDERS,
@@ -265,13 +265,31 @@ const STARTING_HAIR: Record<CharacterBase, RegExp[]> = {
   male: [/Hair_S_Clean/, /Hair_S_Casual/, /Hair_S_/],
 };
 
+/** A manifest id without its kind prefix: `face.Ada` -> `Ada`. */
+const presetName = (id: string) => id.slice(id.indexOf('.') + 1);
+
+/**
+ * The face a new character of this base starts with (and the identity card
+ * shows): the starting preset, else the base's first face.
+ */
+export function startingFace(manifest: MhManifest, base: CharacterBase): MhFace | undefined {
+  const faces = facesFor(manifest, base);
+  return faces.find((face) => presetName(face.id) === STARTING_PRESET[base]) ?? faces[0];
+}
+
 /**
  * A new character for this base: the defaults reconciled with the manifest,
  * in underwear until an outfit is picked, wearing natural eyebrows (a bare
  * brow ridge reads as uncanny, not as a choice) and an everyday haircut.
  */
 export function startingConfig(base: CharacterBase, manifest: MhManifest): CharacterConfig {
-  const config = reconcileConfig(createDefaultConfig(base), manifest);
+  const defaults = createDefaultConfig(base);
+  const face = startingFace(manifest, base);
+  if (face) {
+    defaults.face.preset = face.id;
+    defaults.skin.set = face.defaultSkin;
+  }
+  const config = reconcileConfig(defaults, manifest);
   if (config.eyebrows.style === null) {
     const brows = groomsFor(manifest, 'eyebrows', base);
     const natural = brows.find((groom) => /natural/i.test(groom.id)) ?? brows[0];

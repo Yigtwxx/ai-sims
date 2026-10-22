@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { fixtureManifest } from '@/features/creator/fixtures/manifest';
-import { startingConfig } from '@/features/creator/reconcile';
-import { createDefaultConfig } from '@/lib/character/defaults';
+import { startingConfig, startingFace } from '@/features/creator/reconcile';
 import { CharacterConfigSchema } from '@/lib/character/schema';
 
 import { irisFor, outfitBase, thumbConfig, thumbShot } from './thumbConfig';
@@ -82,8 +81,7 @@ describe('thumbConfig for outfits', () => {
   it('wears a unisex outfit alone, in its first colourway, on the default female figure', () => {
     const hoodie = manifest.outfits.find((entry) => entry.id === 'Top_Hoodie')!;
     const config = thumbConfig(manifest, outfitTarget(hoodie.id));
-    const female = createDefaultConfig('female');
-    const face = manifest.faces.find((entry) => entry.id === female.face.preset)!;
+    const face = startingFace(manifest, 'female')!;
     expect(config).toMatchObject({
       base: 'female',
       face: { preset: face.id },
@@ -114,7 +112,7 @@ describe('thumbConfig for outfits', () => {
       { ...outfitTarget(jeans.id), id: maleOnly.id },
     );
     expect(config?.base).toBe('male');
-    expect(config?.face.preset).toBe(createDefaultConfig('male').face.preset);
+    expect(config?.face.preset).toBe(startingFace(manifest, 'male')?.id);
     expect(config?.outfit.bottom?.id).toBe(maleOnly.id);
   });
 

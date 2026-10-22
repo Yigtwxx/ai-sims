@@ -1,11 +1,12 @@
 import { CURRENT_SCHEMA_VERSION, type CharacterBase, type CharacterConfig } from './schema';
 
 /**
- * Starting ids are MetaHuman preset names (the manifest uses them as face and
- * skin ids). The creator reconciles every id with the loaded manifest, so a
- * curated-out or missing item falls back to the first available option.
+ * Starting ids are MetaHuman preset names (the manifest's face and skin ids,
+ * which may carry a `face.` / `skin.` prefix). The creator reconciles every id
+ * with the loaded manifest, so a curated-out or missing item falls back to the
+ * first available option.
  */
-const STARTING_PRESET: Record<CharacterBase, string> = { female: 'Ada', male: 'Bruce' };
+export const STARTING_PRESET: Record<CharacterBase, string> = { female: 'Jelena', male: 'Victor' };
 
 /** Returns a fresh, independently mutable default config for the given base. */
 export function createDefaultConfig(base: CharacterBase): CharacterConfig {

@@ -6,7 +6,7 @@ import { useCreatorStore } from '../store';
 import { thumbnailSrc } from '../useMhManifest';
 import { OptionGrid, OptionTile } from '../ui/OptionGrid';
 import { Hint, Section, Segmented } from '../ui/controls';
-import { facesFor } from '../reconcile';
+import { startingFace } from '../reconcile';
 
 import { useConfig, type PanelProps } from './shared';
 
@@ -26,7 +26,7 @@ export function IdentityPanel({ manifest }: PanelProps) {
             <OptionTile
               key={base}
               label={t(`bases.${base}`)}
-              image={thumbnailSrc(facesFor(manifest, base)[0]?.thumbnail)}
+              image={thumbnailSrc(startingFace(manifest, base)?.thumbnail)}
               selected={config.base === base}
               onSelect={() => setBase(base, manifest)}
             />
