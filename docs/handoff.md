@@ -91,7 +91,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Yüz veya gövde değişince yeni karakter ekran dışında kurulur ve tek karede eskisinin yerini alır. Boş ya da kel kare yok.
     - Kurulum sırasında kamera ekrandaki karakteri kadrajlar (`1c129d1`).
   - Cilt shader'ı:
-    - SSS sarma, SRMF speküler, gözenek mikro normali, cavity. (SRMF speküler ve cavity şu an devrede değil, bkz. "Bilinen notlar".)
+    - SSS sarma, SRMF speküler (kırmızı kanal, roughness'ın okuduğu texel'den; `c4cb122`), gözenek mikro normali. Cavity haritası yok: DCC SRMF bake'i gözenek ve kırışıktaki speküler düşüşünü zaten taşıyor.
     - Gözenek döşemesi Unreal'ın değerleri: kafa 48 (Unreal 44), gövde 70 (`c4f1be7`). Gövde 36'dayken dikişin altında gözenekler ~1.8 kat iriydi.
     - Kırışıklık normalleri.
     - Groom yoğunluğuyla kafa derisi, kaş ve sakal tonu.
@@ -185,8 +185,8 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - **Omuz silüetinde koyu çentik** (`ff99bb2`): kafa kenarı gövdenin ağırlıklarını alıyor ama kafanın kendi bind matrisleriyle skinleniyordu. Preset kafanın eklemleri bu gövdeninkinden 3-4.5 cm farklı; idle'da kenar omuzda 4 mm'ye kadar kayıyor, 1.5 mm skirt'i aşıyordu. Kenar artık gövdenin ters bind matrisleriyle skinleniyor: aralık animasyon boyunca 0.000 mm.
   - **Dikişte gözenek ölçeği** (`c4f1be7`): gövde döşemesi 36 → 70.
   - Dikişte albedo ve ışık ölçüldü: iki taraf arasındaki fark ≤5/255. "Göğüste ton farkı" diye görülen, askıların düz rengiyle gözenek farkıydı.
+  - **Cilt speküleri hiç çalışmıyordu** (`c4cb122`, kullanıcı onayıyla): `createSkinMaterial` `material.defines`'ı baştan yazıp three'nin `PHYSICAL` tanımını siliyordu; her texel F0 0.04'teydi, SRMF kırmızısı ve boyalı saçın düşük speküleri uygulanmıyordu. Artık açık; kafa yine 15/16 sampler. Cavity haritaları kaldırıldı: SRMF bake'i onları zaten taşıyor (Jelena'da yüksek geçiren korelasyon -0.77 / +0.74; Unreal'ın baked materyali de cavity almıyor). Ciltler 1.2 GB → 1017 MB, `web` 2.0 GB.
 - Bilinen notlar:
-  - **Cilt speküleri devrede değil:** `createSkinMaterial` `material.defines`'ı baştan yazıyor ve three'nin `PHYSICAL` tanımını siliyor. `IOR`/`USE_SPECULAR` tanımsız kalıyor, SRMF kırmızı kanalı (speküler seviye) ve cavity speküler örtüsü hiç uygulanmıyor; F0 sabit 0.04. Açmak kafada 17 sampler ister (sınır 16): önce SRMF'yi tek sampler'dan okumak ve cavity'yi boş bir kanala taşımak gerek. Görünümü değiştirir, kullanıcı kararı bekliyor.
   - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). Kalan 3 sakin idle (relax, listening, shibuya) tam gövdeyi sürmeye yetiyor.
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
@@ -195,7 +195,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 ## Açık işler (2026-10-22 sabah)
 
 - Bitti ve arşive işlendi: Fab/UDIM kıyafetleri (`9d17339`, `eab344f`), çıplak cilt ve boyalı groom yeniden dönüştürmesi (tüm ciltler 21 Ekim 17:23-18:18), `/dev/thumbs` küçük resimleri (92 dosya), kürasyon ve prune (`raw/pruned.json`, 22:37).
-- **Mac'e aktarım:** aşağıdaki "Mac'e taşıma". Plan: yalnız `web` klasörü (~2.25 GB), Wi-Fi ile. Ayrı bir "slim" kopya üretilmez; `serve-slim` arşiv klasörlerini olduğu gibi sunar.
+- **Mac'e aktarım:** aşağıdaki "Mac'e taşıma". Plan: yalnız `web` klasörü (~2.0 GB), Wi-Fi ile. Ayrı bir "slim" kopya üretilmez; `serve-slim` arşiv klasörlerini olduğu gibi sunar.
 - **Unreal temizliği (PC):** Mac çalışınca. Unreal önbellekleri (~165 GB), arşivde sunulmayan `fab/` (~11 GB), UE projesi `AISimsExport`; UE'yi kaldırmak kullanıcıda.
 
 ## Mac'e taşıma
@@ -220,7 +220,7 @@ cd C:/Users/Asus/Desktop/ai-sims/pipeline
 uv run asset-pipeline serve-slim --archive C:/Users/Asus/MetaHumanArchive --include web
 ```
 
-- **Plan (2026-10-22): `--include web`.** Yalnız sitenin okuduğu web varlıkları (~2.25 GB); Wi-Fi'da birkaç dakika. Dönüştürme bittiği için Mac'te `raw/` gerekmez.
+- **Plan (2026-10-22): `--include web`.** Yalnız sitenin okuduğu web varlıkları (~2.0 GB); Wi-Fi'da birkaç dakika. Dönüştürme bittiği için Mac'te `raw/` gerekmez.
 - `raw`, `fab_anims`, `gestures` ve `logs` yalnız Mac'te yeniden dönüştürmek ya da klip retarget etmek için lazım. Gerekirse sonra `--include` olmadan (varsayılan klasörler, ~20 GB) aynı adımlarla alınır; `fetch_slim.py` inmiş dosyaları atlar.
 
 - Çıktı şöyle biter (prune sonrası ölçüm: 5076 dosya, 27.1 GB, **20.1 GB indirilecek**; adres ve token her açılışta kendi değerleri):
@@ -335,7 +335,6 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
 4. Kalan kalite notları:
    - Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).
-   - Cilt speküleri (SRMF, cavity) devrede değil; açmak için sampler bütçesi gerekiyor (bkz. "Bilinen notlar").
    - CC BY atfı: crowd idle klipleri (Vernac Studios, CC BY 4.0) için UI'da kredi satırı. Henüz yok.
 5. Mac'te performans ölçümü (fps, boşta 30) ve lip-sync'in TR + EN cümlelerle yeniden kontrolü.
 
