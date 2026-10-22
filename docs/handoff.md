@@ -172,11 +172,11 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 - Konuşma uçtan uca çalışıyor: "Nasılsın?" ilk metne ~1.5 sn, Edge sesiyle konuşup Hazır'a dönüyor.
 - Düzeltilenler:
   - **Kollar kıvrık görünüyordu** (`9b84d75`): ön kol dönüşü dirsek tarafındaki twist kemiğinde başlıyordu; 3/4 kolun ağzı orada makaslanıp buruşuyordu. Dönüş artık bileğe doğru (twist_01 yarım, el tam 45°), avuçlar hâlâ bacağa bakar.
+  - **Bildirimler** (`16f1196`): 1024 px altında üstten gelir; telefonda taslak bildirimi Bitti çubuğunu kapatıyordu.
   - **Renk başlıkları** (`d73bba6`): kıyafet panelinde "diffuse_color_1/2" yazıyordu; artık Ana / İkincil / Detay / Aksesuar rengi, çok malzemeli kıyafette parça numarasıyla.
 - Bilinen notlar:
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
   - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
-  - Telefonda "İsimsiz taslağın geri yüklendi" bildirimi birkaç saniye alt çubuğun (Bitti) üstünde duruyor.
 
 ## Açık işler (2026-10-22 sabah)
 
