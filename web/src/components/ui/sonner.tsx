@@ -8,20 +8,38 @@ import {
   XCircleIcon,
 } from '@phosphor-icons/react';
 import { useTranslations } from 'next-intl';
+import { useSyncExternalStore } from 'react';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
+
+// Below this width the creator and talk screens stack, with their action bar
+// (Bitti, the message box) pinned to the bottom edge.
+const STACKED = '(max-width: 1023px)';
+
+const subscribeStacked = (onChange: () => void) => {
+  const query = window.matchMedia(STACKED);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+};
 
 /*
  * shadcn/ui Sonner, adapted: the site is dark only, so the theme is fixed
- * (no next-themes) and the toast surface uses the backstage tokens.
+ * (no next-themes) and the toast surface uses the backstage tokens. On
+ * stacked layouts toasts drop in from the top so they never cover the
+ * bottom action bar.
  */
 function Toaster(props: ToasterProps) {
   const t = useTranslations('Status');
+  const stacked = useSyncExternalStore(
+    subscribeStacked,
+    () => window.matchMedia(STACKED).matches,
+    () => false,
+  );
 
   return (
     <Sonner
       theme="dark"
       containerAriaLabel={t('notifications')}
-      position="bottom-center"
+      position={stacked ? 'top-center' : 'bottom-center'}
       offset={24}
       gap={10}
       className="toaster group"
