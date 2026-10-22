@@ -1,4 +1,4 @@
-# Devir notu (2026-10-22 öğleden sonra, eğik duruş düzeltmesi sonrası)
+# Devir notu (2026-10-22 öğleden sonra, eğik duruş ve diz düzeltmesi sonrası)
 
 Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu, açık işleri, Mac'e taşımayı ve Mac'teki sıradaki işi anlatan tek sayfadır.
 
@@ -205,7 +205,13 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Artık bu eklemler çekimin ortalama pozuna göre dönüyor ve o poz bind'in dik duruşuna denk geliyor. `listening`: gövde (pelvis→boyun) -9.0° → -4.5° (bind'inki), baş eğimi ortalama -8.6° → 0°. Bacak ve ayaklar değişmedi.
     - Diğer kliplerde de baş ortalamada düz bakıyor: önce shibuya 11.5° aşağı, stand_talk 9.7° yukarı bakıyordu.
     - 5 klip yeniden üretildi (hedef kadın gövde). `standing`/`calm` bayrakları değişmedi, manifest aynı. GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
-  - **Açık:** `listening`'de dizler kaynakta ~26° bükük (relax ve shibuya ~8°). Gövde artık dik ama yandan bakınca hafif çömelmiş duruyor. Seçenekler: retarget'te bacak IK'sıyla dizleri düzeltmek ya da klibi gizlemek (gizlenirse sakin idle sayısı `MIN_CALM_IDLES`'ın altına düşer). Karar kullanıcıda.
+  - **Dizler bükük, sol ayak havadaydı** (`retarget-fbx.mjs`, `5547e6d`, kullanıcı kararı: bacak IK'sı):
+    - Bacaklar oyuncunun yönlerini kopyalıyor. `listening`'de oyuncu yumuşak dizlerle duruyor: destek dizi 20°, öteki 33° bükük. Bacak oranları yüzünden sol ayak da 1.5 cm havadaydı (kaynakta yerde).
+    - Yeni 3. geçiş üç iş yapıyor. Pelvisi, düz olan bacağın tipik bükümü `STANCE_KNEE` (8°) olana kadar kaldırıyor. Oyuncununkinin tipik olarak `HOVER`'dan (5 mm) fazla üstünde duran ayağı çekim boyunca o kadar indiriyor. İki kemikli IK ile iki dizi çözüyor; ayaklar yerinde ve düz kalıyor.
+    - IK hiçbir dizi `KNEE_MIN`'den (6°) fazla düzleştirmiyor. Tam açıklığa yakın 1 mm erişim dizi derecelerce çeviriyor; kare kare gürültü dizi titretiyordu. İlk denemedeki kare kare ayak hedefi relax ve stand_talk'ta dizleri 5-8° oynattığı için sabit indirmeye geçildi.
+    - `listening`: dizler 8° ve 15°, iki ayak yerde (0-0.5 cm), çömelme 0.021 → 0.009. relax, shibuya ve talking_normal birebir aynı; stand_talk'ta destek dizi 8.6° → 8.0°. Erkek gövdede de sağ/sol ayak farkı 1.3 → 0.0 cm.
+    - 5 klip yeniden üretildi ve arşivdekiler commit'teki betiğin çıktısıyla byte byte aynı. Bayraklar ve manifest değişmedi, GLB validate temiz.
+    - Bilinen: çekimin son karesi ilk kareye sarıyor (eskiden de öyleydi). Klip bitmeden söndüğü için görünmüyor; dizdeki sıçrama 4.8° → 8.4°.
 - Bilinen notlar:
   - Ayakkabı küçük resimleri eski pozla (ayak parmak yukarı) çekildi. İstenirse `/dev/thumbs` ile yeniden üretilir.
   - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). Kalan 3 sakin idle (relax, listening, shibuya) tam gövdeyi sürmeye yetiyor.
@@ -355,9 +361,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 2. İlk açılış kontrolü: landing, yeni karakter (kadın ve erkek), bir kıyafet ve renk değişikliği, Bitti, konuşma ekranında "Nasılsın?" (ses ve dudak). Konsolda `THREE.Clock` uyarısından başka hata olmamalı.
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
 4. Kalan kalite notları:
-   - Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).
-   - `listening` idle'ında kaynaktan gelen ~26° diz bükümü: bacak IK'sı ya da gizleme (kullanıcı kararı, yukarıdaki "Açık" madde).
-   - CC BY atfı: crowd idle klipleri (Vernac Studios, CC BY 4.0) için UI'da kredi satırı. Henüz yok.
+   - Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).   - CC BY atfı: crowd idle klipleri (Vernac Studios, CC BY 4.0) için UI'da kredi satırı. Henüz yok.
 5. Mac'te performans ölçümü (fps, boşta 30) ve lip-sync'in TR + EN cümlelerle yeniden kontrolü.
 
 ## AI ve ses
