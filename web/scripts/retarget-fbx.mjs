@@ -7,6 +7,8 @@
  * Method: per frame, each source bone's world rotation relative to its rest
  * pose is carried over to the target bone's rest pose, after aligning the two
  * skeletons' rest frames (up = the scene vertical, side = right->left upper arm).
+ * The pelvis, spine, neck and head carry theirs relative to the take's average
+ * pose instead, so the body stands as upright as the bind pose on average.
  * Bones the source does not animate keep their rest pose; pelvis translation
  * is scaled by the ratio of hip heights. This is the FK part of what Unreal's
  * IK Retargeter does, sufficient for idles and gestures (no foot IK).
@@ -263,6 +265,16 @@ function toeLift({ ball, local }) {
   return new Quaternion().setFromAxisAngle(toeAxis, angle);
 }
 
+/** Average of unit quaternions near one another: their sign-aligned sum, normalised. */
+function meanQuaternion(quaternions) {
+  const sum = new Quaternion(0, 0, 0, 0);
+  for (const q of quaternions) {
+    const sign = q.dot(quaternions[0]) < 0 ? -1 : 1;
+    sum.set(sum.x + sign * q.x, sum.y + sign * q.y, sum.z + sign * q.z, sum.w + sign * q.w);
+  }
+  return sum.normalize();
+}
+
 /** Depth-first order so parents are solved before children. */
 function hierarchyOrder(joints) {
   const set = new Set(joints);
@@ -346,6 +358,15 @@ const LIMB_CHILD = {
 };
 /** Feet: their rest fix turns them about the vertical only (see `retarget`). */
 const FLAT_FOOT = /^foot_[lr]$/;
+/**
+ * The axial joints have no limb to point along, so their turn is carried over
+ * from a reference pose to the bind pose. That reference is the take's average
+ * pose, not the FBX rest: a Mocap.in take rests on its first frame, where in
+ * `listening` the torso leans forward and the head bows 19°. Taken as upright,
+ * that frame left the character's torso 10° behind the actor's all through the
+ * take, over knees bent forward (legs carry their directions), and its chin up.
+ */
+const AXIAL = /^(pelvis|spine_0[1-5]|neck_0[12]|head)$/;
 
 /** The joint a limb or finger bone points at (undefined for the spine and head). */
 function chainChild(name) {
@@ -426,9 +447,13 @@ function retarget(source, target, fps) {
       .applyQuaternion(align)
       .multiplyScalar(scale);
 
-  // Pass 1: where the actor stands and faces during the take. Takes start
-  // wherever the calibration pose was held, so each clip is turned to face
-  // forward on average and centred over the rest position.
+  // Pass 1: where the actor stands and faces during the take, and its average
+  // axial pose (see AXIAL). Takes start wherever the calibration pose was held,
+  // so each clip is turned to face forward on average and centred over the
+  // rest position.
+  const axialPoses = new Map(
+    mapped.filter((joint) => AXIAL.test(joint.name)).map((joint) => [joint.name, []]),
+  );
   const yaws = [];
   let sin = 0;
   let cos = 0;
@@ -438,9 +463,14 @@ function retarget(source, target, fps) {
     yaws.push(yaw);
     sin += Math.sin(yaw / DEG);
     cos += Math.cos(yaw / DEG);
+    for (const [name, poses] of axialPoses) poses.push(worldQuaternion(source.byName.get(name)));
   }
+  const axialMeanInverse = new Map(
+    [...axialPoses].map(([name, poses]) => [name, meanQuaternion(poses).invert()]),
+  );
   const meanYaw = Math.atan2(sin, cos) * DEG;
   const facing = new Quaternion().setFromAxisAngle(UP, -meanYaw / DEG);
+  const facingInverse = facing.clone().invert();
   const centre = new Vector3();
   for (let frame = 0; frame < frames; frame += 1) {
     sample(frame);
@@ -490,9 +520,20 @@ function retarget(source, target, fps) {
       let jointWorld;
       if (rotations.has(joint.name)) {
         const now = worldQuaternion(source.byName.get(joint.name));
-        // World-space rotation since rest, expressed in the target's frame.
-        delta.copy(now).multiply(sourceRest.get(joint.name).clone().invert());
-        delta.premultiply(align).multiply(alignInverse).premultiply(facing);
+        const meanInverse = axialMeanInverse.get(joint.name);
+        if (meanInverse) {
+          // Turn away from the take's average pose, in the facing target's frame.
+          delta.copy(now).multiply(meanInverse);
+          delta
+            .premultiply(align)
+            .multiply(alignInverse)
+            .premultiply(facing)
+            .multiply(facingInverse);
+        } else {
+          // World-space rotation since rest, expressed in the target's frame.
+          delta.copy(now).multiply(sourceRest.get(joint.name).clone().invert());
+          delta.premultiply(align).multiply(alignInverse).premultiply(facing);
+        }
         jointWorld = delta
           .clone()
           .multiply(restFix.get(joint.name) ?? IDENTITY)
