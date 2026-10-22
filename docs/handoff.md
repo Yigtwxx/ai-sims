@@ -1,4 +1,4 @@
-# Devir notu (2026-10-21 akşam)
+# Devir notu (2026-10-22 sabah)
 
 Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu, açık işleri, Mac'e taşımayı ve Mac'teki sıradaki işi anlatan tek sayfadır.
 
@@ -52,7 +52,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 ### Dönüştürücü (`asset-pipeline mh-convert`, `pipeline/src/asset_pipeline/mh/`)
 
 - Komut `--all` ile artımlı çalışır; yalnızca değişen ya da yeni gelen birimleri çevirir. Çıktı `MetaHumanArchive/web/`.
-- **Manifest v2** (`generatedAt` 2026-10-21T13:57Z): 20 yüz, 29 cilt, 2 vücut, 88 groom, 37 kıyafet, 29 iris, 14 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md`.
+- **Manifest v2** (`generatedAt` 2026-10-21T20:26Z, prune sonrası): 19 yüz, 20 cilt, 2 vücut, 49 groom, 24 kıyafet, 22 iris, 10 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
 - **Kürasyon:** `raw/pruned.json` silinmiş 115 id'yi tutar; `web/curation.json` 191 id'yi gizler. Elenen yüzler: Bo, Bruce, Grace, Jorge, Lani, Lorenzo, Orlando, Sook-ja, Walter.
 - Sıkıştırma:
   - Kendi meshopt encoder'ı; vertex sırası ve IBM'ler korunur.
@@ -131,7 +131,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Ön eleme: `asset-pipeline mh-similar` çok benzer öğeleri ölçer (saç/kaş/sakal/bıyık kart yüzeyi, kıyafet yüzeyi, yüz DNA'sı, gövde klibi). `--apply` bunları `curation.json`'da `auto` altına yazar ve gizler; ekran "Ön elemede gizlenenler" filtresiyle gösterir, kullanıcı geri açabilir. Rapor: arşivde `build/similar.json`.
     - Silme: `asset-pipeline mh-prune` deneme modunda planı, boşalacak yeri ve bir plan özeti yazar. Silmek için `--apply --plan <özet>`; plan o arada değiştiyse reddeder. `--unused-packages` hiçbir öğenin gelmediği Fab paketlerini de siler, ama bir export klasörü eksikken (export sürüyorsa) hiçbir paketi kullanılmıyor saymaz.
   - i18n anahtar testi ve Playwright e2e.
-- Doğrulama (2026-10-21 akşam): `pnpm test` **681 test geçti** (71 dosya).
+- Doğrulama (2026-10-22 sabah): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **805 test geçti** (81 dosya).
 - **Dev sayfaları** (`next dev` dışında 404):
   - `/dev/stage`: gerçek manifest; yüz, saç, kıyafet ve kalite seçimi; `/api/tts` ile canlı TTS; zoom.
   - `/dev/mh`: tek preset görüntüleyici, `?face=<id>` ile.
@@ -166,18 +166,23 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - **P5** kadraj: kurulumda kamera ekrandaki karakteri izler (`1c129d1`); kıyafet küçük resimleri öğenin kendisine kadrajlanır (`9d8912d`).
   - **P6** Ada'nın askı kamaları (`258d56a`).
 
-## Açık işler (2026-10-21 akşam)
+## Site kontrolü (2026-10-22 sabah, PC)
 
-- **Sürüyor, başka ajan:** KhaosMDF255, 322 ve 503 için UDIM atlas desteği. 10 Fab kıyafeti ham olarak hazır ama manifest'te yok. Bitince: `uv run asset-pipeline mh-convert --outfits --manifest`.
-- **Cilt ve groom yeniden dönüştürme:** çıplak cilt ve boyalı groom değişiklikleri arşive tam işlenmeli. Tercihen PC'de, aktarımdan önce (Mac'te her birim baştan çevrilir, bkz. "Mac kurulumu"). `pipeline/` içinde:
+- Landing, Karakterlerim, oluşturucu ve konuşma masaüstünde (1440×900) ve telefonda (390×844) gezildi. Yatay kaydırma yok, konsolda yalnız three'nin `THREE.Clock` uyarısı var.
+- Konuşma uçtan uca çalışıyor: "Nasılsın?" ilk metne ~1.5 sn, Edge sesiyle konuşup Hazır'a dönüyor.
+- Düzeltilenler:
+  - **Kollar kıvrık görünüyordu** (`9b84d75`): ön kol dönüşü dirsek tarafındaki twist kemiğinde başlıyordu; 3/4 kolun ağzı orada makaslanıp buruşuyordu. Dönüş artık bileğe doğru (twist_01 yarım, el tam 45°), avuçlar hâlâ bacağa bakar.
+  - **Renk başlıkları** (`d73bba6`): kıyafet panelinde "diffuse_color_1/2" yazıyordu; artık Ana / İkincil / Detay / Aksesuar rengi, çok malzemeli kıyafette parça numarasıyla.
+- Bilinen notlar:
+  - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
+  - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
+  - Telefonda "İsimsiz taslağın geri yüklendi" bildirimi birkaç saniye alt çubuğun (Bitti) üstünde duruyor.
 
-  ```bash
-  uv run asset-pipeline mh-convert --character all --parts skins --grooms --manifest
-  ```
+## Açık işler (2026-10-22 sabah)
 
-- **Küçük resimler:** dönüştürme bittikten sonra `/dev/thumbs` ile tüm yüz, groom ve kıyafetler yeniden çekilir. Unreal küçük resimleri placeholder dokuyla çizilmişti.
-- **Mac'e aktarım:** aşağıdaki "Mac'e taşıma". Ayrı bir "slim" kopya üretilmez; `serve-slim` arşiv klasörlerini olduğu gibi sunar.
-- **Unreal temizliği (PC):** aktarım doğrulandıktan sonra. Kapsamı kullanıcı belirler (UE projesi `AISimsExport`, arşivde sunulmayan `fab/` 16 GB).
+- Bitti ve arşive işlendi: Fab/UDIM kıyafetleri (`9d17339`, `eab344f`), çıplak cilt ve boyalı groom yeniden dönüştürmesi (tüm ciltler 21 Ekim 17:23-18:18), `/dev/thumbs` küçük resimleri (92 dosya), kürasyon ve prune (`raw/pruned.json`, 22:37).
+- **Mac'e aktarım:** aşağıdaki "Mac'e taşıma". Plan: yalnız `web` klasörü (~2.25 GB), Wi-Fi ile. Ayrı bir "slim" kopya üretilmez; `serve-slim` arşiv klasörlerini olduğu gibi sunar.
+- **Unreal temizliği (PC):** Mac çalışınca. Unreal önbellekleri (~165 GB), arşivde sunulmayan `fab/` (~11 GB), UE projesi `AISimsExport`; UE'yi kaldırmak kullanıcıda.
 
 ## Mac'e taşıma
 
@@ -198,8 +203,11 @@ PowerShell ya da Git Bash, iki satır:
 
 ```bash
 cd C:/Users/Asus/Desktop/ai-sims/pipeline
-uv run asset-pipeline serve-slim --archive C:/Users/Asus/MetaHumanArchive
+uv run asset-pipeline serve-slim --archive C:/Users/Asus/MetaHumanArchive --include web
 ```
+
+- **Plan (2026-10-22): `--include web`.** Yalnız sitenin okuduğu web varlıkları (~2.25 GB); Wi-Fi'da birkaç dakika. Dönüştürme bittiği için Mac'te `raw/` gerekmez.
+- `raw`, `fab_anims`, `gestures` ve `logs` yalnız Mac'te yeniden dönüştürmek ya da klip retarget etmek için lazım. Gerekirse sonra `--include` olmadan (varsayılan klasörler, ~20 GB) aynı adımlarla alınır; `fetch_slim.py` inmiş dosyaları atlar.
 
 - Çıktı şöyle biter (prune sonrası ölçüm: 5076 dosya, 27.1 GB, **20.1 GB indirilecek**; adres ve token her açılışta kendi değerleri):
 
@@ -282,7 +290,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
   - AI: `GROQ_API_KEY`, `GROQ_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_PROVIDER_ORDER`.
   - TTS: `TTS_PROVIDER_ORDER`, `TTS_ENABLE_EDGE`, `GEMINI_TTS_MODEL`, `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`, `AZURE_TTS_VOICE_TR_FEMALE`, `AZURE_TTS_VOICE_TR_MALE`, `AZURE_TTS_VOICE_EN_FEMALE`, `AZURE_TTS_VOICE_EN_MALE`.
   - Edge sesi ve lip-sync'in kelime zamanları için `TTS_ENABLE_EDGE=1` gerekir. Eski bir `.env.local`'da bu satır olmayabilir.
-- **Dönüştürücü (yalnız yeniden dönüştürmek için),** `pipeline/` içinde:
+- **Dönüştürücü (yalnız yeniden dönüştürmek için; önce `raw/` da aktarılmış olmalı, bkz. "PC: sunucu"),** `pipeline/` içinde:
 
   ```bash
   uv sync
@@ -309,7 +317,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 ## Sıradaki iş (Mac)
 
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
-2. Açık işlerden PC'de bitmeyenleri Mac'te tamamla: cilt/groom yeniden dönüştürme, Fab kıyafetleri (UDIM işi bittiyse `--outfits --manifest`), `/dev/thumbs` ile küçük resimler.
+2. İlk açılış kontrolü: landing, yeni karakter (kadın ve erkek), bir kıyafet ve renk değişikliği, Bitti, konuşma ekranında "Nasılsın?" (ses ve dudak). Konsolda `THREE.Clock` uyarısından başka hata olmamalı.
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
 4. Kalan kalite notları:
    - Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).
