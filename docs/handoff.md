@@ -1,4 +1,4 @@
-# Devir notu (2026-10-22 sabah)
+# Devir notu (2026-10-22 öğle)
 
 Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu, açık işleri, Mac'e taşımayı ve Mac'teki sıradaki işi anlatan tek sayfadır.
 
@@ -131,7 +131,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Ön eleme: `asset-pipeline mh-similar` çok benzer öğeleri ölçer (saç/kaş/sakal/bıyık kart yüzeyi, kıyafet yüzeyi, yüz DNA'sı, gövde klibi). `--apply` bunları `curation.json`'da `auto` altına yazar ve gizler; ekran "Ön elemede gizlenenler" filtresiyle gösterir, kullanıcı geri açabilir. Rapor: arşivde `build/similar.json`.
     - Silme: `asset-pipeline mh-prune` deneme modunda planı, boşalacak yeri ve bir plan özeti yazar. Silmek için `--apply --plan <özet>`; plan o arada değiştiyse reddeder. `--unused-packages` hiçbir öğenin gelmediği Fab paketlerini de siler, ama bir export klasörü eksikken (export sürüyorsa) hiçbir paketi kullanılmıyor saymaz.
   - i18n anahtar testi ve Playwright e2e.
-- Doğrulama (2026-10-22 sabah): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **805 test geçti** (81 dosya).
+- Doğrulama (2026-10-22 öğle): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **807 test geçti** (81 dosya). Pipeline: `ruff` temiz, pytest **309 geçti, 1 atlandı**. Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
 - **Dev sayfaları** (`next dev` dışında 404):
   - `/dev/stage`: gerçek manifest; yüz, saç, kıyafet ve kalite seçimi; `/api/tts` ile canlı TTS; zoom.
   - `/dev/mh`: tek preset görüntüleyici, `?face=<id>` ile.
@@ -174,7 +174,13 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - **Kollar kıvrık görünüyordu** (`9b84d75`): ön kol dönüşü dirsek tarafındaki twist kemiğinde başlıyordu; 3/4 kolun ağzı orada makaslanıp buruşuyordu. Dönüş artık bileğe doğru (twist_01 yarım, el tam 45°), avuçlar hâlâ bacağa bakar.
   - **Bildirimler** (`16f1196`): 1024 px altında üstten gelir; telefonda taslak bildirimi Bitti çubuğunu kapatıyordu.
   - **Renk başlıkları** (`d73bba6`): kıyafet panelinde "diffuse_color_1/2" yazıyordu; artık Ana / İkincil / Detay / Aksesuar rengi, çok malzemeli kıyafette parça numarasıyla.
+- Kullanıcının üç ekran görüntüsünden düzeltilenler (2026-10-22, Aera, topuz, crop top + tayt):
+  - **Kırık bilek ve kol** (`retarget-fbx.mjs`): twist ve corrective kemikler, parmak uçları ve ayak parmakları zincir kemiğinin duruş düzeltmesini (`restFix`) almıyordu. Shibuya HumanIK klibinde kol twist'leri 27°, uyluk twist'leri 24.5° yan büküyordu; dirsekte kol ağzı da buruşuyordu. Artık en yakın atanın düzeltmesini alıyorlar. Arşivdeki 5 FBX klibi (shibuya, relax, listening, stand_talk, talking_normal) yeniden üretildi; Mocap.in parmak uçları ~55° düzeldi.
+  - **Topuzda arka kafada çıplak kafa derisi** (`grooms.py`): `density` yalnız kart köklerinden geliyordu; topuzun kökleri saç çizgisinde kaldığı için tepe ve arka boyanmıyordu. Artık Unreal `baked` haritasının örtüsüyle birleşiyor (`groom_density`). `baked`'i olan 12 saç yeniden dönüştürüldü; sakal ve bıyıkların `baked`'i yok, değişmedi.
+  - **Kazaktan taşan cilt** (`garments.ts`, `MhCharacter.tsx`): aynı gövde GLB'sinden kurulan karakterler gövde geometrisini, dolayısıyla `bodyHidden` maskesini paylaşıyor. Yüz değişince eski karakter kaldırılırken maskeyi sıfırlıyordu; yeni karakterin cildi kıyafetin altından görünür kalıyor, jestte omuzdan taşıyordu. Kaldırma artık yalnız maskeyi son yazan karakterse temizliyor (`releaseBodyHide`).
 - Bilinen notlar:
+  - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyor; kürasyonda gizlenmesi önerildi, karar kullanıcıda.
+  - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
   - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
 
