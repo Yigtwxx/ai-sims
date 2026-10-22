@@ -40,7 +40,12 @@ export interface SkinTuning {
   wrap: number;
   /** Tint and strength of the light that scatters back (linear RGB). */
   scatter: Color;
-  /** UV repeats of the micro normal across the head / body atlas. */
+  /**
+   * UV repeats of the micro normal across the head / body atlas. The body atlas
+   * spends fewer UV units per metre (about 0.72 at the neck seam, the head about
+   * 1.0), so it repeats more for pores of one size on both sides of the seam;
+   * Unreal's MI_Body_Baked uses 70.
+   */
   microTiling: number;
   microStrength: number;
   sheen: number;
@@ -72,8 +77,7 @@ export const HEAD_SKIN: SkinTuning = {
 
 export const BODY_SKIN: SkinTuning = {
   ...HEAD_SKIN,
-  microTiling: 36,
-  microStrength: 0.3,
+  microTiling: 70,
   wrinkles: false,
   groomDensity: false,
   bodyHide: true,
