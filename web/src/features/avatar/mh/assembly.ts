@@ -268,14 +268,30 @@ export interface NeckSeamBinding {
   outward: Float32Array;
   /** Per boundary slot: the body vertex it is welded to. */
   bodyVertex: Int32Array;
+  /**
+   * Per boundary seam vertex, four influences each: its skin on the head's own
+   * entries (the frame the rings' offsets are solved in) and on the entries
+   * that carry the body's inverse binds (what it is drawn with).
+   */
+  headSkinIndex: Int32Array;
+  headSkinWeight: Float32Array;
+  bodySkinIndex: Int32Array;
+  bodySkinWeight: Float32Array;
+  /** Head skeleton entries added for the body's bones, as [head slot, body slot] pairs. */
+  bodyEntries: Int32Array;
 }
 
 type Attribute = BufferAttribute | InterleavedBufferAttribute;
 
 const DNA_POSITION = '_dna_position';
-/** How far (m) the head boundary reaches past the seam, and how deep under the body skin. */
-const SEAM_SKIRT_OUT = 0.0015;
-const SEAM_SKIRT_IN = 0.0004;
+/**
+ * How far (m) the head boundary reaches past the seam, and how deep under the
+ * body skin: just enough to close sub-pixel cracks, since both edges skin
+ * alike (see addBodyEntries). A deeper tuck stands as a step on the shoulder's
+ * silhouette.
+ */
+const SEAM_SKIRT_OUT = 0.0003;
+const SEAM_SKIRT_IN = 0.00005;
 
 /** First primitive vertex of each DNA position (glTF splits positions at UV seams). */
 function vertexOfPosition(geometry: BufferGeometry): Map<number, number> {
@@ -315,20 +331,38 @@ const skinScratch = new Matrix4();
 
 /** World transform of one skinned vertex's bind-space position (attached bind mode). */
 function skinTransform(mesh: SkinnedMesh, vertex: number, target: Matrix4): Matrix4 {
-  const { bones, boneInverses } = mesh.skeleton;
   const index = mesh.geometry.getAttribute('skinIndex') as Attribute;
   const weight = mesh.geometry.getAttribute('skinWeight') as Attribute;
   const out = target.elements;
   out.fill(0);
   for (let k = 0; k < 4; k += 1) {
     const w = weight.getComponent(vertex, k);
-    if (w === 0) continue;
-    const bone = index.getComponent(vertex, k);
-    skinScratch.multiplyMatrices(bones[bone]!.matrixWorld, boneInverses[bone]!);
-    const m = skinScratch.elements;
-    for (let e = 0; e < 16; e += 1) out[e]! += w * m[e]!;
+    if (w !== 0) addInfluence(mesh, index.getComponent(vertex, k), w, out);
   }
   return target.multiply(mesh.bindMatrix);
+}
+
+/** skinTransform for the four influences at `at` of a skin kept outside the geometry. */
+function skinTransformOf(
+  mesh: SkinnedMesh,
+  index: Int32Array,
+  weight: Float32Array,
+  at: number,
+  target: Matrix4,
+): Matrix4 {
+  const out = target.elements;
+  out.fill(0);
+  for (let k = at * 4; k < at * 4 + 4; k += 1) {
+    if (weight[k] !== 0) addInfluence(mesh, index[k]!, weight[k]!, out);
+  }
+  return target.multiply(mesh.bindMatrix);
+}
+
+function addInfluence(mesh: SkinnedMesh, slot: number, w: number, out: number[]): void {
+  const { bones, boneInverses } = mesh.skeleton;
+  skinScratch.multiplyMatrices(bones[slot]!.matrixWorld, boneInverses[slot]!);
+  const m = skinScratch.elements;
+  for (let e = 0; e < 16; e += 1) out[e]! += w * m[e]!;
 }
 
 const SEAM_OWNED = ['position', 'normal', 'skinIndex', 'skinWeight'];
@@ -388,10 +422,11 @@ function materialName(mesh: Mesh): string {
 }
 
 /**
- * Binds the head's neck to the body's: pairs the two boundary loops, copies the
- * body's skin weights onto the head boundary and snaps it once. Call after
- * `attachHead`, with the whole character's world matrices up to date. Returns
- * undefined when either GLB lacks seam data (the character still renders).
+ * Binds the head's neck to the body's: pairs the two boundary loops, gives the
+ * head boundary the body's skin (weights and inverse binds) and snaps it once.
+ * Call after `attachHead`, with the whole character's world matrices up to
+ * date. Returns undefined when either GLB lacks seam data (the character still
+ * renders).
  */
 export function bindNeckSeam(
   headMeshes: readonly SkinnedMesh[],
@@ -442,6 +477,11 @@ export function bindNeckSeam(
     onBoundary: new Uint8Array(count),
     outward: new Float32Array(count * 3),
     bodyVertex,
+    headSkinIndex: new Int32Array(count * 4),
+    headSkinWeight: new Float32Array(count * 4),
+    bodySkinIndex: new Int32Array(count * 4),
+    bodySkinWeight: new Float32Array(count * 4),
+    bodyEntries: addBodyEntries(head, headMeshes, body.mesh, bodyVertex),
   };
   const restBoundary = headBoundary.map((v) => new Vector3().fromBufferAttribute(position, v!));
   const point = new Vector3();
@@ -501,31 +541,84 @@ function setSeamOutward(binding: NeckSeamBinding): void {
   }
 }
 
-/** Gives every head boundary vertex the skin of the body vertex it is welded to. */
+/**
+ * Extends the head skeleton with one entry per body bone the welded body
+ * vertices skin with, carrying the body's inverse bind (refreshed on every
+ * snap). A preset head binds its shared bones at its own body's joints,
+ * centimetres off this body's, so a boundary skinned with the head's inverse
+ * binds slid up to 4 mm off the body's edge as the shoulders moved, and the
+ * backdrop showed between them. Returns the [head slot, body slot] pairs.
+ */
+function addBodyEntries(
+  head: SkinnedMesh,
+  headMeshes: readonly SkinnedMesh[],
+  body: SkinnedMesh,
+  bodyVertices: Int32Array,
+): Int32Array {
+  const bodyIndex = body.geometry.getAttribute('skinIndex') as Attribute;
+  const bodyWeight = body.geometry.getAttribute('skinWeight') as Attribute;
+  const used = new Set<number>();
+  for (const vertex of bodyVertices) {
+    for (let k = 0; k < 4; k += 1)
+      if (bodyWeight.getComponent(vertex, k) > 0) used.add(bodyIndex.getComponent(vertex, k));
+  }
+  const shared = head.skeleton;
+  const bones = [...shared.bones];
+  const inverses = [...shared.boneInverses];
+  const entries = new Int32Array(used.size * 2);
+  [...used].forEach((bodySlot, i) => {
+    entries[i * 2] = bones.length;
+    entries[i * 2 + 1] = bodySlot;
+    bones.push(body.skeleton.bones[bodySlot]!);
+    inverses.push(body.skeleton.boneInverses[bodySlot]!.clone());
+  });
+  // The head primitives share one skeleton (see attachHead): they all move to the extended one.
+  const skeleton = new Skeleton(bones, inverses);
+  for (const mesh of headMeshes) if (mesh.skeleton === shared) mesh.bind(skeleton, mesh.bindMatrix);
+  return entries;
+}
+
+/**
+ * Gives every head boundary vertex the skin of the body vertex it is welded
+ * to: drawn on the body's own inverse binds (the added entries), so the two
+ * edges move as one, and kept on the head's entries of those bones, the frame
+ * the rings follow. A body bone the head lacks leaves that frame on the
+ * vertex's own head skin.
+ */
 function copyBoundarySkin(binding: NeckSeamBinding): void {
-  const { head, body } = binding;
+  const { head, body, bodyEntries } = binding;
   const headIndex = head.geometry.getAttribute('skinIndex') as Attribute;
   const headWeight = head.geometry.getAttribute('skinWeight') as Attribute;
   const bodyIndex = body.geometry.getAttribute('skinIndex') as Attribute;
   const bodyWeight = body.geometry.getAttribute('skinWeight') as Attribute;
-  const headSlot = new Map(head.skeleton.bones.map((bone, slot) => [bone, slot]));
+  const ownSlots = head.skeleton.bones.length - bodyEntries.length / 2;
+  const headSlot = new Map(
+    head.skeleton.bones.slice(0, ownSlots).map((bone, slot) => [bone, slot]),
+  );
+  const entryOf = new Map<number, number>();
+  for (let e = 0; e < bodyEntries.length; e += 2) entryOf.set(bodyEntries[e + 1]!, bodyEntries[e]!);
   for (let i = 0; i < binding.vertices.length; i += 1) {
     if (!binding.onBoundary[i]) continue;
     const vertex = binding.vertices[i]!;
     const source = binding.bodyVertex[binding.slotA[i]!]!;
-    const mapped: [number, number][] = [];
+    let mapped = true;
     for (let k = 0; k < 4; k += 1) {
       const w = bodyWeight.getComponent(source, k);
-      if (w === 0) continue;
-      const slot = headSlot.get(body.skeleton.bones[bodyIndex.getComponent(source, k)]!);
-      if (slot === undefined) break;
-      mapped.push([slot, w]);
+      const bone = bodyIndex.getComponent(source, k);
+      binding.bodySkinIndex[i * 4 + k] = w > 0 ? entryOf.get(bone)! : 0;
+      binding.bodySkinWeight[i * 4 + k] = w;
+      const slot = headSlot.get(body.skeleton.bones[bone]!);
+      if (w > 0 && slot === undefined) mapped = false;
+      binding.headSkinIndex[i * 4 + k] = w > 0 ? (slot ?? 0) : 0;
+      binding.headSkinWeight[i * 4 + k] = w;
     }
-    const total = mapped.reduce((sum, [, w]) => sum + w, 0);
-    if (total < 0.999) continue; // a body-only bone: keep the head's own weights
     for (let k = 0; k < 4; k += 1) {
-      headIndex.setComponent(vertex, k, mapped[k]?.[0] ?? 0);
-      headWeight.setComponent(vertex, k, mapped[k]?.[1] ?? 0);
+      if (!mapped) {
+        binding.headSkinIndex[i * 4 + k] = headIndex.getComponent(vertex, k);
+        binding.headSkinWeight[i * 4 + k] = headWeight.getComponent(vertex, k);
+      }
+      headIndex.setComponent(vertex, k, binding.bodySkinIndex[i * 4 + k]!);
+      headWeight.setComponent(vertex, k, binding.bodySkinWeight[i * 4 + k]!);
     }
   }
   headIndex.needsUpdate = true;
@@ -568,12 +661,22 @@ export function snapNeckSeam(binding: NeckSeamBinding): void {
     targetNormals.push(n);
   }
 
-  // Boundary vertices: solve rest position = S⁻¹ (target − t) under their own skin.
+  // The added entries take the body's inverse binds as they are now (sliders rebake them).
+  const { bodyEntries } = binding;
+  for (let e = 0; e < bodyEntries.length; e += 2) {
+    const inverse = body.skeleton.boneInverses[bodyEntries[e + 1]!]!;
+    head.skeleton.boneInverses[bodyEntries[e]!]!.copy(inverse);
+  }
+
+  // Boundary vertices: solve rest position = S⁻¹ (target − t). The rings'
+  // offsets are read in the head's own skin frame; the vertex is drawn on the body's.
+  const drawn = new Matrix4();
+  const world = new Vector3();
   for (let i = 0; i < binding.vertices.length; i += 1) {
     if (!binding.onBoundary[i]) continue;
     const vertex = binding.vertices[i]!;
     const slot = binding.slotA[i]!;
-    skinTransform(head, vertex, transform);
+    skinTransformOf(head, binding.headSkinIndex, binding.headSkinWeight, i, transform);
     const e = transform.elements;
     linear.setFromMatrix4(transform).invert();
     target
@@ -582,17 +685,28 @@ export function snapNeckSeam(binding: NeckSeamBinding): void {
       .applyMatrix3(linear);
     for (let c = 0; c < 3; c += 1)
       offsets[slot * 3 + c] = target.getComponent(c) - binding.rest[i * 3 + c]!;
-    const n = seamNormal.copy(targetNormals[slot]!).applyMatrix3(linear).normalize();
-    if (normal && bodyNormal) normal.setXYZ(vertex, n.x, n.y, n.z);
-    // Skirt: the head and body skin the shared edge with their own matrices,
-    // so it never matches to the bit and sub-pixel cracks show the backdrop.
+    // Skirt: the two meshes skin the shared edge in their own shaders, so it
+    // rarely matches to the bit and sub-pixel cracks would show the backdrop.
     // Tuck the head boundary just past the edge and under the body skin.
     if (bodyNormal) {
+      const n = seamNormal.copy(targetNormals[slot]!).applyMatrix3(linear).normalize();
       target
         .addScaledVector(local.fromArray(binding.outward, i * 3), SEAM_SKIRT_OUT)
         .addScaledVector(n, -SEAM_SKIRT_IN);
     }
+    world.copy(target).applyMatrix4(transform);
+    skinTransformOf(head, binding.bodySkinIndex, binding.bodySkinWeight, i, drawn);
+    const d = drawn.elements;
+    linear.setFromMatrix4(drawn).invert();
+    target
+      .copy(world)
+      .sub(local.set(d[12]!, d[13]!, d[14]!))
+      .applyMatrix3(linear);
     position.setXYZ(vertex, target.x, target.y, target.z);
+    if (normal && bodyNormal) {
+      const n = seamNormal.copy(targetNormals[slot]!).applyMatrix3(linear).normalize();
+      normal.setXYZ(vertex, n.x, n.y, n.z);
+    }
   }
   // Rings: the offset of their two boundary neighbours, faded out by the falloff.
   for (let i = 0; i < binding.vertices.length; i += 1) {
