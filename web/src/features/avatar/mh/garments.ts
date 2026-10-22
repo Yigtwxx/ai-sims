@@ -2,6 +2,7 @@ import {
   BufferAttribute,
   Matrix4,
   type Bone,
+  type BufferGeometry,
   type InterleavedBufferAttribute,
   type SkinnedMesh,
 } from 'three';
@@ -68,9 +69,14 @@ export function decodeHideBitset(base64: string, count: number): Uint8Array {
   return flags;
 }
 
+/** The character whose clothes a shared body geometry's mask shows (see applyBodyHide). */
+const hideOwners = new WeakMap<BufferGeometry, SkinnedMesh>();
+
 /**
  * Hides the skin under every worn garment: the union of their masks becomes
  * the body's BODY_HIDDEN attribute, which the body skin shader discards on.
+ * Characters built from one body GLB share its geometry and so this mask: the
+ * character that set it last owns it (see releaseBodyHide).
  */
 export function applyBodyHide(body: SkinnedMesh, masks: readonly Uint8Array[]): void {
   const count = (body.geometry.getAttribute('position') as Attribute).count;
@@ -80,6 +86,17 @@ export function applyBodyHide(body: SkinnedMesh, masks: readonly Uint8Array[]): 
     for (let v = 0; v < count; v += 1) if (mask[v]) hidden[v] = 1;
   }
   body.geometry.setAttribute(BODY_HIDDEN, new BufferAttribute(hidden, 1));
+  hideOwners.set(body.geometry, body);
+}
+
+/**
+ * Clears the mask when a character takes its clothes off on teardown, unless
+ * another character has set it since. A face change dresses the new character
+ * before the old one unmounts; clearing then left the new one's skin showing
+ * through its clothes.
+ */
+export function releaseBodyHide(body: SkinnedMesh): void {
+  if (hideOwners.get(body.geometry) === body) applyBodyHide(body, []);
 }
 
 /** Garment vertices farther than this (m) from the head skin keep their weights. */

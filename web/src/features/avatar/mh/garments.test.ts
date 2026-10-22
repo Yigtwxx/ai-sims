@@ -18,6 +18,7 @@ import {
   decodeHideBitset,
   fitGarmentOverHead,
   layerGarments,
+  releaseBodyHide,
   skinGarmentToHead,
   syncGarmentMorphs,
 } from './garments';
@@ -109,6 +110,23 @@ describe('body hide', () => {
       Uint8Array.from([1, 1]),
     ]);
     expect([...body.mesh.geometry.getAttribute(BODY_HIDDEN).array]).toEqual([1, 0, 1]);
+  });
+
+  it('keeps the mask of the character that dressed after the one torn down', () => {
+    // Characters built from one body GLB share its geometry (SkeletonUtils.clone).
+    const old = rig();
+    const next = new SkinnedMesh(old.mesh.geometry, old.mesh.material);
+    applyBodyHide(old.mesh, [Uint8Array.from([1, 1, 0])]);
+    applyBodyHide(next, [Uint8Array.from([0, 1, 1])]);
+    releaseBodyHide(old.mesh);
+    expect([...next.geometry.getAttribute(BODY_HIDDEN).array]).toEqual([0, 1, 1]);
+  });
+
+  it('clears the mask a character set itself when it is torn down', () => {
+    const body = rig();
+    applyBodyHide(body.mesh, [Uint8Array.from([1, 1, 0])]);
+    releaseBodyHide(body.mesh);
+    expect([...body.mesh.geometry.getAttribute(BODY_HIDDEN).array]).toEqual([0, 0, 0]);
   });
 });
 

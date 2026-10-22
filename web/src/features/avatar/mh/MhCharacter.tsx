@@ -32,7 +32,7 @@ import {
 } from './assembly';
 import { useQuality } from '../quality';
 import { applyEyeMaterials, bindIrisTextures } from './eyeMaterials';
-import { applyBodyHide } from './garments';
+import { applyBodyHide, releaseBodyHide } from './garments';
 import {
   densityFiles,
   packGroomDensity,
@@ -476,7 +476,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   }, [outfits]);
   const wornOutfits = useRef<WornOutfit[]>([]);
   const swapOutfits = useCallback(
-    (next: WornOutfit[]) => {
+    (next: WornOutfit[], release = false) => {
       const body = assembled.handle.body;
       for (const worn of wornOutfits.current) {
         for (const mesh of worn.meshes) {
@@ -493,10 +493,13 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       wornOutfits.current = next;
       layerOutfits(next, body);
       presetSkinnedBounds(assembled.root);
-      applyBodyHide(
-        body.mesh,
-        next.flatMap((worn) => (worn.hide ? [worn.hide] : [])),
-      );
+      // Teardown (release) leaves the shared mask to the character that set it last.
+      if (release) releaseBodyHide(body.mesh);
+      else
+        applyBodyHide(
+          body.mesh,
+          next.flatMap((worn) => (worn.hide ? [worn.hide] : [])),
+        );
       // In the same frame as the garments, so a change never flashes bare skin.
       const worn = new Set(next.map((outfit) => outfit.category));
       const full = worn.has('full');
@@ -507,7 +510,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     },
     [assembled, underwearTop],
   );
-  useEffect(() => () => swapOutfits([]), [swapOutfits]);
+  useEffect(() => () => swapOutfits([], true), [swapOutfits]);
   useEffect(() => {
     if (assembled) setSkinTone(assembled.skins, skinTone);
   }, [assembled, skinTone]);
