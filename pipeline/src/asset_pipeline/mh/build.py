@@ -638,7 +638,7 @@ def _ids(info: dict[str, Any]) -> list[str]:
 
 def _entry_files(entry: dict[str, Any]) -> list[str]:
     """Web files a skin entry names, nested maps (the underwear's) included. Only paths
-    count: the strap colour beside the strap mask is a hex string, not a file."""
+    count: strings without a slash (a hex colour) are not files."""
 
     def walk(value: object) -> Iterator[str]:
         if isinstance(value, str):

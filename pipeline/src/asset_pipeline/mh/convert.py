@@ -426,7 +426,8 @@ def skin_fingerprint(archive: Path, name: str) -> str:
     # v2: face albedo takes the DCC bake in the neck/chest flap and its low frequencies.
     # v3: 2K face cavity; maps whose own recipe did not change are reused (TextureCache).
     # v4: underwear straps are filled from the head's UV island only (no pale wedges).
-    return fingerprint("skin-v4", CharacterSource.find(archive, name).done)
+    # v5: the head's straps carry the bake's grey, normal and coverage (face_underwear).
+    return fingerprint("skin-v5", CharacterSource.find(archive, name).done)
 
 
 def iris_fingerprint(archive: Path, name: str) -> str:

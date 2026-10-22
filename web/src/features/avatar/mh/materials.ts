@@ -52,10 +52,10 @@ export interface SkinTuning {
   bodyHide: boolean;
   /**
    * Draw the underwear over the bare skin where no garment covers it: `cloth`
-   * samples the shared cloth maps (body), `color` paints one colour (the top's
-   * straps on the head, which has no sampler units left for the cloth).
+   * samples the shared cloth maps (body), `straps` the top's straps packed in
+   * one map (the head, which has one sampler unit left).
    */
-  underwear: 'cloth' | 'color' | null;
+  underwear: 'cloth' | 'straps' | null;
 }
 
 export const HEAD_SKIN: SkinTuning = {
@@ -67,7 +67,7 @@ export const HEAD_SKIN: SkinTuning = {
   wrinkles: true,
   groomDensity: true,
   bodyHide: false,
-  underwear: 'color',
+  underwear: 'straps',
 };
 
 export const BODY_SKIN: SkinTuning = {
@@ -190,34 +190,43 @@ const GROOM_SPECULAR = /* glsl */ `
 
 const UNDERWEAR_PARS = /* glsl */ `
 #ifdef MH_UNDERWEAR
-uniform sampler2D skinUnderwearMask;
 uniform vec2 skinUnderwearShow;
-uniform vec3 skinUnderwearColor;
 #endif
 #ifdef MH_UNDERWEAR_CLOTH
+uniform sampler2D skinUnderwearMask;
 uniform sampler2D skinUnderwearAlbedo;
 uniform sampler2D skinUnderwearNormal;
 uniform float skinUnderwearHasNormal;
 #endif
+#ifdef MH_UNDERWEAR_STRAPS
+uniform sampler2D skinUnderwearStraps;
+uniform float skinUnderwearHasStraps;
+#endif
 `;
 // The body albedo is bare skin; the underwear (mask R top, G briefs) is drawn
-// over it only where no garment covers that part (see setUnderwear).
+// over it only where no garment covers that part (see setUnderwear). On the
+// head, the top's straps: R the cloth's grey (sRGB), A its coverage.
 const UNDERWEAR = /* glsl */ `
 #ifdef MH_UNDERWEAR
   float underwear = 0.0;
+  #ifdef MH_UNDERWEAR_STRAPS
+  vec4 underwearStraps = vec4( 0.5, 0.5, 0.5, 0.0 );
+  #endif
   #ifdef USE_MAP
+  #ifdef MH_UNDERWEAR_CLOTH
   vec2 underwearCover = texture2D( skinUnderwearMask, vMapUv ).rg * skinUnderwearShow;
   underwear = max( underwearCover.r, underwearCover.g );
-  #ifdef MH_UNDERWEAR_CLOTH
   vec3 underwearCloth = texture2D( skinUnderwearAlbedo, vMapUv ).rgb;
   #else
-  vec3 underwearCloth = skinUnderwearColor;
+  underwearStraps = texture2D( skinUnderwearStraps, vMapUv );
+  underwear = underwearStraps.a * skinUnderwearShow.x * skinUnderwearHasStraps;
+  vec3 underwearCloth = sRGBTransferEOTF( vec4( underwearStraps.rrr, 1.0 ) ).rgb;
   #endif
   diffuseColor.rgb = mix( diffuseColor.rgb, underwearCloth, underwear );
   #endif
 #endif
 `;
-// The cloth's normal (seams, folds) replaces the bare skin's where it is drawn.
+// The cloth's normal (seams, folds, hems) replaces the bare skin's where it is drawn.
 const UNDERWEAR_NORMAL = /* glsl */ `
   #if defined( MH_UNDERWEAR_CLOTH ) && defined( USE_NORMALMAP_TANGENTSPACE )
   if ( underwear * skinUnderwearHasNormal > 0.0 ) {
@@ -226,17 +235,27 @@ const UNDERWEAR_NORMAL = /* glsl */ `
     mapN = mix( mapN, underwearN, underwear );
   }
   #endif
+  #if defined( MH_UNDERWEAR_STRAPS ) && defined( USE_NORMALMAP_TANGENTSPACE )
+  if ( underwear > 0.0 ) {
+    vec3 strapN = vec3( underwearStraps.gb * 2.0 - 1.0, 0.0 );
+    strapN.z = sqrt( saturate( 1.0 - dot( strapN.xy, strapN.xy ) ) );
+    strapN.xy *= normalScale;
+    mapN = mix( mapN, strapN, underwear );
+  }
+  #endif
 `;
 
 /** Underwear inputs of a skin; textures arrive with the skin set. */
 export interface UnderwearUniforms {
   skinUnderwearMask: { value: Texture | null };
-  /** Linear cloth colour where there are no cloth maps (the head's straps). */
-  skinUnderwearColor: { value: Color };
   skinUnderwearAlbedo: { value: Texture | null };
   skinUnderwearNormal: { value: Texture | null };
   /** 1 once the cloth normal is bound. */
   skinUnderwearHasNormal: { value: number };
+  /** The head's packed straps (see UNDERWEAR). */
+  skinUnderwearStraps: { value: Texture | null };
+  /** 1 once the straps are bound (a man's skin has none). */
+  skinUnderwearHasStraps: { value: number };
   /** Shown parts: x the top, y the briefs (0 or 1). */
   skinUnderwearShow: { value: Vector2 };
 }
@@ -336,10 +355,11 @@ export function createSkinMaterial(
   const underwear: UnderwearUniforms | null = tuning.underwear
     ? {
         skinUnderwearMask: { value: null },
-        skinUnderwearColor: { value: new Color(0.25, 0.25, 0.25) },
         skinUnderwearAlbedo: { value: null },
         skinUnderwearNormal: { value: null },
         skinUnderwearHasNormal: { value: 0 },
+        skinUnderwearStraps: { value: null },
+        skinUnderwearHasStraps: { value: 0 },
         skinUnderwearShow: { value: new Vector2(0, 0) },
       }
     : null;
@@ -349,6 +369,7 @@ export function createSkinMaterial(
     ...(tuning.bodyHide ? { MH_BODY_HIDE: '' } : {}),
     ...(underwear ? { MH_UNDERWEAR: '' } : {}),
     ...(tuning.underwear === 'cloth' ? { MH_UNDERWEAR_CLOTH: '' } : {}),
+    ...(tuning.underwear === 'straps' ? { MH_UNDERWEAR_STRAPS: '' } : {}),
   };
   material.userData.skinUniforms = uniforms;
   material.userData.wrinkleUniforms = wrinkles;

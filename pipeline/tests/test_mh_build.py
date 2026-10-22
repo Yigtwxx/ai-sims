@@ -137,12 +137,12 @@ def test_grooms_take_the_curated_gender_or_keep_their_own() -> None:
     assert with_compat(beard) == beard
 
 
-def test_skin_outputs_include_the_nested_underwear_maps_but_not_the_strap_colour() -> None:
+def test_skin_outputs_include_the_nested_underwear_maps() -> None:
     entry = {
         "face": {
             "albedo": "skins/Ada/face_albedo.ktx2",
             "wrinkleMasks": ["skins/masks/m/wm1.ktx2"],
-            "underwear": {"mask": "skins/Ada/face_underwear.ktx2", "color": "#7a7a7a"},
+            "underwear": {"straps": "skins/Ada/face_underwear.ktx2"},
         },
         "body": {
             "albedo": "skins/Ada/body_albedo.ktx2",

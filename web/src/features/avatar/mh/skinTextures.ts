@@ -1,5 +1,4 @@
 import {
-  Color,
   RepeatWrapping,
   SRGBColorSpace,
   TextureLoader,
@@ -25,8 +24,8 @@ import { WRINKLE_MASK_LAYERS } from './wrinkles';
 
 export interface SkinTextures {
   face: {
-    /** The underwear top's straps where the head reaches the shoulders. */
-    underwear: { mask: Texture; color: Color } | null;
+    /** The underwear top's straps on the head's chest flap (packed, see materials.ts). */
+    straps: Texture | null;
     albedo: Texture;
     normal: Texture;
     srmf: Texture | null;
@@ -155,15 +154,10 @@ export async function loadSkinTextures(
           optional(renderer, skin.body.underwear.normal, 'data'),
         ]).then(([mask, albedo, normal]) => ({ mask, albedo, normal }))
       : Promise.resolve(null),
-    face.underwear
-      ? loadTexture(renderer, face.underwear.mask, 'data').then((mask) => ({
-          mask,
-          color: new Color(face.underwear!.color),
-        }))
-      : Promise.resolve(null),
+    optional(renderer, face.underwear?.straps, 'data'),
   ]);
   return {
-    face: { albedo, normal, srmf, cavity, wrinkleNormals, underwear: straps },
+    face: { albedo, normal, srmf, cavity, wrinkleNormals, straps },
     body: {
       albedo: bodyAlbedo,
       normal: bodyNormal,
@@ -206,10 +200,8 @@ export function bindSkinTextures(materials: readonly Material[], textures: SkinT
     uniforms.skinCavityStrength.value = set.cavity ? CAVITY_STRENGTH : 0;
     const underwear = skin.userData.underwearUniforms as UnderwearUniforms | null | undefined;
     if (underwear && isHead) {
-      underwear.skinUnderwearMask.value = textures.face.underwear?.mask ?? null;
-      // Color(hex) is sRGB in, linear out under three's colour management.
-      if (textures.face.underwear)
-        underwear.skinUnderwearColor.value.copy(textures.face.underwear.color);
+      underwear.skinUnderwearStraps.value = textures.face.straps;
+      underwear.skinUnderwearHasStraps.value = textures.face.straps ? 1 : 0;
     } else if (underwear) {
       underwear.skinUnderwearMask.value = textures.body.underwear?.mask ?? null;
       underwear.skinUnderwearAlbedo.value = textures.body.underwear?.albedo ?? null;

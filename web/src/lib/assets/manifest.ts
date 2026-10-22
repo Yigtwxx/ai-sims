@@ -54,10 +54,11 @@ const FaceMapsSchema = z.object({
   wrinkleNormal: z.array(File).max(3).default([]),
   wrinkleMasks: z.array(File).default([]),
   /**
-   * The underwear top's straps where the head reaches the shoulders: a mask
-   * (R) and the cloth colour, drawn with the body's top.
+   * The underwear top's straps where the head reaches the shoulders, drawn
+   * with the body's top: one map, R the cloth's grey (sRGB), G and B its
+   * tangent normal (x, y), A its coverage.
    */
-  underwear: z.object({ mask: File, color: Hex }).optional(),
+  underwear: z.object({ straps: File }).optional(),
 });
 
 const BodyMapsSchema = z.object({

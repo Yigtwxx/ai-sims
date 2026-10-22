@@ -41,7 +41,7 @@ describe('skin gender', () => {
       id: 'skin.Grace',
       face: {
         ...manifest.skins[0]!.face,
-        underwear: { mask: 'skins/Grace/face_underwear.ktx2', color: '#7b7a7b' },
+        underwear: { straps: 'skins/Grace/face_underwear.ktx2' },
       },
     });
     const bare = faceless(manifest, { id: 'skin.Bo' });

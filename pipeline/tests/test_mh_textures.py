@@ -25,7 +25,7 @@ from asset_pipeline.mh.textures import (
     push_pull_fill,
     skin_tone,
     srgb_to_linear,
-    strap_mask,
+    strap_map,
     underwear_texels,
 )
 
@@ -248,20 +248,54 @@ def test_find_straps_takes_grey_cloth_in_the_flap_only() -> None:
     flap[44:, :] = True
     straps = find_straps(albedo, flap)
     assert straps is not None
-    assert straps.texels[50:56, 10:20].all()
-    assert not straps.texels[5:10, 10:20].any()
-    np.testing.assert_allclose(
-        straps.color, srgb_to_linear(np.array([128, 128, 128]))[0], atol=1e-3
-    )
+    assert straps[50:56, 10:20].all()
+    assert not straps[5:10, 10:20].any()
     albedo[50:56, 10:20] = (150, 100, 80)
     assert find_straps(albedo, flap) is None
 
 
-def test_strap_mask_averages_down_to_soft_edges() -> None:
-    texels = np.zeros((8, 8), dtype=bool)
-    texels[0:2, 0:2] = True
-    texels[0:2, 2:3] = True
-    mask = strap_mask(texels, 4)
-    assert mask.shape == (4, 4, 3)
-    assert mask[0, 0, 0] == 255 and mask[0, 1, 0] == 128 and mask[2, 2, 0] == 0
-    assert not mask[..., 1:].any()
+SKIN = (150, 100, 80)
+STRAP_NORMAL = np.array([0.3, 0.2, np.sqrt(1 - 0.13)])
+
+
+def _bake_with_strap(size: int = 64) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """A DCC head bake: skin with a grey strap (rows 50-55) in the flap (rows 44 on), a hem
+    row half skin half cloth (in linear light) under it, and the strap's own normal."""
+    albedo = np.empty((size, size, 3), dtype=np.uint8)
+    albedo[:] = SKIN
+    albedo[50:56, 10:20] = (128, 128, 128)
+    hem = 0.5 * srgb_to_linear(np.array(SKIN, dtype=np.uint8))
+    albedo[56, 10:20] = linear_to_srgb(hem + 0.5 * srgb_to_linear(np.array([128] * 3, np.uint8)))
+    albedo[5:10, 10:20] = (128, 128, 128)  # grey outside the flap (not underwear)
+    normal = np.full((size, size, 3), (128, 128, 255), dtype=np.uint8)
+    normal[50:57, 10:20] = np.round(STRAP_NORMAL * 127.5 + 127.5).astype(np.uint8)
+    flap = np.zeros((size, size), dtype=bool)
+    flap[44:, :] = True
+    return albedo, normal, flap, np.ones((size, size), dtype=bool)
+
+
+def test_strap_map_packs_the_cloth_grey_normal_and_coverage() -> None:
+    packed = strap_map(*_bake_with_strap())
+    assert packed is not None and packed.shape == (64, 64, 4)
+    strap_xy = np.round(STRAP_NORMAL[:2] * 127.5 + 127.5)
+    assert packed[52, 15, 3] == 255, "solid cloth is fully covered"
+    assert packed[52, 15, 0] == 128, f"cloth grey {packed[52, 15, 0]}"
+    np.testing.assert_allclose(packed[52, 15, 1:3], strap_xy, atol=1)
+    assert abs(int(packed[56, 15, 3]) - 128) <= 8, f"hem coverage {packed[56, 15, 3]}"
+
+
+def test_strap_map_spreads_the_cloth_past_the_hem_only_nearby() -> None:
+    packed = strap_map(*_bake_with_strap())
+    assert packed is not None
+    strap_xy = np.round(STRAP_NORMAL[:2] * 127.5 + 127.5)
+    assert packed[59, 15, 3] == 0, "skin past the hem is not covered"
+    np.testing.assert_allclose(packed[59, 15, 1:3], strap_xy, atol=2)
+    assert packed[59, 15, 0] == 128, "filtering at the hem reads cloth, not skin"
+    assert packed[20, 40, 3] == 0 and tuple(packed[20, 40, 1:3]) == (128, 128), "far: flat"
+    assert not packed[5:10, 10:20, 3].any(), "grey outside the flap is not a strap"
+
+
+def test_strap_map_is_none_without_straps() -> None:
+    albedo, normal, flap, island = _bake_with_strap()
+    albedo[44:] = SKIN
+    assert strap_map(albedo, normal, flap, island) is None
