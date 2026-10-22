@@ -32,14 +32,14 @@ export const ARM_RELAX = 30 * DEG;
 
 /**
  * Lowered from the bind pose, the palms face forward and show their light
- * skin; relaxed hands face the thighs. The forearm pronates like a real one:
- * none at the elbow, the twist bones by where they sit along it (1/3, 2/3),
- * the hand fully.
+ * skin; relaxed hands face the thighs. The forearm pronates toward the
+ * wrist: none at the elbow or the elbow-side twist bone, half at the
+ * wrist-side one, the hand fully. Twisting the elbow-side bone sheared
+ * sleeves that end there (a 3/4 sleeve's hem crumpled and the arm looked kinked).
  */
 export const PRONATION = 45 * DEG;
 const FOREARM_TWIST: readonly (readonly [string, number])[] = [
-  ['lowerarm_twist_02', 1 / 3],
-  ['lowerarm_twist_01', 2 / 3],
+  ['lowerarm_twist_01', 1 / 2],
   ['hand', 1],
 ];
 

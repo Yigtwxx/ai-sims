@@ -47,6 +47,19 @@ describe('idlePose', () => {
     }
   });
 
+  it('pronates toward the wrist and leaves the elbow-side twist bone alone', () => {
+    // Twisting lowerarm_twist_02 shears sleeves whose hem sits near the elbow.
+    const twist = (bone: string) =>
+      idlePose({ t: 0, mode: 'idle' })
+        .filter((r) => r.bone === bone && r.axis === 'twist')
+        .reduce((sum, r) => sum + r.angle, 0);
+    for (const side of ['l', 'r']) {
+      expect(twist(`lowerarm_twist_02_${side}`)).toBe(0);
+      expect(twist(`lowerarm_twist_01_${side}`)).toBeCloseTo(PRONATION / 2);
+      expect(twist(`hand_${side}`)).toBeCloseTo(PRONATION);
+    }
+  });
+
   it('is a pure function of its input', () => {
     expect(idlePose({ t: 4.2, mode: 'speaking', loudness: 0.5 })).toEqual(
       idlePose({ t: 4.2, mode: 'speaking', loudness: 0.5 }),
