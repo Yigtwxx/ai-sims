@@ -386,7 +386,10 @@
       "authored": "Orijinal",
       "params": {
         "PrimaryColor": "Ana renk",
-        "SecondaryColor": "İkincil renk"
+        "SecondaryColor": "İkincil renk",
+        "DetailColor": "Detay rengi",
+        "AccentColor": "Aksesuar rengi",
+        "piece": "{piece}. parça: {name}"
       },
       "fullReplaces": "Tek parça kıyafet, üst ve altın yerine geçer.",
       "empty": "Bu bölümde bu taban için kıyafet yok.",

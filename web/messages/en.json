@@ -386,7 +386,10 @@
       "authored": "Original",
       "params": {
         "PrimaryColor": "Main colour",
-        "SecondaryColor": "Secondary colour"
+        "SecondaryColor": "Secondary colour",
+        "DetailColor": "Detail colour",
+        "AccentColor": "Accent colour",
+        "piece": "Piece {piece}: {name}"
       },
       "fullReplaces": "A one-piece outfit replaces the top and bottom.",
       "empty": "No clothes in this section for this base.",

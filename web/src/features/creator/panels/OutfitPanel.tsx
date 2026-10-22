@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { OUTFIT_CATEGORIES, type OutfitCategory } from '@/lib/assets/manifest';
 
 import { GARMENT_COLORS } from '../palettes';
+import { colorParamLabels } from '../outfitParams';
 import { outfitsFor } from '../reconcile';
 import { thumbnailSrc } from '../useMhManifest';
 import { OptionGrid, OptionTile } from '../ui/OptionGrid';
@@ -57,8 +58,12 @@ export function OutfitPanel({ manifest, slot, onSlotChange }: OutfitPanelProps) 
     );
   }
 
-  const paramLabel = (name: string) =>
-    name === 'PrimaryColor' || name === 'SecondaryColor' ? t(`params.${name}`) : name;
+  const paramLabels = colorParamLabels(colorParams.map((param) => param.name));
+  const paramLabel = (index: number) => {
+    const { key, piece } = paramLabels[index] ?? { key: null, piece: null };
+    const name = key ? t(`params.${key}`) : (colorParams[index]?.name ?? '');
+    return piece ? t('params.piece', { piece, name }) : name;
+  };
 
   return (
     <>
@@ -130,10 +135,10 @@ export function OutfitPanel({ manifest, slot, onSlotChange }: OutfitPanelProps) 
 
       {outfit && item
         ? colorParams.map((param, index) => (
-            <Section key={param.name} title={paramLabel(param.name)}>
+            <Section key={param.name} title={paramLabel(index)}>
               {index === 0 ? <Hint>{t('colorsHint')}</Hint> : null}
               <SwatchPicker
-                label={paramLabel(param.name)}
+                label={paramLabel(index)}
                 size="sm"
                 noneLabel={t('authored')}
                 colors={GARMENT_COLORS.map((color) => ({
