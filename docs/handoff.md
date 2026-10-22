@@ -52,7 +52,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 ### Dönüştürücü (`asset-pipeline mh-convert`, `pipeline/src/asset_pipeline/mh/`)
 
 - Komut `--all` ile artımlı çalışır; yalnızca değişen ya da yeni gelen birimleri çevirir. Çıktı `MetaHumanArchive/web/`.
-- **Manifest v2** (`generatedAt` 2026-10-21T20:26Z, prune sonrası): 19 yüz, 20 cilt, 2 vücut, 49 groom, 24 kıyafet, 22 iris, 10 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
+- **Manifest v2** (`generatedAt` 2026-10-22T07:56Z, prune sonrası): 19 yüz, 20 cilt, 2 vücut, 49 groom, 24 kıyafet, 22 iris, 9 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
 - **Kürasyon:** `raw/pruned.json` silinmiş 115 id'yi tutar; `web/curation.json` 191 id'yi gizler. Elenen yüzler: Bo, Bruce, Grace, Jorge, Lani, Lorenzo, Orlando, Sook-ja, Walter.
 - Sıkıştırma:
   - Kendi meshopt encoder'ı; vertex sırası ve IBM'ler korunur.
@@ -179,7 +179,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - **Topuzda arka kafada çıplak kafa derisi** (`grooms.py`): `density` yalnız kart köklerinden geliyordu; topuzun kökleri saç çizgisinde kaldığı için tepe ve arka boyanmıyordu. Artık Unreal `baked` haritasının örtüsüyle birleşiyor (`groom_density`). `baked`'i olan 12 saç yeniden dönüştürüldü; sakal ve bıyıkların `baked`'i yok, değişmedi.
   - **Kazaktan taşan cilt** (`garments.ts`, `MhCharacter.tsx`): aynı gövde GLB'sinden kurulan karakterler gövde geometrisini, dolayısıyla `bodyHidden` maskesini paylaşıyor. Yüz değişince eski karakter kaldırılırken maskeyi sıfırlıyordu; yeni karakterin cildi kıyafetin altından görünür kalıyor, jestte omuzdan taşıyordu. Kaldırma artık yalnız maskeyi son yazan karakterse temizliyor (`releaseBodyHide`).
 - Bilinen notlar:
-  - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla `curation.json`'da gizlendi. Kalan 3 sakin idle (relax, listening, shibuya) tam gövdeyi sürmeye yetiyor. Kalıcı silme planı: `mh-prune --apply --plan f86f4cfc26` (yalnız bu klip, 0.01 GB).
+  - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). Kalan 3 sakin idle (relax, listening, shibuya) tam gövdeyi sürmeye yetiyor.
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
   - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
