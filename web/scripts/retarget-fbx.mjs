@@ -11,7 +11,9 @@
  * pose instead, so the body stands as upright as the bind pose on average.
  * Bones the source does not animate keep their rest pose; pelvis translation
  * is scaled by the ratio of hip heights. This is the FK part of what Unreal's
- * IK Retargeter does, sufficient for idles and gestures (no foot IK).
+ * IK Retargeter does, sufficient for idles and gestures. A leg IK pass then
+ * stands the character on straighter knees and brings down a foot the copied
+ * angles leave hovering over the floor (see STANCE_KNEE and HOVER).
  *
  * Usage: node scripts/retarget-fbx.mjs --target <body.glb> --out <dir> [--role idle|talk|listen] <clip.fbx>...
  * The role (default idle) is what the character uses the clips for: idling,
@@ -220,8 +222,8 @@ function footContacts(byName) {
     if (!foot || !ball) return [];
     const heel = worldPosition(byName.get(`ankle_bck_${side}`) ?? foot).setY(0);
     return [
-      { joint: ball, local: new Vector3(), rest: worldPosition(ball).y },
-      { joint: foot, local: foot.worldToLocal(heel), rest: 0 },
+      { side, joint: ball, local: new Vector3(), rest: worldPosition(ball).y },
+      { side, joint: foot, local: foot.worldToLocal(heel), rest: 0 },
     ];
   });
 }
@@ -263,6 +265,117 @@ function toeLift({ ball, local }) {
   // Horizontal, across the toes: turning about it raises a forward reach.
   toeAxis.set(-reach.z, 0, reach.x).normalize();
   return new Quaternion().setFromAxisAngle(toeAxis, angle);
+}
+
+/**
+ * Standing knees, in degrees. Mocap actors often stand on soft knees: in
+ * `listening` the weight-bearing leg bends 20° and the other 33°, so the
+ * character stood half crouched. The straighter leg's typical bend comes down
+ * to STANCE_KNEE as the pelvis rises, the feet staying where they stand. IK
+ * straightens no knee past KNEE_MIN: near full extension a millimetre of reach
+ * turns the knee by degrees, so mocap noise would make it twitch.
+ */
+const STANCE_KNEE = 8;
+const KNEE_MIN = 6;
+/**
+ * A foot that typically stands this far (m) or more above where the actor's
+ * does comes down by that height for the whole take: leg proportions left
+ * `listening`'s left foot 1.5 cm in the air. Smaller gaps are mocap noise.
+ */
+const HOVER = 0.005;
+
+/** Knee bend of a leg (degrees): the angle between its thigh and shin. */
+function kneeBend({ thigh, calf, foot }) {
+  const knee = worldPosition(calf);
+  return knee.clone().sub(worldPosition(thigh)).angleTo(worldPosition(foot).sub(knee)) * DEG;
+}
+
+/**
+ * Per frame, how far a foot stands above its lowest in the take: the lower of
+ * its ankle's and ball's rises, so a heel lifted over a planted ball is 0.
+ */
+function footRises({ ankle, ball }) {
+  const ankleLow = Math.min(...ankle);
+  const ballLow = Math.min(...ball);
+  return ankle.map((height, i) => Math.min(height - ankleLow, ball[i] - ballLow));
+}
+
+const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
+/** A target leg for the stance pass: joints, bone lengths, floor contacts. Call at rest. */
+function stanceLeg(byName, side, contacts) {
+  const [thigh, calf, foot] = ['thigh', 'calf', 'foot'].map((bone) =>
+    byName.get(`${bone}_${side}`),
+  );
+  return {
+    side,
+    thigh,
+    calf,
+    foot,
+    upper: worldPosition(calf).distanceTo(worldPosition(thigh)),
+    lower: worldPosition(foot).distanceTo(worldPosition(calf)),
+    contacts: contacts.filter((contact) => contact.side === side),
+  };
+}
+
+/** Hip-to-ankle distance of a leg whose knee bends `degrees`. */
+const legReach = ({ upper, lower }, degrees) =>
+  Math.sqrt(upper ** 2 + lower ** 2 + 2 * upper * lower * Math.cos(degrees / DEG));
+
+/** Knee bend (degrees) of a leg whose hip and ankle are `distance` apart. */
+function legBend({ upper, lower }, distance) {
+  const cos = (distance ** 2 - upper ** 2 - lower ** 2) / (2 * upper * lower);
+  return Math.acos(Math.min(1, Math.max(-1, cos))) * DEG;
+}
+
+/** How far a hip `offset` from its ankle (hip - ankle) must rise to end `distance` from it. */
+function hipRise(offset, distance) {
+  const across = Math.hypot(offset.x, offset.z);
+  return distance > across ? Math.sqrt(distance ** 2 - across ** 2) - offset.y : -Infinity;
+}
+
+const legAxis = new Vector3();
+const legPole = new Vector3();
+
+/**
+ * Two-bone IK: turns the thigh and calf so the ankle reaches `ankle`, the knee
+ * bending in the plane it bends in now, and keeps the foot's world turn. The
+ * knee ends no straighter than KNEE_MIN, or than now if it already is. Writes
+ * the three local rotations to `rotations` at `frame`.
+ */
+function standOn(leg, ankle, rotations, frame) {
+  const { thigh, calf, foot, upper, lower } = leg;
+  const hip = worldPosition(thigh);
+  const knee = worldPosition(calf);
+  const ankleNow = worldPosition(foot);
+  legAxis.copy(ankle).sub(hip);
+  const straightest = Math.max(legReach(leg, KNEE_MIN), ankleNow.distanceTo(hip));
+  const distance = Math.min(legAxis.length(), straightest);
+  legAxis.normalize();
+  legPole.copy(knee).sub(hip);
+  legPole.addScaledVector(legAxis, -legPole.dot(legAxis)).normalize();
+  const cos = (upper ** 2 + distance ** 2 - lower ** 2) / (2 * upper * distance);
+  const kneeTo = hip
+    .clone()
+    .addScaledVector(legAxis, upper * cos)
+    .addScaledVector(legPole, upper * Math.sqrt(Math.max(0, 1 - cos ** 2)));
+  const ankleTo = hip.clone().addScaledVector(legAxis, distance);
+  const footWorld = worldQuaternion(foot);
+  const thighWorld = new Quaternion()
+    .setFromUnitVectors(knee.clone().sub(hip).normalize(), kneeTo.clone().sub(hip).normalize())
+    .multiply(worldQuaternion(thigh));
+  const calfWorld = new Quaternion()
+    .setFromUnitVectors(ankleNow.sub(knee).normalize(), ankleTo.sub(kneeTo).normalize())
+    .multiply(worldQuaternion(calf));
+  for (const [joint, world] of [
+    [thigh, thighWorld],
+    [calf, calfWorld],
+    [foot, footWorld],
+  ]) {
+    joint.quaternion.copy(worldQuaternion(joint.parent).invert().multiply(world));
+    joint.updateMatrixWorld(true);
+    joint.quaternion.toArray(rotations.get(joint.name), frame * 4);
+  }
 }
 
 /** Average of unit quaternions near one another: their sign-aligned sum, normalised. */
@@ -447,13 +560,29 @@ function retarget(source, target, fps) {
       .applyQuaternion(align)
       .multiplyScalar(scale);
 
-  // Pass 1: where the actor stands and faces during the take, and its average
-  // axial pose (see AXIAL). Takes start wherever the calibration pose was held,
-  // so each clip is turned to face forward on average and centred over the
-  // rest position.
+  // Legs both skeletons carry, for the stance pass (see STANCE_KNEE).
+  const mappedNames = new Set(mapped.map((joint) => joint.name));
+  const legSides = ['l', 'r'].every((side) =>
+    ['thigh', 'calf', 'foot'].every((bone) => mappedNames.has(`${bone}_${side}`)),
+  )
+    ? ['l', 'r']
+    : [];
+  const sourceLegs = legSides.map((side) => {
+    const [thigh, calf, foot] = ['thigh', 'calf', 'foot'].map((bone) =>
+      source.byName.get(`${bone}_${side}`),
+    );
+    return { side, thigh, calf, foot, ball: source.byName.get(`ball_${side}`) ?? foot };
+  });
+
+  // Pass 1: where the actor stands and faces during the take, its average
+  // axial pose (see AXIAL), how its knees bend and how high its feet stand.
+  // Takes start wherever the calibration pose was held, so each clip is turned
+  // to face forward on average and centred over the rest position.
   const axialPoses = new Map(
     mapped.filter((joint) => AXIAL.test(joint.name)).map((joint) => [joint.name, []]),
   );
+  const standingBends = [];
+  const footHeights = new Map(legSides.map((side) => [side, { ankle: [], ball: [] }]));
   const yaws = [];
   let sin = 0;
   let cos = 0;
@@ -464,9 +593,24 @@ function retarget(source, target, fps) {
     sin += Math.sin(yaw / DEG);
     cos += Math.cos(yaw / DEG);
     for (const [name, poses] of axialPoses) poses.push(worldQuaternion(source.byName.get(name)));
+    if (sourceLegs.length === 0) continue;
+    standingBends.push(Math.min(...sourceLegs.map(kneeBend)));
+    for (const { side, foot, ball } of sourceLegs) {
+      footHeights.get(side).ankle.push(worldPosition(foot).dot(sourceUp));
+      footHeights.get(side).ball.push(worldPosition(ball).dot(sourceUp));
+    }
   }
   const axialMeanInverse = new Map(
     [...axialPoses].map(([name, poses]) => [name, meanQuaternion(poses).invert()]),
+  );
+  // The legs copy the actor's directions, so the target's knees bend as its do.
+  const straighten =
+    standingBends.length > 0 ? Math.max(0, median(standingBends) - STANCE_KNEE) : 0;
+  const footLifts = new Map(
+    [...footHeights].map(([side, heights]) => [
+      side,
+      footRises(heights).map((rise) => rise * scale),
+    ]),
   );
   const meanYaw = Math.atan2(sin, cos) * DEG;
   const facing = new Quaternion().setFromAxisAngle(UP, -meanYaw / DEG);
@@ -504,6 +648,11 @@ function retarget(source, target, fps) {
   const headJoint = target.byName.get('head');
   const contacts = footContacts(target.byName);
   const toes = toeTips(target.byName);
+  const stance = legSides
+    .map((side) => stanceLeg(target.byName, side, contacts))
+    .filter((leg) => leg.contacts.length > 0);
+  // Per frame, how high each foot's lowest point stands once the feet are planted.
+  const hovers = new Map(stance.map(({ side }) => [side, new Float32Array(frames)]));
   let handsUp = 0;
   let crossed = 0;
   let handsFront = 0;
@@ -576,6 +725,47 @@ function retarget(source, target, fps) {
     stats.floor = [Math.min(stats.floor[0], lowest), Math.max(stats.floor[1], lowest)];
     moved.y -= lowest;
     pose();
+    for (const leg of stance) {
+      hovers.get(leg.side)[frame] = Math.min(...leg.contacts.map(contactHeight));
+    }
+  }
+
+  // How far each foot comes down (see HOVER): its typical height above the actor's.
+  const lowering = new Map(
+    stance.map(({ side }) => {
+      const rises = footLifts.get(side);
+      const gap = median([...hovers.get(side)].map((hover, frame) => hover - rises[frame]));
+      return [side, gap > HOVER ? gap : 0];
+    }),
+  );
+
+  // Pass 3, on the keys of pass 2: stand on straighter knees, keep the toes
+  // above the floor, and measure the clip.
+  for (let frame = 0; frame < frames; frame += 1) {
+    for (const [name, values] of rotations) {
+      target.byName.get(name).quaternion.fromArray(values, frame * 4);
+    }
+    targetPelvis.position.fromArray(pelvisPositions, frame * 3);
+    targetTop.updateMatrixWorld(true);
+    // Each foot comes down by its lowering, never through the floor; the
+    // pelvis rises until the straighter leg bends `straighten` degrees less
+    // (see STANCE_KNEE), and IK bends both knees to reach the feet.
+    if (stance.length === 2) {
+      const goals = stance.map((leg) => {
+        const height = Math.min(...leg.contacts.map(contactHeight));
+        const drop = Math.min(height, lowering.get(leg.side));
+        const ankle = worldPosition(leg.foot).addScaledVector(UP, -drop);
+        const hip = worldPosition(leg.thigh);
+        const bend = Math.max(KNEE_MIN, legBend(leg, ankle.distanceTo(hip)) - straighten);
+        return { leg, ankle, rise: hipRise(hip.sub(ankle), legReach(leg, bend)) };
+      });
+      const rise = Math.max(0, Math.min(...goals.map((goal) => goal.rise)));
+      const pelvisWorld = worldPosition(targetPelvis).addScaledVector(UP, rise);
+      targetPelvis.position.copy(targetPelvis.parent.worldToLocal(pelvisWorld));
+      targetPelvis.position.toArray(pelvisPositions, frame * 3);
+      targetTop.updateMatrixWorld(true);
+      for (const { leg, ankle } of goals) standOn(leg, ankle, rotations, frame);
+    }
     // Toes bend on the floor rather than pass through it: the take's toe
     // joint (mocap noise, or a heel lifting over the ball) can put the tips
     // below it. Turn the toes up about the ball until the tips touch.
