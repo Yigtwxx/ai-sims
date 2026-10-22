@@ -61,6 +61,32 @@ export function syncGarmentMorphs(garment: SkinnedMesh, body: BodyRig): void {
   }
 }
 
+/** A sole is this many vertices lying within SOLE_FLAT (m) of the lowest of them. */
+const SOLE_VERTICES = 12;
+const SOLE_FLAT = 0.002;
+
+/**
+ * How far a garment reaches under the floor (y = 0 in bind space, where the
+ * bare soles rest), in metres; 0 when it stays above it. Footwear is fitted
+ * around the bare foot, so its sole lies 2-3.5 cm under the floor: the
+ * character stands up by this much, or the shoes sink into the platform. A
+ * few stray vertices lower down (on the female Oxfords, 1.6 cm under the
+ * sole) do not count: a sole is many vertices lying together.
+ */
+export function soleDepth(geometry: BufferGeometry): number {
+  const position = geometry.getAttribute('position') as Attribute;
+  const below: number[] = [];
+  for (let v = 0; v < position.count; v += 1) {
+    const y = position.getY(v);
+    if (y < 0) below.push(y);
+  }
+  below.sort((a, b) => a - b);
+  for (let i = 0; i + SOLE_VERTICES <= below.length; i += 1) {
+    if (below[i + SOLE_VERTICES - 1]! - below[i]! <= SOLE_FLAT) return -below[i]!;
+  }
+  return 0;
+}
+
 /** Decodes a base64 bitset (bit v of byte v >> 3, LSB first) into one flag per vertex. */
 export function decodeHideBitset(base64: string, count: number): Uint8Array {
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));

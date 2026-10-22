@@ -10,7 +10,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import type { Camera, Material, Mesh, Object3D, Scene, WebGLRenderTarget } from 'three';
+import type { Camera, Group, Material, Mesh, Object3D, Scene, WebGLRenderTarget } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
@@ -475,6 +475,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     latestOutfits.current = outfits;
   }, [outfits]);
   const wornOutfits = useRef<WornOutfit[]>([]);
+  // Lifts the character onto its shoes' soles (the bare feet stand on the floor).
+  const stand = useRef<Group>(null);
   const swapOutfits = useCallback(
     (next: WornOutfit[], release = false) => {
       const body = assembled.handle.body;
@@ -491,6 +493,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         body.garments.push(...worn.meshes);
       }
       wornOutfits.current = next;
+      // In the same frame as the shoes, so they never show sunk into the floor.
+      if (stand.current) stand.current.position.y = Math.max(0, ...next.map((worn) => worn.sole));
       layerOutfits(next, body);
       presetSkinnedBounds(assembled.root);
       // Teardown (release) leaves the shared mask to the character that set it last.
@@ -586,7 +590,13 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     }
   });
 
-  return <primitive object={assembled.root} />;
+  return (
+    // A parent, like the turntable: skinned meshes bound later keep their bind
+    // matrices valid however far it lifts the character.
+    <group ref={stand}>
+      <primitive object={assembled.root} />
+    </group>
+  );
 });
 
 /** Quiet period (ms) after the last slider change before the clothes are layered again. */

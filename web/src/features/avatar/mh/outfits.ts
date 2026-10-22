@@ -26,6 +26,7 @@ import {
   fitGarmentOverHead,
   layerGarments,
   skinGarmentToHead,
+  soleDepth,
   syncGarmentMorphs,
 } from './garments';
 import type { Rgb } from './hairColor';
@@ -48,6 +49,8 @@ export interface WornOutfit {
   fabrics: Map<string, FabricMaterial>;
   /** Body vertices the garment covers (null: hides nothing). */
   hide: Uint8Array | null;
+  /** How far its soles reach under the floor (m); 0 for anything but footwear. */
+  sole: number;
   dispose(): void;
 }
 
@@ -180,6 +183,7 @@ export async function wearOutfit(
     meshes,
     fabrics,
     hide: bitset ? decodeHideBitset(bitset, bodyVertices) : null,
+    sole: Math.max(0, ...meshes.map((mesh) => soleDepth(mesh.geometry))),
     dispose() {
       for (const mesh of meshes) mesh.geometry.dispose();
       for (const fabric of fabrics.values()) fabric.material.dispose();

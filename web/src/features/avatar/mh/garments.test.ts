@@ -20,6 +20,7 @@ import {
   layerGarments,
   releaseBodyHide,
   skinGarmentToHead,
+  soleDepth,
   syncGarmentMorphs,
 } from './garments';
 
@@ -407,5 +408,39 @@ describe('layerGarments', () => {
     const trousers = garmentOf(rig, [[0.07, 0.8]]);
     expect(layerGarments([shirt], [trousers], rig.mesh)).toBe(0);
     expect(radius(shirt, 0)).toBeCloseTo(0.09, 6);
+  });
+});
+
+describe('soleDepth', () => {
+  /** A garment geometry with vertices at these heights (bind space, floor at y = 0). */
+  const heights = (ys: number[]) => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new BufferAttribute(Float32Array.from(ys.flatMap((y, i) => [i * 0.001, y, 0])), 3),
+    );
+    return geometry;
+  };
+  /** A flat sole: `count` vertices spread over the millimetre above `bottom`. */
+  const sole = (bottom: number, count = 40) =>
+    Array.from({ length: count }, (_, i) => bottom + (i / count) * 0.001);
+
+  it('is the depth of a flat sole under the floor', () => {
+    expect(soleDepth(heights([...sole(-0.0246), 0.03, 0.05]))).toBeCloseTo(0.0246, 6);
+  });
+
+  it('is zero for a garment that stays above the floor', () => {
+    expect(soleDepth(heights([0.08, 0.5, 1.1]))).toBe(0);
+  });
+
+  it('skips a few stray vertices below the sole', () => {
+    // The female Oxfords: 8 vertices hang 1.6 cm under a sole at -2.53 cm.
+    const strays = [-0.0409, -0.0409, -0.0403, -0.0403, -0.036, -0.036, -0.0354, -0.0354];
+    expect(soleDepth(heights([...strays, ...sole(-0.0253)]))).toBeCloseTo(0.0253, 6);
+  });
+
+  it('ignores a handful of vertices just under the floor', () => {
+    // The streetwear bomber jacket: five degenerate vertices at the origin.
+    expect(soleDepth(heights([-0.0006, -0.0006, -0.0006, -0.0006, -0.0006, 0.82, 1.4]))).toBe(0);
   });
 });
