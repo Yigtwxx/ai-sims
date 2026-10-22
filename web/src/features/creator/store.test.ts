@@ -4,7 +4,7 @@ import type { MhManifest } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 
 import { fixtureManifest } from './fixtures/manifest';
-import { presetSliders, startingConfig } from './reconcile';
+import { outfitsFor, presetSliders, startingConfig } from './reconcile';
 import { useCreatorStore } from './store';
 
 /**
@@ -88,5 +88,36 @@ describe('creator store base switch', () => {
       preset: 'athletic',
       sliders: presetSliders(manifest, 'male', 'athletic'),
     });
+  });
+
+  it('stays in underwear when no outfit was picked', () => {
+    const manifest = maleWithoutCurvy();
+    useCreatorStore.setState({ config: startingConfig('female', manifest) });
+
+    useCreatorStore.getState().setBase('male', manifest);
+
+    expect(useCreatorStore.getState().config.outfit).toEqual({
+      top: null,
+      bottom: null,
+      shoes: null,
+      full: null,
+    });
+  });
+
+  it('keeps picked garments, swapping one the new body cannot wear', () => {
+    const manifest = maleWithoutCurvy();
+    const unisex = outfitsFor(manifest, 'bottom', 'female').find((o) => o.compat === 'unisex')!;
+    const femaleOnly = outfitsFor(manifest, 'top', 'female').find((o) => o.compat === 'female')!;
+    const female = startingConfig('female', manifest);
+    female.outfit.bottom = { id: unisex.id, tint: null, colors: {} };
+    female.outfit.top = { id: femaleOnly.id, tint: null, colors: {} };
+    useCreatorStore.setState({ config: female });
+
+    useCreatorStore.getState().setBase('male', manifest);
+
+    const { outfit } = useCreatorStore.getState().config;
+    expect(outfit.bottom?.id).toBe(unisex.id);
+    expect(outfit.top?.id).toBe(outfitsFor(manifest, 'top', 'male')[0]?.id);
+    expect(outfit.shoes).toBeNull();
   });
 });

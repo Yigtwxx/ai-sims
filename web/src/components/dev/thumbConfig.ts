@@ -35,7 +35,7 @@ function wearing(manifest: MhManifest, face: MhFace): CharacterConfig {
   config.hair.style = null;
   config.beard.style = null;
   config.mustache.style = null;
-  // New characters start dressed; a thumbnail shows its one item on underwear.
+  // A thumbnail shows its one item on underwear.
   config.outfit = { top: null, bottom: null, shoes: null, full: null };
   return config;
 }

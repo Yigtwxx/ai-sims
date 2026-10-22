@@ -1,20 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyCuration, type MhManifest, type MhSkin } from '@/lib/assets/manifest';
+import type { MhManifest, MhSkin } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import { CHARACTER_BASES } from '@/lib/character/schema';
 
 import { fixtureManifest } from './fixtures/manifest';
 import { randomConfig } from './randomize';
-import {
-  facesFor,
-  outfitsFor,
-  reconcileConfig,
-  skinGender,
-  skinsFor,
-  startingConfig,
-  startingOutfit,
-} from './reconcile';
+import { facesFor, reconcileConfig, skinGender, skinsFor, startingConfig } from './reconcile';
 
 const manifest = fixtureManifest();
 
@@ -97,55 +89,11 @@ describe('skin gender', () => {
 });
 
 describe('starting outfit', () => {
-  it('dresses a new character in the first top, bottom and shoes, first colour', () => {
+  it('starts a new character in underwear, with no garment picked', () => {
     for (const base of CHARACTER_BASES) {
       const config = startingConfig(base, manifest);
-      expect(config.outfit.full).toBeNull();
-      for (const slot of ['top', 'bottom', 'shoes'] as const) {
-        const first = outfitsFor(manifest, slot, base)[0]!;
-        expect(config.outfit[slot]).toEqual({
-          id: first.id,
-          tint: first.tintPresets[0]?.id ?? null,
-          colors: {},
-        });
-      }
-      // Deterministic and already consistent with the manifest.
-      expect(startingConfig(base, manifest)).toEqual(config);
+      expect(config.outfit).toEqual({ top: null, bottom: null, shoes: null, full: null });
       expect(reconcileConfig(config, manifest)).toEqual(config);
     }
-  });
-
-  it('skips curated-out garments', () => {
-    const first = outfitsFor(manifest, 'top', 'female')[0]!;
-    const curated = applyCuration(manifest, { hidden: [first.id] });
-    const top = startingConfig('female', curated).outfit.top;
-    expect(top?.id).toBeDefined();
-    expect(top?.id).not.toBe(first.id);
-    expect(top?.id).toBe(outfitsFor(curated, 'top', 'female')[0]?.id);
-  });
-
-  it('never starts in a garment of the other gender', () => {
-    const femaleOnly = manifest.outfits.find(
-      (outfit) => outfit.category === 'top' && outfit.compat === 'female',
-    )!;
-    // Put the women's top first: the man still starts in one made for him.
-    const reordered: MhManifest = {
-      ...manifest,
-      outfits: [femaleOnly, ...manifest.outfits.filter((outfit) => outfit !== femaleOnly)],
-    };
-    expect(startingOutfit(reordered, 'top', 'female')?.id).toBe(femaleOnly.id);
-    const male = startingConfig('male', reordered).outfit.top;
-    expect(male).not.toBeNull();
-    expect(male?.id).not.toBe(femaleOnly.id);
-  });
-
-  it('leaves a category empty when the manifest has nothing for it', () => {
-    const bare: MhManifest = {
-      ...manifest,
-      outfits: manifest.outfits.filter((outfit) => outfit.category !== 'shoes'),
-    };
-    const config = startingConfig('female', bare);
-    expect(config.outfit.shoes).toBeNull();
-    expect(config.outfit.top).not.toBeNull();
   });
 });

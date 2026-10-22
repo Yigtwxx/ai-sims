@@ -83,6 +83,8 @@ export const useCreatorStore = create<CreatorState>()(
           const preset = reconcilePreset(manifest, base, state.config.body.preset);
           fresh.body = { preset, sliders: presetSliders(manifest, base, preset) };
           fresh.eyes = state.config.eyes;
+          // Picked garments carry over (reconciled to the new body); none stays underwear.
+          fresh.outfit = state.config.outfit;
           fresh.hair.color = state.config.hair.color;
           fresh.hair.pattern = state.config.hair.pattern;
           fresh.accessories = state.config.accessories;

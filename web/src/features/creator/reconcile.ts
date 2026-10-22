@@ -265,35 +265,13 @@ const STARTING_HAIR: Record<CharacterBase, RegExp[]> = {
   male: [/Hair_S_Clean/, /Hair_S_Casual/, /Hair_S_/],
 };
 
-/** Slots a new character is dressed in (a one-piece outfit is a choice, not a start). */
-const STARTING_OUTFIT = ['top', 'bottom', 'shoes'] as const satisfies readonly OutfitCategory[];
-
-/**
- * The first garment the (curated) manifest offers this base for a category, in
- * its first colour, or null when the category has none.
- */
-export function startingOutfit(
-  manifest: MhManifest,
-  category: OutfitCategory,
-  base: CharacterBase,
-): OutfitItem | null {
-  const outfit = outfitsFor(manifest, category, base)[0];
-  return outfit ? { id: outfit.id, tint: outfit.tintPresets[0]?.id ?? null, colors: {} } : null;
-}
-
 /**
  * A new character for this base: the defaults reconciled with the manifest,
- * dressed in the first top, bottom and shoes on offer (a character in
- * underwear is not a demo start), wearing natural eyebrows (a bare brow ridge
- * reads as uncanny, not as a choice) and an everyday haircut.
+ * in underwear until an outfit is picked, wearing natural eyebrows (a bare
+ * brow ridge reads as uncanny, not as a choice) and an everyday haircut.
  */
 export function startingConfig(base: CharacterBase, manifest: MhManifest): CharacterConfig {
   const config = reconcileConfig(createDefaultConfig(base), manifest);
-  if (config.outfit.full === null) {
-    for (const slot of STARTING_OUTFIT) {
-      config.outfit[slot] ??= startingOutfit(manifest, slot, base);
-    }
-  }
   if (config.eyebrows.style === null) {
     const brows = groomsFor(manifest, 'eyebrows', base);
     const natural = brows.find((groom) => /natural/i.test(groom.id)) ?? brows[0];

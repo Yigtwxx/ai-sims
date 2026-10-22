@@ -26,9 +26,6 @@ const FIXTURE_SKINS = {
   male: ['Bruce', 'Cooper', 'Ettore', 'Lucian', 'Omar', 'Taro', 'Trey', 'Wallace'],
 };
 
-/** The first garment the fixture offers both bases in each starting slot. */
-const FIXTURE_START_OUTFIT = { top: 'Kapüşonlu', bottom: 'Kot pantolon', shoes: 'Chelsea bot' };
-
 async function openCreator(page: Page, query = '?fixture=1'): Promise<void> {
   await enterAsGuest(page);
   await page.goto(`/tr/create${query}`);
@@ -46,28 +43,22 @@ async function radioNames(group: Locator): Promise<string[]> {
 test.describe('creator options (fixture manifest)', () => {
   test.describe.configure({ mode: 'default' });
 
-  test('a new character starts dressed in top, bottom and shoes', async ({ page }) => {
+  test('a new character starts in underwear, with no garment picked', async ({ page }) => {
     test.setTimeout(120_000);
     await openCreator(page);
 
     for (const base of ['female', 'male'] as const) {
-      // Female is the default base; male comes from switching, which re-dresses.
+      // Female is the default base; male comes from switching, which keeps it undressed.
       if (base === 'male') await chooseBase(page, 'male');
       const panel = await openCategory(page, c.categories.outfit);
       const slots = panel.getByRole('radiogroup', { name: c.outfit.slotsLabel, exact: true });
 
-      for (const slot of ['top', 'bottom', 'shoes'] as const) {
+      for (const slot of ['top', 'bottom', 'shoes', 'full'] as const) {
         await slots.getByRole('radio', { name: c.outfit.slots[slot], exact: true }).click();
         const grid = panel.getByRole('radiogroup', { name: c.outfit.slots[slot], exact: true });
         const picked = grid.getByRole('radio', { checked: true });
-        await expect(picked, `${base} ${slot}`).toHaveCount(1);
-        await expect(picked, `${base} ${slot}`).toHaveAccessibleName(FIXTURE_START_OUTFIT[slot]);
+        await expect(picked, `${base} ${slot}`).toHaveAccessibleName(c.outfit.none);
       }
-
-      // Separates, not a one-piece outfit.
-      await slots.getByRole('radio', { name: c.outfit.slots.full, exact: true }).click();
-      const full = panel.getByRole('radiogroup', { name: c.outfit.slots.full, exact: true });
-      await expect(full.getByRole('radio', { checked: true })).toHaveAccessibleName(c.outfit.none);
     }
   });
 
