@@ -1,4 +1,4 @@
-# Devir notu (2026-10-22 öğle)
+# Devir notu (2026-10-22 öğleden sonra)
 
 Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu, açık işleri, Mac'e taşımayı ve Mac'teki sıradaki işi anlatan tek sayfadır.
 
@@ -64,6 +64,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - DCC'nin gömdüğü gri iç çamaşırı gövde albedo'sundan ve kafanın boyun flap'inden çevredeki ciltle dolduruldu.
   - Ortak iç çamaşırı maskesi, kumaş albedo ve normal bir kez yazılır (`web/skins/underwear/`). Web shader onu yalnızca kıyafetin örtmediği yerde çizer.
   - Askılar yalnızca kafa UV adasından doldurulur. Ada'nın omuzlarındaki açık renkli kamalar bundandı.
+  - Kafadaki askılar DCC kafa bake'inin kendi askılarından tek RGBA harita olur (`face_underwear.ktx2`, 2K: R kumaş grisi, GB normal, A kaplama). Biye, örgü ve dikiş boyun dikişinden kesintisiz geçer (`30e7eab`). Önce tek düz gri renk + maskeydi.
 - Groom:
   - Kart LOD0 ve LOD2.
   - Yüzey bağlaması (`_bind_*`) sayesinde her yüze oturur.
@@ -86,11 +87,12 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 - **Sahne (`web/src/features/avatar/mh/`)**, sayfaların tek 3D giriş noktası `MhStage`'dir. İçinde:
   - Montaj:
     - Kafa gövde iskeletine bağlanır.
-    - Boyun dikişi kaynaklanır. Kafa kenarı gövdenin altına 1.5 mm uzanır, böylece çatlak kalmaz.
+    - Boyun dikişi kaynaklanır. Kafa kenarı gövdenin ağırlıkları ve **ters bind matrisleriyle** skinlenir (kafa iskeletine eklenen girdiler), iki kenar animasyonda birlikte hareket eder (`ff99bb2`). Kenar 0.3 mm öteye ve 0.05 mm gövdenin altına uzanır; alt-piksel çatlak kalmaz.
     - Yüz veya gövde değişince yeni karakter ekran dışında kurulur ve tek karede eskisinin yerini alır. Boş ya da kel kare yok.
     - Kurulum sırasında kamera ekrandaki karakteri kadrajlar (`1c129d1`).
   - Cilt shader'ı:
-    - SSS sarma, SRMF speküler, gözenek mikro normali, cavity.
+    - SSS sarma, SRMF speküler, gözenek mikro normali, cavity. (SRMF speküler ve cavity şu an devrede değil, bkz. "Bilinen notlar".)
+    - Gözenek döşemesi Unreal'ın değerleri: kafa 48 (Unreal 44), gövde 70 (`c4f1be7`). Gövde 36'dayken dikişin altında gözenekler ~1.8 kat iriydi.
     - Kırışıklık normalleri.
     - Groom yoğunluğuyla kafa derisi, kaş ve sakal tonu.
     - **İç çamaşırı shader'da** (`8968f4e`): alt ya da tek parça giyilmemişse külot; kadın gövdede üst giyilmemişse üst. Askılar kıyafetlerle aynı karede çizilir, değişimde çıplak cilt parlamaz.
@@ -131,7 +133,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Ön eleme: `asset-pipeline mh-similar` çok benzer öğeleri ölçer (saç/kaş/sakal/bıyık kart yüzeyi, kıyafet yüzeyi, yüz DNA'sı, gövde klibi). `--apply` bunları `curation.json`'da `auto` altına yazar ve gizler; ekran "Ön elemede gizlenenler" filtresiyle gösterir, kullanıcı geri açabilir. Rapor: arşivde `build/similar.json`.
     - Silme: `asset-pipeline mh-prune` deneme modunda planı, boşalacak yeri ve bir plan özeti yazar. Silmek için `--apply --plan <özet>`; plan o arada değiştiyse reddeder. `--unused-packages` hiçbir öğenin gelmediği Fab paketlerini de siler, ama bir export klasörü eksikken (export sürüyorsa) hiçbir paketi kullanılmıyor saymaz.
   - i18n anahtar testi ve Playwright e2e.
-- Doğrulama (2026-10-22 öğle): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **807 test geçti** (81 dosya). Pipeline: `ruff` temiz, pytest **309 geçti, 1 atlandı**. Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
+- Doğrulama (2026-10-22 öğleden sonra): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **809 test geçti**. Pipeline: `ruff` temiz, pytest **310 geçti, 2 atlandı** (atlananlar budanan stand idle ve body ROM klipleri). Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
 - **Dev sayfaları** (`next dev` dışında 404):
   - `/dev/stage`: gerçek manifest; yüz, saç, kıyafet ve kalite seçimi; `/api/tts` ile canlı TTS; zoom.
   - `/dev/mh`: tek preset görüntüleyici, `?face=<id>` ile.
@@ -178,7 +180,13 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - **Kırık bilek ve kol** (`retarget-fbx.mjs`): twist ve corrective kemikler, parmak uçları ve ayak parmakları zincir kemiğinin duruş düzeltmesini (`restFix`) almıyordu. Shibuya HumanIK klibinde kol twist'leri 27°, uyluk twist'leri 24.5° yan büküyordu; dirsekte kol ağzı da buruşuyordu. Artık en yakın atanın düzeltmesini alıyorlar. Arşivdeki 5 FBX klibi (shibuya, relax, listening, stand_talk, talking_normal) yeniden üretildi; Mocap.in parmak uçları ~55° düzeldi.
   - **Topuzda arka kafada çıplak kafa derisi** (`grooms.py`): `density` yalnız kart köklerinden geliyordu; topuzun kökleri saç çizgisinde kaldığı için tepe ve arka boyanmıyordu. Artık Unreal `baked` haritasının örtüsüyle birleşiyor (`groom_density`). `baked`'i olan 12 saç yeniden dönüştürüldü; sakal ve bıyıkların `baked`'i yok, değişmedi.
   - **Kazaktan taşan cilt** (`garments.ts`, `MhCharacter.tsx`): aynı gövde GLB'sinden kurulan karakterler gövde geometrisini, dolayısıyla `bodyHidden` maskesini paylaşıyor. Yüz değişince eski karakter kaldırılırken maskeyi sıfırlıyordu; yeni karakterin cildi kıyafetin altından görünür kalıyor, jestte omuzdan taşıyordu. Kaldırma artık yalnız maskeyi son yazan karakterse temizliyor (`releaseBodyHide`).
+- Kullanıcının atlet ekran görüntüsünden düzeltilenler (2026-10-22 öğle, Jelena, iç çamaşırı):
+  - **Askılar boyunda düz griydi** (`30e7eab`): kafanın göğüs flap'inde askılar tek renk + maskeyle çiziliyordu; biye ve örgü dikişte bitiyor, dikiş askılarda U çizgisi gibi görünüyordu. Artık DCC kafa bake'inin askıları (gri, normal, kaplama) tek haritada; 10 kadın cildi yeniden üretildi (her biri ~200 KB).
+  - **Omuz silüetinde koyu çentik** (`ff99bb2`): kafa kenarı gövdenin ağırlıklarını alıyor ama kafanın kendi bind matrisleriyle skinleniyordu. Preset kafanın eklemleri bu gövdeninkinden 3-4.5 cm farklı; idle'da kenar omuzda 4 mm'ye kadar kayıyor, 1.5 mm skirt'i aşıyordu. Kenar artık gövdenin ters bind matrisleriyle skinleniyor: aralık animasyon boyunca 0.000 mm.
+  - **Dikişte gözenek ölçeği** (`c4f1be7`): gövde döşemesi 36 → 70.
+  - Dikişte albedo ve ışık ölçüldü: iki taraf arasındaki fark ≤5/255. "Göğüste ton farkı" diye görülen, askıların düz rengiyle gözenek farkıydı.
 - Bilinen notlar:
+  - **Cilt speküleri devrede değil:** `createSkinMaterial` `material.defines`'ı baştan yazıyor ve three'nin `PHYSICAL` tanımını siliyor. `IOR`/`USE_SPECULAR` tanımsız kalıyor, SRMF kırmızı kanalı (speküler seviye) ve cavity speküler örtüsü hiç uygulanmıyor; F0 sabit 0.04. Açmak kafada 17 sampler ister (sınır 16): önce SRMF'yi tek sampler'dan okumak ve cavity'yi boş bir kanala taşımak gerek. Görünümü değiştirir, kullanıcı kararı bekliyor.
   - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). Kalan 3 sakin idle (relax, listening, shibuya) tam gövdeyi sürmeye yetiyor.
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
@@ -327,7 +335,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
 4. Kalan kalite notları:
    - Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).
-   - Baş ve gövde cildi arasında göğüste hafif ton farkı.
+   - Cilt speküleri (SRMF, cavity) devrede değil; açmak için sampler bütçesi gerekiyor (bkz. "Bilinen notlar").
    - CC BY atfı: crowd idle klipleri (Vernac Studios, CC BY 4.0) için UI'da kredi satırı. Henüz yok.
 5. Mac'te performans ölçümü (fps, boşta 30) ve lip-sync'in TR + EN cümlelerle yeniden kontrolü.
 
