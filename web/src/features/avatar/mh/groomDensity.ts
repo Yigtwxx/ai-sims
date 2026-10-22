@@ -25,9 +25,10 @@ import type { HairLook } from './hairMaterial';
  * darkens and tints the scalp, brows and beard area with it, which is what
  * makes a hairline and a brow read as hair growing from skin rather than cards
  * on top. Hair and facial hair use the converter's `density` map (smooth, from
- * the cards' root UVs, every groom has one): Unreal's `baked` map is strand
- * detail averaging ~0.13 and missing for half the grooms, so the scalp showed
- * pink through the crown. Brows keep the strand detail of `baked`. The four
+ * the cards' root UVs joined with the cover of Unreal's `baked` map where the
+ * groom has one; every groom has it): `baked` alone is strand detail averaging
+ * ~0.13 and missing for half the grooms, so the scalp showed pink through the
+ * crown. Brows keep the strand detail of `baked`. The four
  * slots are packed into one RGBA texture so the head skin spends a single
  * texture unit on them.
  *

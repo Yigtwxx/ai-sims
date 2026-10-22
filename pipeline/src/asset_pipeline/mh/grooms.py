@@ -75,7 +75,8 @@ ATTACH_DISTANCE = 0.01  # metres
 # Texture caps by slot: a 4K cards atlas costs ~10 MB as UASTC, 2K ~2.7 MB; eyebrows are
 # seen in face close-ups and keep 4K.
 MAX_TEXTURE = {"eyebrows": 4096}
-# `density`: where on the head the cards grow, from their root UVs (see density_from_roots).
+# `density`: where on the head the cards grow, from their root UVs, joined with Unreal's
+# baked cover where there is one (see groom_density).
 ROOT_GRID = 512  # head-UV texels the roots are counted on
 ROOT_SIGMA = 4.0  # blur (grid texels): sparse roots stand for the scalp between them
 ROOT_COVERAGE = 0.05  # atlas texels fainter than this carry no strand
@@ -526,6 +527,23 @@ def density_from_roots(root_uv_seed_coverage: NDArray[np.uint8]) -> NDArray[np.u
     return out
 
 
+def groom_density(
+    root_uv_seed_coverage: NDArray[np.uint8], baked_cover: NDArray[np.uint8] | None
+) -> NDArray[np.uint8]:
+    """The `density` map: the root density joined with Unreal's baked cover (the `_baked`
+    map's alpha, head UV) where the groom has one. Cards only carry the strands they were
+    built from, so the roots of combed-back styles stay near the hairline; an updo's crown
+    and back, which its strands cover, showed bare scalp between the cards."""
+    density = density_from_roots(root_uv_seed_coverage)
+    if baked_cover is None:
+        return density
+    cover = Image.fromarray(baked_cover).resize(
+        (DENSITY_SIZE, DENSITY_SIZE), Image.Resampling.BILINEAR
+    )
+    density[..., 3] = np.maximum(density[..., 3], np.asarray(cover))
+    return density
+
+
 def convert_textures(
     groom: GroomUnit, folder: Path, web_root: Path
 ) -> tuple[dict[str, str], str | None]:
@@ -533,6 +551,8 @@ def convert_textures(
     flags = groom.texture_flags()
     textures: dict[str, str] = {}
     thumbnail = None
+    roots: NDArray[np.uint8] | None = None
+    baked_cover: NDArray[np.uint8] | None = None
     for path in sorted((groom.unit / "textures").glob("*.png")):
         if THUMB.search(path.stem):
             output = folder / "thumbnail.webp"
@@ -567,10 +587,15 @@ def convert_textures(
         output = folder / f"{file_name}.ktx2"
         encode_ktx2(pixels, output, _texture_settings(path, flags.get(path.name.lower(), False)))
         textures[name] = output.relative_to(web_root).as_posix()
-        if name == "rootUvSeedCoverage" and pixels.ndim == 3 and pixels.shape[2] == 4:
-            density = folder / "density.ktx2"
-            encode_ktx2(density_from_roots(pixels), density, LINEAR)
-            textures["density"] = density.relative_to(web_root).as_posix()
+        if pixels.ndim == 3 and pixels.shape[2] == 4:
+            if name == "rootUvSeedCoverage":
+                roots = pixels
+            elif name == "baked":
+                baked_cover = pixels[..., 3]
+    if roots is not None:
+        density = folder / "density.ktx2"
+        encode_ktx2(groom_density(roots, baked_cover), density, LINEAR)
+        textures["density"] = density.relative_to(web_root).as_posix()
     return textures, thumbnail
 
 

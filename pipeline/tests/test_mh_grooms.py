@@ -152,6 +152,33 @@ def test_cardless_grooms_without_a_baked_map_fail(tmp_path: Path, monkeypatch) -
         grooms.convert_groom(_cardless_unit(tmp_path, False), {}, None, tmp_path / "web")
 
 
+def test_groom_density_joins_the_baked_cover_beyond_the_roots() -> None:
+    # Every strand grows from head UV (0.25, 0.25), as an updo's do from its hairline...
+    roots = np.zeros((64, 64, 4), dtype=np.uint8)
+    roots[..., 0] = roots[..., 1] = 64
+    roots[..., 3] = 255
+    # ...while Unreal's baked map also covers the crown they are combed over.
+    baked = np.zeros((32, 32), dtype=np.uint8)
+    baked[24:, 24:] = 255
+    density = grooms.groom_density(roots, baked)[..., 3]
+    size = grooms.DENSITY_SIZE
+    root_texel = density[size // 4, size // 4]
+    crown_texel = density[size * 7 // 8, size * 7 // 8]
+    bare_texel = density[size // 2, size * 7 // 8]
+    assert root_texel == 255, f"roots stay full cover, got {root_texel}"
+    assert crown_texel == 255, f"the baked cover is joined, got {crown_texel}"
+    assert bare_texel == 0, f"skin neither map covers stays bare, got {bare_texel}"
+
+
+def test_groom_density_without_a_baked_map_is_the_root_density() -> None:
+    roots = np.zeros((64, 64, 4), dtype=np.uint8)
+    roots[..., 0] = roots[..., 1] = 64
+    roots[..., 3] = 255
+    joined = grooms.groom_density(roots, None)
+    alone = grooms.density_from_roots(roots)
+    assert np.array_equal(joined, alone), "no baked map leaves the root density as it is"
+
+
 def test_empty_skin_slots_point_at_a_skin_joint() -> None:
     # Joint 0 of the head is not in the groom skin; empty slots (weight 0) carry it.
     remap = np.array([-1, 0, 1, -1], dtype=np.int64)
