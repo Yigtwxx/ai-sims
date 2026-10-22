@@ -3,9 +3,13 @@
 Sources (per `raw/characters/<Name>`; checked on Ada, see the report of chunk 3):
 
 - `textures/face/T_Face_Basecolor.png` (8K, sRGB) is the final face albedo, and
-  `T_Face_Normal` / `T_Face_Cavity` (8K, linear) the final normal and packed cavity maps.
+  `T_Face_Normal` (8K, linear) the final normal map.
   The 8K `*_Animated_CM*/WM*` and the 4K body basecolor are grey material *inputs*, so the
   wrinkle maps, SRMF and body albedo/normal come from the DCC bakes (`dcc/<Name>/Maps`, 2K).
+- The cavity maps (`T_Face_Cavity`, `T_Body_Body_Cavity`) are not converted: the DCC SRMF
+  bake already lowers the specular and raises the roughness in their pores and creases
+  (high-pass correlation -0.77 and +0.74 on Jelena), and Unreal's baked skin material
+  (`MI_Head_Baked_LOD0`) takes no cavity map.
 - The DCC body albedo has the default underwear baked in (neutral grey). `body_albedo` is that
   map with the underwear filled from the skin around it; the underwear comes back in the web
   shader from `T_Body_Body_Underwear_Mask` (R top, G briefs; B, a longer leg, is unused) and
@@ -27,7 +31,6 @@ Conventions of the written maps (documented for the web material pass):
 - Colour maps are sRGB (KTX2 transfer function sRGB); everything else is linear.
 - Normal maps are tangent space in the glTF/OpenGL convention (+Y up): Unreal's DirectX
   green channel is flipped. They are renormalised after downsampling.
-- `face_cavity` keeps the three packed channels of `T_Face_Cavity`.
 - SRMF: R specular, G roughness, B metallic (0), A the fourth Unreal mask channel.
 - UVs: glTF top-left origin, the same images Unreal samples (no vertical flip).
 """
@@ -58,14 +61,10 @@ TEXTURES_VERSION = 3
 ALBEDO_VERSION = 3  # bump when the face albedo changes (3: straps filled on the island)
 COLOR = Ktx2Settings("srgb", rdo=1.0)
 NORMAL = Ktx2Settings("linear", rdo=1.5)
-DATA = Ktx2Settings("linear", rdo=3.0)
 SRMF = Ktx2Settings("linear", rdo=2.0)
 MASK = Ktx2Settings("linear", rdo=None)
 
 FACE_SIZE = 4096
-# The packed cavity map is noise-like: 18.7 MB as 4K UASTC against 4.7 MB at 2K; the 4K
-# normal map already carries the pores.
-FACE_CAVITY_SIZE = 2048
 FACE_SRMF_SIZE = 2048
 WRINKLE_SIZE = 2048
 BODY_SIZE = 2048
@@ -490,8 +489,6 @@ class PresetMaps:
         required = [
             self.face / "T_Face_Basecolor.png",
             self.face / "T_Face_Normal.png",
-            self.face / "T_Face_Cavity.png",
-            self.body / "T_Body_Body_Cavity.png",
             *(
                 self.maps / f"{name}.png"
                 for name in (
@@ -797,14 +794,6 @@ def skin_jobs(maps: PresetMaps) -> list[MapJob]:
             NORMAL,
         ),
         MapJob(
-            "face_cavity",
-            "face_cavity.ktx2",
-            maps.face / "T_Face_Cavity.png",
-            FACE_CAVITY_SIZE,
-            "data",
-            DATA,
-        ),
-        MapJob(
             "face_srmf",
             "face_srmf.ktx2",
             maps.maps / "Head_SRMF.png",
@@ -845,14 +834,6 @@ def skin_jobs(maps: PresetMaps) -> list[MapJob]:
             BODY_SIZE,
             "normal",
             NORMAL,
-        ),
-        MapJob(
-            "body_cavity",
-            "body_cavity.ktx2",
-            maps.body / "T_Body_Body_Cavity.png",
-            BODY_SIZE,
-            "data",
-            DATA,
         ),
         MapJob(
             "body_srmf", "body_srmf.ktx2", maps.maps / "Body_SRMF.png", BODY_SIZE, "data", SRMF, 4
@@ -1013,6 +994,9 @@ def convert_skin(
         pixels = prepare(job.source, job.size, job.kind, job.channels)
         textures.add(job.role, output, web_root, encode_ktx2(pixels, output, job.settings))
         cache.remember(output, job_print)
+    # Written before the SRMF bake was found to carry the cavity (see the module docstring).
+    for retired in ("face_cavity.ktx2", "body_cavity.ktx2"):
+        (folder / retired).unlink(missing_ok=True)
     convert_body_albedo(maps, folder, web_root, cache, textures)
     masks = write_masks(maps, web_root)
     underwear = write_underwear(maps, web_root)
@@ -1026,7 +1010,6 @@ def convert_skin(
         "face": {
             "albedo": files["face_albedo"],
             "normal": files["face_normal"],
-            "cavity": files["face_cavity"],
             "srmf": files["face_srmf"],
             "wrinkleColor": [files[f"face_cm{i}"] for i in (1, 2, 3)],
             "wrinkleNormal": [files[f"face_wm{i}"] for i in (1, 2, 3)],
@@ -1036,7 +1019,6 @@ def convert_skin(
         "body": {
             "albedo": files["body_albedo"],
             "normal": files["body_normal"],
-            "cavity": files["body_cavity"],
             "srmf": files["body_srmf"],
             **({"underwear": underwear} if underwear else {}),
         },

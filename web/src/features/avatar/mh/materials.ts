@@ -22,8 +22,8 @@ import { WRINKLE_MASK_LAYERS, WRINKLE_WEIGHT_COUNT } from './wrinkles';
  * PBR materials; skin gets a physical material with the look of MetaHuman's
  * skin shader where it matters most at web cost:
  *  - wrapped, red-tinted diffuse past the terminator (subsurface scattering),
- *  - per-pixel specular level from the SRMF map's red channel (the glTF
- *    metallic-roughness slot already carries roughness in green),
+ *  - per-pixel specular level from the SRMF map's red channel, read from the
+ *    texel the roughness slot already fetches (roughness is its green),
  *  - a tiled micro-normal for pore detail up close,
  *  - a faint sheen for peach fuzz at grazing angles,
  *  - on the head, wrinkle normals (wm1..wm3) blended in where RigLogic's
@@ -86,8 +86,7 @@ export const BODY_SKIN: SkinTuning = {
 
 const DIFFUSE_LINE =
   'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseContribution ) * ( 1.0 - F );';
-const SPECULAR_MAP_LINE =
-  'specularIntensityFactor *= texture2D( specularIntensityMap, vSpecularIntensityMapUv ).a;';
+const ROUGHNESS_TEXEL_LINE = 'vec4 texelRoughness = texture2D( roughnessMap, vRoughnessMapUv );';
 const F90_LINE = 'material.specularF90 = mix( specularIntensityFactor, 1.0, metalnessFactor );';
 const NORMAL_SCALE_LINE = 'mapN.xy *= normalScale;';
 
@@ -96,11 +95,13 @@ const SCATTER = /* glsl */ `
   vec3 skinScatter = skinScatterColor * max( skinWrapNL - dotNL, 0.0 ) * directLight.color;
   reflectedLight.directDiffuse += ( irradiance + skinScatter ) * BRDF_Lambert( material.diffuseContribution ) * ( 1.0 - F );
 `;
-// SRMF red is Unreal's "Specular" (0.5 = the default F0 of 0.04); the cavity map
-// takes the specular out of pores and creases (specular occlusion).
+// SRMF red is Unreal's "Specular" (0.5 = the default F0 of 0.04), from the
+// texel the roughness map already fetched. The DCC bake has the cavity map's
+// specular occlusion in it: pores and creases are already darker there.
 const SPECULAR_FROM_RED = /* glsl */ `
-  specularIntensityFactor *= texture2D( specularIntensityMap, vSpecularIntensityMapUv ).r * 2.0;
-  specularIntensityFactor *= mix( 1.0, texture2D( skinCavity, vSpecularIntensityMapUv ).r, skinCavityStrength );
+  #ifdef USE_ROUGHNESSMAP
+  specularIntensityFactor *= texelRoughness.r * 2.0;
+  #endif
 `;
 const F90_CLAMPED =
   'material.specularF90 = mix( min( specularIntensityFactor, 1.0 ), 1.0, metalnessFactor );';
@@ -302,7 +303,7 @@ let warned = false;
 function chunksMatch(): boolean {
   const ok =
     ShaderChunk.lights_physical_pars_fragment.includes(DIFFUSE_LINE) &&
-    ShaderChunk.lights_physical_fragment.includes(SPECULAR_MAP_LINE) &&
+    ShaderChunk.roughnessmap_fragment.includes(ROUGHNESS_TEXEL_LINE) &&
     ShaderChunk.lights_physical_fragment.includes(F90_LINE) &&
     ShaderChunk.normal_fragment_maps.includes(NORMAL_SCALE_LINE);
   if (!ok && !warned) {
@@ -322,11 +323,10 @@ export function createSkinMaterial(
     map: source.map,
     normalMap: source.normalMap,
     normalScale: source.normalScale.clone(),
+    // SRMF: green is the roughness, red the specular level in the patched shader.
     roughnessMap: source.roughnessMap,
     roughness: 1,
     metalness: 0,
-    // Same SRMF texture: red becomes the specular level in the patched shader.
-    specularIntensityMap: source.roughnessMap,
     specularIntensity: 1,
     sheen: tuning.sheen,
     sheenRoughness: 0.55,
@@ -342,8 +342,6 @@ export function createSkinMaterial(
     skinMicroNormal: { value: micro },
     skinMicroTiling: { value: tuning.microTiling },
     skinMicroStrength: { value: micro ? tuning.microStrength : 0 },
-    skinCavity: { value: null as Texture | null },
-    skinCavityStrength: { value: 0 },
   };
   const wrinkles: WrinkleUniforms | null = tuning.wrinkles
     ? {
@@ -368,6 +366,9 @@ export function createSkinMaterial(
       }
     : null;
   material.defines = {
+    // Three's own (STANDARD, PHYSICAL): without PHYSICAL the shader has no
+    // specular level at all, every texel at F0 0.04.
+    ...material.defines,
     ...(wrinkles ? { MH_WRINKLES: '' } : {}),
     ...(density ? { MH_GROOM_DENSITY: '' } : {}),
     ...(tuning.bodyHide ? { MH_BODY_HIDE: '' } : {}),
@@ -408,8 +409,6 @@ ${BODY_HIDE_FRAGMENT}`,
           'uniform sampler2D skinMicroNormal;',
           'uniform float skinMicroTiling;',
           'uniform float skinMicroStrength;',
-          'uniform sampler2D skinCavity;',
-          'uniform float skinCavityStrength;',
           GROOM_DENSITY_PARS,
           UNDERWEAR_PARS,
           BODY_HIDE_FRAGMENT_PARS,
@@ -431,9 +430,10 @@ ${BODY_HIDE_FRAGMENT}`,
       )
       .replace(
         '#include <lights_physical_fragment>',
-        ShaderChunk.lights_physical_fragment
-          .replace(SPECULAR_MAP_LINE, `${SPECULAR_FROM_RED}${GROOM_SPECULAR}`)
-          .replace(F90_LINE, F90_CLAMPED),
+        ShaderChunk.lights_physical_fragment.replace(
+          F90_LINE,
+          `${SPECULAR_FROM_RED}${GROOM_SPECULAR}${F90_CLAMPED}`,
+        ),
       )
       .replace(
         '#include <normal_fragment_maps>',

@@ -21,7 +21,10 @@ import {
 
 function character() {
   const material = new MeshStandardMaterial({ map: new Texture(), normalMap: new Texture() });
-  material.userData.skinUniforms = { cavity: { value: new Texture() }, gain: { value: 1 } };
+  material.userData.skinUniforms = {
+    skinMicroNormal: { value: new Texture() },
+    gain: { value: 1 },
+  };
   const root = new Object3D();
   root.add(new Mesh(new BoxGeometry(), material));
   return root;

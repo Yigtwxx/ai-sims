@@ -173,16 +173,21 @@ def test_build_index_leaves_out_unused_preset_sources(tmp_path: Path):
     body = face.parent / "body"
     face.mkdir(parents=True)
     body.mkdir()
-    for name in ("T_Face_Basecolor.png", "T_Face_Normal_Animated_WM1.png"):
+    for name in ("T_Face_Basecolor.png", "T_Face_Normal_Animated_WM1.png", "T_Face_Cavity.png"):
         (face / name).write_bytes(b"face")
-    for name in ("T_Body_Body_Normal.png", "T_Body_Chest_Cavity.png", "T_Body_Body_Basecolor.png"):
+    for name in (
+        "T_Body_Body_Normal.png",
+        "T_Body_Chest_Cavity.png",
+        "T_Body_Body_Basecolor.png",
+        "T_Body_Body_Cavity.png",
+    ):
         (body / name).write_bytes(b"body")
     kept = [f.path for f in build_index(root, ("raw",), UNUSED_SOURCES)]
     assert kept == [
         "raw/characters/Ada/textures/body/T_Body_Body_Normal.png",
         "raw/characters/Ada/textures/face/T_Face_Basecolor.png",
     ], kept
-    assert len(build_index(root, ("raw",))) == 5, "no patterns keeps every file"
+    assert len(build_index(root, ("raw",))) == 7, "no patterns keeps every file"
 
 
 def test_build_index_leaves_out_unused_outfit_sources(tmp_path: Path):

@@ -44,8 +44,9 @@ The manifest lives at `/assets/mh/manifest.json` and is validated by the zod sch
 
 - **Top level:** `{ version: 2, generatedAt, faces[], skins[], bodies[], grooms[], outfits[], irises[], animations[], lighting[] }`.
 - **`faces[]`:** `{ id, label, gender, head, thumbnail, defaultSkin, defaultIris }`.
-- **`skins[]`:** `{ id, label, tone, swatch, face: { albedo, normal, cavity, srmf, cm1..3, wm1..3, masks[] }, body: { albedo, normal, cavity, srmf } }`.
+- **`skins[]`:** `{ id, label, tone, swatch, face: { albedo, normal, srmf, cm1..3, wm1..3, masks[], underwear?: { straps } }, body: { albedo, normal, srmf, underwear?: { mask, albedo, normal } } }`.
   - Every preset's skin can be put on any face, because UVs are shared.
+  - SRMF: R specular level (Unreal's "Specular"), G roughness, A Unreal's fourth mask. There is no cavity map (updated 2026-10-22): the DCC SRMF bake already carries its specular occlusion.
   - `tone` is a 0..1 melanin estimate; the creator sorts skins by it.
 - **`bodies[]`:** `{ gender, glb, sliders: [{ id, min, max, default }], presets: { slim, average, athletic, curvy } }`. Each preset is a slider vector. `curvy` is female only (updated 2026-10-21): the male body has `slim`, `average` and `athletic`.
 - **`grooms[]`:** `{ id, slot: hair|eyebrows|beard|mustache|eyelashes|peachfuzz, label, thumbnail, glb, textures, params }`.

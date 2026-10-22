@@ -19,7 +19,6 @@ export function benchSkin(id: string): MhSkin {
       albedo: `skins/${id}/face_albedo.ktx2`,
       normal: `skins/${id}/face_normal.ktx2`,
       srmf: `skins/${id}/face_srmf.ktx2`,
-      cavity: `skins/${id}/face_cavity.ktx2`,
       wrinkleColor: [1, 2, 3].map((n) => `skins/${id}/face_cm${n}.ktx2`),
       wrinkleNormal: [1, 2, 3].map((n) => `skins/${id}/face_wm${n}.ktx2`),
       wrinkleMasks: WRINKLE_MASK_LAYERS.map((layer) => `${MASK_DIR}/${layer}.ktx2`),
@@ -28,7 +27,6 @@ export function benchSkin(id: string): MhSkin {
       albedo: 'skins/Ada/body_albedo.ktx2',
       normal: 'skins/Ada/body_normal.ktx2',
       srmf: 'skins/Ada/body_srmf.ktx2',
-      cavity: 'skins/Ada/body_cavity.ktx2',
     },
     makeupAlbedo: `skins/${id}/face_albedo_makeup.ktx2`,
   });

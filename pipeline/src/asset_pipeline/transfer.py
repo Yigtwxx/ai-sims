@@ -46,6 +46,9 @@ UNUSED_SOURCES = (
     "raw/characters/*/textures/face/T_Face_*_Animated_*",
     "raw/characters/*/textures/body/T_Body_Chest_*",
     "raw/characters/*/textures/body/T_Body_Body_Basecolor.png",
+    # The cavity maps: the DCC SRMF bake already carries them (2026-10-22).
+    "raw/characters/*/textures/face/T_Face_Cavity.png",
+    "raw/characters/*/textures/body/T_Body_Body_Cavity.png",
     # Groom FBX exports: the converter reads the glTF twin of every mesh.
     "raw/grooms/*.fbx",
     # Outfit exports (traced on a full outfit conversion, 2026-10-21): the FBX twins of

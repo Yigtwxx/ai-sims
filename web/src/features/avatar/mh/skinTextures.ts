@@ -29,7 +29,6 @@ export interface SkinTextures {
     albedo: Texture;
     normal: Texture;
     srmf: Texture | null;
-    cavity: Texture | null;
     /** wm1..wm3 when the skin has wrinkle maps. */
     wrinkleNormals: Texture[] | null;
   };
@@ -37,7 +36,6 @@ export interface SkinTextures {
     albedo: Texture;
     normal: Texture;
     srmf: Texture | null;
-    cavity: Texture | null;
     /** Shared underwear mask (R top, G briefs), cloth albedo and normal. */
     underwear: { mask: Texture; albedo: Texture; normal: Texture | null } | null;
   };
@@ -125,12 +123,10 @@ export async function loadSkinTextures(
     albedo,
     normal,
     srmf,
-    cavity,
     wrinkleNormals,
     bodyAlbedo,
     bodyNormal,
     bodySrmf,
-    bodyCavity,
     masks,
     underwear,
     straps,
@@ -138,14 +134,12 @@ export async function loadSkinTextures(
     loadTexture(renderer, makeup && skin.makeupAlbedo ? skin.makeupAlbedo : face.albedo, 'color'),
     loadTexture(renderer, face.normal, 'data'),
     optional(renderer, face.srmf, 'data'),
-    optional(renderer, face.cavity, 'data'),
     wrinkleFiles
       ? Promise.all(wrinkleFiles.map((file) => loadTexture(renderer, file, 'data')))
       : Promise.resolve(null),
     loadTexture(renderer, skin.body.albedo, 'color'),
     loadTexture(renderer, skin.body.normal, 'data'),
     optional(renderer, skin.body.srmf, 'data'),
-    optional(renderer, skin.body.cavity, 'data'),
     wrinkleFiles ? (maskArray(renderer, face.wrinkleMasks) ?? Promise.resolve(null)) : null,
     skin.body.underwear
       ? Promise.all([
@@ -157,24 +151,10 @@ export async function loadSkinTextures(
     optional(renderer, face.underwear?.straps, 'data'),
   ]);
   return {
-    face: { albedo, normal, srmf, cavity, wrinkleNormals, straps },
-    body: {
-      albedo: bodyAlbedo,
-      normal: bodyNormal,
-      srmf: bodySrmf,
-      cavity: bodyCavity,
-      underwear,
-    },
+    face: { albedo, normal, srmf, wrinkleNormals, straps },
+    body: { albedo: bodyAlbedo, normal: bodyNormal, srmf: bodySrmf, underwear },
     masks,
   };
-}
-
-/** How much the cavity map removes specular from pores and creases. */
-export const CAVITY_STRENGTH = 0.7;
-
-interface SkinUniforms {
-  skinCavity: { value: Texture | null };
-  skinCavityStrength: { value: number };
 }
 
 /**
@@ -184,8 +164,7 @@ interface SkinUniforms {
 export function bindSkinTextures(materials: readonly Material[], textures: SkinTextures): void {
   for (const material of materials) {
     const skin = material as MeshPhysicalMaterial;
-    const uniforms = skin.userData.skinUniforms as SkinUniforms | undefined;
-    if (!uniforms) continue;
+    if (!skin.userData.skinUniforms) continue;
     const isHead = skin.name.startsWith('head');
     const set = isHead ? textures.face : textures.body;
     skin.map = set.albedo;
@@ -193,11 +172,9 @@ export function bindSkinTextures(materials: readonly Material[], textures: SkinT
     // Our GLBs carry no tangents, so three derives them and glTF normal maps
     // need y flipped, as GLTFLoader does for embedded maps.
     skin.normalScale.set(1, -1);
+    // Green is the roughness, red the specular level (see materials.ts).
     skin.roughnessMap = set.srmf;
-    skin.specularIntensityMap = set.srmf;
     skin.roughness = set.srmf ? 1 : 0.5;
-    uniforms.skinCavity.value = set.cavity;
-    uniforms.skinCavityStrength.value = set.cavity ? CAVITY_STRENGTH : 0;
     const underwear = skin.userData.underwearUniforms as UnderwearUniforms | null | undefined;
     if (underwear && isHead) {
       underwear.skinUnderwearStraps.value = textures.face.straps;

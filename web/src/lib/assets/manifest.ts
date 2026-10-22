@@ -48,7 +48,7 @@ export const FaceSchema = z.object({
 const FaceMapsSchema = z.object({
   albedo: File,
   normal: File,
-  cavity: File.optional(),
+  /** R specular level (Unreal's "Specular"), G roughness, A Unreal's fourth mask. */
   srmf: File.optional(),
   wrinkleColor: z.array(File).max(3).default([]),
   wrinkleNormal: z.array(File).max(3).default([]),
@@ -65,7 +65,6 @@ const BodyMapsSchema = z.object({
   /** Bare skin: the converter fills the underwear baked into the source albedo. */
   albedo: File,
   normal: File,
-  cavity: File.optional(),
   srmf: File.optional(),
   /**
    * Shared underwear the shader draws over the bare skin where no garment

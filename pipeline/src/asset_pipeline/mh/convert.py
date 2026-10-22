@@ -427,7 +427,8 @@ def skin_fingerprint(archive: Path, name: str) -> str:
     # v3: 2K face cavity; maps whose own recipe did not change are reused (TextureCache).
     # v4: underwear straps are filled from the head's UV island only (no pale wedges).
     # v5: the head's straps carry the bake's grey, normal and coverage (face_underwear).
-    return fingerprint("skin-v5", CharacterSource.find(archive, name).done)
+    # v6: no cavity maps (the SRMF bake already carries them).
+    return fingerprint("skin-v6", CharacterSource.find(archive, name).done)
 
 
 def iris_fingerprint(archive: Path, name: str) -> str:

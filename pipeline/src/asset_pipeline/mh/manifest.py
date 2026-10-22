@@ -108,8 +108,7 @@ def validate(manifest: Mapping[str, Any], web_root: Path | None = None) -> list[
         face = skin.get("face", {})
         for role in ("albedo", "normal"):
             file(face.get(role), f"{where} face.{role}")
-        for role in ("cavity", "srmf"):
-            file(face.get(role), f"{where} face.{role}", optional=True)
+        file(face.get("srmf"), f"{where} face.srmf", optional=True)
         for role in ("wrinkleColor", "wrinkleNormal"):
             values = face.get(role, [])
             need(isinstance(values, list) and len(values) <= 3, f"{where}: {role} holds at most 3")
@@ -120,8 +119,7 @@ def validate(manifest: Mapping[str, Any], web_root: Path | None = None) -> list[
         body = skin.get("body", {})
         for role in ("albedo", "normal"):
             file(body.get(role), f"{where} body.{role}")
-        for role in ("cavity", "srmf"):
-            file(body.get(role), f"{where} body.{role}", optional=True)
+        file(body.get("srmf"), f"{where} body.srmf", optional=True)
         file(skin.get("makeupAlbedo"), f"{where} makeupAlbedo", optional=True)
     for body in manifest.get("bodies", []):
         where = f"body {body.get('gender')}"
