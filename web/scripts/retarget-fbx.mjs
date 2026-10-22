@@ -322,6 +322,15 @@ function retarget(source, target, fps) {
       .normalize();
     restFix.set(joint.name, new Quaternion().setFromUnitVectors(from, to));
   }
+  // Joints with no chain of their own (twist and corrective bones, finger
+  // tips, toes) turn with the nearest ancestor that has one. Without its fix
+  // a twist bone kept the stance difference (27° at the shoulder on the
+  // HumanIK stand loop) and bent the skin it carries: kinked elbows, wrists
+  // and sleeves.
+  for (const joint of order) {
+    const inherited = restFix.has(joint.name) ? null : restFix.get(joint.parent?.name);
+    if (inherited) restFix.set(joint.name, inherited);
+  }
 
   const mixer = new AnimationMixer(source.object);
   mixer.clipAction(clip).play();
