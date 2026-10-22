@@ -1,4 +1,4 @@
-# Devir notu (2026-10-22 öğleden sonra)
+# Devir notu (2026-10-22 öğleden sonra, eğik duruş düzeltmesi sonrası)
 
 Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu, açık işleri, Mac'e taşımayı ve Mac'teki sıradaki işi anlatan tek sayfadır.
 
@@ -198,6 +198,14 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Karakter artık giydiği ayakkabının taban derinliği kadar kalkıyor. Kaldırma turntable gibi bir üst grupta; sonradan bağlanan skin'lerin bind matrisleri bozulmuyor.
     - Tek tük aykırı köşe sayılmıyor: kadın Oxford'da tabanın 1.6 cm altında 8 nokta var.
     - Terlikle taban idle'larda zeminden 0-2 mm, konuşmada en kötü 5 mm aşağıda. Erkek + botta ±5 mm, stand_talk'ta en kötü 1 cm (erkek gövdede klip pelvis ölçeği, aşağıdaki açık madde).
+- Kullanıcının eğik duruş ekran görüntüsünden düzeltilen (2026-10-22 öğleden sonra, Ada, crop top + tayt + terlik, `listening` idle'ı):
+  - **Gövde geriye yatık, çene yukarıdaydı** (`retarget-fbx.mjs`, `f6b3e9e`):
+    - Pelvis, omurga, boyun ve baş dönüşlerini FBX rest'ine göre taşıyordu. Mocap.in klipleri ilk kareyi rest sayıyor; `listening`'de o karede gövde öne eğik, baş 19° önde.
+    - O kare "dik" sayılınca gövde oyuncununkinden 10° geride, baş ortalama 9° (en çok 19°) yukarıda kaldı. Bacaklar yön taşıdığı için dizler oyuncununki gibi öndeydi; yandan bakınca karakter geriye yatık duruyordu.
+    - Artık bu eklemler çekimin ortalama pozuna göre dönüyor ve o poz bind'in dik duruşuna denk geliyor. `listening`: gövde (pelvis→boyun) -9.0° → -4.5° (bind'inki), baş eğimi ortalama -8.6° → 0°. Bacak ve ayaklar değişmedi.
+    - Diğer kliplerde de baş ortalamada düz bakıyor: önce shibuya 11.5° aşağı, stand_talk 9.7° yukarı bakıyordu.
+    - 5 klip yeniden üretildi (hedef kadın gövde). `standing`/`calm` bayrakları değişmedi, manifest aynı. GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
+  - **Açık:** `listening`'de dizler kaynakta ~26° bükük (relax ve shibuya ~8°). Gövde artık dik ama yandan bakınca hafif çömelmiş duruyor. Seçenekler: retarget'te bacak IK'sıyla dizleri düzeltmek ya da klibi gizlemek (gizlenirse sakin idle sayısı `MIN_CALM_IDLES`'ın altına düşer). Karar kullanıcıda.
 - Bilinen notlar:
   - Ayakkabı küçük resimleri eski pozla (ayak parmak yukarı) çekildi. İstenirse `/dev/thumbs` ile yeniden üretilir.
   - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). Kalan 3 sakin idle (relax, listening, shibuya) tam gövdeyi sürmeye yetiyor.
@@ -348,6 +356,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
 4. Kalan kalite notları:
    - Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).
+   - `listening` idle'ında kaynaktan gelen ~26° diz bükümü: bacak IK'sı ya da gizleme (kullanıcı kararı, yukarıdaki "Açık" madde).
    - CC BY atfı: crowd idle klipleri (Vernac Studios, CC BY 4.0) için UI'da kredi satırı. Henüz yok.
 5. Mac'te performans ölçümü (fps, boşta 30) ve lip-sync'in TR + EN cümlelerle yeniden kontrolü.
 
