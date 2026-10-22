@@ -133,7 +133,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Ön eleme: `asset-pipeline mh-similar` çok benzer öğeleri ölçer (saç/kaş/sakal/bıyık kart yüzeyi, kıyafet yüzeyi, yüz DNA'sı, gövde klibi). `--apply` bunları `curation.json`'da `auto` altına yazar ve gizler; ekran "Ön elemede gizlenenler" filtresiyle gösterir, kullanıcı geri açabilir. Rapor: arşivde `build/similar.json`.
     - Silme: `asset-pipeline mh-prune` deneme modunda planı, boşalacak yeri ve bir plan özeti yazar. Silmek için `--apply --plan <özet>`; plan o arada değiştiyse reddeder. `--unused-packages` hiçbir öğenin gelmediği Fab paketlerini de siler, ama bir export klasörü eksikken (export sürüyorsa) hiçbir paketi kullanılmıyor saymaz.
   - i18n anahtar testi ve Playwright e2e.
-- Doğrulama (2026-10-22 öğleden sonra): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **809 test geçti**. Pipeline: `ruff` temiz, pytest **310 geçti, 2 atlandı** (atlananlar budanan stand idle ve body ROM klipleri). Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
+- Doğrulama (2026-10-22 öğleden sonra): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **813 test geçti**. Pipeline: `ruff` temiz, pytest **310 geçti, 2 atlandı** (atlananlar budanan stand idle ve body ROM klipleri). Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
 - **Dev sayfaları** (`next dev` dışında 404):
   - `/dev/stage`: gerçek manifest; yüz, saç, kıyafet ve kalite seçimi; `/api/tts` ile canlı TTS; zoom.
   - `/dev/mh`: tek preset görüntüleyici, `?face=<id>` ile.
@@ -186,7 +186,20 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - **Dikişte gözenek ölçeği** (`c4f1be7`): gövde döşemesi 36 → 70.
   - Dikişte albedo ve ışık ölçüldü: iki taraf arasındaki fark ≤5/255. "Göğüste ton farkı" diye görülen, askıların düz rengiyle gözenek farkıydı.
   - **Cilt speküleri hiç çalışmıyordu** (`c4cb122`, kullanıcı onayıyla): `createSkinMaterial` `material.defines`'ı baştan yazıp three'nin `PHYSICAL` tanımını siliyordu; her texel F0 0.04'teydi, SRMF kırmızısı ve boyalı saçın düşük speküleri uygulanmıyordu. Artık açık; kafa yine 15/16 sampler. Cavity haritaları kaldırıldı: SRMF bake'i onları zaten taşıyor (Jelena'da yüksek geçiren korelasyon -0.77 / +0.74; Unreal'ın baked materyali de cavity almıyor). Ciltler 1.2 GB → 1017 MB, `web` 2.0 GB.
+- Kullanıcının terlik ekran görüntüsünden düzeltilenler (2026-10-22 öğleden sonra, Ada, terlik + tayt). Ayak platforma tam basmıyordu: topuk platformun içinde, parmak ucu havadaydı.
+  - **Ayaklar eğikti** (`retarget-fbx.mjs`):
+    - İskeletler hizalanırken "yukarı" pelvis→baş çizgisinden alınıyordu. Mocap.in klipleri ilk kareyi dinlenme pozu sayıyor ve gövde orada 7.5° öne eğik; bu eğim bütün bacaklara geçiyordu.
+    - ActorCore'da ayak bileği→parmak eklemi çizgisi MetaHuman'ınkinden 12° yatık. Ayağın duruş düzeltmesi bu çizgiyi eşleyince parmaklar kalkıyordu.
+    - Sonuç: relax ve listening'de ayak 7-13° parmak yukarı, topuk 3-4 cm platformun içinde.
+    - Artık yukarı sahnenin dikey ekseni; ayağın düzeltmesi yalnız dikey eksen etrafında. Basma noktası tarağın yanında topuğu da (`ankle_bck` altındaki zemin) kullanıyor. Parmak ucu zeminin altına inerse parmaklar tarak ekleminden yukarı bükülüyor.
+    - 5 klip yeniden üretildi (hedef yine kadın gövde). Çıplak ayağın en alçak noktası idle'larda zeminden en fazla 3 mm, stand_talk adımlarında 4.4 mm aşağıda (önce 4 cm). `crouch` 0.04-0.05'ten 0.006-0.026'ya indi; `standing` ve `calm` değişmedi.
+  - **Ayakkabılar platforma gömülüyordu** (`garments.ts` `soleDepth`, `MhCharacter.tsx`):
+    - Kıyafet GLB'lerinde ayakkabı tabanı çıplak ayağın 2-3.5 cm altında (terlik 2.5, bot 3.1, sokak setinin ayakkabısı 3.4 cm).
+    - Karakter artık giydiği ayakkabının taban derinliği kadar kalkıyor. Kaldırma turntable gibi bir üst grupta; sonradan bağlanan skin'lerin bind matrisleri bozulmuyor.
+    - Tek tük aykırı köşe sayılmıyor: kadın Oxford'da tabanın 1.6 cm altında 8 nokta var.
+    - Terlikle taban idle'larda zeminden 0-2 mm, konuşmada en kötü 5 mm aşağıda. Erkek + botta ±5 mm, stand_talk'ta en kötü 1 cm (erkek gövdede klip pelvis ölçeği, aşağıdaki açık madde).
 - Bilinen notlar:
+  - Ayakkabı küçük resimleri eski pozla (ayak parmak yukarı) çekildi. İstenirse `/dev/thumbs` ile yeniden üretilir.
   - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). Kalan 3 sakin idle (relax, listening, shibuya) tam gövdeyi sürmeye yetiyor.
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
