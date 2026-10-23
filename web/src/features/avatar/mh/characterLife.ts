@@ -9,6 +9,7 @@ import type { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import { Quaternion, Vector3, type Object3D } from 'three';
 
 import { stepBlink, type BlinkState } from '../life';
+import { ArmCollider } from './armCollision';
 import { createEmphasis, stepEmphasis, type EmphasisState } from './emphasis';
 import { addFaceClip, type FaceClip } from './faceClips';
 import {
@@ -82,6 +83,7 @@ export class CharacterLife {
   private mouth = createMouthState();
   private rig: PoseRig | undefined;
   private rigFor: MhCharacterHandle | undefined;
+  private arms: ArmCollider | undefined;
   private smile = 0;
   private emphasis: EmphasisState = createEmphasis();
   private readonly face = new Map<string, number>();
@@ -98,6 +100,7 @@ export class CharacterLife {
       // First frame of this character: its bones are at rest right now.
       const bones = new Set([...idlePose({ t: 0, mode: 'idle' }).map((r) => r.bone), ...EYES]);
       this.rig = createPoseRig(handle.body.root, bones);
+      this.arms = new ArmCollider(handle.body);
       this.rigFor = handle;
     }
 
@@ -122,6 +125,9 @@ export class CharacterLife {
         upper: motion?.upper,
       }),
     );
+    // The arms are posed: keep them out of the body (clips copy the actor's arm
+    // directions, and a MetaHuman's hips and waist are wider than an actor's).
+    this.arms!.step(delta);
 
     // The head turns part of the way toward the viewer (a clip's actor looks
     // around; in a conversation people face whom they talk to)...
