@@ -174,8 +174,12 @@ export function outfitWears(config: CharacterConfig, manifest: MhManifest): Outf
   });
 }
 
-/** Fewer calm clips than this would loop visibly; the body layer of standing ones is used then. */
-export const MIN_CALM_IDLES = 3;
+/**
+ * Fewer calm clips than this would loop visibly; the body layer of standing
+ * ones is used then. Two do: relax and the HumanIK stand loop take turns (the
+ * third, `listening`, holds the hands behind the back and is not calm).
+ */
+export const MIN_CALM_IDLES = 2;
 
 /**
  * Idle clips (manifest body animations tagged "idle"), with the retarget
