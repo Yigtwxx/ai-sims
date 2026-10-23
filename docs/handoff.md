@@ -52,7 +52,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 ### Dönüştürücü (`asset-pipeline mh-convert`, `pipeline/src/asset_pipeline/mh/`)
 
 - Komut `--all` ile artımlı çalışır; yalnızca değişen ya da yeni gelen birimleri çevirir. Çıktı `MetaHumanArchive/web/`.
-- **Manifest v2** (`generatedAt` 2026-10-22T07:56Z, prune sonrası): 19 yüz, 20 cilt, 2 vücut, 49 groom, 24 kıyafet, 22 iris, 9 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
+- **Manifest v2** (`generatedAt` 2026-10-23T10:42Z, listening prune'u sonrası): 19 yüz, 20 cilt, 2 vücut, 49 groom, 24 kıyafet, 22 iris, 8 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
 - **Kürasyon:** `raw/pruned.json` silinmiş 115 id'yi tutar; `web/curation.json` 191 id'yi gizler. Elenen yüzler: Bo, Bruce, Grace, Jorge, Lani, Lorenzo, Orlando, Sook-ja, Walter.
 - Sıkıştırma:
   - Kendi meshopt encoder'ı; vertex sırası ve IBM'ler korunur.
@@ -148,7 +148,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - Gövde katmanlı idle'da prosedürel kollar, jest girerken jeste devreder.
 - Jestler Unreal'sız, FBX'ten gelir. 2026-10-21 kararı: yalnızca ücretsiz paketler kullanılır. Fab'daki ücretsiz Unreal paketleri de en fazla ~3 konuşma klibi veriyor.
 - Kullanılanlar (2026-10-21, hepsi ayakta, tam boy):
-  - Mocap.in Realistic Acting (Fab, Personal lisans): `talking_normal` (talk), `listening` (sakin idle).
+  - Mocap.in Realistic Acting (Fab, Personal lisans): `talking_normal` (talk). `listening` (eller arkada) 2026-10-23'te silindi.
   - ActorCore ücretsiz hareketleri: `stand_talk` (talk), `relax` (sakin idle). İndirme ayarı: hedef "Unreal (UE 5 Skeleton)", 60 fps; kemik adları zaten UE5. Zip'ler `MetaHumanArchive/gestures/actorcore/zips/`.
   - Elenenler: Female Idle-2 (kalça 17 cm kayıyor), Change Pose (61° dönüş, 38° eğilme), oturan ve yürüyen klipler.
 - Hepsi `web/scripts/retarget-fbx.mjs` ile MetaHuman'a aktarılır:
@@ -225,10 +225,10 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Betik artık `handsBehind` ölçüyor: iki el pelvisin 6 cm'den fazla arkasında olan karelerin payı; 0.3'ü geçen klip `calm` değil. listening 0.75; relax ve shibuya 0, konuşma klipleri 0.02-0.11.
     - Arşivdeki 5 `clips.json` yenilendi (GLB'ler byte byte aynı), manifest yeniden yazıldı: tek değişiklik listening'in `calm` etiketini kaybetmesi.
     - `MIN_CALM_IDLES` 3 → 2: varsayılan duruş relax ve shibuya, tam gövde mocap, eller yanda. 2'nin altına düşülseydi kollar prosedürel katmana kalırdı.
-    - listening artık hiçbir rolde oynamıyor. Silmek (kürasyon + `mh-prune`) ya da yalnız dinleme rolüne almak kullanıcı kararı.
+    - Kullanıcı kararıyla listening silindi: kürasyonda gizlendi, `mh-prune --apply` yalnız `listening.glb`'yi sildi (~0 GB), id `raw/pruned.json`'da, manifest 8 animasyon. Kaynak FBX `gestures/mocapin/named/` içinde duruyor.
 - Bilinen notlar:
   - Ayakkabı küçük resimleri eski pozla (ayak parmak yukarı) çekildi. İstenirse `/dev/thumbs` ile yeniden üretilir.
-  - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). 2026-10-23'ten beri sakin idle'lar relax ve shibuya (listening eller arkada olduğu için sakin sayılmıyor, yukarıda).
+  - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). 2026-10-23'ten beri sakin idle'lar relax ve shibuya (eller arkada duran listening silindi, yukarıda).
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
   - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
