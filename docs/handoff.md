@@ -1,4 +1,4 @@
-# Devir notu (2026-10-22 öğleden sonra, eğik duruş ve diz düzeltmesi sonrası)
+# Devir notu (2026-10-23, kol-gövde çarpışması ve düz varsayılan duruş sonrası)
 
 Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu, açık işleri, Mac'e taşımayı ve Mac'teki sıradaki işi anlatan tek sayfadır.
 
@@ -110,6 +110,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - Canlılık (`characterLife.ts`, `motion.ts`):
     - Mocap idle klipleri: Fab crowd/stand döngüleri, `web/scripts/retarget-fbx.mjs` ile.
     - Prosedürel nefes ve kol katmanı. Rahat kollarda ön kol 45° döner, avuç içi bacağa bakar.
+    - Kol-gövde çarpışması (`armCollision.ts`): klip ve katmanlardan sonra üst kol omuzdan, kol gövdenin dışında kalacak kadar döner (aşağıda, 2026-10-23).
     - Göz teması ve başın kısmen kullanıcıya dönmesi.
     - Sakkad, göz kırpma.
     - Yüz idle döngüsü ve hafif "nefes alan" gülümseme.
@@ -133,7 +134,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Ön eleme: `asset-pipeline mh-similar` çok benzer öğeleri ölçer (saç/kaş/sakal/bıyık kart yüzeyi, kıyafet yüzeyi, yüz DNA'sı, gövde klibi). `--apply` bunları `curation.json`'da `auto` altına yazar ve gizler; ekran "Ön elemede gizlenenler" filtresiyle gösterir, kullanıcı geri açabilir. Rapor: arşivde `build/similar.json`.
     - Silme: `asset-pipeline mh-prune` deneme modunda planı, boşalacak yeri ve bir plan özeti yazar. Silmek için `--apply --plan <özet>`; plan o arada değiştiyse reddeder. `--unused-packages` hiçbir öğenin gelmediği Fab paketlerini de siler, ama bir export klasörü eksikken (export sürüyorsa) hiçbir paketi kullanılmıyor saymaz.
   - i18n anahtar testi ve Playwright e2e.
-- Doğrulama (2026-10-22 öğleden sonra): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **813 test geçti**. Pipeline: `ruff` temiz, pytest **310 geçti, 2 atlandı** (atlananlar budanan stand idle ve body ROM klipleri). Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
+- Doğrulama (2026-10-23): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **812 geçti, 8 atlandı** (mongod kapalıydı; repository testleri atlanır). Pipeline (2026-10-22): `ruff` temiz, pytest **310 geçti, 2 atlandı** (atlananlar budanan stand idle ve body ROM klipleri). Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
 - **Dev sayfaları** (`next dev` dışında 404):
   - `/dev/stage`: gerçek manifest; yüz, saç, kıyafet ve kalite seçimi; `/api/tts` ile canlı TTS; zoom.
   - `/dev/mh`: tek preset görüntüleyici, `?face=<id>` ile.
@@ -212,9 +213,22 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - `listening`: dizler 8° ve 15°, iki ayak yerde (0-0.5 cm), çömelme 0.021 → 0.009. relax, shibuya ve talking_normal birebir aynı; stand_talk'ta destek dizi 8.6° → 8.0°. Erkek gövdede de sağ/sol ayak farkı 1.3 → 0.0 cm.
     - 5 klip yeniden üretildi ve arşivdekiler commit'teki betiğin çıktısıyla byte byte aynı. Bayraklar ve manifest değişmedi, GLB validate temiz.
     - Bilinen: çekimin son karesi ilk kareye sarıyor (eskiden de öyleydi). Klip bitmeden söndüğü için görünmüyor; dizdeki sıçrama 4.8° → 8.4°.
+- Kullanıcının notlarından düzeltilenler (2026-10-23, "kollar hareket ederken vücudun içinden geçiyor", "varsayılan duruş düz olsun"):
+  - **Kollar gövdeden geçiyordu** (`armCollision.ts`, `characterLife.ts`):
+    - Retarget kemik yönlerini kopyalıyor, elin gövdeye nerede değdiğini değil. MetaHuman'ın kalça ve beli oyunculardan geniş: `listening`'de el kalçanın 8 cm içinde, konuşma kliplerinde ön kol bele 8 cm giriyordu. Ölçüm tam gövde köşeleriyle, kadın gövde, el/ön kol en derin: relax 35, listening 80, stand_talk 80, talking_normal 80 mm.
+    - `ArmCollider` her karede klip ve prosedürel katmandan sonra çalışır. Gövde derisi 2 cm aralıkla örneklenir ve CPU'da skinlenir. Kol örnekleri gövdeye girerse üst kol omuzdan en küçük açıyla döner (4 geçiş). Gerek kalmayan itme 0.3 sn'de klibe söner (`RELEASE`).
+    - Üst kol dirseğin 3 cm yukarısına kadar sayılmaz (`ELBOW`): sarkan kolda koltuk altı göğsün yanına gömülür. Sayılınca prosedürel rahat kollar 16° dışarı itiliyordu.
+    - Kıyafet deri üstüne en çok 1 cm kalınlık ekler (`CLOTH`), kolda ve gövdede. Bol kumaş ezilir sayılır: kumaş yüzeyini sert sayınca bol ceketin eteği kolları 26-40° açıyordu (penguen duruşu), 2 cm'de sweatshirt 8°, 1 cm'de 4°.
+    - Sonuç (kadın gövde, el/ön kol en derin): 80 → 0-10 mm. İtme medyanı idle'larda ~1°, konuşmada 5-10°. 60 fps'te kare başı ek el hızı 5 mm'yi aşan kare binde 1-2 (derin girişin ilk anları). Node'da ~0.6-0.9 ms/kare.
+  - **Varsayılan duruşta eller arkadaydı** (`retarget-fbx.mjs`, `resolve.ts`):
+    - `listening` elleri pelvisin ortalama 11 cm (en çok 17 cm) arkasında tutuyor. Sakin idle sayıldığı için varsayılan döngüdeydi.
+    - Betik artık `handsBehind` ölçüyor: iki el pelvisin 6 cm'den fazla arkasında olan karelerin payı; 0.3'ü geçen klip `calm` değil. listening 0.75; relax ve shibuya 0, konuşma klipleri 0.02-0.11.
+    - Arşivdeki 5 `clips.json` yenilendi (GLB'ler byte byte aynı), manifest yeniden yazıldı: tek değişiklik listening'in `calm` etiketini kaybetmesi.
+    - `MIN_CALM_IDLES` 3 → 2: varsayılan duruş relax ve shibuya, tam gövde mocap, eller yanda. 2'nin altına düşülseydi kollar prosedürel katmana kalırdı.
+    - listening artık hiçbir rolde oynamıyor. Silmek (kürasyon + `mh-prune`) ya da yalnız dinleme rolüne almak kullanıcı kararı.
 - Bilinen notlar:
   - Ayakkabı küçük resimleri eski pozla (ayak parmak yukarı) çekildi. İstenirse `/dev/thumbs` ile yeniden üretilir.
-  - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). Kalan 3 sakin idle (relax, listening, shibuya) tam gövdeyi sürmeye yetiyor.
+  - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). 2026-10-23'ten beri sakin idle'lar relax ve shibuya (listening eller arkada olduğu için sakin sayılmıyor, yukarıda).
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
   - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
