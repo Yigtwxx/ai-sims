@@ -52,8 +52,8 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 ### Dönüştürücü (`asset-pipeline mh-convert`, `pipeline/src/asset_pipeline/mh/`)
 
 - Komut `--all` ile artımlı çalışır; yalnızca değişen ya da yeni gelen birimleri çevirir. Çıktı `MetaHumanArchive/web/`.
-- **Manifest v2** (`generatedAt` 2026-10-23T10:42Z, listening prune'u sonrası): 19 yüz, 20 cilt, 2 vücut, 49 groom, 24 kıyafet, 22 iris, 8 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
-- **Kürasyon:** `raw/pruned.json` silinmiş 115 id'yi tutar; `web/curation.json` 191 id'yi gizler. Elenen yüzler: Bo, Bruce, Grace, Jorge, Lani, Lorenzo, Orlando, Sook-ja, Walter.
+- **Manifest v2** (`generatedAt` 2026-10-25T08:08Z, mini elbise prune'u sonrası): 19 yüz, 20 cilt, 2 vücut, 49 groom, 23 kıyafet, 22 iris, 8 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
+- **Kürasyon:** `raw/pruned.json` silinmiş 201 id'yi tutar; `web/curation.json` aynı 201 id'yi gizler. Elenen yüzler: Bo, Bruce, Grace, Jorge, Lani, Lorenzo, Orlando, Sook-ja, Walter.
 - Sıkıştırma:
   - Kendi meshopt encoder'ı; vertex sırası ve IBM'ler korunur.
   - Dokular GLB dışında, KTX2 UASTC + zstd. Normal haritalar OpenGL.
@@ -229,6 +229,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 - Bilinen notlar:
   - Ayakkabı küçük resimleri eski pozla (ayak parmak yukarı) çekildi. İstenirse `/dev/thumbs` ile yeniden üretilir.
   - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). 2026-10-23'ten beri sakin idle'lar relax ve shibuya (eller arkada duran listening silindi, yukarıda).
+  - Yeşil mini elbise (`outfit.MiniDress01`, yalnız kadın) kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-25, 0.17 GB): web klasörü, iki cinsiyetin export birimi, `oa_minidress01_variant` Fab paketi ve içe aktarma kaydı. Etiketi ve cinsiyet kaydı kaldırıldı; manifest 23 kıyafet.
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
   - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
@@ -403,5 +404,5 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 - **Tasarım:** karanlık sinematik. Grafit zemin, tek amber vurgu. Mor gradyan ve her yerde glassmorphism yasak.
 - **Dövme ve piercing:** ölçülü.
 - **Kıyafet:** iş ve günlük karışık.
-- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği; arşivde bugün 31 `.mhpkg` var: 27 `oa_*`, 4 `khaosmdf*`). Animasyonlar da yalnız ücretsiz paketlerden.
+- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği; arşivde 2026-10-25'te 23 `.mhpkg` var: 21 `oa_*`, 2 `khaosmdf*`). Animasyonlar da yalnız ücretsiz paketlerden.
 - **Lisans:** UE EULA MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor. LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
