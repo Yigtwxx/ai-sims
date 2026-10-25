@@ -1,4 +1,4 @@
-# Devir notu (2026-10-23, kol-gövde çarpışması ve düz varsayılan duruş sonrası)
+# Devir notu (2026-10-25, oluşturucuda ayar yaparken titreme düzeltmesi sonrası)
 
 Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. Kalıcı kurallar `CLAUDE.md`'de. Bu dosya güncel durumu, açık işleri, Mac'e taşımayı ve Mac'teki sıradaki işi anlatan tek sayfadır.
 
@@ -134,7 +134,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Ön eleme: `asset-pipeline mh-similar` çok benzer öğeleri ölçer (saç/kaş/sakal/bıyık kart yüzeyi, kıyafet yüzeyi, yüz DNA'sı, gövde klibi). `--apply` bunları `curation.json`'da `auto` altına yazar ve gizler; ekran "Ön elemede gizlenenler" filtresiyle gösterir, kullanıcı geri açabilir. Rapor: arşivde `build/similar.json`.
     - Silme: `asset-pipeline mh-prune` deneme modunda planı, boşalacak yeri ve bir plan özeti yazar. Silmek için `--apply --plan <özet>`; plan o arada değiştiyse reddeder. `--unused-packages` hiçbir öğenin gelmediği Fab paketlerini de siler, ama bir export klasörü eksikken (export sürüyorsa) hiçbir paketi kullanılmıyor saymaz.
   - i18n anahtar testi ve Playwright e2e.
-- Doğrulama (2026-10-23): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **812 geçti, 8 atlandı** (mongod kapalıydı; repository testleri atlanır). Pipeline (2026-10-22): `ruff` temiz, pytest **310 geçti, 2 atlandı** (atlananlar budanan stand idle ve body ROM klipleri). Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
+- Doğrulama (2026-10-25): `pnpm typecheck` ve `pnpm lint` temiz, `pnpm test` **823 geçti** (mongod açıktı; kapalıyken repository testleri atlanır). Pipeline (2026-10-22): `ruff` temiz, pytest **310 geçti, 2 atlandı** (atlananlar budanan stand idle ve body ROM klipleri). Yeniden üretilen GLB'ler `gltf-transform validate`'ten hatasız ve uyarısız geçti.
 - **Dev sayfaları** (`next dev` dışında 404):
   - `/dev/stage`: gerçek manifest; yüz, saç, kıyafet ve kalite seçimi; `/api/tts` ile canlı TTS; zoom.
   - `/dev/mh`: tek preset görüntüleyici, `?face=<id>` ile.
@@ -226,6 +226,13 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
     - Arşivdeki 5 `clips.json` yenilendi (GLB'ler byte byte aynı), manifest yeniden yazıldı: tek değişiklik listening'in `calm` etiketini kaybetmesi.
     - `MIN_CALM_IDLES` 3 → 2: varsayılan duruş relax ve shibuya, tam gövde mocap, eller yanda. 2'nin altına düşülseydi kollar prosedürel katmana kalırdı.
     - Kullanıcı kararıyla listening silindi: kürasyonda gizlendi, `mh-prune --apply` yalnız `listening.glb`'yi sildi (~0 GB), id `raw/pruned.json`'da, manifest 8 animasyon. Kaynak FBX `gestures/mocapin/named/` içinde duruyor.
+- Kullanıcının notundan düzeltilen (2026-10-25, "saç ayarlarken renkte de diğer kısımlarda da titriyor, düzgün durmuyor"; kadında görüldü):
+  - **Ayar yaparken baş bir karede dönüyordu** (`d4aa8c1`, `MhCharacter.tsx`, `assembly.ts`):
+    - Oluşturucu store'u her düzenlemede config'i `structuredClone` ile baştan kopyalıyor. Saç rengi değişince bile `MhCharacter`'a yeni ama eşit bir `sliders` nesnesi geliyordu.
+    - Slider efekti nesnenin kimliğine bağlıydı. Her adımda `applyBodySliders` iskeleti dinlenme pozuna sıfırlayıp yeniden bind ediyor, 150 ms sonra kıyafetleri yeniden katmanlıyordu (50-150 ms'lik uzun görevler). Animasyonun ortasında baş bir karede yandan karşıya dönüyordu.
+    - Efektler artık slider değerlerinden kurulan anahtara bağlı (`bodySliderKey`); yalnız vücut slider'ı değişince çalışıyor.
+    - Ölçüm (kadın, saç rengi kaydırma): `applyBodySliders` 211 → 0 çağrı. Tuvalde ardışık kareler arasındaki en büyük fark 7-8'den 1.6'ya indi (boştaki salınım düzeyi). Ten, göz ve kıyafet rengi gibi diğer düzenlemeler de aynı yoldan geçiyordu; hepsi düzeldi. Erkekte görsel ölçülmedi, kod ortak.
+  - **Kaydırırken kare hızı** (kod değişmedi): 144 Hz ekranda `next dev` boşta 121, kaydırırken 73 fps; production build'de 144 ve 125 fps. Production profilinde React adım başına ~1.6 ms harcıyor, gerisi her karede zaten çalışan WebGL render'ı. Dev'deki büyük düşüş React'in dev yükü (`console.createTask` vb.).
 - Bilinen notlar:
   - Ayakkabı küçük resimleri eski pozla (ayak parmak yukarı) çekildi. İstenirse `/dev/thumbs` ile yeniden üretilir.
   - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). 2026-10-23'ten beri sakin idle'lar relax ve shibuya (eller arkada duran listening silindi, yukarıda).
@@ -233,6 +240,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
   - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
+  - **`pnpm build` (Turbopack) kırılıyor:** `public/assets/mh` junction'ı proje dışını (`C:\Users\Asus\MetaHumanArchive\web`) gösteriyor ve dev küçük resim route'u o klasörü izliyor ("symlink target leaves the filesystem root"). `next build --webpack` derleniyor ama Tailwind yalnız Turbopack'e bağlı olduğu için sayfa stilsiz çıkıyor. Ölçüm için `web/next.config.ts`'te `turbopack.root` geçici olarak `C:/Users/Asus` yapılıp derlendi ve hemen geri alındı (commit'lenmez). Kalıcı çözüm kullanıcı kararıyla ertelendi (2026-10-25); Mac'teki sembolik bağlantıda da aynısı beklenir.
 
 ## Açık işler (2026-10-22 sabah)
 
