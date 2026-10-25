@@ -20,6 +20,7 @@ import {
   applyBodySliders,
   attachHead,
   bindNeckSeam,
+  bodySliderKey,
   collectMorphMeshes,
   createBodyRig,
   mhExtras,
@@ -564,9 +565,15 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
 
   useImperativeHandle(ref, () => assembled.handle, [assembled]);
 
+  // By value: any edit brings an equal but new sliders object (see bodySliderKey).
+  const sliderKey = bodySliderKey(sliders);
+  const latestSliders = useRef(sliders);
   useLayoutEffect(() => {
-    applyBodySliders(assembled.handle.body, sliders ?? {});
-  }, [assembled, sliders]);
+    latestSliders.current = sliders;
+  }, [sliders]);
+  useLayoutEffect(() => {
+    applyBodySliders(assembled.handle.body, latestSliders.current ?? {});
+  }, [assembled, sliderKey]);
   // Layering walks every vertex of the clothes: it waits for the sliders to rest.
   useEffect(() => {
     const timer = window.setTimeout(
@@ -574,7 +581,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       LAYER_DELAY_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [assembled, sliders]);
+  }, [assembled, sliderKey]);
 
   useFrame(({ camera }, delta) => {
     onFrame?.(assembled.handle, delta, camera);

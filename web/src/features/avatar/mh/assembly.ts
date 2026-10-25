@@ -155,6 +155,16 @@ export const BODY_SLIDER_IDS = [
 ] as const;
 export type BodySliderId = (typeof BODY_SLIDER_IDS)[number];
 
+/**
+ * The slider values as one string, missing ones neutral. The creator clones
+ * the whole config on every edit, so a hair or colour change hands over a new
+ * but equal sliders object; re-applying it would snap the posed skeleton to
+ * rest and re-bind it mid-animation.
+ */
+export function bodySliderKey(values: Partial<Record<BodySliderId, number>> | undefined): string {
+  return BODY_SLIDER_IDS.map((id) => values?.[id] ?? 0).join('|');
+}
+
 /** Morph weight of each slider end for a slider value in -1..1. */
 export function sliderEndWeights(value: number): { min: number; max: number } {
   const v = Math.max(-1, Math.min(1, value));

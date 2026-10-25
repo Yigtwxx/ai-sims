@@ -10,7 +10,13 @@ import {
 } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { alignLoops, bindNeckSeam, createBodyRig, type NeckSeamExtras } from './assembly';
+import {
+  alignLoops,
+  bindNeckSeam,
+  bodySliderKey,
+  createBodyRig,
+  type NeckSeamExtras,
+} from './assembly';
 
 const RING = 8;
 
@@ -167,5 +173,23 @@ describe('bindNeckSeam', () => {
     const rig = createBodyRig(root, {});
     expect(bindNeckSeam([head], undefined, rig, seam('body'))).toBeUndefined();
     expect(bindNeckSeam([head], seam('head'), rig, undefined)).toBeUndefined();
+  });
+});
+
+describe('bodySliderKey', () => {
+  it('is the same for equal values in a fresh object (the creator clones the config per edit)', () => {
+    const sliders = { height: 0.2, waist: -0.5 };
+    expect(bodySliderKey(structuredClone(sliders))).toBe(bodySliderKey(sliders));
+  });
+
+  it('treats a missing slider as neutral', () => {
+    expect(bodySliderKey({ height: 0.2, weight: 0 })).toBe(bodySliderKey({ height: 0.2 }));
+    expect(bodySliderKey({})).toBe(bodySliderKey(undefined));
+  });
+
+  it('changes when any slider moves', () => {
+    const before = bodySliderKey({ height: 0.2 });
+    expect(bodySliderKey({ height: 0.21 })).not.toBe(before);
+    expect(bodySliderKey({ height: 0.2, shoulders: 0.1 })).not.toBe(before);
   });
 });
