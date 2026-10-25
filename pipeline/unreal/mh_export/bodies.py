@@ -36,6 +36,22 @@ SLIDERS = {
     "hips": ("Hip", 12.0),
     "shoulders": ("Across Shoulder", 4.0),
 }
+# (gender, slider end) -> the measurements allowed to move with that end, as offsets
+# (cm) from neutral; every other measurement is held at its neutral value. With Chest
+# alone the solver widens the ribcage (Underbust +5.7), lowers the apex (Shoulder to
+# Apex +3.7) and splays the breasts (Bust Span +4.4): the torso swells instead of the
+# bust growing. With Hip alone High Hip grows almost as much as Hip (+10.7 of +12), a
+# boxy flank, not a curve. Holding only those measurements moves the excess elsewhere
+# (shoulders, neck, biceps), hence the rest is held too.
+SHAPED_ENDS: dict[tuple[str, str], dict[str, float]] = {
+    ("female", "chest_max"): {
+        "Underbust": 1.5,
+        "Shoulder to Apex": 1.0,
+        "Bust Span": 1.5,
+        "Front Interscye Length": 1.0,
+    },
+    ("female", "hips_max"): {"High Hip": 4.0, "Thigh": 3.0, "Rise": 5.0},
+}
 
 
 def create_character(name: str) -> unreal.MetaHumanCharacter:
@@ -107,8 +123,13 @@ def export_gender(gender: str, work: Path) -> dict[str, Any]:
         for slider, (constraint, delta) in SLIDERS.items():
             center = base.get(constraint, neutral[constraint]["value"])
             for sign, label in ((-1, "min"), (1, "max")):
-                targets = {**base, constraint: center + sign * delta}
                 key = f"{slider}_{label}"
+                targets = {**base, constraint: center + sign * delta}
+                shaped = SHAPED_ENDS.get((gender, key))
+                if shaped is not None:
+                    for name, reading in neutral.items():
+                        if name not in targets:
+                            targets[name] = reading["value"] + shaped.get(name, 0.0)
                 measured = apply(character, targets)
                 variants[key] = {
                     "slider": slider,
