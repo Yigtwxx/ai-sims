@@ -52,7 +52,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 ### Dönüştürücü (`asset-pipeline mh-convert`, `pipeline/src/asset_pipeline/mh/`)
 
 - Komut `--all` ile artımlı çalışır; yalnızca değişen ya da yeni gelen birimleri çevirir. Çıktı `MetaHumanArchive/web/`.
-- **Manifest v2** (`generatedAt` 2026-10-25T08:08Z, mini elbise prune'u sonrası): 19 yüz, 20 cilt, 2 vücut, 49 groom, 23 kıyafet, 22 iris, 8 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
+- **Manifest v2** (`generatedAt` 2026-10-25T20:04Z, Clara body eklendikten sonra): 19 yüz, 20 cilt, 2 vücut, 49 groom, 24 kıyafet, 22 iris, 8 animasyon, 8 ışık. Kategori ayrıntısı ve klasör boyutları: `docs/metahuman-export.md` (prune öncesi sayılar).
 - **Kürasyon:** `raw/pruned.json` silinmiş 201 id'yi tutar; `web/curation.json` aynı 201 id'yi gizler. Elenen yüzler: Bo, Bruce, Grace, Jorge, Lani, Lorenzo, Orlando, Sook-ja, Walter.
 - Sıkıştırma:
   - Kendi meshopt encoder'ı; vertex sırası ve IBM'ler korunur.
@@ -237,6 +237,8 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - Ayakkabı küçük resimleri eski pozla (ayak parmak yukarı) çekildi. İstenirse `/dev/thumbs` ile yeniden üretilir.
   - `anim.stand_idle_loop` (Unreal'ın MetaHuman stand idle'ı) kolları yana açık ve parmakları kıvrık oynuyordu; kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-22, 0.01 GB; manifest yeniden yazıldı). 2026-10-23'ten beri sakin idle'lar relax ve shibuya (eller arkada duran listening silindi, yukarıda).
   - Yeşil mini elbise (`outfit.MiniDress01`, yalnız kadın) kullanıcı kararıyla gizlendi ve `mh-prune --apply` ile silindi (2026-10-25, 0.17 GB): web klasörü, iki cinsiyetin export birimi, `oa_minidress01_variant` Fab paketi ve içe aktarma kaydı. Etiketi ve cinsiyet kaydı kaldırıldı; manifest 23 kıyafet.
+  - Clara body (`outfit.KhaosMDF479`, QuingKhaos, Fab'de ücretsiz, Standard License) kullanıcı isteğiyle eklendi (2026-10-25), yalnız kadın. Sıra: `.mhpkg` arşivin `fab/` klasörüne, `ue fab_import` (1 dk 53 sn), `ue outfits --args '{"genders": ["female"], "only": ["WI_KhaosMDF479"]}'` (6 dk 39 sn), `mh-convert --outfits --outfit KhaosMDF479 --manifest` (76 sn), `/dev/thumbs` ile küçük resim, sonra `mh-convert --manifest`. Kategori `full`; diğer Khaos kıyafetleri gibi renk parametresi ve preseti yok (krem beyaz). Etiket ve cinsiyet kaydı `outfit_labels.json` ve `gender_compat.json`'da.
+  - Bu koşuda `outfits` işi kadın taban gövdesini (`raw/outfits/female/body`) de yeniden yazdı. GLB ve `body.json` byte byte aynı, yalnız FBX'in hash'i ve `done.json` değişti. Bu yüzden sonraki tam `mh-convert --outfits` kadın kıyafetlerini yeniden çevirebilir; çıktının aynı kalması beklenir.
   - Koyu renkli crew-neck yakalarda yakanın iç katmanı lekeli görünüyor (maske açık ya da kapalı fark etmiyor).
   - Kargo pantolonun ağındaki turuncu leke önden, haki renkte görülemedi. Doku ve dikiş maskelerinde de leke yok (`raw/outfits/*/WI_OA_Cargopants/textures/`). Görüldüğü renk, cinsiyet ve açı bilinirse yeniden bakılır.
   - `next dev`'de karakterin sahneye gelmesi ilk açılışta ~40 sn sürüyor (derleme + doku). Production build'de ölçülmedi.
@@ -412,5 +414,5 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 - **Tasarım:** karanlık sinematik. Grafit zemin, tek amber vurgu. Mor gradyan ve her yerde glassmorphism yasak.
 - **Dövme ve piercing:** ölçülü.
 - **Kıyafet:** iş ve günlük karışık.
-- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği; arşivde 2026-10-25'te 23 `.mhpkg` var: 21 `oa_*`, 2 `khaosmdf*`). Animasyonlar da yalnız ücretsiz paketlerden.
+- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği, 2026-10-25'te kullanıcının seçtiği Clara body; arşivde 2026-10-25'te 24 `.mhpkg` var: 21 `oa_*`, 3 `khaosmdf*`). Fab liste sayfası fiyatı eski gösterebiliyor: Romantic Casual Overalls listede "Free" iken 2026-10-25'te ücretliye dönmüştü ve alınmadı. İndirmeden önce öğenin kendi sayfasındaki lisans kutusuna bakılır. Animasyonlar da yalnız ücretsiz paketlerden.
 - **Lisans:** UE EULA MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor. LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
