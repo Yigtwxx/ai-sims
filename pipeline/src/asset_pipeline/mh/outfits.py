@@ -147,6 +147,18 @@ OPEN_MARGIN = 0.025  # metres kept visible around an exposed garment opening...
 OPEN_GAP_FACTOR = 1.0  # ...plus this times the opening's distance from the skin
 OPEN_NEIGHBOURS = 8
 LAYER_THICKNESS = 0.006  # metres: hem folds and ribs closer than this are one layer
+# Female tops that should fit the torso instead of hanging off the bust (`hug_torso`): the
+# share of the gap between cloth and skin taken away.
+TOP_HUG: dict[str, float] = {"OA_TCrop3QSlv": 0.85}
+HUG_VERSION = "hug-v2"  # in the fingerprint of hugged outfits only; v2: smoothed shift
+HUG_GAP = 0.003  # metres a hugged garment keeps from the skin
+HUG_REACH = 0.06  # metres: cloth further out (hoods, loose folds) is left alone
+HUG_FACING = 0.5  # skin normal z (forward) from which the front is pulled straight back
+HUG_LIMB_NEAR = 0.01  # metres from arm or neck skin where the pull is none...
+HUG_LIMB_FAR = 0.05  # ...growing to full here
+HUG_SMOOTH = 0.008  # metres: Gaussian width the shift is averaged over
+HULL_SLAB = 0.0075  # metres: half the height of the skin row `front_hull` bridges
+HUG_SKIPPED_REGIONS = frozenset({"upperArms", "forearms", "hands", "neck"})
 
 # Textures.
 COVERAGE_LEVEL = 63  # 8-bit level a mask texel must exceed to count as covered
@@ -794,10 +806,97 @@ def stack_push(over: F64, need: F64, movable: Bool, reach: float = LAYER_REACH) 
     return push
 
 
-def fit_garment(garment: Garment, body: BodyFit) -> Fit:
+def hug_for(name: str, gender: str) -> float:
+    """The share of the gap over the torso `hug_torso` takes away for this outfit."""
+    return TOP_HUG.get(name, 0.0) if gender == "female" else 0.0
+
+
+def front_hull(points: F64, skin: F64) -> tuple[F64, Bool]:
+    """Depth (z, forward) of the skin's front with its hollows bridged across: at each
+    point, the upper hull of the `skin` points within HULL_SLAB of its height, read at its
+    x. Cloth spans the cleavage from breast to breast, but under the bust it follows the
+    skin, so the hull bridges sideways only. False where a point lies beyond its row."""
+    order = np.argsort(skin[:, 1])
+    heights = skin[order, 1]
+    depth = np.zeros(len(points))
+    inside = np.zeros(len(points), dtype=bool)
+    lows = np.searchsorted(heights, points[:, 1] - HULL_SLAB)
+    highs = np.searchsorted(heights, points[:, 1] + HULL_SLAB)
+    for i, (x, lo, hi) in enumerate(zip(points[:, 0], lows, highs, strict=True)):
+        row = skin[order[lo:hi]]
+        left = row[row[:, 0] <= x]
+        right = row[row[:, 0] >= x]
+        if not len(left) or not len(right):
+            continue
+        span = right[None, :, 0] - left[:, None, 0]
+        share = np.divide(x - left[:, None, 0], span, out=np.zeros_like(span), where=span > 0)
+        depth[i] = (left[:, None, 2] + (right[None, :, 2] - left[:, None, 2]) * share).max()
+        inside[i] = True
+    return depth, inside
+
+
+def hug_torso(points: F64, body: BodyFit, strength: float) -> tuple[F64, F64]:
+    """Pull a fitted top onto the torso (base body's space).
+
+    Unreal drapes a knit from the apex of the bust straight down: a curtain up to 3.5 cm
+    off the skin under the breasts that stays 1.5 cm off the belly down to the hem. Every
+    torso vertex is pulled in by `strength` of its gap beyond HUG_GAP: on the front back
+    (-z) toward the `front_hull`, so the cloth spans the cleavage instead of wrapping each
+    breast on its own, and elsewhere along the skin normal at its closest point; the two
+    blend by how far the skin faces forward. The shifts are then averaged over HUG_SMOOTH,
+    so layers and seams close together move as one. Returns the points and each vertex's
+    pull (m)."""
+    pull = np.zeros(len(points))
+    if strength <= 0.0:
+        return points, pull
+    _, signed, triangle, _, normal = _signed_distance(
+        points, body.base_positions, body.base_normals, body.triangles
+    )
+    limbs = np.array([name in HUG_SKIPPED_REGIONS for name in body_regions(body)])
+    # The pull fades out toward the arms and neck; cut off where the closest skin turns
+    # from torso to limb, it left the side seams jagged.
+    to_limb = (
+        cKDTree(body.base_positions[limbs]).query(points)[0]
+        if limbs.any()
+        else np.full(len(points), np.inf)
+    )
+    torso = ~limbs[body.triangles[triangle]].any(axis=1) * smoothstep(
+        (to_limb - HUG_LIMB_NEAR) / (HUG_LIMB_FAR - HUG_LIMB_NEAR)
+    )
+    front_skin = ~limbs & (body.base_normals[:, 2] > 0.0)
+    facing = (torso > 0.0) & (normal[:, 2] > 0.0)
+    depth = np.zeros(len(points))
+    inside = np.zeros(len(points), dtype=bool)
+    depth[facing], inside[facing] = front_hull(points[facing], body.base_positions[front_skin])
+    forward = inside * smoothstep(normal[:, 2] / HUG_FACING)
+
+    def taken(gap: F64) -> F64:
+        return strength * torso * np.where((gap > HUG_GAP) & (gap < HUG_REACH), gap - HUG_GAP, 0)
+
+    shift = -(taken(signed) * (1.0 - forward))[:, None] * normal
+    shift[:, 2] -= taken(np.where(inside, points[:, 2] - depth, 0.0)) * forward
+    # Seam allowances, collar ribs and inner layers sit nearer the skin than the cloth over
+    # them, so their own pull is smaller and the outer cloth would pass through them.
+    # Moving every vertex by the average shift around it moves them together.
+    tree = cKDTree(points)
+    pairs = tree.sparse_distance_matrix(tree, 2.5 * HUG_SMOOTH, output_type="ndarray")
+    pairs = pairs[pairs["i"] != pairs["j"]]
+    count = len(points)
+    weights = np.concatenate([np.exp(-(pairs["v"] ** 2) / (2.0 * HUG_SMOOTH**2)), np.ones(count)])
+    rows = np.concatenate([pairs["i"], np.arange(count)])
+    cols = np.concatenate([pairs["j"], np.arange(count)])
+    kernel = coo_matrix((weights, (rows, cols)), shape=(count, count)).tocsr()
+    shift = (kernel @ shift) / np.asarray(kernel.sum(axis=1))
+    pull[:] = np.linalg.norm(shift, axis=1)
+    return points + shift, pull
+
+
+def fit_garment(garment: Garment, body: BodyFit, *, hug: float = 0.0) -> Fit:
     """Re-express the garment in the web body's bind space (positions, normals, skin,
-    slider morphs); see the module docstring."""
+    slider morphs); see the module docstring. `hug` > 0 first pulls the cloth onto the
+    torso (`hug_torso`)."""
     points = np.concatenate([p.positions for p in garment.parts])
+    points, pulled = hug_torso(points, body, hug)
     transfer = build_transfer(points, body)
     moved = points + transfer.matrix @ body.displacement
     _, signed, triangle, bary, normal = _signed_distance(
@@ -844,6 +943,7 @@ def fit_garment(garment: Garment, body: BodyFit) -> Fit:
             "p95": _mm(np.percentile(transfer.distance, 95)),
         },
         "pushed_out": int(push.sum()),
+        "hug": {"over_1mm": int((pulled > 0.001).sum()), "max_mm": _mm(pulled.max(initial=0.0))},
         "morph_cleared": cleared,
         "inside_after_fit": int(
             np.sum((signed < -0.001) & (transfer.signed > -PUSH_DEPTH_LIMIT) & ~push)
@@ -1957,7 +2057,7 @@ def convert_outfit(
     """Write `outfits/<name>/<gender>.glb` and its maps; return the manifest record."""
     garment = load_garment(unit.glb, body)
     atlases = pack_udim_parts(unit, garment, log)
-    fit = fit_garment(garment, body)
+    fit = fit_garment(garment, body, hug=hug_for(unit.name, unit.gender))
     hidden, hide_stats = body_hide(fit, body)
     coverage = region_coverage(hidden, body_regions(body))
     category = outfit_category(unit.name, coverage)

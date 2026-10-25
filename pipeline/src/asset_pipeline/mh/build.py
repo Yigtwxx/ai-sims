@@ -63,12 +63,14 @@ from asset_pipeline.mh.ktx import KtxEncodeError, KtxUnavailableError
 from asset_pipeline.mh.lighting import convert_level, has_lights, list_levels, manifest_entry
 from asset_pipeline.mh.manifest import assemble, write_manifest
 from asset_pipeline.mh.outfits import (
+    HUG_VERSION,
     OUTFITS_VERSION,
     BodyFit,
     OutfitError,
     OutfitUnit,
     base_body_path,
     convert_outfit,
+    hug_for,
     list_outfit_units,
     manifest_entries,
 )
@@ -463,8 +465,15 @@ class Builder:
             if not body_glb.is_file() or not base.is_file():
                 self._fail(key, OutfitError(f"needs {body_glb.name} and {base.name} first"))
                 continue
+            # Only outfits with a hug carry it, so adding one rebuilds that outfit alone.
+            hug = hug_for(unit.name, unit.gender)
             print_ = fingerprint(
-                OUTFITS_VERSION, unit.done, base.parent / "done.json", body_glb, self.compress
+                OUTFITS_VERSION,
+                unit.done,
+                base.parent / "done.json",
+                body_glb,
+                self.compress,
+                *([{"hug": hug, "version": HUG_VERSION}] if hug else []),
             )
             self.run(key, print_, self._outfit_builder(unit, body_glb, base, bodies))
 

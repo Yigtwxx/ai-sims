@@ -279,6 +279,76 @@ def test_morph_clearance_keeps_the_inner_layer_under_the_outer() -> None:
     assert radius[half:].min() >= 0.11 + outfits.CLEARANCE - 1e-3, "inner layer in grown skin"
 
 
+def _chest(spacing: float = 0.005) -> BodyFit:
+    """A front-facing (+z) chest: a flat skin with two bumps 12 cm apart at y 0.2."""
+    xs = np.arange(-0.15, 0.15 + 1e-9, spacing)
+    ys = np.arange(0.0, 0.3 + 1e-9, spacing)
+    grid = np.array([[x, y, 0.0] for y in ys for x in xs])
+    for centre in (-0.06, 0.06):
+        squared = (grid[:, 0] - centre) ** 2 + (grid[:, 1] - 0.2) ** 2
+        grid[:, 2] += 0.04 * np.exp(-squared / (2 * 0.02**2))
+    columns = len(xs)
+    triangles = []
+    for r in range(len(ys) - 1):
+        for c in range(columns - 1):
+            a, b = r * columns + c, r * columns + c + 1
+            triangles += [(a, b, a + columns), (b, b + columns, a + columns)]
+    return _body(grid, np.array(triangles, dtype=np.int64))
+
+
+def _sheet(z: float) -> np.ndarray:
+    """Cloth points on the plane at depth z over the chest, 1 cm apart."""
+    return np.array(
+        [[x, y, z] for y in np.arange(0.05, 0.28, 0.01) for x in np.arange(-0.1, 0.101, 0.01)]
+    )
+
+
+def test_front_hull_bridges_a_hollow_sideways_only() -> None:
+    skin = np.array([[-0.1, 0.0, 0.0], [-0.05, 0.0, 0.04], [0.0, 0.0, 0.0], [0.05, 0.0, 0.04]])
+    points = np.array([[0.0, 0.0, 0.1], [-0.075, 0.0, 0.1], [0.08, 0.0, 0.1], [0.0, 0.5, 0.1]])
+    depth, inside = outfits.front_hull(points, skin)
+    assert inside.tolist() == [True, True, False, False], f"rows found: {inside}"
+    assert depth[0] == pytest.approx(0.04), f"valley bridged at {depth[0]}, expected 0.04"
+    assert depth[1] == pytest.approx(0.02), f"slope read at {depth[1]}, expected 0.02"
+
+
+def test_hug_torso_spans_the_cleavage_and_follows_the_underside() -> None:
+    body = _chest()
+    cloth = _sheet(0.045)  # a curtain 5 mm over the bump tops
+    hugged, _ = outfits.hug_torso(cloth, body, 0.85)
+    at = {tuple(np.round(c[:2], 2)): h[2] for c, h in zip(cloth, hugged, strict=True)}
+    cleavage = at[(0.0, 0.2)]
+    under = at[(0.06, 0.08)]
+    assert cleavage > 0.035, f"cloth sank into the cleavage: z {cleavage * 1e3:.1f} mm"
+    assert under < 0.012, f"curtain left under the bump: z {under * 1e3:.1f} mm"
+
+
+def test_hug_torso_leaves_a_zero_strength_garment_alone() -> None:
+    body = _chest()
+    cloth = _sheet(0.045)
+    hugged, pull = outfits.hug_torso(cloth, body, 0.0)
+    assert np.array_equal(hugged, cloth) and not pull.any(), "zero strength moved cloth"
+
+
+def test_hug_torso_keeps_the_gap_between_layers() -> None:
+    torso, triangles = _tube(0.1, 0.0, 1.0)
+    body = _body(torso, triangles)
+    part = _two_layer_sleeve(0.13, 0.128)
+    half = len(part.positions) // 2
+    hugged, pull = outfits.hug_torso(part.positions, body, 0.85)
+    radius = np.linalg.norm(hugged[:, [0, 2]], axis=1)
+    apart = np.linalg.norm(hugged[:half] - hugged[half:], axis=1)
+    assert pull.max() > 0.01, f"nothing hugged: largest pull {pull.max() * 1e3:.1f} mm"
+    assert apart.min() > 0.0019, f"layers squeezed: closest pair {apart.min() * 1e3:.2f} mm"
+    assert np.all(radius[:half] > radius[half:]), "inner layer came out over the outer"
+
+
+def test_hug_applies_to_listed_female_outfits_only() -> None:
+    assert outfits.hug_for("OA_TCrop3QSlv", "female") > 0.0, "crop top not hugged"
+    assert outfits.hug_for("OA_TCrop3QSlv", "male") == 0.0, "male garment hugged"
+    assert outfits.hug_for("OA_Hoodie", "female") == 0.0, "loose top hugged"
+
+
 def test_closed_shoes_hide_every_toe_and_sandals_none() -> None:
     limb, triangles = _tube(0.05, 0.0, 1.0, rings=11, segments=8)
     body = _body(limb, triangles)
