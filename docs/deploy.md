@@ -46,4 +46,4 @@ Anahtarlar ekrana basılmadan CLI ile girildi: `printf '%s' "$VALUE" | vercel en
 ## Bilinen riskler
 
 - Production adresi herkese açık ve anonim giriş var. Linki bilen herkes sohbeti ve sesi kullanabilir. Groq ve Gemini ücretsiz kotada kalır, ama zincirin sonundaki Claude ücretlidir. Kötüye kullanım görülürse Vercel'den `ANTHROPIC_API_KEY` silinip yeniden deploy edilir.
-- Edge TTS resmî olmayan bir uç nokta. Vercel IP'lerinden engellenirse ses Gemini TTS'e düşer; Gemini zamanlama vermediği için dudak senkronu metinden tahmin edilir.
+- Edge TTS Vercel'den çalışmıyor: `fra1`'de her istek `kind: 'service'` hatasıyla düşüyor (2026-10-26). Ses bu yüzden Gemini TTS'ten geliyor. Gemini zamanlama vermediği için dudak senkronu metinden tahmin ediliyor ve ücretsiz günlük kotası küçük. Viseme'li en iyi senkron için Vercel'e `AZURE_SPEECH_KEY` ve `AZURE_SPEECH_REGION` eklenmeli (F0 ücretsiz; `docs/setup-accounts.md`).
