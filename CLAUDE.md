@@ -19,6 +19,7 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 - Gövde klipleri FBX'ten `web/scripts/retarget-fbx.mjs --target <body.glb> --out <dir> [--fps 30] [--role idle|talk|listen] <clip.fbx>...` ile gelir. Rol klasörün `clips.json`'una yazılır, manifest onu `tags`'ın başına koyar; `MotionPlayer` (`web/src/features/avatar/mh/motion.ts`) rolüne göre klip seçer (konuşurken `talk`, dinlerken `listen` + idle).
 - Veri: MongoDB (resmi `mongodb` driver) + Better Auth (`anonymous` plugin). Geliştirmede yerel mongod: `127.0.0.1:27018`, veri `.data/mongo` (gitignored). Compass: `mongodb://localhost:27018`.
 - `pipeline/`: Python (uv). Unreal'dan MetaHuman dışa aktarımı (`pipeline/unreal/`) ve web'e çevirme (`asset_pipeline/mh/`). Çıktı arşivin `web/` klasörü (`web/public/assets/mh` bağlantısı) + `manifest.json`.
+- Deploy: Vercel Hobby (`main`'e her push production, bölge `fra1`), varlıklar Cloudflare R2 (`node scripts/r2-sync.mjs`), veri Atlas M0. Ayrıntı: `docs/deploy.md`.
 - Ayrı backend yok. Sunucu işleri Next.js route handler'larında. AI için resmi SDK'lar: `@anthropic-ai/sdk` (Claude), `@google/genai` (Gemini), `groq-sdk` (Groq); TTS için `microsoft-cognitiveservices-speech-sdk` (Azure), `msedge-tts` (Edge sesleri) ve `@google/genai` (Gemini TTS). Vercel AI SDK kullanılmaz.
 
 ## Mimari kuralları
@@ -27,7 +28,7 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 - Tüm giysi ve saç GLB'leri base iskelete skinlenir; runtime'da `SkinnedMesh.bind` ile bağlanır.
 - Base mesh'te ARKit 52 + Oculus 15 viseme morph'ları **zorunlu** (lip-sync için).
 - Turntable: sürükleyince kamerayı değil karakteri döndür. Stüdyo ışığı yüze göre sabit kalmalı.
-- Secret'lar yalnızca env'de durur. Şu an hiçbir değişken `NEXT_PUBLIC_` almaz. `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, AI ve TTS key'leri yalnızca server tarafında kullanılır. Env eksikse build ve landing çökmez; login "Database not configured" gösterir.
+- Secret'lar yalnızca env'de durur. Tek `NEXT_PUBLIC_` değişkeni `NEXT_PUBLIC_MH_ASSET_ROOT`: secret değil, deploy'da varlık bucket'ının herkese açık adresi (build'de inline edilir; boşsa `/assets/mh`). `MONGODB_URI`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, AI ve TTS key'leri yalnızca server tarafında kullanılır. Env eksikse build ve landing çökmez; login "Database not configured" gösterir.
 
 ## Komutlar
 ```bash

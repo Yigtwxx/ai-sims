@@ -385,6 +385,12 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
   - Dönüştürücü CPU'da çalışır (numpy, scipy, OpenRigLogic).
   - Kalite katmanları ve fps RTX 4070 laptopta ölçüldü. Mac'te (M4 Pro) `auto`'nun hangi katmanda durduğu yeniden ölçülmeli.
 
+## Canlı demo (2026-10-26)
+
+- https://ai-sims-zeta.vercel.app. `main`'e her push production deploy'u. Kurulum ve env listesi: `docs/deploy.md`.
+- Varlıklar Vercel'de değil, R2 bucket'ı `ai-sims-mh`'de. Dönüştürücü ya da `mh-prune` çalıştıktan sonra değişen klasörleri `cd web && node scripts/r2-sync.mjs <klasör>` ile yükle.
+- Veri Atlas M0'da (Frankfurt). Yerel geliştirme 27018'deki mongod'la devam eder.
+
 ## Sıradaki iş (Mac)
 
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
