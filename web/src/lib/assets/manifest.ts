@@ -3,9 +3,14 @@ import { z } from 'zod';
 /**
  * MetaHuman asset manifest (v2), written by the pipeline converter and served from
  * `/assets/mh/manifest.json`. Contract: docs/specs/2026-10-20-metahuman-web-assets.md.
- * File paths inside the manifest are relative to ASSET_ROOT.
+ * File paths inside the manifest are relative to ASSET_ROOT: the local `/assets/mh`
+ * junction in development, the asset bucket in deployments (NEXT_PUBLIC_MH_ASSET_ROOT,
+ * a public URL inlined at build time).
  */
-export const ASSET_ROOT = '/assets/mh';
+export const ASSET_ROOT = (process.env.NEXT_PUBLIC_MH_ASSET_ROOT || '/assets/mh').replace(
+  /\/+$/,
+  '',
+);
 export const MANIFEST_URL = `${ASSET_ROOT}/manifest.json`;
 export const CURATION_URL = `${ASSET_ROOT}/curation.json`;
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   applyCuration,
@@ -104,6 +104,23 @@ describe('helpers', () => {
   it('builds asset urls under the asset root', () => {
     expect(assetUrl('faces/Ada/head.glb')).toBe('/assets/mh/faces/Ada/head.glb');
     expect(assetUrl('/faces/Ada/head.glb')).toBe('/assets/mh/faces/Ada/head.glb');
+  });
+
+  describe('with NEXT_PUBLIC_MH_ASSET_ROOT', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+
+    it('builds asset urls under the configured bucket', async () => {
+      vi.stubEnv('NEXT_PUBLIC_MH_ASSET_ROOT', 'https://cdn.example.com/mh/');
+      vi.resetModules();
+      const bucket = await import('./manifest');
+      expect(bucket.assetUrl('faces/Ada/head.glb')).toBe(
+        'https://cdn.example.com/mh/faces/Ada/head.glb',
+      );
+      expect(bucket.MANIFEST_URL).toBe('https://cdn.example.com/mh/manifest.json');
+    });
   });
 
   it('picks a localized label', () => {

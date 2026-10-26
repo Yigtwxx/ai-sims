@@ -12,6 +12,7 @@ import {
   type Texture,
 } from 'three';
 
+import { assetUrl } from '@/lib/assets/manifest';
 import { BODY_HIDDEN } from './garments';
 import { createGroomDensityUniforms } from './groomDensity';
 import { skinToneGain } from './skinTone';
@@ -500,7 +501,7 @@ export function setSkinTone(materials: readonly Material[], tone: number): void 
 }
 
 /** Shared detail textures (renderer-owned, next to the converted assets). */
-export const MICRO_NORMAL_URL = '/assets/mh/shared/skin/micro_normal.png';
+export const MICRO_NORMAL_URL = assetUrl('shared/skin/micro_normal.png');
 
 let detail: Promise<SkinDetail> | null = null;
 
