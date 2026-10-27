@@ -791,6 +791,43 @@
           "Tecwear_MH_Shoes.diffuse_color_2": "#e6e2da"
         }
       }
+    ],
+    "AS_PencilSkirt": [
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#1f2941"
+        }
+      },
+      {
+        "id": "charcoal",
+        "values": {
+          "diffuse_color_1": "#3a3a3c",
+          "diffuse_color_2": "#3a3a3c"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#1d1d1f"
+        }
+      },
+      {
+        "id": "camel",
+        "values": {
+          "diffuse_color_1": "#a47a4f",
+          "diffuse_color_2": "#a47a4f"
+        }
+      },
+      {
+        "id": "oatmeal",
+        "values": {
+          "diffuse_color_1": "#c9bba2",
+          "diffuse_color_2": "#c9bba2"
+        }
+      }
     ]
   }
 }

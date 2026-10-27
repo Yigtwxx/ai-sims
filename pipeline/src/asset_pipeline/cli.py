@@ -6,6 +6,7 @@ import json
 
 def main(argv: list[str] | None = None) -> None:
     from asset_pipeline import transfer
+    from asset_pipeline.garments import cli as garment_cli
     from asset_pipeline.mh import cli as mh_cli
     from asset_pipeline.mh import prune, similar
 
@@ -20,6 +21,7 @@ def main(argv: list[str] | None = None) -> None:
     prune.add_parser(sub)
     similar.add_parser(sub)
     transfer.add_parser(sub)
+    garment_cli.add_parser(sub)
     ue.add_argument(
         "--until-done",
         action="store_true",
@@ -34,6 +36,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(prune.run(args))
     elif args.command == similar.COMMAND:
         raise SystemExit(similar.run(args))
+    elif args.command == garment_cli.COMMAND:
+        raise SystemExit(garment_cli.run(args))
     elif args.command == "serve-slim":
         raise SystemExit(transfer.run(args))
     elif args.command == "ue":

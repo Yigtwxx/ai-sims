@@ -178,5 +178,9 @@
   "Street_Wear_01": {
     "en": "Streetwear set",
     "tr": "Sokak stili kombin"
+  },
+  "AS_PencilSkirt": {
+    "en": "Pencil skirt",
+    "tr": "Kalem etek"
   }
 }
