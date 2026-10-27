@@ -86,12 +86,14 @@ export function useTalk({ characterId, locale, voice }: UseTalkOptions) {
   }, []);
 
   const toggleVoice = useCallback(() => {
+    // Turning the voice on is a gesture too: wake the audio while it lasts.
+    if (!voiceOnRef.current) player.unlock();
     setVoiceOn((on) => {
       voiceOnRef.current = !on;
       if (on) queueRef.current?.stop();
       return !on;
     });
-  }, []);
+  }, [player]);
 
   const run = useCallback(
     async (history: ChatMessage[]) => {
@@ -148,21 +150,24 @@ export function useTalk({ characterId, locale, voice }: UseTalkOptions) {
     (text: string) => {
       const content = text.trim();
       if (!content || phase !== 'idle') return false;
+      // Still inside the user's gesture: the reply's audio arrives seconds later.
+      if (voiceOnRef.current) player.unlock();
       if (speaking) queueRef.current?.stop();
       const history: ChatMessage[] = [...messages, { role: 'user', content }];
       lastPrompt.current = { history, text: content };
       void run(history);
       return true;
     },
-    [messages, phase, run, speaking],
+    [messages, phase, player, run, speaking],
   );
 
   /** Re-asks the last message after a failure. */
   const retry = useCallback(() => {
     const last = lastPrompt.current;
     if (!last || phase !== 'idle') return;
+    if (voiceOnRef.current) player.unlock();
     void run(last.history);
-  }, [phase, run]);
+  }, [phase, player, run]);
 
   return {
     player,

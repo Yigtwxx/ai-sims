@@ -72,6 +72,22 @@ export class SpeechPlayer {
     this.timeline = 'events' in script ? shifted : snapClosuresToAudio(shifted, this.envelope);
   }
 
+  /**
+   * Call synchronously inside the user's gesture (the click or Enter that asks
+   * for a reply). Safari keeps a context that is created or resumed outside a
+   * gesture suspended, so speech arriving seconds later never played and
+   * `play()` waited on `resume()` forever. A one-frame silent buffer started
+   * here also unlocks iOS.
+   */
+  unlock(): void {
+    const context = this.getContext();
+    if (context.state === 'suspended') void context.resume().catch(() => undefined);
+    const silence = context.createBufferSource();
+    silence.buffer = context.createBuffer(1, 1, context.sampleRate);
+    silence.connect(context.destination);
+    silence.start();
+  }
+
   async play(onEnded?: () => void): Promise<void> {
     if (!this.buffer) throw new Error('SpeechPlayer.play() called before load()');
     const context = this.getContext();

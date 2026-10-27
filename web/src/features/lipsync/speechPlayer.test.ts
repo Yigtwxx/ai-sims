@@ -22,15 +22,22 @@ class FakeAudioContext {
     getChannelData: () => pcm,
   });
 
+  sampleRate = 48000;
+  sources: { start: ReturnType<typeof vi.fn> }[] = [];
+
   createBufferSource() {
-    return { buffer: null, onended: null, connect: vi.fn(), start: vi.fn(), stop: vi.fn() };
+    const source = { buffer: null, onended: null, connect: vi.fn(), start: vi.fn(), stop: vi.fn() };
+    this.sources.push(source);
+    return source;
   }
+
+  createBuffer = vi.fn(() => ({}));
 
   getOutputTimestamp() {
     return { contextTime: this.currentTime };
   }
 
-  resume = async () => undefined;
+  resume = vi.fn(async () => undefined);
   close = async () => undefined;
 }
 
@@ -134,5 +141,24 @@ describe('SpeechPlayer visual lead', () => {
     context.currentTime = 0.45;
     // Heard: still "aa"; shown: the closure 0.1 s ahead.
     expect(player.sample().PP).toBeGreaterThan(0.5);
+  });
+});
+
+describe('SpeechPlayer.unlock', () => {
+  it('wakes a suspended context and starts silence before any await', () => {
+    // Safari only lets a context run if it is resumed inside the user's gesture,
+    // and speech arrives seconds after the click that asked for it.
+    context.state = 'suspended';
+    const player = new SpeechPlayer(0);
+    player.unlock();
+    expect(context.resume).toHaveBeenCalledTimes(1);
+    expect(context.sources).toHaveLength(1);
+    expect(context.sources[0].start).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not resume a context that already runs', () => {
+    const player = new SpeechPlayer(0);
+    player.unlock();
+    expect(context.resume).not.toHaveBeenCalled();
   });
 });
