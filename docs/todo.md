@@ -63,7 +63,45 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - "Uzun dağınık / Long messy" (`groom.hair.Hair_L_MessyClumps`) unisex. İki cinsiyetten de tamamen silinir (kullanıcı kararı): Medium layered ile aynı yol.
   - Üçü tek prune planında silinebilir.
   - Sonra `mh-convert --manifest`, `node scripts/r2-sync.mjs`. Bu saçları giyen kayıtlı karakterleri `reconcile.ts` boşa düşürmeli; denenir.
-- [ ] **A4. Kendi kıyafetimiz: düz tişört.** Plan `docs/handoff.md` "Kendi kıyafetimiz" bölümünde.
+- [ ] **A4. Kendi kıyafetlerimiz** (kullanıcı kararı, 2026-10-27: aşağıdaki listenin hepsi, bu sırayla). Bağlam ve kaynaklar `docs/handoff.md` "Kendi kıyafetimiz" bölümünde. Kararlar verildi, tekrar sorma. Büyük görev kuralı gereği önce `superpowers:writing-plans` ile plan yazılır; tasarım bu maddedir.
+  - **Yöntem (Mac oturumunun önerisi, 2026-10-27):** Unreal atlanır. Kıyafet Blender'da kurulur ve doğrudan arşiv birimi olarak yazılır. Kemik ağırlıklarını, slider morph'larını, deri payını ve `body_hide`'ı `mh-convert` zaten kendisi üretiyor (`pipeline/src/asset_pipeline/mh/outfits.py` docstring, adım 1-5). Handoff'taki Unreal Outfit Asset yolu ("Adımlar") yalnız A4.0 başarısız olursa kullanılır.
+  - **Teknik:**
+    - Blender headless çalışır (`blender --background --python ...`); kurulum `winget install BlenderFoundation.Blender`.
+    - Kıyafet 2D kalıp parçalarından dikilir: bpy ile poligon parçalar, gövdenin etrafına yerleştirme, dikiş kenarları (Cloth modifier "Sewing"), taban gövdeyle çarpışma, simülasyon, uygula, Solidify (~2 mm).
+    - UV, kalıbın düz koordinatıdır; kumaş deseni ve dokusu düz akar.
+    - z-weave elle kullanılan bir araç, otomatikleşmiyor; kullanılmaz.
+  - **Kod:**
+    - Kalıplar ve sim script'i repo'da durur (`pipeline/blender/`, ruff + tip anotasyonu). Her parçanın parametrik bir kalıbı olur, çıktı yeniden üretilebilir.
+    - Paketleyici bir CLI komutu (örneğin `asset-pipeline garment-pack`) `raw/outfits/<cinsiyet>/WI_AS_<Ad>/` birimini yazar: `OutfitBase_<cinsiyet>_Outfits.glb` (tek mesh, malzeme adı `MI_AS_<Ad>`), `outfit.json`, `textures/` ve `done.json` (dosyalar + sha256). Biçim `_is_unit` ve `OutfitUnit` (`outfits.py:200`) ile, ayrıca mevcut bir Epic biriminin (örneğin `raw/outfits/female/WI_OA_Crewneckt/`) `outfit.json`'u ile birebir aynı olur.
+    - Kaynak gövde `raw/outfits/<cinsiyet>/body/SKM_OutfitBase_<cinsiyet>_BodyMesh.glb` (`base_body_path`). Kıyafet bunun üstünde kurulur, web gövdesinin üstünde değil; dönüştürücü farkı kendisi taşır.
+    - Malzeme `M_fabric_simpler` instance'ı olarak yazılır (kot için `M_jeans_nrm_custom_master`), dokular Epic'in kumaş haritalarından (yün, pamuk, denim) gelir. Böylece web kendi kumaş shader'ını kurar ve renk presetleri çalışır (`NATIVE_MASTERS`, `pipeline/unreal/mh_export/outfits.py:37`).
+    - `AS_` öneki bizim öğelerimizi Epic'inkilerden ayırır. `ue outfits` yalnız kendi birim klasörlerini siler (`archive.py` `run_units`), bunlara dokunmaz.
+  - **Her parça için:** `mh-convert --outfits --outfit AS_<Ad> --manifest`, `gltf-transform validate`. Etiket `outfit_labels.json`'a (TR/EN), tek cinsiyetse `gender_compat.json`'a, renkler `outfit_tints.json`'a (ilk preset varsayılan) yazılır. `/dev/stage`'de iki cinsiyet × nötr ve slider uçları × idle ve talk kontrol edilir. Sonra `/dev/thumbs`, `node scripts/r2-sync.mjs`, commit + push (yalnız bitmiş parça). Kullanıcıya telefondan önden ve yandan birer ekran görüntüsü gönderilir.
+  - **Bitti sayılır (her parça):** kumaş deriye girmiyor, altından cilt görünmüyor, slider uçlarında kırılmıyor, idle ve talk'ta kol ve bacak hareketiyle yırtılmıyor, renk presetleri çalışıyor.
+  - **Kapsam dışı:** topuklu ayakkabı (ayak pozu değişmesi gerekir), uzun etek ve maksi elbise (bacak arasında kemik ağırlığı kumaşı yırtar), kat kat giyim (C9).
+
+  - [ ] **A4.0 Yol denemesi: kalem etek (kadın).** En basit kalıp (ön + arka, bel bandı, arka yırtmaç); iş setini de açar. Zincir uçtan uca çalışınca paketleyici ve kalıp altyapısı hazır sayılır. Blender'da sim ya da otomasyon 2-3 denemede yürümezse dur, nedenini "Kullanıcıya sorular"a yaz, Unreal yoluna geçmeyi sor ve beklerken B görevlerine geç.
+  - [ ] **A4.1 İş seti:**
+    - Kumaş pantolon, kadın ve erkek (düz paça, bel bandı; ütü çizgisi normal haritada).
+    - Uzun kollu düz gömlek, kadın ve erkek (yaka, düğme patı, manşet; düğmeler dokuda). Budanan `OA_Shirt_04`'ün yerini alır.
+    - Blazer + gömlek, kadın ve erkek, tek `top` öğe: C9'daki `outer` slotu gelene kadar gömlek blazer'ın içinde modellenir. Tek düğme, çentik yaka. En zor parça olduğu için sona kalır.
+    - Renkler: lacivert, antrasit, siyah, deve tüyü, bej; gömlekte beyaz, açık mavi, pudra.
+  - [ ] **A4.2 Düz tişört,** kadın ve erkek (eski A4). Desen varyantlarının tabanıdır.
+  - [ ] **A4.3 Şortlar** (kullanıcı isteği, 2026-10-27):
+    - Mini kot şort, kadın (denim, kesik ya da kıvrık paça).
+    - Mini şort, kadın (kumaş, denim olmayan).
+    - Kot şort, erkek (diz üstü, kıvrık paça).
+    - Kalıpları basit, A4.0 altyapısıyla hızlı çıkar. Mevcut `OA_Shorts`'tan ayırt edilmeleri için etiketler net olsun.
+  - [ ] **A4.4 Günlük çeşit:**
+    - Diz boyu elbise, kadın (kısa kol ya da kolsuz, belden oturan). Hem iş hem günlük.
+    - Hafif ceket (overshirt / chore ceket), kadın ve erkek; tek başına `top`.
+    - Desen varyantları ayrı katalog öğeleri olur, şema değişmez: çizgili tişört (A4.2), ekose gömlek (A4.1), keten pantolon. Paketleyici aynı mesh'ten ikinci bir birim yazar. `M_fabric_simpler`'ın iki renk maskesi (`diffuse_color_1/2`) desen maskesi olarak kullanılabiliyorsa desen iki renkli ve renk presetli olur; olmuyorsa dokusu bake'lenmiş düz PBR. Desen dokuları CC0 (ambientCG, Poly Haven) ya da script'le çizilir.
+  - [ ] **A4.5 Çorap: kısa ve uzun, renk seçilebilir** (kullanıcı isteği, 2026-10-27). Blender gerekmez; web işidir.
+    - Mesh değil, cilt shader'ında bir katman olur, iç çamaşırıyla aynı yoldan: gövde UV'sinde maske, kumaş albedo ve normal, renk (`web/src/features/avatar/mh/materials.ts`, `skinTextures.ts`; iç çamaşırı maskesi `web/skins/underwear/`). Böylece ayakkabının içinden taşmaz ve slider'larla bozulmaz.
+    - Boylar: kısa (bilek) ve uzun (diz altı). Maskeler gövde UV'sinde ayak bileği ve diz yükseklik çizgilerinden script'le üretilir; kenarda ince bir lastik bandı (normal haritada).
+    - Görünürlük: alt giysi ya da ayakkabının örttüğü yerde zaten çizilmez (`body_hide`); çıplak ayakta ve terlikte çorap görünür.
+    - Şema: `CharacterConfig`'e `socks: { style: 'none' | 'ankle' | 'knee', color }` eklenir, `schemaVersion` 2 → 3, migration `none` yazar (`web/src/lib/character/`). Panelde Ayakkabı'nın yanında boy seçici ve renk presetleri (siyah, beyaz, gri melanj, lacivert, bej, bordo); metinler `web/messages/{tr,en}.json`'da.
+    - **Bitti sayılır:** iki cinsiyette iki boy, her renk; idle ve talk'ta çorap bacakla birlikte hareket ediyor; ayakkabı ve pantolonla birlikte doğru katmanlanıyor; eski kayıtlı karakterler migration'la açılıyor.
 
 ## B. Panelde olan ama sahnede çalışmayan ayarlar
 
