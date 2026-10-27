@@ -129,6 +129,11 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - Sorun: iç parça dış parçanın içinden çıkar. Seçenekler: iç giysi için `body_hide` benzeri bir gizleme maskesi ya da iç parçayı içeri itmek.
   - Önce tek bir çiftle (tişört + ceket) prototip yapılır. **Bitti sayılır:** idle ve konuşmada parçalar birbirinin içinden çıkmıyor.
 
+- [ ] **C10. Yüz seçicide açık ten** (kullanıcı isteği, 2026-10-27). Koyu tenli yüz küçük resimlerinde yüz hatları seçilmiyor; yüzler karşılaştırılırken hepsi açık tenle görünmeli.
+  - Küçük resimler: `web/src/components/dev/thumbConfig.ts` her yüzü kendi cildiyle çiziyor (`wearing()`: `skin.set = face.defaultSkin`). Yüz küçük resimleri için tek, açık ve nötr bir ten seçilir: cinsiyetine uygun cilt seti (en açıklar `tone`'a göre `skin.Jelena` 0.22, `skin.Vivian` 0.28, `skin.Aera` 0.31; erkek tarafında `skinsFor`/`skinGender` ile seçilir). İris yüzün kendi irisi kalır. Görseller D1'de yeniden üretilir.
+  - Canlı seçim: bugün yüze tıklayınca ten de o yüzün kendi cildine geçiyor (`FacePanel.tsx:45-46`). Bunun değişip değişmeyeceği kullanıcı kararı (aşağıdaki soru); karar gelene kadar bu kısma dokunma.
+  - **Bitti sayılır:** yüz panelindeki tüm küçük resimler aynı açık tenle, aynı ışıkta; yüz hatları karşılaştırılabiliyor.
+
 ## D. Kapanış
 
 - [ ] **D1. Küçük resimler.** Yüz, saç ve kıyafet küçük resimleri `/dev/thumbs` ile yeniden üretilir (A-pose hatası `motion.ts`'te düzeldi; eski görseller A-pozunda ve koyu fonda). Açık fon düşünülebilir. Sonra `cd web && node scripts/r2-sync.mjs`.
@@ -136,4 +141,4 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## Kullanıcıya sorular
 
-(Bekleyen soru yok.)
+- **C10:** Yüze tıklayınca ten de o yüzün kendi rengine geçmeye devam etsin mi, yoksa seçili ten korunsun mu? (öneri: korunsun; ten Cilt panelinden seçilir, yüzler arasında gezinirken hatlar açık tende kalır)
