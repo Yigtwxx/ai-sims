@@ -128,12 +128,14 @@ interface OptionTileProps {
   /** Small colour dots under the label (tint presets). */
   swatches?: readonly string[];
   disabled?: boolean;
+  /** The art alone tells options apart (faces): the label is for screen readers only. */
+  labelHidden?: boolean;
 }
 
 /**
- * A 3:4 option with its label always visible (scanable). The frame lifts on
- * hover and sinks on press; the selected one carries the ink ring and the
- * cobalt tick.
+ * A 3:4 option with its label visible (scanable) unless `labelHidden`. The
+ * frame lifts on hover and sinks on press; the selected one carries the ink
+ * ring and the cobalt tick.
  */
 export function OptionTile({
   label,
@@ -143,6 +145,7 @@ export function OptionTile({
   none = false,
   swatches,
   disabled,
+  labelHidden = false,
 }: OptionTileProps) {
   const ringId = useContext(RingId);
   const [broken, setBroken] = useState(false);
@@ -156,6 +159,7 @@ export function OptionTile({
       type="button"
       role="radio"
       aria-checked={selected}
+      aria-label={labelHidden ? label : undefined}
       disabled={disabled}
       onClick={onSelect}
       className="group/tile flex min-w-0 flex-col gap-2 text-left outline-none disabled:opacity-40"
@@ -218,14 +222,16 @@ export function OptionTile({
           />
         )}
       </span>
-      <span
-        className={cn(
-          'text-label line-clamp-2 leading-tight transition-colors duration-200',
-          selected ? 'text-ink font-semibold' : 'text-ink-muted group-hover/tile:text-ink',
-        )}
-      >
-        {label}
-      </span>
+      {labelHidden ? null : (
+        <span
+          className={cn(
+            'text-label line-clamp-2 leading-tight transition-colors duration-200',
+            selected ? 'text-ink font-semibold' : 'text-ink-muted group-hover/tile:text-ink',
+          )}
+        >
+          {label}
+        </span>
+      )}
       {dots ? (
         <span className="-mt-0.5 flex gap-1" aria-hidden="true">
           {/* Colourways can repeat a colour: key by position. */}

@@ -36,6 +36,7 @@ export function FacePanel({ manifest }: PanelProps) {
             <OptionTile
               key={face.id}
               label={label(face.label)}
+              labelHidden
               image={thumbnailSrc(face.thumbnail)}
               selected={config.face.preset === face.id}
               onSelect={() =>
@@ -57,11 +58,23 @@ export function FacePanel({ manifest }: PanelProps) {
         {blends.map(([id, weight]) => {
           const face = byId.get(id);
           const name = face ? label(face.label) : id;
+          const thumbnail = thumbnailSrc(face?.thumbnail);
           return (
             <div key={id} className="flex items-end gap-3">
               <div className="min-w-0 flex-1">
                 <LabeledSlider
                   label={t('blendTowards', { name })}
+                  lead={
+                    thumbnail ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- local manifest art, no optimizer needed
+                      <img
+                        src={thumbnail}
+                        alt=""
+                        draggable={false}
+                        className="bg-paper-deep aspect-[3/4] w-9 rounded-md object-cover shadow-[0_0_0_1px_rgb(23_26_33/0.1)]"
+                      />
+                    ) : undefined
+                  }
                   value={weight}
                   min={0}
                   max={1}
@@ -90,6 +103,7 @@ export function FacePanel({ manifest }: PanelProps) {
                 <OptionTile
                   key={face.id}
                   label={label(face.label)}
+                  labelHidden
                   image={thumbnailSrc(face.thumbnail)}
                   selected={false}
                   onSelect={() => {

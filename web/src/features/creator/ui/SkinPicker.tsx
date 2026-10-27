@@ -2,8 +2,6 @@
 
 import { useId } from 'react';
 
-import { cn } from '@/lib/utils';
-
 import { groupByToneBand, stageSwatchBackground, type ToneBand } from '../skinSwatch';
 
 import { SlidingIndicator, SWATCH_RING } from './controls';
@@ -28,10 +26,9 @@ interface SkinPickerProps {
 }
 
 /**
- * Skin sets as named, lit swatches in light / medium / deep bands. Neighbouring
- * presets can share an average colour and differ only in texture, so every
- * swatch carries its name; the swatch itself is the stage-lit skin, not the
- * flat albedo. One radiogroup: arrow keys move across the bands.
+ * Skin sets as lit swatches in light / medium / deep bands. The swatch is the
+ * stage-lit skin, not the flat albedo; names stay with screen readers only.
+ * One radiogroup: arrow keys move across the bands.
  */
 export function SkinPicker({ label, bandLabels, options, value, onChange }: SkinPickerProps) {
   const ringId = `skin-ring-${useId()}`;
@@ -50,7 +47,7 @@ export function SkinPicker({ label, bandLabels, options, value, onChange }: Skin
           >
             {bandLabels[band]}
           </p>
-          <div className="stagger-in grid grid-cols-[repeat(auto-fill,minmax(3.5rem,1fr))] gap-x-1 gap-y-3">
+          <div className="stagger-in flex flex-wrap gap-2.5">
             {items.map((option) => {
               const selected = option.id === value;
               return (
@@ -61,7 +58,7 @@ export function SkinPicker({ label, bandLabels, options, value, onChange }: Skin
                   aria-checked={selected}
                   aria-label={option.label}
                   onClick={() => onChange(option.id)}
-                  className="group/skin flex min-w-0 flex-col items-center gap-2 pt-1 outline-none"
+                  className="group/skin outline-none"
                 >
                   <span
                     className="ease-out-expo group-focus-visible/skin:outline-cobalt relative block size-[30px] shrink-0 rounded-full shadow-[inset_0_0_0_1px_rgb(23_26_33/0.12)] transition-[scale] duration-300 group-hover/skin:scale-[1.06] group-focus-visible/skin:outline-2 group-focus-visible/skin:outline-offset-[5px] group-active/skin:scale-95 group-active/skin:duration-100"
@@ -70,16 +67,6 @@ export function SkinPicker({ label, bandLabels, options, value, onChange }: Skin
                     {selected ? (
                       <SlidingIndicator layoutId={ringId} className={SWATCH_RING} />
                     ) : null}
-                  </span>
-                  <span
-                    className={cn(
-                      'text-label max-w-full truncate leading-tight transition-colors duration-200',
-                      selected
-                        ? 'text-ink font-semibold'
-                        : 'text-ink-muted group-hover/skin:text-ink',
-                    )}
-                  >
-                    {option.label}
                   </span>
                 </button>
               );

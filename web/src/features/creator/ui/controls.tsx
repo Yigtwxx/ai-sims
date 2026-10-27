@@ -103,6 +103,8 @@ interface LabeledSliderProps {
    * readers only and drop the value column (the section shows it instead).
    */
   labelHidden?: boolean;
+  /** Shown in the name column in place of the label (a face thumbnail); the label stays for screen readers. */
+  lead?: ReactNode;
 }
 
 /**
@@ -122,6 +124,7 @@ export function LabeledSlider({
   disabled,
   adornment,
   labelHidden = false,
+  lead,
 }: LabeledSliderProps) {
   const id = useId();
   const slider = (
@@ -169,9 +172,18 @@ export function LabeledSlider({
 
   return (
     <div className="grid grid-cols-[minmax(0,5.25rem)_minmax(0,1fr)_3.75rem] items-center gap-x-3.5">
-      <label id={id} className="text-label text-ink-muted leading-tight">
-        {label}
-      </label>
+      {lead ? (
+        <div className="flex items-center">
+          <label id={id} className="sr-only">
+            {label}
+          </label>
+          {lead}
+        </div>
+      ) : (
+        <label id={id} className="text-label text-ink-muted leading-tight">
+          {label}
+        </label>
+      )}
       {slider}
       <span className="text-ink flex items-center justify-end gap-1.5 font-mono text-[12px] tabular-nums">
         {adornment}

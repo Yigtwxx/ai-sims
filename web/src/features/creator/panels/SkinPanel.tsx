@@ -24,7 +24,7 @@ export function SkinPanel({ manifest }: PanelProps) {
 
   return (
     <>
-      <Section title={t('sets')} aside={current ? label(current.label) : undefined}>
+      <Section title={t('sets')}>
         <SkinPicker
           label={t('sets')}
           bandLabels={{ light: t('bands.light'), medium: t('bands.medium'), deep: t('bands.deep') }}
