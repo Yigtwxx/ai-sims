@@ -292,3 +292,5 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 ## Kullanıcıya sorular
 
 (Bekleyen soru yok.)
+
+- Cevaplanan (2026-10-27, A2): Mason'ın 8K yüz dokuları belleği tıkadı, Claude Code dışa aktarımı durdurdu. Kullanıcı kararı: web için 8K gerekmez, 4K ya da daha düşüğü olur ("sen karar ver"). Yeni Fab yüzleri `"face": "res4k"` ile dışa aktarılır: web yüzü zaten 4096 px (`textures.py` `FACE_SIZE`, en az 4096 ister), 1080 gözenek detayını kaybettirir. Gövde 4K kalır.

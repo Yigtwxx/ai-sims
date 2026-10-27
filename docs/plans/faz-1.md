@@ -31,7 +31,7 @@
   - Kontrol: her yeni paketin `raw/fab_import/<paket>/import.json`'u var. "created no assets" çıkarsa sebep UE sürümü olabilir (Skotukeda yalnız 5.7 listeliyor): o paket için sonucu "Kullanıcıya sorular"a yaz, diğerleriyle devam et.
 - [ ] **1a.3 Yüzleri dışa aktar.** Tahmin 1.5 (çoğu bekleme) · Gerçek —
   - Karakter adları: dört yüz paketinin `import.json` `created` alanındaki `MetaHumanCharacter` sınıflı asset'in son adı.
-  - `uv run asset-pipeline ue characters --args '{"only": ["<ad1>", "<ad2>", "<ad3>", "<ad4>"]}'` (yüz başına ~11 dk, ~860 MB). `only` şart.
+  - `uv run asset-pipeline ue characters --args '{"only": ["Skotukeda", "Mason", "MHC_Seo", "MHC_Frey"], "face": "res4k"}'`. `only` şart. 8K ile ilk deneme Mason'da belleği tıkadı ve Claude Code işi durdurdu; kullanıcı kararıyla yüz kaynağı 4K (web yüzü zaten 4096 px).
   - Ardından `uv run asset-pipeline ue probe --args '{"script": "unreal/probes/preset_genders.py"}'`; dört ad `raw/characters_genders.json`'da olmalı.
   - Beklerken (editör meşgul): 1b.2'nin kod okuması ana oturumda yapılır.
 - [ ] **1a.4 Dönüştür ve manifest.** Tahmin 1 · Gerçek —
@@ -70,16 +70,34 @@
 
 > Ayrıntılı TDD planı (dosya yapısı, kod, testler) 1c'nin başında bu bölüme yazılır (`superpowers:writing-plans`): Blender kurulmadan ve bir Epic biriminin `outfit.json`'u okunmadan yazılırsa tahmin olur. 2-3 denemede sim ya da otomasyon yürümezse dur, nedeni `docs/todo.md` "Kullanıcıya sorular"a yaz, Unreal yolunu sor, beklerken Faz 2'ye geçme (faz kuralı) ama 1d'ye geç.
 
-- [ ] **1c.1 Keşif ve ayrıntılı plan.** Tahmin 1.5 · Gerçek —
+- [x] **1c.1 Keşif ve ayrıntılı plan.** Tahmin 1.5 · Gerçek 0.7
   - `winget install BlenderFoundation.Blender`; `blender --background --python-expr "import bpy; print(bpy.app.version)"`.
   - Oku: `pipeline/src/asset_pipeline/mh/outfits.py` docstring (adım 1-5), `_is_unit`, `OutfitUnit` (:200), `base_body_path`; `raw/outfits/female/WI_OA_Crewneckt/outfit.json`, `done.json`; `raw/outfits/female/body/SKM_OutfitBase_female_BodyMesh.glb`.
   - Bu bölümün altına 1c.2-1c.5 için dosya yapısı ve adım adım TDD planı.
-- [ ] **1c.2 Parametrik kalıp.** Tahmin 2 · Gerçek —
-  - `pipeline/blender/patterns/pencil_skirt.py`: ön + arka panel, bel bandı, arka yırtmaç; ölçüler (bel, kalça, boy) parametre; dikiş kenarı çiftleri ve kalıp UV'si çıktı. bpy'siz saf Python, ruff + tip anotasyonu, pytest.
-- [ ] **1c.3 Blender simülasyonu.** Tahmin 3 · Gerçek —
-  - `pipeline/blender/sim.py` (headless): kalıbı gövdenin etrafına yerleştir, Cloth "Sewing", gövdeyle çarpışma, sim, uygula, Solidify ~2 mm; tek mesh, malzeme adı `MI_AS_PencilSkirt`; GLB çıktı.
-- [ ] **1c.4 Paketleyici.** Tahmin 2 · Gerçek —
-  - `asset-pipeline garment-pack`: `raw/outfits/female/WI_AS_PencilSkirt/` → `OutfitBase_female_Outfits.glb`, `outfit.json` (Epic biriminin biçimiyle birebir), `textures/` (Epic kumaş haritaları, `M_fabric_simpler`), `done.json` (dosyalar + sha256). Biçim testi `_is_unit` + `OutfitUnit` ile.
+  - Bulgular (2026-10-27, Faz 1a beklerken):
+    - Blender 5.2.3 LTS (Python 3.13) taşınabilir zip'ten `C:\Users\Asus\tools\blender-5.2.3-windows-x64\blender.exe`, sha256 doğrulandı; winget kurulumu UAC istediği için kullanılmadı. Headless çalışıyor.
+    - Epic birimi (`WI_OA_Crewneckt`): `OutfitBase_female_Outfits.glb` (UE 5.8.4 glTF, Y yukarı, metre, A-pozu; tek mesh, 342 eklemli skin, `TEXCOORD_0/1`, `TANGENT`), `outfit.json` (`gender`, `item`, `item_properties`, `materials`, `meshes`, `parameters`, `textures`), `done.json`, `textures/*.png`.
+    - Dönüştürücü kıyafet GLB'sinden yalnız `POSITION`, indeksler, `NORMAL`, `TEXCOORD_0` ister; `JOINTS_*`/`WEIGHTS_*` isteğe bağlı (`_primitive`, `outfits.py:268`). Ağırlık ve morph'ları gövdeden kendisi aktarır. Blender skinsiz, transform'u uygulanmış tek mesh yazabilir.
+    - `M_fabric_simpler` instance'ının okunan doku slotları `fabric_slots()` (`outfits.py:1293`): her zaman `normalmap`, `AO`, `Masks`, `CustomStitch`; diğerleri static switch'lere bağlı döşenen haritalar. Kalem etek için Crewneckt'in instance'ı şablon alınır; kıyafete özgü dört harita kalıp UV'sinde üretilir.
+    - Taban gövde `SKM_OutfitBase_female_BodyMesh.glb`: 32334 köşe, kafasız, A-pozu, y 0-1.44 m.
+- **Tasarım (1c.1 sonucu).** Geometri uv ortamında (numpy/scipy, pytest'li), Blender yalnız simülasyon ve GLB yazımı. Böylece kalıp ve yerleşim editörsüz test edilir; Blender betiği ince kalır.
+  - `pipeline/src/asset_pipeline/garments/` (yeni paket):
+    - `body.py`: taban gövde GLB'sini okur (`outfits._primitive` yolu), yükseklik başına kesit (iki bacak + kalça tek kesit, dışbükey zarf) ve çevre profili; bel, kalça, diz yüksekliği. Saf fonksiyon: `profile(positions, heights) -> list[Section]`.
+    - `pattern.py`: `Panel` (2D dış çizgi, metre; adlı kenar parçaları), `triangulate(panel, edge) -> PanelMesh` (iç ızgara + kenar örnekleri, `scipy.spatial.Delaunay`, dışarı taşan üçgen elenir), `Seam` (iki panelin adlı kenarı, eşlenen köşe çiftleri), kalıp UV atlası (paneller sabit ölçekle 0-1'e dizilir).
+    - `skirt.py`: kalem etek kalıbı gövde ölçüsünden: ön panel, iki arka yarım (orta arka dikiş, altta yırtmaç açık), bel bandı; bolluk (ease) parametre. Yerleşim: her panel kesit zarfının ilgili yayına sarılır (ön: yan dikişten yan dikişe, arka: yan dikişten orta arkaya), zarf bolluk kadar dışarıda.
+    - `blender.py`: Blender'ı bulur (`$BLENDER`, yoksa `~/tools/blender-*/blender.exe`), `blender --background --factory-startup --python pipeline/blender/garment_sim.py -- <job.json>` çalıştırır.
+    - `pack.py`: arşiv birimi: GLB (`OutfitBase_<cinsiyet>_Outfits.glb`), `outfit.json` (Crewneckt instance'ı şablon, ad `MI_AS_<Ad>`), `textures/` (döşenen Epic haritaları kopya + kıyafete özgü `Masks`, `AO`, `normalmap`, `CustomStitch` PIL ile kalıp UV'sinde: dikiş ve etek ucu çizgileri), `done.json` (dosya + sha256). `.partial` klasörde yazılır, sonda yeniden adlandırılır.
+    - CLI `asset-pipeline garment --item AS_PencilSkirt --gender female [--keep-work]`: ölç → kalıp → yerleştir → `job.json` → Blender → paketle.
+  - `pipeline/blender/garment_sim.py` (bpy, `unreal/` gibi pytest dışında): gövdeyi glTF'ten içe al, Collision; kumaş mesh'i `job.json`'dan kur (UV, pin grubu bel bandının üstü, dikiş çiftleri gevşek kenar), Cloth + Sewing, N kare sim, uygula, Solidify 2 mm (dışa), üçgenle, malzeme `MI_AS_<Ad>`, GLB yaz (Y yukarı, transform uygulanmış, skinsiz).
+  - Testler `pipeline/tests/test_garments_*.py`: kesit profili (sentetik silindirde çevre 2πr), panel üçgenlemesi (alan korunur, kenar köşeleri sırada), dikiş eşlemesi (iki kenarda eşit köşe sayısı), sarma (yerleşen panel zarfın dışında, dikiş köşeleri ±1 mm çakışık), paket (`outfits._is_unit` true, `OutfitUnit.load().materials()` adı `MI_AS_PencilSkirt`, `done.json` hash'leri dosyalarla aynı).
+- **Uygulamada değişen (2026-10-27):** paneller Delaunay'lı düz kalıp yerine gövde kesitine sarılmış düzenli ızgaralar (satır = yükseklik, sütun = çevre boyunca eşit yay). Dikişler Blender "Sewing" yerine ortak sütunla kaynaklı: paneller zaten dikiş yerinde buluşuyor, yay kuvveti gereksizdi. Kalıbın açılmış koordinatı (yay uzunluğu × meridyen uzunluğu) UV olur. Blender kumaşın dinlenme şekli olarak bu mesh'i alıyor; sim yerçekimi ve gövdeyle çarpışmayla oturtuyor. Kesit ölçüsünde kol kemikleri ayıklanıyor; ayak parmakları ("ringtoe" vb.) kol sayılmıyor.
+- [x] **1c.2 Ölçü, kalıp ve yerleşim (uv tarafı).** Tahmin 3 · Gerçek 1
+  - `garments/body.py`, `pattern.py`, `skirt.py` + `tests/test_garments_pattern.py`. Kadın gövdede bel 1.113, kalça 0.844, diz 0.483 m; 69 satır, 6639 köşe, deriden en az 2.9 mm. Yumuşatma hızlı değişen kesitte noktayı içeri çekebiliyordu (test yakaladı), büyütülmüş kesitin dışına geri itiliyor.
+- [x] **1c.3 Blender simülasyonu.** Tahmin 3 · Gerçek 0.5
+  - `pipeline/blender/garment_sim.py` + `garments/blender.py`. 40 kare 12 sn; kalça altında arka bacak arasına en çok 3.3 cm sarkıyor, etek ucu 8 mm iniyor, deriden en az 2.95 mm. Solidify 2 mm dışa; 13662 köşe.
+- [x] **1c.4 Paketleyici ve CLI.** Tahmin 2 · Gerçek 0.7
+  - `garments/pack.py`, `garments/cli.py` (`asset-pipeline garment --item AS_PencilSkirt`), `tests/test_garments_pack.py`. Uçtan uca 21 sn. Döşeme haritaları Crewneckt'ten, yalnız `fabric_slots()`'un örnekledikleri; döşeme ölçeği 1.48/0.99 m/UV. `DoPill` kapalı (takım kumaşı).
+  - `mh-convert --outfits --outfit AS_PencilSkirt --manifest` 28 sn: kategori `bottom`, 3495 gövde köşesi gizli, 0.9 MB GLB + 3.2 MB harita; `gltf-transform validate` hatasız (Crewneckt'le aynı bilgi satırları).
 - [ ] **1c.5 Dönüştür, kontrol, yayın.** Tahmin 1.5 · Gerçek —
   - `mh-convert --outfits --outfit AS_PencilSkirt --manifest`, validate; `outfit_labels.json` (TR/EN), `gender_compat.json` (yalnız kadın), `outfit_tints.json` (lacivert, antrasit, siyah, deve tüyü, bej).
   - `/dev/stage`: nötr ve her slider ucu × idle ve talk; kumaş deriye girmiyor, cilt görünmüyor, yırtılmıyor, renk presetleri çalışıyor.
