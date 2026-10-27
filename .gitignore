@@ -42,3 +42,8 @@ pipeline/vendor-src/
 pipeline/vendor/
 # Web-ready MetaHuman assets: tens of GB, copied in from the archive, never committed
 web/public/assets/mh/
+# Local-only source packs, caches and frozen anime-track assets (VRoid licence risk, hundreds of MB)
+pipeline/cache/
+pipeline/source/
+web/public/assets/spike/
+web/public/assets/vrm/
