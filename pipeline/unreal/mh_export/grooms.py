@@ -28,6 +28,9 @@ EYELASH_TEXTURES = "/MetaHumanCharacter/Textures/Eyelashes"
 PLUGIN_PREFIX = "/MetaHumanCharacter/"
 MESH_CLASSES = {"StaticMesh", "SkeletalMesh"}
 TEXTURE_CLASSES = {"Texture2D"}
+FAB_ROOT = "/Game/Fab"  # fab_import puts each .mhpkg in /Game/Fab/<package>
+FAB_BINDING_CLASSES = {"GroomBindingAsset", "MetaHumanWardrobeItem"}
+FAB_SLOT = "Hair"  # the Fab groom packages we take are all hairstyles
 
 
 def related_assets(package_paths: list[str]) -> set[str]:
@@ -56,17 +59,29 @@ def assets_in_packages(packages: set[str], classes: set[str]) -> list[unreal.Ass
     return result
 
 
-def export_style(slot: str, style_path: str, work: Path) -> dict[str, Any]:
-    style = style_path.rsplit("/", 1)[-1]
+def export_style(
+    slot: str, style_path: str, work: Path, style: str | None = None
+) -> dict[str, Any]:
+    """`style` is given for Fab packages, whose folder is named after the package."""
+    fab = style is not None
+    style = style or style_path.rsplit("/", 1)[-1]
     own = inventory.assets_under(style_path)
     own_packages = {str(asset.package_name) for asset in own}
-    # Bindings/<slot> holds "<style>_Binding" and the wardrobe item "WI_<style>".
-    binding_names = {f"{style}_Binding", f"WI_{style}"}
-    binding_packages = {
-        str(asset.package_name)
-        for asset in inventory.assets_under(f"{BINDINGS}/{slot}")
-        if str(asset.asset_name) in binding_names
-    }
+    if fab:
+        # A Fab package keeps its binding and wardrobe item next to the groom.
+        binding_packages = {
+            str(asset.package_name)
+            for asset in own
+            if inventory.class_name(asset) in FAB_BINDING_CLASSES
+        }
+    else:
+        # Bindings/<slot> holds "<style>_Binding" and the wardrobe item "WI_<style>".
+        binding_names = {f"{style}_Binding", f"WI_{style}"}
+        binding_packages = {
+            str(asset.package_name)
+            for asset in inventory.assets_under(f"{BINDINGS}/{slot}")
+            if str(asset.asset_name) in binding_names
+        }
     linked = related_assets(sorted(own_packages | binding_packages)) - own_packages
 
     meshes: dict[str, dict[str, str]] = {}
@@ -76,8 +91,16 @@ def export_style(slot: str, style_path: str, work: Path) -> dict[str, Any]:
     textures: dict[str, Any] = {}
     texture_assets = [a for a in own if inventory.class_name(a) in TEXTURE_CLASSES]
     texture_assets += assets_in_packages(linked, TEXTURE_CLASSES)
+    skipped_textures: dict[str, str] = {}
     for asset in texture_assets:
-        textures[str(asset.package_name)] = export_texture(asset.get_asset(), work / "textures")
+        try:
+            textures[str(asset.package_name)] = export_texture(asset.get_asset(), work / "textures")
+        except RuntimeError as error:
+            # Fab packages carry helper textures (T_Black_Linear) some exporters refuse;
+            # the converter reports a missing card atlas on its own.
+            if not fab or "atlas" in str(asset.asset_name).lower():
+                raise
+            skipped_textures[str(asset.package_name)] = str(error)
 
     grooms = {
         inventory.object_path(a): ue.dump_properties(a.get_asset())
@@ -99,6 +122,7 @@ def export_style(slot: str, style_path: str, work: Path) -> dict[str, Any]:
             "textures": textures,
             "grooms": grooms,
             "bindings": bindings,
+            "skipped_textures": skipped_textures,
             "other_assets": {
                 inventory.object_path(a): inventory.class_name(a)
                 for a in own
@@ -156,8 +180,28 @@ def style_folders() -> list[tuple[str, str]]:
     return folders
 
 
+def fab_styles() -> list[tuple[str, str, str]]:
+    """(slot, package folder, style) for Fab packages holding a groom and its wardrobe item.
+    The style is the wardrobe item's name without `WI_`; character packages (whose own
+    groom we do not take) are left out."""
+    inventory.scan((FAB_ROOT,))
+    registry = inventory.registry()
+    styles = []
+    for folder in sorted(str(p) for p in registry.get_sub_paths(FAB_ROOT, False)):
+        classes: dict[str, list[str]] = {}
+        for asset in inventory.assets_under(folder):
+            classes.setdefault(inventory.class_name(asset), []).append(str(asset.asset_name))
+        if "MetaHumanCharacter" in classes or "GroomAsset" not in classes:
+            continue
+        items = [n for n in classes.get("MetaHumanWardrobeItem", []) if n.startswith("WI_")]
+        if len(items) == 1:
+            styles.append((FAB_SLOT, folder, items[0].removeprefix("WI_")))
+    return styles
+
+
 def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
-    """Args: slots (list, default all), only (list of style names), force."""
+    """Args: slots (list, default all), only (list of style names), fab (Fab packages,
+    default true), force."""
     inventory.scan((GROOMS_ROOT,))
     slots = set(args.get("slots") or [])
     only = set(args.get("only") or [])
@@ -180,6 +224,18 @@ def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
                 directory=archive.unit_dir("grooms", slot, style),
                 export=lambda work, slot=slot, style_path=style_path: export_style(
                     slot, style_path, work
+                ),
+            )
+        )
+    for slot, folder, style in fab_styles() if args.get("fab", True) else []:
+        if (slots and slot not in slots) or (only and style not in only):
+            continue
+        units.append(
+            Unit(
+                name=f"grooms/{slot}/{style}",
+                directory=archive.unit_dir("grooms", slot, style),
+                export=lambda work, slot=slot, folder=folder, style=style: export_style(
+                    slot, folder, work, style
                 ),
             )
         )

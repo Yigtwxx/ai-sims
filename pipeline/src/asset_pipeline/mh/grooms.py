@@ -92,8 +92,9 @@ COLOR_PARAMS = [
 TEXTURE_ROLES = (
     # (filename pattern, manifest role, output file, keep alpha). Channels stay as Unreal
     # exported them; the hair material of the web app decides how to use them.
-    (re.compile(r"cardsatlas_attribute", re.I), "attribute", "attribute", False),
-    (re.compile(r"cardsatlas_tangent", re.I), "tangent", "tangent", True),
+    # Some Epic packages spell it "CardsAltas" (Hair_L_HighPonytail).
+    (re.compile(r"cardsa(?:tl|lt)as_attribute", re.I), "attribute", "attribute", False),
+    (re.compile(r"cardsa(?:tl|lt)as_tangent", re.I), "tangent", "tangent", True),
     (
         re.compile(r"colorxydepthgroupid", re.I),
         "colorXYDepthGroupId",

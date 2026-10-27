@@ -18,7 +18,12 @@
     "Hair_S_Clean": "male",
     "Hair_S_HairLoss": "male",
     "Hair_S_Messy": "male",
-    "Hair_S_SlickBack": "male"
+    "Hair_S_SlickBack": "male",
+    "Hair_L_HighPonytail": "female",
+    "Hair_F_Ponytail_MessyWavy_01": "female",
+    "Ponytail": "female",
+    "SC_Hairstyle_Male_11": "male",
+    "NomadWaveUndercut": "male"
   },
   "outfits": {
     "Casual_F_Outfit": "female",

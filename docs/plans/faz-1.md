@@ -63,6 +63,7 @@
     | `gb_ponytail` (PonytailGroom) | Yok (yalnız tel, zip yok) | Kart üretilmeli |
 
     Frey paketinin kendi saçı (`Middle_part`) da tel; kullanılmıyor. Kart üretimi (Hair Card Generator headless mi, yoksa telden kendi kart üreticimiz mi) 1b.2'nin başında karar verilir.
+  - 1b.2 sırası: (A) `grooms.py` `/Game/Fab/<paket>/` altındaki groom'ları bulur (karakter paketleri hariç); stil adı wardrobe item'ın adı (`WI_` öneki atılır: `Hair_L_HighPonytail`, `SC_Hairstyle_Male_11`, `Hair_F_Ponytail_MessyWavy_01`, `NomadWaveUndercut`, `Ponytail`); binding ve WI paketin kendi klasöründen. (B) Dönüştürücü: `TEXTURE_ROLES` Epic'in `CardsAltas_Attribute` yazım hatasını da tanır. (C) MessyWavy: zip'teki kart FBX'leri Blender'la GLB'ye, `fiber_Tangent`/`fiber_Attribue` atlas rollerine. (D) Male 11'in tek mesh'i ve dokusu incelenir. (E) Nomad ve PonytailGroom: Hair Card Generator.
 - [ ] **1b.2 Keşif kodunu genişlet.** Tahmin 2.5 · Gerçek —
   - `pipeline/unreal/mh_export/grooms.py`: `style_folders()` (:148) Epic'in `GroomAssets/<slot>/<style>` klasörüne ek olarak `/Game/Fab/<paket>/` altındaki groom'ları bulur; slot (`Hair`) ve stil adı paketten türetilir. `related_assets()` `PLUGIN_PREFIX` dışında paketin kendi klasörünü de alır.
   - Saf fonksiyonlar (yol → slot/stil eşlemesi, önek filtresi) editörsüz test edilebilir hale getirilir; testler `pipeline/tests/`.

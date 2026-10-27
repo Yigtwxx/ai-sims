@@ -189,3 +189,16 @@ def test_empty_skin_slots_point_at_a_skin_joint() -> None:
     np.testing.assert_array_equal(local, [[0, 1, 0, 0], [1, 0, 0, 0]])
     with pytest.raises(ValueError):
         grooms._local_joints(remap, np.array([[3, 0, 0, 0]]), np.array([[1.0, 0, 0, 0]]))
+
+
+@pytest.mark.parametrize(
+    "file_name, role",
+    [
+        ("Hair_L_Straight_CardsAtlas_Attribute.png", "attribute"),
+        ("Hair_L_HighPonytail_CardsAltas_Attribute.png", "attribute"),
+        ("Hair_L_HighPonytail_CardsAtlas_Tangent.png", "tangent"),
+    ],
+)
+def test_texture_roles_match_epic_atlas_names_including_typo(file_name, role):
+    matched = [r for pattern, r, _, _ in grooms.TEXTURE_ROLES if pattern.search(file_name)]
+    assert matched[:1] == [role], f"{file_name} matched {matched}"

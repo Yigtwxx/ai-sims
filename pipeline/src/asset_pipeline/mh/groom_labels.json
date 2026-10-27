@@ -350,5 +350,25 @@
   "Mustache_S_Uneven": {
     "en": "Short uneven mustache",
     "tr": "Kısa düzensiz bıyık"
+  },
+  "Hair_L_HighPonytail": {
+    "en": "Long high ponytail",
+    "tr": "Uzun yüksek at kuyruğu"
+  },
+  "Hair_F_Ponytail_MessyWavy_01": {
+    "en": "Messy wavy ponytail",
+    "tr": "Dağınık dalgalı at kuyruğu"
+  },
+  "SC_Hairstyle_Male_11": {
+    "en": "Medium tousled",
+    "tr": "Orta boy dağınık"
+  },
+  "NomadWaveUndercut": {
+    "en": "Wavy undercut",
+    "tr": "Dalgalı undercut"
+  },
+  "Ponytail": {
+    "en": "Sleek ponytail",
+    "tr": "Düz at kuyruğu"
   }
 }

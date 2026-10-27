@@ -31,9 +31,13 @@ def test_a_label_without_both_languages_is_rejected(tmp_path: Path) -> None:
 
 
 def test_turkish_sizes_follow_the_style_size_code() -> None:
-    """A label that names a size names the one in the style id (`Hair_M_...` is `Orta boy`)."""
+    """A label that names a size names the one in the style id (`Hair_M_...` is `Orta boy`).
+    Fab styles (`SC_Hairstyle_Male_11`, `NomadWaveUndercut`) carry no size code."""
     for style, label in groom_labels().items():
-        size = style.split("_")[1]
+        parts = style.split("_")
+        if len(parts) < 3 or parts[1] not in SIZES:
+            continue
+        size = parts[1]
         named = [word for word in SIZES.values() if label["tr"].startswith(word)]
         assert named in ([], [SIZES[size]]), f"{style}: {label['tr']}"
 
