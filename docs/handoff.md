@@ -25,6 +25,8 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 
 ## Durum
 
+- **2026-10-27 (PC, Faz 1, `docs/plans/faz-1.md`):** 4 Fab yüzü (Skotukeda, Mason, MHC_Seo, MHC_Frey; yüz kaynağı 4K) ve Long High Ponytail sitede. Kendi kıyafet yolu çalışıyor: `asset-pipeline garment` (gövdeden kalıp, Blender sim, arşiv birimi) ile kalem etek sitede. Dönüştürücü outfit-v7: bacak arasını köprüleyen kumaş iki bacağa birden asılıyor (`bridging`), bütün kıyafetler yeniden dönüştürüldü. Açık: Mason'da yaka taşması, 4 Fab saçında kart üretimi (Hair Card Generator), AO gürültüsü.
+
 ### Unreal dışa aktarımı (Windows, `pipeline/unreal/mh_export/`)
 
 - **Bitti.** Sayılar `MetaHumanArchive/raw/` altındaki `done.json` birimlerinden:

@@ -38,7 +38,7 @@
   - `uv run asset-pipeline mh-convert --character <ad1> --character <ad2> --character <ad3> --character <ad4> --manifest`.
   - `gltf-transform validate` her yeni `faces/<ad>/*.glb` ve gövde/cilt GLB'si için.
   - Manifest'te 4 yüzün cinsiyeti beklenenle aynı: Skotukeda K, Mason E, Seo K, Frey E. Yanlışsa `characters_genders.json` değerine bak, eşik kuralı (`|değer| < 0.3` gövde şekli) handoff "Cinsiyet" maddesinde.
-- [ ] **1a.5 Sahnede kontrol, küçük resim, yayın.** Tahmin 2 · Gerçek —
+- [x] **1a.5 Sahnede kontrol, küçük resim, yayın.** Tahmin 2 · Gerçek 1.5 (R2 manifest 2026-10-27: 23 yüz, 25 kıyafet, 50 saç; yeni dosyalar herkese açık adreste 200)
   - Durum (2026-10-27): dört yüz `/dev/stage`'de tişört + kot + spor ayakkabıyla açılıyor; Skotukeda'da konuşurken ağız ve dişler sese göre oynuyor. Dönüştürücünün yazdığı küçük resimler Unreal önizlemesiydi (kel, gri), `/dev/thumbs`'ta yeniden çizildi. Yüz, cilt ve iris klasörleri R2'ye yükleniyor. **Manifest bekliyor:** içinde henüz düzeltilmemiş kalem etek var (1c.5).
   - **Mason'da yaka taşması:** kafa mesh'inin boyun ve göğüs parçası diğer erkeklerden ~3.5 cm önde (z 0.130, diğerleri ~0.095), paylaşılan gövdeye takılınca tişört ve kazak yakasından taşıyor. B5'e (1d) ilk vaka olarak yazıldı.
   - `pnpm db:start`, `pnpm dev`; `/dev/stage`'de her yeni yüz: idle, konuşma (`/api/tts` ile TR ve EN birer cümle), dudak senkronu ve göz kırpma; boyun dikişi; ekran görüntüsü.
@@ -114,7 +114,7 @@
 - [x] **1c.4 Paketleyici ve CLI.** Tahmin 2 · Gerçek 0.7
   - `garments/pack.py`, `garments/cli.py` (`asset-pipeline garment --item AS_PencilSkirt`), `tests/test_garments_pack.py`. Uçtan uca 21 sn. Döşeme haritaları Crewneckt'ten, yalnız `fabric_slots()`'un örnekledikleri; döşeme ölçeği 1.48/0.99 m/UV. `DoPill` kapalı (takım kumaşı).
   - `mh-convert --outfits --outfit AS_PencilSkirt --manifest` 28 sn: kategori `bottom`, 3495 gövde köşesi gizli, 0.9 MB GLB + 3.2 MB harita; `gltf-transform validate` hatasız (Crewneckt'le aynı bilgi satırları).
-- [ ] **1c.5 Dönüştür, kontrol, yayın.** Tahmin 1.5 · Gerçek —
+- [x] **1c.5 Dönüştür, kontrol, yayın.** Tahmin 1.5 · Gerçek 2.5 (kalça düzeltmesi ve 48 kıyafetin yeniden dönüşümü dahil; R2'de)
   - Durum (2026-10-27): `/dev/stage`'e `body` seçici eklendi (nötr ve her kaydırıcının ±1 ucu). Ada'da nötr, idle ve konuşma temiz; arkada yırtmaç açılıyor, yırtılma yok; kilo ±1 temiz. **Kalça ±1 bozuk:** bacak arasını köprüleyen kumaş iç uyluk ve kasık derisinin morph'unu izliyor (+1'de ön ortada "Y" kat ve dikey kıvrım, −1'de kasıkta çukur ve etek ucunda çentik). Düzeltme dönüştürücünün aktarımında (A4.7 ile aynı aile).
   - Düzeldi (`3df9de4`, xhigh subagent): neden `build_transfer`'ın 32 komşu sınırıydı; bacak arasındaki kumaş (deriden 6-10 cm) her yanda tek uyluğu izliyordu. Bacak arasını köprüleyen kumaş artık iki bacağı kapsayan geniş bir Gauss'a karışıyor (`bridging`, `BodyFit.limbs`). Etekte en büyük morph gerilmesi %439 → %38, nötrde orta çizgi %62 → %27; tayt ve kot kasıkta en çok ~2 mm değişti, crop top ve ayakkabılar aynı. `OUTFITS_VERSION` v7: bütün kıyafetler yeniden dönüştürülüyor. Kalan: kalça −1'de eteğin önünde sol altta küçük gri leke (v6'da da vardı).
   - `mh-convert --outfits --outfit AS_PencilSkirt --manifest`, validate; `outfit_labels.json` (TR/EN), `gender_compat.json` (yalnız kadın), `outfit_tints.json` (lacivert, antrasit, siyah, deve tüyü, bej).

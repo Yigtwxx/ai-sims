@@ -93,7 +93,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   | Nomad Wave Undercut (Quang Phan) | saç | herhangi biri ($0) | 5.7 | https://www.fab.com/listings/0d3d4066-49b8-4c7c-a416-a0b5c12ba7d0 |
   | PonytailGroom (DropBear) | saç | herhangi biri ($0) | 5.6 | https://www.fab.com/listings/d8c790ae-3b8c-4238-b520-1db8a99cac0f |
 
-- [ ] **A2. Yüzleri ekle** (A1'den sonra; komutlar `pipeline/` içinde):
+- [x] **A2. Yüzleri ekle** (2026-10-27, `13dfb5f` + R2 manifest: Skotukeda, Mason, MHC_Seo, MHC_Frey; 4K yüz kaynağı. Mason'ın yaka taşması B5'te.) (A1'den sonra; komutlar `pipeline/` içinde):
   1. `uv run asset-pipeline ue fab_import`. Bitmiş paketleri atlar, yalnız yenileri alır.
   2. Karakter adı her paketin `raw/fab_import/<paket>/import.json` dosyasında: `created` içindeki `MetaHumanCharacter` sınıflı asset'in son adı.
   3. `uv run asset-pipeline ue characters --args '{"only": ["<ad1>", "<ad2>", "<ad3>", "<ad4>"]}'`. **`only` şart:** `characters` işi `pruned.json`'a bakmaz (yalnız `outfits` bakar). `raw/characters/` klasörü silinmiş budanan preset'leri baştan dışa aktarır; her biri ~11 dk ve ~860 MB.
@@ -136,7 +136,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - **Ayrı görevler:** uzun parçalar (maksi etek, uzun palto) en sonda deneme olarak A4.7'de; topuklu ayakkabı A4.10'da.
   - **Çıkarılanlar** (kullanıcı kararı, 2026-10-27; ekleme, önerme): doktor önlüğü, reflektörlü iş yeleği, atkı, eldiven; jogger, tulum, koşu şortu, espadril; gece serisinden erkek dar atlet, erkek vücuda oturan tişört ve yüksek bel mini şort; pijamanın şortlu varyantı, açık burun terlik; gömlekte içe sokulu ve yaka düğmesi açık/kapalı varyantları; trençkot, kaban; ince bantlı topuklu sandalet, kalın topuklu ayakkabı; sweatshirt, platform spor ayakkabı, ev terliği, şişme mont (A4.17 Kış tamamen).
 
-  - [ ] **A4.0 Yol denemesi: kalem etek (kadın).** En basit kalıp (ön + arka, bel bandı, arka yırtmaç); iş setini de açar. Zincir uçtan uca çalışınca paketleyici ve kalıp altyapısı hazır sayılır. Blender'da sim ya da otomasyon 2-3 denemede yürümezse dur, nedenini "Kullanıcıya sorular"a yaz, Unreal yoluna geçmeyi sor ve beklerken B görevlerine geç.
+  - [x] **A4.0 Yol denemesi: kalem etek (kadın).** (2026-10-27, `7c691dc`, `3df9de4`, `1010c10`: `asset-pipeline garment --item AS_PencilSkirt`, sitede. Açık: AO gürültüsü ve kalça −1'deki gri leke B5'te.) En basit kalıp (ön + arka, bel bandı, arka yırtmaç); iş setini de açar. Zincir uçtan uca çalışınca paketleyici ve kalıp altyapısı hazır sayılır. Blender'da sim ya da otomasyon 2-3 denemede yürümezse dur, nedenini "Kullanıcıya sorular"a yaz, Unreal yoluna geçmeyi sor ve beklerken B görevlerine geç.
   - [ ] **A4.1 İş seti:**
     - Kumaş pantolon, kadın ve erkek (düz paça, bel bandı; ütü çizgisi normal haritada).
     - Uzun kollu düz gömlek, kadın ve erkek (yaka, düğme patı, manşet; düğmeler dokuda). Budanan `OA_Shirt_04`'ün yerini alır.
