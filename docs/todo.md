@@ -5,7 +5,17 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 ## Çalışma kuralları
 
 - **Başlarken:** önce `git pull` (liste Mac'te de güncellenebilir), sonra `CLAUDE.md`, `docs/handoff.md` ve bu dosya. Kararları tekrar sorma.
-- **Sıra:** işaretlenmemiş (`[ ]`) ilk görev. Bir görev kullanıcıya bağlıysa (indirme, seçim, karar) soruyu aşağıdaki "Kullanıcıya sorular" bölümüne yaz, kullanıcıya kısaca sor ve beklemeden sıradaki engelsiz göreve geç.
+- **Sıra** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı bu liste belirler. Listede işaretlenmemiş (`[ ]`) ilk görev yapılır:
+  1. A1 → A2 → A3 → A3b: Fab ve Unreal. Uzun işler arka planda çalışır.
+  2. A4.0 kalem etek: Blender yolunun denemesi ve paketleyici.
+  3. B5 oturma hataları: düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer ve onları yeniden dönüştürmek gerekmez.
+  4. A4.1 iş seti → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu → A4.4 günlük çeşit → A4.6 ek parçalar.
+  5. C9 kat kat giyim (prototip A4.1 blazer'ı ve A4.2 tişörtüyle) → A4.7 uzun parçalar.
+  6. B1 → B2 → B3 → B4.
+  7. C1 → C2 → C3 → C4 → C5 → C6 → C7 (B2'den sonra) → C8 → C10 (A2'den sonra).
+  8. D1 küçük resimler → D2 son kontrol.
+  - Unreal ya da Blender arka planda çalışırken sıradaki engelsiz web görevine geçilebilir (örneğin A4.5, B1-B4); iş bitince listeye geri dönülür.
+- **Engel:** bir görev kullanıcıya bağlıysa (indirme, seçim, karar) soruyu aşağıdaki "Kullanıcıya sorular" bölümüne yaz, kullanıcıya kısaca sor ve beklemeden sıradaki engelsiz göreve geç.
 - **Unreal işleri uzun sürer** (yüz başına ~11 dk). `asset-pipeline ue ...` komutlarını arka planda başlat, beklerken web görevlerine devam et. Aynı anda tek editör açılır (RAM yetmiyor).
 - **Büyük görevlerde** (B2, B5, C1, C2, C7, C9) önce tasarım: `superpowers:brainstorming` + `superpowers:writing-plans`. Kullanıcıya en fazla 2-3 seçenekli, telefondan cevaplanabilir soru sor.
 - **Her görevde:**
@@ -63,7 +73,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - "Uzun dağınık / Long messy" (`groom.hair.Hair_L_MessyClumps`) unisex. İki cinsiyetten de tamamen silinir (kullanıcı kararı): Medium layered ile aynı yol.
   - Üçü tek prune planında silinebilir.
   - Sonra `mh-convert --manifest`, `node scripts/r2-sync.mjs`. Bu saçları giyen kayıtlı karakterleri `reconcile.ts` boşa düşürmeli; denenir.
-- [ ] **A4. Kendi kıyafetlerimiz** (kullanıcı kararı, 2026-10-27: aşağıdaki listenin hepsi, bu sırayla). Bağlam ve kaynaklar `docs/handoff.md` "Kendi kıyafetimiz" bölümünde. Kararlar verildi, tekrar sorma. Büyük görev kuralı gereği önce `superpowers:writing-plans` ile plan yazılır; tasarım bu maddedir.
+- [ ] **A4. Kendi kıyafetlerimiz** (kullanıcı kararı, 2026-10-27: aşağıdaki listenin hepsi; sıra yukarıdaki "Sıra" listesinde, B5 A4.0 ile A4.1 arasında). Bağlam ve kaynaklar `docs/handoff.md` "Kendi kıyafetimiz" bölümünde. Kararlar verildi, tekrar sorma. Büyük görev kuralı gereği önce `superpowers:writing-plans` ile plan yazılır; tasarım bu maddedir.
   - **Yöntem (Mac oturumunun önerisi, 2026-10-27):** Unreal atlanır. Kıyafet Blender'da kurulur ve doğrudan arşiv birimi olarak yazılır. Kemik ağırlıklarını, slider morph'larını, deri payını ve `body_hide`'ı `mh-convert` zaten kendisi üretiyor (`pipeline/src/asset_pipeline/mh/outfits.py` docstring, adım 1-5). Handoff'taki Unreal Outfit Asset yolu ("Adımlar") yalnız A4.0 başarısız olursa kullanılır.
   - **Teknik:**
     - Blender headless çalışır (`blender --background --python ...`); kurulum `winget install BlenderFoundation.Blender`.
@@ -121,7 +131,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 - [ ] **B3. Dövme** (`tattoos`, `schema.ts:103`, `TattooPanel.tsx`, `web/src/features/creator/tattoos.ts`). Cilt shader'ında gövde ve kafa UV'sine bir katman eklenir. Tasarımlar küçük ve ölçülü kalır; yerleşim UV'leri gövde GLB'sinden ölçülür.
 - [ ] **B4. Takı** (`accessories`, `JewelryPanel.tsx`, `web/src/features/avatar/accessories/`). Bu kod anime döneminden kalma (VRoid kulak arama vb.); MetaHuman kafa ve gövde mesh'ine ve eklemlerine bağlanır. **Bitti sayılır:** küpe, kolye ve yüzük idle ve konuşma sırasında yerinde kalıyor ve mesh'e girmiyor.
 
-- [ ] **B5. Oturma hataları: kıyafet ve saç** (kullanıcı şikâyeti, 2026-10-27).
+- [ ] **B5. Oturma hataları: kıyafet ve saç** (kullanıcı şikâyeti, 2026-10-27; sırası A4.0'dan hemen sonra, bkz. "Sıra").
   - Belirtiler:
     - Kıyafetler hâlâ yer yer vücudun içine giriyor, tam oturmuyor.
     - Gövde kaydırıcıları değişince kıyafet bozulabiliyor.
