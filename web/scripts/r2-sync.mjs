@@ -1,9 +1,10 @@
 // Uploads the MetaHuman web export (the folder behind public/assets/mh) to the R2
 // bucket the deployed site reads from (NEXT_PUBLIC_MH_ASSET_ROOT). Objects are
 // overwritten in place. Needs a Cloudflare login first: `npx wrangler login`.
-// Usage: node scripts/r2-sync.mjs [--bucket ai-sims-mh] [--jobs 8] [subdir ...]
+// Usage: node scripts/r2-sync.mjs [--bucket ai-sims-mh] [--jobs 8] [subdir | file ...]
+// e.g. `faces skins manifest.json` after converting new presets.
 import { spawn } from 'node:child_process';
-import { readdirSync, realpathSync } from 'node:fs';
+import { readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -33,6 +34,10 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const exportRoot = realpathSync(join(webRoot, 'public', 'assets', 'mh'));
 
 function* walk(dir) {
+  if (statSync(dir).isFile()) {
+    yield dir;
+    return;
+  }
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) yield* walk(path);

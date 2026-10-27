@@ -18,7 +18,9 @@ import {
 } from '@/lib/assets/manifest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import {
+  BODY_SLIDERS,
   HAIR_PATTERNS,
+  type BodySlider,
   type CharacterConfig,
   type HairPattern,
   type OutfitItem,
@@ -88,6 +90,8 @@ export function DevStageViewer() {
   const [outfit, setOutfit] = useState<CharacterConfig['outfit']>(
     () => createDefaultConfig('female').outfit,
   );
+  // One slider pushed to an end ('hips:1'), for checking how garments follow the body.
+  const [body, setBody] = useState('');
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
   const [quality, setQuality] = useState<QualityPreference>('high');
   const [thinking, setThinking] = useState(false);
@@ -107,8 +111,12 @@ export function DevStageViewer() {
     value.beard.style = styles.beard || null;
     value.mustache.style = styles.mustache || null;
     value.outfit = outfit;
+    if (body) {
+      const [slider, end] = body.split(':');
+      value.body.sliders = { [slider as BodySlider]: Number(end) };
+    }
     return value;
-  }, [gender, face, styles, melanin, redness, pattern, outfit]);
+  }, [gender, face, styles, melanin, redness, pattern, outfit, body]);
 
   const pickOutfit = useCallback((category: OutfitCategory, id: string) => {
     setOutfit((current) => {
@@ -221,6 +229,17 @@ export function DevStageViewer() {
             {Object.keys(IDLE_SETS).map((key) => (
               <option key={key}>{key}</option>
             ))}
+          </select>
+          body
+          <select data-testid="body" value={body} onChange={(e) => setBody(e.target.value)}>
+            <option value="">neutral</option>
+            {BODY_SLIDERS.flatMap((slider) =>
+              [-1, 1].map((end) => (
+                <option key={`${slider}:${end}`} value={`${slider}:${end}`}>
+                  {slider} {end > 0 ? '+1' : '-1'}
+                </option>
+              )),
+            )}
           </select>
         </label>
         {(['hair', ...FACIAL] as const).map((slot) => (
