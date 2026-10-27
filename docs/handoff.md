@@ -387,7 +387,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 
 ## Canlı demo (2026-10-26)
 
-- https://ai-sims-zeta.vercel.app. `main`'e her push production deploy'u. Kurulum ve env listesi: `docs/deploy.md`.
+- https://ai-sims.pages.dev (Türkiye'den bu adres açılır; `*.vercel.app` 2026-10-27'den beri engelli, ayna `proxy/pages/`). Vercel'deki asıl adres https://ai-sims-zeta.vercel.app. `main`'e her push production deploy'u. Kurulum ve env listesi: `docs/deploy.md`.
 - Varlıklar Vercel'de değil, R2 bucket'ı `ai-sims-mh`'de. Dönüştürücü ya da `mh-prune` çalıştıktan sonra değişen klasörleri `cd web && node scripts/r2-sync.mjs <klasör>` ile yükle.
 - Veri Atlas M0'da (Frankfurt). Yerel geliştirme 27018'deki mongod'la devam eder.
 - **Mac'te yalnızca UI işi için 20 GB aktarım gerekmez.** Repo'yu klonla, `.env.local`'ı elle taşı ve içine `NEXT_PUBLIC_MH_ASSET_ROOT=https://pub-3bc24e93f6b644a09830eee4f15bb5e0.r2.dev` ekle. Varlıklar R2'den gelir. Yüz, kıyafet, kürasyon ve thumbnail gibi varlık işleri `raw/` arşivi ve dönüştürücü ister; onlar PC'de kalır.

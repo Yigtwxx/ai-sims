@@ -16,9 +16,17 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
+/**
+ * Public address for absolute metadata URLs (the social preview image).
+ * *.vercel.app is blocked on Turkish networks, so links are shared through the
+ * Cloudflare Pages mirror (proxy/pages); its previews must load from there too.
+ */
+const SITE_URL = 'https://ai-sims.pages.dev';
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('App');
   return {
+    metadataBase: new URL(SITE_URL),
     title: { default: t('name'), template: `%s | ${t('name')}` },
     description: t('description'),
     // The image itself is `opengraph-image.png` next to this layout.

@@ -43,6 +43,25 @@ Anahtarlar ekrana basılmadan CLI ile girildi: `printf '%s' "$VALUE" | vercel en
 - Network Access `0.0.0.0/0`: Vercel fonksiyonlarının IP'si sabit değil.
 - M0 sınırları `docs/setup-accounts.md` §7'de. 30 gün bağlantı olmazsa küme duraklar.
 
+## Türkiye erişimi: Cloudflare Pages aynası
+
+- **Paylaşılacak adres: https://ai-sims.pages.dev.**
+- **Sebep:** 2026-10-27'den beri Türk ağları (ev interneti ve mobil hotspot denendi) `*.vercel.app` adresleri için TLS el sıkışmasını kesiyor (SNI filtresi). Aynı Vercel IP'si başka bir adla yanıt veriyor; `*.pages.dev` ve R2'nin `*.r2.dev` adresi açılıyor.
+- **Nasıl çalışır:** `proxy/pages/_worker.js` her isteği `https://ai-sims-zeta.vercel.app`'e aktarır ve host'u iki yönde çevirir:
+  - `Origin` ve `Referer` Vercel adresine çevrilir; server action'lar ve Better Auth Origin'i kendi host'larıyla karşılaştırır.
+  - Vercel host'una giden yönlendirmeler aynaya döner.
+  - Çerezler aynanın host'unda kalır; `Domain` özniteliği atılır.
+  - Uygulamada değişiklik gerekmez. Vercel'e her push aynada da hemen görünür.
+- **Paylaşım önizlemesi:** önizleme görselinin mutlak adresi aynaya bakar (`web/src/app/[locale]/layout.tsx`, `metadataBase`). WhatsApp gibi uygulamalar görseli telefondan çeker; `vercel.app` adresi orada açılmaz.
+- **Vekili güncellemek:** proje Cloudflare'de klasik Pages olarak açıldı (`ai-sims`, bir kez `--force` ile). Repo kökünde:
+
+  ```bash
+  npx -y wrangler@4.152.0 pages deploy proxy/pages --project-name ai-sims --branch main --commit-dirty=true
+  ```
+
+  Önce `npx wrangler login` gerekir. Bu Mac'te oturum açık.
+- **Kalıcı çözüm:** projeye bir alan adı bağlamak. Engel `vercel.app` adınadır; kendi alan adında olmaz.
+
 ## Bilinen riskler
 
 - Production adresi herkese açık ve anonim giriş var. Linki bilen herkes sohbeti ve sesi kullanabilir. Groq ve Gemini ücretsiz kotada kalır, ama zincirin sonundaki Claude ücretlidir. Kötüye kullanım görülürse Vercel'den `ANTHROPIC_API_KEY` silinip yeniden deploy edilir.
