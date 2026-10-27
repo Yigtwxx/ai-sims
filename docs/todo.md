@@ -129,10 +129,17 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - Sorun: iç parça dış parçanın içinden çıkar. Seçenekler: iç giysi için `body_hide` benzeri bir gizleme maskesi ya da iç parçayı içeri itmek.
   - Önce tek bir çiftle (tişört + ceket) prototip yapılır. **Bitti sayılır:** idle ve konuşmada parçalar birbirinin içinden çıkmıyor.
 
-- [ ] **C10. Yüz seçicide açık ten** (kullanıcı isteği, 2026-10-27). Koyu tenli yüz küçük resimlerinde yüz hatları seçilmiyor; yüzler karşılaştırılırken hepsi açık tenle görünmeli.
-  - Küçük resimler: `web/src/components/dev/thumbConfig.ts` her yüzü kendi cildiyle çiziyor (`wearing()`: `skin.set = face.defaultSkin`). Yüz küçük resimleri için tek, açık ve nötr bir ten seçilir: cinsiyetine uygun cilt seti (en açıklar `tone`'a göre `skin.Jelena` 0.22, `skin.Vivian` 0.28, `skin.Aera` 0.31; erkek tarafında `skinsFor`/`skinGender` ile seçilir). İris yüzün kendi irisi kalır. Görseller D1'de yeniden üretilir.
-  - Canlı seçim: bugün yüze tıklayınca ten de o yüzün kendi cildine geçiyor (`FacePanel.tsx:45-46`). Bunun değişip değişmeyeceği kullanıcı kararı (aşağıdaki soru); karar gelene kadar bu kısma dokunma.
-  - **Bitti sayılır:** yüz panelindeki tüm küçük resimler aynı açık tenle, aynı ışıkta; yüz hatları karşılaştırılabiliyor.
+- [ ] **C10. Yüz seçicide ten** (kullanıcı kararı, 2026-10-27). Koyu tenli yüz küçük resimlerinde yüz hatları seçilmiyordu. Karar:
+  1. **Yüz seçmek teni değiştirmez.** Bugün yüze tıklayınca ten o yüzün kendi cildine geçiyor (`FacePanel.tsx:45-46`); bu kalkar, seçili cilt korunur. Ten yalnız Cilt panelinden değişir.
+  2. **Yüz küçük resimleri o anki tenle görünür.** Kullanıcı teni değiştirdiyse yüz seçeneklerinin hepsi o tende görünür.
+  3. **Varsayılan açık ten.** Yeni karakter bugün de en açık tenle başlıyor (`web/src/lib/character/defaults.ts:9`: kadın Jelena 0.22, erkek Victor 0.38, ikisi de cinsiyetinin en açık cildi). A2'den sonra yeni ciltler gelince bu yeniden kontrol edilir.
+  - Önerilen yol:
+    - Her yüz × aynı cinsiyetteki her cilt seti için küçük resim önceden üretilir (`/dev/thumbs`; `web/src/components/dev/thumbConfig.ts` bugün `wearing()` içinde yüzün kendi cildini kullanıyor).
+    - A2 sonrası ~12×12 + 11×11 ≈ 265 görsel; biri ~8 KB, toplam ~2 MB.
+    - Manifest'te yüz başına cilt → küçük resim eşlemesi olur (zod: `web/src/lib/assets/manifest.ts`, pipeline: `pipeline/src/asset_pipeline/mh/manifest.py`). Panel `config.skin.set`'e göre seçer, yoksa varsayılan açık tene düşer.
+    - `skin.tone` kaydırıcısı küçük resme yansımaz; set yeterli.
+    - Tarayıcıda her yüzü canlı çizmek ağır (yüz başına ~11 MB kafa) ve elendi.
+  - **Bitti sayılır:** yeni karakterde tüm yüz küçük resimleri açık tende; Cilt panelinden koyu bir set seçilince yüz küçük resimleri o tene geçiyor; yüze tıklamak teni değiştirmiyor.
 
 ## D. Kapanış
 
@@ -141,4 +148,4 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## Kullanıcıya sorular
 
-- **C10:** Yüze tıklayınca ten de o yüzün kendi rengine geçmeye devam etsin mi, yoksa seçili ten korunsun mu? (öneri: korunsun; ten Cilt panelinden seçilir, yüzler arasında gezinirken hatlar açık tende kalır)
+(Bekleyen soru yok.)
