@@ -9,8 +9,8 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   1. A1 → A2 → A3 → A3b: Fab ve Unreal. Uzun işler arka planda çalışır.
   2. A4.0 kalem etek: Blender yolunun denemesi ve paketleyici.
   3. B5 oturma hataları: düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer ve onları yeniden dönüştürmek gerekmez.
-  4. A4.1 iş seti → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu → A4.9 iç giyim → A4.11 mayo ve bikini → A4.4 günlük çeşit → A4.6 ek parçalar → A4.10 topuklu → A4.8 gece ve seksi çizgi.
-  5. C9 kat kat giyim (prototip A4.1 blazer'ı ve A4.2 tişörtüyle) → A4.7 uzun parçalar.
+  4. A4.1 iş seti → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu → A4.9 iç giyim → A4.11 mayo ve bikini → A4.4 günlük çeşit → A4.6 ek parçalar → A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.15 varyantlar → A4.16 ve A4.17'nin C9'suz parçaları → A4.10 topuklu → A4.8 gece ve seksi çizgi.
+  5. C9 kat kat giyim (prototip A4.1 blazer'ı ve A4.2 tişörtüyle) → A4.16 ve A4.17'nin üste giyilen parçaları (önlük, yelek, mont) → A4.7 uzun parçalar.
   6. B1 → B2 → B3 → B4.
   7. C1 → C2 → C3 → C4 → C5 → C6 → C7 (B2'den sonra) → C8 → C10 (A2'den sonra).
   8. D1 küçük resimler → D2 son kontrol.
@@ -149,6 +149,22 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Renkler: siyah, beyaz, lacivert, kırmızı, haki, pudra; desen varyantı (çizgili ya da çiçekli) A4.4'teki desen yöntemiyle.
     - Sınır A4.9 ile aynı: çıplaklık yok, her stil göğüs ucunu ve kasığı opak örter.
     - **Bitti sayılır:** iki cinsiyette her stil ve renk idle ve talk'ta doğru; deniz şortu A4.0 ölçütlerini karşılıyor.
+  - [ ] **A4.12 Spor** (kullanıcı isteği, 2026-10-27): fermuarlı eşofman üstü (K/E), spor tayt + spor sütyeni seti (K), koşu şortu (K/E), pileli tenis eteği (K). Malzeme teknik örgü, hafif parlak.
+  - [ ] **A4.13 Ev** (kullanıcı isteği, 2026-10-27): pijama takımı (K/E; uzun kollu üst + uzun alt, bir de şortlu varyantı), diz boyu kimono sabahlık (K/E, kuşaklı; iç giyimin ya da pijamanın üstüne tek başına giyilir), ev terliği (K/E, kapalı ve açık burun).
+  - [ ] **A4.14 Ayakkabı çeşitleri** (kullanıcı isteği, 2026-10-27): diz boyu çizme (K), espadril (K/E), düz sandalet (K/E), platform spor ayakkabı (K), loafer (K/E; Epic'inki budanmıştı).
+    - Ayakkabılar kumaş simülasyonuyla yapılmaz. Taban ayak izinden ekstrüde edilir, üst kısım ayak yüzeyinin ofset kabuğundan kesim çizgileriyle çıkar. Dikiş, bağcık ve taban dokusu normal haritaya bake'lenir. Çizmenin konçu baldırın ofset kabuğudur.
+    - Kapalı ayakkabıda parmaklar mevcut kuralla gizlenir (`hide_closed_toes`); sandalet ve espadrilde ayak görünür, `soleDepth` doğru ölçülmeli.
+  - [ ] **A4.15 Varyantlar** (kullanıcı isteği, 2026-10-27). Aynı kalıptan ayrı katalog öğeleri, şema değişmez: gömlek ve tişörtte sıvanmış kol, gömlekte içe sokulu ve dışarıda, yaka düğmesi açık ve kapalı. İçe sokulu varyant belde hafif bir kabarıklıkla biter, pantolon ve eteğin bel bandının altında kalır.
+  - [ ] **A4.16 Meslek kıyafetleri** (kullanıcı isteği, 2026-10-27).
+    - C9'suz yapılabilenler: hemşire / sağlık forması (scrubs; V yaka üst + alt, K/E), aşçı ceketi (kruvaze, K/E).
+    - C9'dan sonra: doktor önlüğü (diz boyu, önü açık; önü açık eteği A4.7'deki bacak arası sorununa da girer), reflektörlü iş yeleği (üste giyilir).
+    - C1'de rol veya meslek seçilince ilgili kıyafet önerilebilir. Bu bir öneridir, zorunlu değil; C1 yapılırken değerlendirilir.
+    - C9'suz parçalar bitince kutu açık kalır, yanına "kalanlar C9'dan sonra" notu düşülür.
+  - [ ] **A4.17 Kış** (kullanıcı isteği, 2026-10-27).
+    - Atkı (K/E): Blender'da boyna sarılı simüle edilir. Baş dönünce çeneye girmemesi kontrol edilir.
+    - Eldiven (K/E): mesh değil, çorap gibi cilt shader'ında bir katman olur (el UV'sinde maske; örgü ve deri, renk seçilebilir). Parmaklarla birlikte hareket eder, mesh'teki parmak kırılması sorunu olmaz. Şema: `gloves: { style, color }`; A4.5 ve A4.9 ile aynı sürüme (v3) sığarsa birlikte.
+    - C9'dan sonra: kalça boyu şişme mont (K/E, üste giyilir).
+    - C9'suz parçalar bitince kutu açık kalır, yanına "kalanlar C9'dan sonra" notu düşülür.
   - [ ] **A4.7 Uzun parçalar (deneme, en son):** maksi etek (K), trençkot, kaban, uzun palto (K/E).
     - Sorun: bacak arasındaki kumaş en yakın bacağın ağırlığını alıyor ve adım ya da jestte yırtılıyor. Önce maksi etekle dene: bacak arasındaki vertex'lere iki uyluğun ağırlıklarının karışımı (`build_transfer`'ın Gauss ortalamasını genişleterek, `outfits.py:705`). İdle ve talk'ta temiz değilse dur ve kullanıcıya ekran görüntüsüyle sor.
     - Trençkot, kaban ve palto tek başına `top` olarak bile gövdenin üstüne giyilir. İç kıyafet içinden çıkacağı için C9'daki (`outer` slotu ve iç giysi gizleme) çözüm gerekir. C9 bitmeden başlanmaz.
