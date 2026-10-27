@@ -423,7 +423,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 
 ## Kendi kıyafetimiz (plan, PC'de yapılacak; 2026-10-27)
 
-- **Güncelleme (2026-10-27, Mac):** varsayılan yol artık Unreal değil, Blender'dan doğrudan arşiv birimi. Parça listesi (iş seti, tişört, şortlar, günlük çeşit, çorap ve külotlu, ek parçalar, uzun parçalar), yöntem ve sıra `docs/todo.md` A4'te. Aşağıdaki Unreal adımları yalnız A4.0 başarısız olursa kullanılır.
+- **Güncelleme (2026-10-27, Mac):** varsayılan yol artık Unreal değil, Blender'dan doğrudan arşiv birimi. Parça listesi (iş seti, tişört, şortlar, günlük çeşit, çorap ve külotlu, iç giyim, ek parçalar, topuklu, gece ve seksi çizgi, uzun parçalar), yöntem ve sıra `docs/todo.md` A4'te. Aşağıdaki Unreal adımları yalnız A4.0 başarısız olursa kullanılır.
 - **Karar (kullanıcı):** Fab'den tek tek kıyafet alınmaz. Kıyafetleri kendimiz üretiriz; iş PC'de ve Unreal üzerinden yapılır. Hedef: yapabildiğimizin en kalitelisi (kullanıcı, 2026-10-27; önceki "iyi, AAA değil" hedefinin yerine). Araçlar ücretsiz olmalı. Fab'de abonelik yok; Blender'ın dikiş eklentileri (Garment Tool, Simply Cloth) ve Marvelous Designer / CLO ücretli, bu yüzden elendi.
 - **Bizim için kolaylaştıran şey:** `mh-convert` kemik ağırlıklarını ve vücut slider morph'larını kıyafete vücuttan kendisi aktarıyor (`pipeline/src/asset_pipeline/mh/outfits.py`, adım 3). `ue outfits` yalnızca nötr gövdeyi kuruyor. Yani Unreal'ın kıyafeti yalnızca her cinsiyetin **nötr** gövdesine oturtması yeterli. Epic'in birden çok kaynak bedenli resizable kurulumu (slider uçlarında bozulmayı önlemek için) bizde gerekmeyebilir; önce tek kaynak bedenle denenir.
 - **Araçlar:**
@@ -451,7 +451,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 
 ## Sıradaki iş (Mac)
 
-0. **PC işleri `docs/todo.md`'de** (2026-10-27): Fab'den 4 yüz ve 5 saç, sahnede çalışmayan ayarlar (göz tonu, yüz karıştırma, dövme, takı), yeni özellikler (kişilik, ses, ifade önizleme, makyaj, cilt detayları, kaş ve kirpik, yüz ince ayarı, gözlük ve şapka, kat kat giyim), kendi kıyafetlerimiz (A4: iş seti, tişört, şortlar, günlük çeşit, çorap ve külotlu, ek parçalar, uzun parçalar), küçük resimler. Kullanıcı telefondan "yapılacakları yap" der.
+0. **PC işleri `docs/todo.md`'de** (2026-10-27): Fab'den 4 yüz ve 5 saç, sahnede çalışmayan ayarlar (göz tonu, yüz karıştırma, dövme, takı), yeni özellikler (kişilik, ses, ifade önizleme, makyaj, cilt detayları, kaş ve kirpik, yüz ince ayarı, gözlük ve şapka, kat kat giyim), kendi kıyafetlerimiz (A4: iş seti, tişört, şortlar, günlük çeşit, çorap ve külotlu, iç giyim, ek parçalar, topuklu, gece ve seksi çizgi, uzun parçalar), küçük resimler. Kullanıcı telefondan "yapılacakları yap" der.
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
 2. İlk açılış kontrolü: landing, yeni karakter (kadın ve erkek), bir kıyafet ve renk değişikliği, Bitti, konuşma ekranında "Nasılsın?" (ses ve dudak). Konsolda `THREE.Clock` uyarısından başka hata olmamalı.
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
@@ -485,6 +485,6 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 - **Dil (2026-10-27):** ana dil İngilizce (`/` → `/en`), Türkçe ikinci dil; tarayıcı dili algılanmaz.
 - **Repo:** 2026-10-27'den beri public. Secret, gerçek token ya da `.env` değeri commit'lenmez.
 - **Dövme ve piercing:** ölçülü.
-- **Kıyafet:** iş ve günlük karışık.
+- **Kıyafet:** iş ve günlük karışık; 2026-10-27 itibarıyla gece ve seksi çizgi ile seçilebilir iç giyim de var (mayo yok).
 - **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği, 2026-10-25'te kullanıcının seçtiği Clara body, 2026-10-27'de seçilen 4 yüz: Skotukeda, Mason, Seo, Frey ve 5 saç: Long High Ponytail, Ponytail MessyWavy, Hairstyle Male 11, Nomad Wave Undercut, PonytailGroom; arşivde 2026-10-25'te 24 `.mhpkg` var: 21 `oa_*`, 3 `khaosmdf*`). Fab liste sayfası fiyatı eski gösterebiliyor: Romantic Casual Overalls listede "Free" iken 2026-10-25'te ücretliye dönmüştü ve alınmadı. İndirmeden önce öğenin kendi sayfasındaki lisans kutusuna bakılır. Animasyonlar da yalnız ücretsiz paketlerden.
 - **Lisans:** UE EULA MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor. LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.

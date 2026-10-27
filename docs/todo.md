@@ -9,7 +9,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   1. A1 → A2 → A3 → A3b: Fab ve Unreal. Uzun işler arka planda çalışır.
   2. A4.0 kalem etek: Blender yolunun denemesi ve paketleyici.
   3. B5 oturma hataları: düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer ve onları yeniden dönüştürmek gerekmez.
-  4. A4.1 iş seti → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu → A4.4 günlük çeşit → A4.6 ek parçalar → A4.8 gece ve seksi çizgi.
+  4. A4.1 iş seti → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu → A4.9 iç giyim → A4.4 günlük çeşit → A4.6 ek parçalar → A4.10 topuklu → A4.8 gece ve seksi çizgi.
   5. C9 kat kat giyim (prototip A4.1 blazer'ı ve A4.2 tişörtüyle) → A4.7 uzun parçalar.
   6. B1 → B2 → B3 → B4.
   7. C1 → C2 → C3 → C4 → C5 → C6 → C7 (B2'den sonra) → C8 → C10 (A2'den sonra).
@@ -88,7 +88,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - `AS_` öneki bizim öğelerimizi Epic'inkilerden ayırır. `ue outfits` yalnız kendi birim klasörlerini siler (`archive.py` `run_units`), bunlara dokunmaz.
   - **Her parça için:** `mh-convert --outfits --outfit AS_<Ad> --manifest`, `gltf-transform validate`. Etiket `outfit_labels.json`'a (TR/EN), tek cinsiyetse `gender_compat.json`'a, renkler `outfit_tints.json`'a (ilk preset varsayılan) yazılır. `/dev/stage`'de iki cinsiyet × nötr ve slider uçları × idle ve talk kontrol edilir. Sonra `/dev/thumbs`, `node scripts/r2-sync.mjs`, commit + push (yalnız bitmiş parça). Kullanıcıya telefondan önden ve yandan birer ekran görüntüsü gönderilir.
   - **Bitti sayılır (her parça):** kumaş deriye girmiyor, altından cilt görünmüyor, slider uçlarında kırılmıyor, idle ve talk'ta kol ve bacak hareketiyle yırtılmıyor, renk presetleri çalışıyor.
-  - **Kapsam dışı:** topuklu ayakkabı (ayak pozu değişmesi gerekir). Uzun parçalar (maksi etek, trençkot, kaban, palto) en sonda deneme olarak A4.7'de.
+  - **Kapsam dışı:** mayo ve bikini. Uzun parçalar (maksi etek, trençkot, kaban, palto) en sonda deneme olarak A4.7'de; topuklu ayakkabı A4.10'da.
 
   - [ ] **A4.0 Yol denemesi: kalem etek (kadın).** En basit kalıp (ön + arka, bel bandı, arka yırtmaç); iş setini de açar. Zincir uçtan uca çalışınca paketleyici ve kalıp altyapısı hazır sayılır. Blender'da sim ya da otomasyon 2-3 denemede yürümezse dur, nedenini "Kullanıcıya sorular"a yaz, Unreal yoluna geçmeyi sor ve beklerken B görevlerine geç.
   - [ ] **A4.1 İş seti:**
@@ -119,12 +119,27 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Kolay: kravatlı gömlek, A4.1 gömleğinin varyantı (E, isteğe bağlı K). Kravat gömleğin içinde modellenir, ayrı renk parametresi olur.
     - Orta: triko balıkçı kazak (K/E), düğmeli hırka (K/E), kot ceket (K/E), kapüşonsuz sweatshirt (K/E), tulum ve salopet (K, `full`), gömlek elbise (K), kısa kollu gömlek (E).
     - Takım elbise ayrı parça değildir: A4.1'in blazer'ı ve kumaş pantolonu aynı renk presetleriyle (lacivert, antrasit, siyah) çıkar. İkisi aynı ada ve sıraya sahip olsun ki kullanıcı takımı kolayca eşleştirsin.
-  - [ ] **A4.8 Gece ve seksi çizgi** (kullanıcı isteği, 2026-10-27). Yetişkin işi, şık ve açık parçalar, müstehcen değil. İç giyim ve mayo yok.
+  - [ ] **A4.8 Gece ve seksi çizgi** (kullanıcı isteği, 2026-10-27). Yetişkin işi, şık ve açık parçalar, müstehcen değil. İç giyim A4.9'da; mayo yok.
     - Kadın: bodycon mini elbise, saten askılı (slip) elbise (diz üstü), açık sırtlı ya da derin V yaka üst, korse (bustier) üst, deri mini etek, yırtmaçlı diz boyu etek, dar deri pantolon, yüksek bel mini şort (A4.3 ile ortak kalıp).
     - Erkek: dar atlet, yakası açık saten gömlek (A4.1 gömlek kalıbından), vücuda oturan tişört (A4.2 kalıbından).
     - File çorap, kadın: A4.5 katmanında desenli bir maske, külotlu ve diz üstü boy.
     - Saten ve deri parlak malzemeler: önce kumaş shader'ının parlama ayarları denenir, yetmezse bake'lenmiş PBR kullanılır.
     - Kalıplar diz boyunu geçmez. Daha uzun yırtmaçlı ya da maksi parçalar A4.7'deki bacak arası sorununa girer.
+  - [ ] **A4.9 İç giyim, seçilebilir** (kullanıcı isteği, 2026-10-27). Bugünkü sabit iç çamaşırı seçilebilir hale gelir. Mesh olmaz, cilt shader'ındaki katman olarak kalır (`web/skins/underwear/`, `web/src/features/avatar/mh/materials.ts`, `skinTextures.ts`).
+    - Kadın: bugünkü basic takım (varsayılan), dantel sütyen + külot, bralet, spor sütyeni + külot, yüksek bel külot.
+    - Erkek: bugünkü takım (varsayılan), slip, boxer brief.
+    - Dantel: alfa maskeli desen + normal haritası, gövde UV'sinde; script'le çizilir ya da CC0 dokudan gelir. Askılar ve kenar bantları normal haritada.
+    - Renkler: siyah, beyaz, ten rengi, bordo, lacivert, pudra.
+    - Görünürlük bugünkü kuralla aynı: kıyafetin örtmediği yerde çizilir. Külotlu çorap iç giyimin üstünde durur.
+    - Sınır: çıplaklık yok. Her stil göğüs ucunu ve kasığı opak örter.
+    - Şema: `underwear: { style, color }`. A4.5 ile aynı şema sürümüne (v3) sığarsa birlikte yapılır; migration bugünkü takımı yazar.
+    - **Bitti sayılır:** iki cinsiyette her stil ve renk idle ve talk'ta doğru; kıyafetle ve külotluyla doğru katmanlanıyor.
+  - [ ] **A4.10 Topuklu ayakkabı ve ayak pozu** (kullanıcı onayı, 2026-10-27). Büyük görev: önce `superpowers:writing-plans`.
+    - Parçalar, kadın: stiletto (pump), ince bantlı topuklu sandalet, kalın topuklu ayakkabı, topuklu bilek botu. Topuk 5-10 cm.
+    - Ayak pozu: her ayakkabının `footPose`'u (ayak bileği ve parmak kökü açısı, topuk yüksekliği) manifest'e girer (zod `web/src/lib/assets/manifest.ts`, pipeline `manifest.py`). Web her karede animasyondan sonra bu açıları ayak eklemlerine ekler (`web/src/features/avatar/mh/motion.ts` sonrası) ve karakteri topuk yüksekliği kadar kaldırır. Bunun için mevcut `soleDepth` mekanizması (`garments.ts`, `MhCharacter.tsx`) genişletilir.
+    - Modelleme: Blender'da taban gövdenin ayağı bu pozla bükülür ve ayakkabı onun üstünde modellenir. Paketlemeden önce ayak eklemlerinin ters dönüşümüyle bind pozuna geri çevrilir; böylece dönüştürücü ağırlıkları her zamanki gibi aktarır.
+    - Çıplak ayak ve düz ayakkabılar etkilenmez (`footPose` yoksa sıfır).
+    - **Bitti sayılır:** idle ve talk'ta topuk platforma basıyor, ayak ayakkabının içinden çıkmıyor, ayak bileği doğal duruyor; düz ayakkabıya geçince poz sıfırlanıyor.
   - [ ] **A4.7 Uzun parçalar (deneme, en son):** maksi etek (K), trençkot, kaban, uzun palto (K/E).
     - Sorun: bacak arasındaki kumaş en yakın bacağın ağırlığını alıyor ve adım ya da jestte yırtılıyor. Önce maksi etekle dene: bacak arasındaki vertex'lere iki uyluğun ağırlıklarının karışımı (`build_transfer`'ın Gauss ortalamasını genişleterek, `outfits.py:705`). İdle ve talk'ta temiz değilse dur ve kullanıcıya ekran görüntüsüyle sor.
     - Trençkot, kaban ve palto tek başına `top` olarak bile gövdenin üstüne giyilir. İç kıyafet içinden çıkacağı için C9'daki (`outer` slotu ve iç giysi gizleme) çözüm gerekir. C9 bitmeden başlanmaz.
