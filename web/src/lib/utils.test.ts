@@ -8,6 +8,7 @@ describe('cn', () => {
       'text-primary-foreground text-body-sm',
     );
     expect(cn('text-ink', 'text-ui')).toBe('text-ink text-ui');
+    expect(cn('text-kicker', 'text-ink-faint')).toBe('text-kicker text-ink-faint');
   });
 
   it('still lets a later size win over an earlier one', () => {
