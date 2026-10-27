@@ -9,10 +9,11 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 ## Öncelikler
 1. **Gerçekçilik** en kritik gereksinim. Kalite hedefi Holoxone tanıtım videosu (2D video, kalite çıtası olarak alındı).
 2. Kişiselleştirme: Erkek + Kadın base, yüz, cilt, göz, saç, sakal, üst, alt, ayakkabı.
-3. UI modern ve bol animasyonlu olacak, ama "AI yapmış gibi" durmayacak. Mor gradyan ve her yerde glassmorphism yasak.
+3. UI modern ve bol animasyonlu olacak, ama "AI yapmış gibi" durmayacak. Mor gradyan ve her yerde glassmorphism yasak. Tasarım sistemi `DESIGN.md` ("Paper and Ink": tek açık tema, kâğıt zemin, mürekkep yazı, tek kobalt vurgu; Geologica + Azeret Mono).
 
 ## Stack
-- `web/`: Next.js App Router, React 19, TypeScript `strict`, Tailwind v4, shadcn/ui, Motion, GSAP, next-intl (`/tr`, `/en`), zustand + zundo.
+- `web/`: Next.js App Router, React 19, TypeScript `strict`, Tailwind v4, shadcn/ui, Motion, next-intl (`/en` varsayılan, `/tr` ikinci dil; tarayıcı dili algılanmaz), zustand + zundo.
+- Landing: `web/src/features/landing/` (ham WebGL2 parçacıklar, three yüklenmez). Son şeklin silüeti `web/public/assets/landing/silhouette.bin`, gerçek MetaHuman'dan `/dev/silhouette` ile örneklenir. Paylaşım görseli `web/src/app/[locale]/opengraph-image.png` (`/dev/og` ile çizilir), GitHub kopyası `docs/assets/social-preview.png`.
 - 3D: three.js, @react-three/fiber, drei, postprocessing. Render tarayıcıda (WebGL2).
 - Varlıklar: GLB'ler meshopt'lu; dokular GLB dışında **KTX2** (UASTC + zstd, KTX-Software 4.4.2, `$KTX_TOOLS` ya da PATH). Transcoder `web/public/basis/`.
 - Manifest v2: `/assets/mh/manifest.json`, zod şeması `web/src/lib/assets/manifest.ts` (`version: 2`). Sözleşme: `docs/specs/2026-10-20-metahuman-web-assets.md`.

@@ -392,8 +392,18 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 - Veri Atlas M0'da (Frankfurt). Yerel geliştirme 27018'deki mongod'la devam eder.
 - **Mac'te yalnızca UI işi için 20 GB aktarım gerekmez.** Repo'yu klonla, `.env.local`'ı elle taşı ve içine `NEXT_PUBLIC_MH_ASSET_ROOT=https://pub-3bc24e93f6b644a09830eee4f15bb5e0.r2.dev` ekle. Varlıklar R2'den gelir. Yüz, kıyafet, kürasyon ve thumbnail gibi varlık işleri `raw/` arşivi ve dönüştürücü ister; onlar PC'de kalır.
 
+## Arayüz (2026-10-27, Mac)
+
+- PC ve Unreal gerekmeden yapıldı; varlıklar R2'den (`NEXT_PUBLIC_MH_ASSET_ROOT`).
+- Stil seçimi "AI Sims Stil Önerileri" canvas'ında (claude.ai artifact): landing E, oluşturucu C.
+- Landing: `features/landing/` ham WebGL2, tek `drawArrays`, 7000 nokta (telefonda 3500). Kaydırma yumuşatılır, karede React render yok, kare yavaşlarsa önce DPR sonra nokta sayısı düşer. Sıra: dağınık → küre → dalga → viseme halkası → dudak → silüet. CTA'ya gelince silüet döner; basınca noktalar göğse toplanır ve oluşturucu oradan dairesel açılır (view transition). Landing'de footer yok. Demo ve Epic ticari marka satırı kullanıcı kararıyla tüm sitede kaldırıldı (2026-10-27).
+- Silüet: `/dev/silhouette` gerçek montajla (Ada, bob, tişört + kot + spor ayakkabı, relax idle t=1 s) yüzeyden 8000 nokta örnekler. Kol 25°'den açıksa ya da yüz +z'ye bakmıyorsa kaydetmez. Bunu yaparken `thumbnail` modundaki A-pose hatası bulundu: durağan karede klip yalnız ilk karede uygulanıyordu (`motion.ts` düzeltildi). R2'deki küçük resimler bu hatayla çizildi; `/dev/thumbs` ile yeniden üretilmeli (PC ya da arşiv gerekir).
+- Boş ve bekleme durumları: `StagePoster` noktalı silüeti (`DotPoster`), 404/hata ekranı dağınık noktaları (`DustField`) gösterir.
+- Turbopack dev önbelleği (`web/.next/dev`) Mac'te 20 Ekim'den kalma CSS servis etti; garip stil görülürse sunucuyu durdurup bu klasörü sil.
+
 ## Sıradaki iş (Mac)
 
+0. **PC'ye geçince (kullanıcı kararı, 2026-10-27):** `/dev/thumbs` ile yüz, saç ve kıyafet küçük resimlerini yeniden üret (A-pose hatası `motion.ts`'te düzeldi; mevcut görseller A-pozunda ve koyu fonda), sonra `node scripts/r2-sync.mjs` ile R2'ye yükle. Açık fonla çizmek de o sırada düşünülebilir.
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
 2. İlk açılış kontrolü: landing, yeni karakter (kadın ve erkek), bir kıyafet ve renk değişikliği, Bitti, konuşma ekranında "Nasılsın?" (ses ve dudak). Konsolda `THREE.Clock` uyarısından başka hata olmamalı.
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
@@ -423,7 +433,9 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 - **Demo cihazı:** MacBook (M4 Pro, 48 GB). Kalite en üste çekilir.
 - **Kapsam:** Windows'ta seçim yapılmaz; her şey dışa aktarılır. Ayıklama Mac'teki kürasyon ekranında yapılır.
 - **Kaynak dokular** 8K; web için yüz 4K, diğerleri 2K, KTX2.
-- **Tasarım:** karanlık sinematik. Grafit zemin, tek amber vurgu. Mor gradyan ve her yerde glassmorphism yasak.
+- **Tasarım (2026-10-27, eskisinin yerine):** tek açık tema "Paper and Ink" (`DESIGN.md`). Landing E (kaydırmalı mürekkep parçacıkları, sonda MetaHuman silüeti), oluşturucu C "Kontrol Odası" düzeni, 3D sahne açık kâğıt stüdyo. Mor gradyan ve glassmorphism yasak. Eski karanlık sinematik/amber tasarım kaldırıldı.
+- **Dil (2026-10-27):** ana dil İngilizce (`/` → `/en`), Türkçe ikinci dil; tarayıcı dili algılanmaz.
+- **Repo:** 2026-10-27'den beri public. Secret, gerçek token ya da `.env` değeri commit'lenmez.
 - **Dövme ve piercing:** ölçülü.
 - **Kıyafet:** iş ve günlük karışık.
 - **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği, 2026-10-25'te kullanıcının seçtiği Clara body; arşivde 2026-10-25'te 24 `.mhpkg` var: 21 `oa_*`, 3 `khaosmdf*`). Fab liste sayfası fiyatı eski gösterebiliyor: Romantic Casual Overalls listede "Free" iken 2026-10-25'te ücretliye dönmüştü ve alınmadı. İndirmeden önce öğenin kendi sayfasındaki lisans kutusuna bakılır. Animasyonlar da yalnız ücretsiz paketlerden.
