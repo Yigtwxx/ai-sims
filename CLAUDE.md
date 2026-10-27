@@ -6,6 +6,8 @@ Tasarım ve kararlar: `docs/specs/2026-10-20-character-creator-design.md`. Bu do
 
 **Yeni oturuma başlarken önce `docs/handoff.md`'yi oku**: güncel yön (anime iptal, MetaHuman), mevcut durum ve sıradaki iş orada.
 
+**Yapılacaklar `docs/todo.md`'de.** Kullanıcı (çoğu zaman telefondan, Remote Control ile) "yapılacakları yap" derse oradaki çalışma kurallarına göre ilk açık görevden devam et.
+
 ## Öncelikler
 1. **Gerçekçilik** en kritik gereksinim. Kalite hedefi Holoxone tanıtım videosu (2D video, kalite çıtası olarak alındı).
 2. Kişiselleştirme: Erkek + Kadın base, yüz, cilt, göz, saç, sakal, üst, alt, ayakkabı.

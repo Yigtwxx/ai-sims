@@ -450,51 +450,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 
 ## Sıradaki iş (Mac)
 
-0. **PC'ye geçince, Fab'den 4 yeni yüz (kullanıcı seçimi, 2026-10-27):**
-   - Seçilenler (hepsi düzenlenebilir `.mhpkg`; fiyatlar 2026-10-27'de Fab'in `/i/listings/<id>/prices-infos` cevabından okundu):
-
-     | Yüz | Cinsiyet | Lisans | Fab'in yazdığı UE | İlan |
-     |---|---|---|---|---|
-     | Skotukeda | kadın | iki lisans da $0 | 5.7 | https://www.fab.com/listings/41e1b941-3b4e-468d-b6a7-2ce3e8ef1e32 |
-     | Mason | erkek | $0 lisans (öteki $29.99) | 5.6–5.8 | https://www.fab.com/listings/a8d33031-627b-4904-86b5-a7bb76805e9b |
-     | Seo | kadın | Personal $0 (Professional $4.99) | 5.6–5.8 | https://www.fab.com/listings/3693be83-9054-4fd3-9b2e-0b6d5b45fe22 |
-     | Frey (TOKYO Metahuman) | erkek | $0 lisans (öteki $50.99) | 5.6–5.7 | https://www.fab.com/listings/18777d2f-a05a-4509-80ea-ad87dc555f68 |
-
-   - Adımlar (`pipeline/` içinde):
-     1. Her ilanda $0 lisansı seçip kütüphaneye ekle, `.mhpkg`'yi indir, arşivin `fab/` klasörüne koy.
-     2. `uv run asset-pipeline ue fab_import`. Bitmiş paketleri atlar, yalnız yenileri alır.
-     3. Karakter adı her paketin `raw/fab_import/<paket>/import.json` dosyasında: `created` içindeki `MetaHumanCharacter` sınıflı asset'in son adı.
-     4. `uv run asset-pipeline ue characters --args '{"only": ["<ad1>", "<ad2>", "<ad3>", "<ad4>"]}'`. **`only` şart:** `characters` işi `pruned.json`'a bakmaz (yalnız `outfits` bakar); `raw/characters/` klasörü silinmiş budanan preset'leri baştan dışa aktarır (her biri ~11 dk, ~860 MB).
-     5. Cinsiyet kaydı: `uv run asset-pipeline ue probe --args '{"script": "unreal/probes/preset_genders.py"}'` Fab karakterlerini de `raw/characters_genders.json`'a yazar. Kayıt olmazsa dönüştürücü cinsiyeti gövde şeklinden tahmin eder.
-     6. `uv run asset-pipeline mh-convert --character <ad> ... --manifest`, sonra `/dev/thumbs` ile yüz küçük resimleri ve `node scripts/r2-sync.mjs`.
-   - Paketlerin kendi saç ve sakalı gelmez: `grooms` işi yalnız `/MetaHumanCharacter/Optional/Grooms`'u tarar. Yüz ve cilt gelir, saç kütüphaneden seçilir (Frey'in uzun saçı ve sakalı dahil).
-   - UE 5.8 riski: Skotukeda ve Frey 5.8'i listelemiyor. `fab_import` "created no assets" derse sebep bu olabilir.
-0. **PC'ye geçince, Fab'den 5 saç (kullanıcı seçimi, 2026-10-27):**
-   - Hepsi MetaHuman formatında groom (Fab API'de `metahumanAssetType: Groom`). Lisans ve UE sürümleri 2026-10-27'de Fab'in `/i/listings/search` cevabından okundu; kart bilgisi ilan açıklamasından:
-
-     | Saç | Lisans | Fab'in yazdığı UE | Kart | İlan |
-     |---|---|---|---|---|
-     | Long High Ponytail (Epic) | iki lisans da $0 | 5.6–5.8 | strand + "full set of LODs" | https://www.fab.com/listings/d48ad98a-e343-4a2c-abb3-08730c3bf7d9 |
-     | Ponytail MessyWavy (WhiteCap) | iki lisans da $0 | 5.8 | elle yapılmış kart FBX + Alembic strand | https://www.fab.com/listings/a3425afb-5801-455e-a6a1-e27632d493db |
-     | Hairstyle Male 11 (Superior Content) | Personal $0 (Professional $14.99) | 5.7 | belirtilmemiş | https://www.fab.com/listings/eb7f2500-56d2-49ed-bbf4-ce48f639b373 |
-     | Nomad Wave Undercut (Quang Phan) | iki lisans da $0 | 5.7 | açıklama Hair Card Generator'dan söz ediyor | https://www.fab.com/listings/0d3d4066-49b8-4c7c-a416-a0b5c12ba7d0 |
-     | PonytailGroom (DropBear) | iki lisans da $0 | 5.6 | belirtilmemiş | https://www.fab.com/listings/d8c790ae-3b8c-4238-b520-1db8a99cac0f |
-
-   - Kart LOD'u olmayan groom'a editörde Hair Card Generator ile kart üretilir. MessyWavy'nin kartları ayrı FBX olarak geliyorsa groom'un kart LOD'una atanır.
-   - `grooms` işi bugün bunları görmez, önce editörde değiştirilip denenmeli:
-     - `style_folders()` yalnız `GROOM_ASSETS`'i (`/MetaHumanCharacter/Optional/Grooms/GroomAssets/<slot>/<style>`) tarar (`pipeline/unreal/mh_export/grooms.py:148`). Paket `/Game/Fab/<paket>/` altına iner.
-     - `related_assets()` yalnız `/MetaHumanCharacter/` önekli bağımlılıkları alır (`PLUGIN_PREFIX`). Fab paketinin kart mesh'leri ve atlasları `/Game/Fab/` altında olur.
-     - Önce `probe` ile paketin klasör düzeni, `GroomAsset` adı ve kart LOD'ları (`*_CardsMesh_Group<g>_LOD<n>`) olup olmadığı okunur. Kart yoksa Hair Card Generator gerekir.
-   - Sonrası: `ue grooms --args '{"only": ["<stil>"]}'`, `mh-convert --grooms --groom <stil> --manifest`, `/dev/thumbs`, `node scripts/r2-sync.mjs`.
-   - Elenen (kullanıcı kararı): groom olmayan düz saç mesh'leri (NoEdge'in iki saçı, Pocolov Hair 06) ve Blender eğrisi (Fluffy Short Hair). Web shader'ı groom atlaslarını (kaplama, kök-uç, tel yönü) istiyor; bunlarda yok. Yalnız `.mhpkg` groom'lar alınır. Kartı olmayan strand groom'lar için Hair Card Generator gerekir.
-0. **Dövme, takı ve ek makyaj (kullanıcı isteği, 2026-10-27; PC'de yapılacak):**
-   - Dövme ve takı yalnız arayüzde var: paneller (`TattooPanel.tsx`, `JewelryPanel.tsx`) ve config (`tattoos`, `jewelry`) çalışıyor, ama MetaHuman sahnesi (`web/src/features/avatar/mh/`) bunları hiç çizmiyor. `web/src/features/avatar/accessories/` anime döneminden kalma (VRoid kulak arama vb.) ve `mh/`'ye bağlı değil.
-   - İkisi de Unreal gerektirmez, iş web kodunda: dövme cilt shader'ında gövde/kafa UV'sinde bir katman, takı MetaHuman kafa ve gövde mesh'ine bağlanan aksesuar. Ölçülü kalınır (Kararlar).
-   - Aynı durumda iki ayar daha (2026-10-27 taraması): **yüz karıştırma** (`face.blend`, `FacePanel.tsx`, `randomize.ts` de yazıyor) ve **göz rengi tonu** (`eyes.color`, `EyesPanel.tsx`). `resolve.ts` ikisini de okumuyor; sahnede etkileri yok. Yüz karıştırma MetaHuman kafalarının ortak topolojisiyle vertex + morph delta karışımı olarak yapılabilir; yapılmayacaksa paneli kaldırmak gerekir.
-   - Kullanıcı kararı: hepsi PC'de yapılır, Mac yorulmaz (dövme ve takı saf web kodu olsa da).
-   - Ek makyaj: bugün yalnız preset'in kendi makyajı açılıp kapanıyor (`skin.makeup`, `makeupAlbedo`). Kapsam (kullanıcı onayı): **ruj, far, eyeliner, allık**; her biri için renk ve yoğunluk. Yüz UV'sinde renk + opaklık katmanı olur; ölçülü, gerçekçi varsayılanlar. Panel metinleri `web/messages/{tr,en}.json`'a. Maskeler Unreal'ın kendi makyaj maskeleri: `statics` işi dışa aktardı (`pipeline/unreal/mh_export/statics.py:4`), arşivin `raw/statics/` klasöründe. Mac'te `raw/` yok; maskelerin KTX2'ye çevrilip R2'ye konması PC'de yapılır. Config değişirse `schemaVersion` artar ve migration yazılır.
-0. **PC'ye geçince, kendi kıyafetimiz:** yukarıdaki plan, ilk parça düz tişört.
-0. **PC'ye geçince (kullanıcı kararı, 2026-10-27):** `/dev/thumbs` ile yüz, saç ve kıyafet küçük resimlerini yeniden üret (A-pose hatası `motion.ts`'te düzeldi; mevcut görseller A-pozunda ve koyu fonda), sonra `node scripts/r2-sync.mjs` ile R2'ye yükle. Açık fonla çizmek de o sırada düşünülebilir.
+0. **PC işleri `docs/todo.md`'de** (2026-10-27): Fab'den 4 yüz ve 5 saç, sahnede çalışmayan ayarlar (göz tonu, yüz karıştırma, dövme, takı), yeni özellikler (kişilik, ses, ifade önizleme, makyaj, cilt detayları, kaş ve kirpik, yüz ince ayarı, gözlük ve şapka, kat kat giyim), kendi tişörtümüz, küçük resimler. Kullanıcı telefondan "yapılacakları yap" der.
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
 2. İlk açılış kontrolü: landing, yeni karakter (kadın ve erkek), bir kıyafet ve renk değişikliği, Bitti, konuşma ekranında "Nasılsın?" (ses ve dudak). Konsolda `THREE.Clock` uyarısından başka hata olmamalı.
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
