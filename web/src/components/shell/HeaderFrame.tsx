@@ -32,7 +32,7 @@ export function HeaderFrame({ children }: { children: ReactNode }) {
         // pads this fixed bar by the removed scrollbar width, so it doesn't jump.
         'right-scroll-bar-position ease-out-quint fixed inset-x-0 top-0 z-(--z-header) h-(--header-h) border-b border-transparent transition-[background-color,border-color] duration-300',
         solid &&
-          'border-hairline bg-paper/95 [body:has([data-header-clear])_&]:border-transparent [body:has([data-header-clear])_&]:bg-transparent',
+          'border-hairline bg-paper [body:has([data-header-clear])_&]:border-transparent [body:has([data-header-clear])_&]:bg-transparent',
       )}
     >
       <div className="mx-auto flex h-full max-w-[1440px] items-center px-5 md:px-8 lg:px-12">

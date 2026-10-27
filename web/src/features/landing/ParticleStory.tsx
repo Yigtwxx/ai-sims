@@ -365,10 +365,14 @@ export function ParticleStory() {
                 chapterRefs.current[i] = el;
               }}
               onFocusCapture={() => scrollToChapter(i, 'auto')}
-              className="absolute bottom-[clamp(3.5rem,11svh,6rem)] left-5 flex max-w-[min(540px,calc(100vw-2.5rem))] flex-col gap-4 will-change-[opacity,transform] md:left-10"
+              // On the header's gutter, also past 1440px where the header centres.
+              className="absolute bottom-[clamp(3.5rem,11svh,6rem)] left-5 flex max-w-[min(540px,calc(100vw-2.5rem))] flex-col gap-4 will-change-[opacity,transform] md:left-8 lg:left-[max(3rem,calc((100%-1440px)/2+3rem))]"
               style={{ opacity: i === 0 ? 1 : 0 } satisfies CSSProperties}
             >
-              <span className="text-kicker text-cobalt">{t(`${chapter}.kicker`)}</span>
+              {/* The first kicker is the brand: no Turkish dotted İ in "AI Sims". */}
+              <span className="text-kicker text-cobalt" lang={i === 0 ? 'en' : undefined}>
+                {t(`${chapter}.kicker`)}
+              </span>
               <Title className="font-display text-ink text-[clamp(2.5rem,4.4vw,4.25rem)] leading-[1] font-[560] tracking-[-0.03em]">
                 {t(`${chapter}.title`)}
               </Title>
@@ -415,7 +419,7 @@ export function ParticleStory() {
 
         <nav
           aria-label={t('steps.label')}
-          className="absolute top-1/2 right-10 hidden -translate-y-1/2 md:block"
+          className="absolute top-1/2 right-8 hidden -translate-y-1/2 md:block lg:right-[max(3rem,calc((100%-1440px)/2+3rem))]"
         >
           <ol className="flex flex-col items-end gap-1">
             {CHAPTERS.map((chapter, i) => (

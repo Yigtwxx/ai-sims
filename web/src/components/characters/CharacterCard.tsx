@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { DotPoster } from '@/components/stage/DotPoster';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -33,7 +34,7 @@ export interface CharacterCardData {
 /**
  * A saved character: its portrait, name, state and the three things you can do
  * with it. "Konuş" is quiet until the card is pointed at or focused, then it
- * takes the amber light: one lit card at a time, never a wall of amber buttons.
+ * fills with ink: one inked card at a time, never a wall of dark buttons.
  */
 export function CharacterCard({ character }: { character: CharacterCardData }) {
   const t = useTranslations('Characters');
@@ -73,10 +74,10 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
         {character.hasThumbnail && !broken ? (
           <>
             {loaded ? null : (
-              // Behind the image while it streams in: the slow tungsten sweep, not a blank box.
+              // Behind the image while it streams in: the slow light sweep, not a blank box.
               <span
                 aria-hidden="true"
-                className="after:animate-skeleton-sweep absolute inset-0 after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.06),transparent)]"
+                className="after:animate-skeleton-sweep absolute inset-0 after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.45),transparent)]"
               />
             )}
             {/* Private, session-gated image: next/image optimization does not apply. */}
@@ -101,12 +102,12 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
             />
           </>
         ) : (
-          <span aria-hidden="true" className="absolute inset-0">
-            <span className="absolute inset-0 bg-[radial-gradient(70%_55%_at_50%_30%,rgb(255_226_176/0.14),transparent_72%)]" />
-            <span className="absolute bottom-[18%] left-1/2 h-10 w-2/3 -translate-x-1/2 bg-[radial-gradient(closest-side,rgb(255_226_176/0.16),transparent)]" />
-            <span className="font-display text-ink/15 absolute inset-x-0 top-[34%] text-center text-[clamp(3rem,6vw,4.5rem)]">
-              {name.slice(0, 1).toLocaleUpperCase()}
-            </span>
+          // No portrait yet: the paper studio with the dot silhouette, as on the stage.
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 bg-[linear-gradient(to_bottom,var(--color-paper-raised),var(--color-paper-lift)_88%,var(--color-paper-deep))] [--stage-floor:90%] [--stage-x:50%]"
+          >
+            <DotPoster />
           </span>
         )}
         {/* Finished is the normal state; only an unfinished draft needs a label. */}
@@ -131,7 +132,7 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
           asChild
           variant="quiet"
           size="sm"
-          className="group-focus-within:border-cobalt group-focus-within:bg-cobalt group-focus-within:text-paper group-hover:border-cobalt group-hover:bg-cobalt group-hover:text-paper hover:bg-cobalt-deep min-w-0 flex-1"
+          className="group-focus-within:border-ink group-focus-within:bg-ink group-focus-within:text-paper group-hover:border-ink group-hover:bg-ink group-hover:text-paper hover:bg-ink/85 min-w-0 flex-1"
         >
           <Link href={`/characters/${character.id}/talk`}>
             <ChatCircleDotsIcon
