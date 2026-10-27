@@ -9,7 +9,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   1. A1 → A2 → A3 → A3b: Fab ve Unreal. Uzun işler arka planda çalışır.
   2. A4.0 kalem etek: Blender yolunun denemesi ve paketleyici.
   3. B5 oturma hataları: düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer ve onları yeniden dönüştürmek gerekmez.
-  4. A4.1 iş seti → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu → A4.4 günlük çeşit → A4.6 ek parçalar.
+  4. A4.1 iş seti → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu → A4.4 günlük çeşit → A4.6 ek parçalar → A4.8 gece ve seksi çizgi.
   5. C9 kat kat giyim (prototip A4.1 blazer'ı ve A4.2 tişörtüyle) → A4.7 uzun parçalar.
   6. B1 → B2 → B3 → B4.
   7. C1 → C2 → C3 → C4 → C5 → C6 → C7 (B2'den sonra) → C8 → C10 (A2'den sonra).
@@ -119,6 +119,12 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Kolay: kravatlı gömlek, A4.1 gömleğinin varyantı (E, isteğe bağlı K). Kravat gömleğin içinde modellenir, ayrı renk parametresi olur.
     - Orta: triko balıkçı kazak (K/E), düğmeli hırka (K/E), kot ceket (K/E), kapüşonsuz sweatshirt (K/E), tulum ve salopet (K, `full`), gömlek elbise (K), kısa kollu gömlek (E).
     - Takım elbise ayrı parça değildir: A4.1'in blazer'ı ve kumaş pantolonu aynı renk presetleriyle (lacivert, antrasit, siyah) çıkar. İkisi aynı ada ve sıraya sahip olsun ki kullanıcı takımı kolayca eşleştirsin.
+  - [ ] **A4.8 Gece ve seksi çizgi** (kullanıcı isteği, 2026-10-27). Yetişkin işi, şık ve açık parçalar, müstehcen değil. İç giyim ve mayo yok.
+    - Kadın: bodycon mini elbise, saten askılı (slip) elbise (diz üstü), açık sırtlı ya da derin V yaka üst, korse (bustier) üst, deri mini etek, yırtmaçlı diz boyu etek, dar deri pantolon, yüksek bel mini şort (A4.3 ile ortak kalıp).
+    - Erkek: dar atlet, yakası açık saten gömlek (A4.1 gömlek kalıbından), vücuda oturan tişört (A4.2 kalıbından).
+    - File çorap, kadın: A4.5 katmanında desenli bir maske, külotlu ve diz üstü boy.
+    - Saten ve deri parlak malzemeler: önce kumaş shader'ının parlama ayarları denenir, yetmezse bake'lenmiş PBR kullanılır.
+    - Kalıplar diz boyunu geçmez. Daha uzun yırtmaçlı ya da maksi parçalar A4.7'deki bacak arası sorununa girer.
   - [ ] **A4.7 Uzun parçalar (deneme, en son):** maksi etek (K), trençkot, kaban, uzun palto (K/E).
     - Sorun: bacak arasındaki kumaş en yakın bacağın ağırlığını alıyor ve adım ya da jestte yırtılıyor. Önce maksi etekle dene: bacak arasındaki vertex'lere iki uyluğun ağırlıklarının karışımı (`build_transfer`'ın Gauss ortalamasını genişleterek, `outfits.py:705`). İdle ve talk'ta temiz değilse dur ve kullanıcıya ekran görüntüsüyle sor.
     - Trençkot, kaban ve palto tek başına `top` olarak bile gövdenin üstüne giyilir. İç kıyafet içinden çıkacağı için C9'daki (`outer` slotu ve iç giysi gizleme) çözüm gerekir. C9 bitmeden başlanmaz.
