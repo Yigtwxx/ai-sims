@@ -5,16 +5,18 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 ## Çalışma kuralları
 
 - **Başlarken:** önce `git pull` (liste Mac'te de güncellenebilir), sonra `CLAUDE.md`, `docs/handoff.md` ve bu dosya. Kararları tekrar sorma.
-- **Sıra** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı bu liste belirler. Listede işaretlenmemiş (`[ ]`) ilk görev yapılır:
-  1. A1 → A2 → A3 → A3b: Fab ve Unreal. Uzun işler arka planda çalışır.
-  2. A4.0 kalem etek: Blender yolunun denemesi ve paketleyici.
-  3. B5 oturma hataları: düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer ve onları yeniden dönüştürmek gerekmez.
-  4. A4.1 iş seti → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu → A4.9 iç giyim → A4.11 mayo ve bikini → A4.4 günlük çeşit → A4.6 ek parçalar → A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.15 varyantlar → A4.16 ve A4.17'nin C9'suz parçaları → A4.10 topuklu → A4.8 gece ve seksi çizgi.
-  5. C9 kat kat giyim (prototip A4.1 blazer'ı ve A4.2 tişörtüyle) → A4.16 ve A4.17'nin üste giyilen parçaları (önlük, yelek, mont) → A4.7 uzun parçalar.
-  6. B1 → B2 → B3 → B4.
-  7. C1 → C2 → C3 → C4 → C5 → C6 → C7 (B2'den sonra) → C8 → C10 (A2'den sonra).
-  8. D1 küçük resimler → D2 son kontrol.
-  - Unreal ya da Blender arka planda çalışırken sıradaki engelsiz web görevine geçilebilir (örneğin A4.5, B1-B4); iş bitince listeye geri dönülür.
+- **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir.
+  - **Faz 1, temel (~30 sa):** A1 → A2 → A3 → A3b (Fab ve Unreal, uzun işler arka planda) → A4.0 kalem etek (Blender yolu ve paketleyici) → B5 oturma hataları (düzeltmeler dönüştürücüde kalır ve sonraki kıyafetlerin hepsine geçer).
+  - **Faz 2, panel düzeltmeleri ve temel kıyafet (~60 sa):** B1 → B2 → B3 → B4 → D1 küçük resimler (A-pozlu eski görseller gider) → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu (file çorap hariç).
+  - **Faz 3, iş seti ve karakter (~60 sa):** A4.1'den kumaş pantolon ve gömlek (blazer Faz 7'de) → A4.6'dan polo, chino, kravatlı gömlek → A4.15 varyantlar → C1 kişilik → C2 ses → C3 ifade önizleme.
+  - **Faz 4, günlük (~75 sa):** A4.4 günlük çeşit (elbise, hafif ceket, desen varyantları) → A4.6'nın kalanı (atlet, jogger, düz eşofman altı, A kesim etek, biker şort, triko balıkçı, hırka, sweatshirt, tulum ve salopet, gömlek elbise, kısa kollu gömlek; kot ceket Faz 7'de).
+  - **Faz 5, görünüm (~70 sa):** C4 makyaj → C5 cilt detayları → C6 kaş ve kirpik → C7 yüz ince ayarı → C8 gözlük ve şapka → C10 yüz küçük resimlerinde ten.
+  - **Faz 6, spor, ev, ayakkabı, meslek, kış (~90 sa):** A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.16'dan scrubs ve aşçı ceketi → A4.17'den atkı ve eldiven.
+  - **Faz 7, zor parçalar (~130 sa):** C9 kat kat giyim → blazer + gömlek (A4.1) → kot ceket (A4.6) → doktor önlüğü ve reflektörlü yelek (A4.16) → şişme mont (A4.17) → A4.10 topuklu ve ayak pozu → A4.7 uzun parçalar (maksi etek, trençkot, kaban, palto).
+  - **Faz 8, hot ve sexy, kapanış (~60 sa):** A4.8 gece ve seksi çizgi (file çorap dahil) → A4.9 iç giyim → A4.11 mayo ve bikini → D2 son kontrol.
+  - Her faz sonunda kısa bir kontrol yapılır: landing, yeni karakter, o fazın eklediği şeyler ve konuşma ekranı. Kullanıcıya telefondan ekran görüntüleriyle faz özeti gönderilir.
+  - Görevi iki faza bölünmüş maddelerin (A4.1, A4.5, A4.6, A4.16, A4.17) kutusu son parçası bitene kadar açık kalır; yanına bitenler not edilir.
+  - Unreal ya da Blender arka planda çalışırken aynı fazdaki engelsiz bir web görevine geçilebilir; iş bitince sıraya geri dönülür.
 - **Engel:** bir görev kullanıcıya bağlıysa (indirme, seçim, karar) soruyu aşağıdaki "Kullanıcıya sorular" bölümüne yaz, kullanıcıya kısaca sor ve beklemeden sıradaki engelsiz göreve geç.
 - **Unreal işleri uzun sürer** (yüz başına ~11 dk). `asset-pipeline ue ...` komutlarını arka planda başlat, beklerken web görevlerine devam et. Aynı anda tek editör açılır (RAM yetmiyor).
 - **Büyük görevlerde** (B2, B5, C1, C2, C7, C9) önce tasarım: `superpowers:brainstorming` + `superpowers:writing-plans`. Kullanıcıya en fazla 2-3 seçenekli, telefondan cevaplanabilir soru sor.
