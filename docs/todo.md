@@ -79,7 +79,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## A. Varlıklar (Unreal)
 
-- [ ] **A1. Fab indirmeleri: 4 yüz + 5 saç.** Her ilanda $0 lisansı seç, kütüphaneye ekle, `.mhpkg`'yi indir ve arşivin `fab\` klasörüne koy. Chrome'da Fab oturumu açıksa Claude in Chrome ile yapılabilir; değilse kullanıcıdan iste. Fiyatlar 2026-10-27'de Fab API'sinden okundu.
+- [x] **A1. Fab indirmeleri: 4 yüz + 5 saç.** (2026-10-27: 9 paket `fab\`, ek zip'ler `fab_extras\`; ayrıntı `docs/plans/faz-1.md` 1a.1) Her ilanda $0 lisansı seç, kütüphaneye ekle, `.mhpkg`'yi indir ve arşivin `fab\` klasörüne koy. Chrome'da Fab oturumu açıksa Claude in Chrome ile yapılabilir; değilse kullanıcıdan iste. Fiyatlar 2026-10-27'de Fab API'sinden okundu.
 
   | Öğe | Tür | Seçilecek lisans | Fab'in yazdığı UE | İlan |
   |---|---|---|---|---|
@@ -97,7 +97,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   1. `uv run asset-pipeline ue fab_import`. Bitmiş paketleri atlar, yalnız yenileri alır.
   2. Karakter adı her paketin `raw/fab_import/<paket>/import.json` dosyasında: `created` içindeki `MetaHumanCharacter` sınıflı asset'in son adı.
   3. `uv run asset-pipeline ue characters --args '{"only": ["<ad1>", "<ad2>", "<ad3>", "<ad4>"]}'`. **`only` şart:** `characters` işi `pruned.json`'a bakmaz (yalnız `outfits` bakar). `raw/characters/` klasörü silinmiş budanan preset'leri baştan dışa aktarır; her biri ~11 dk ve ~860 MB.
-  4. `uv run asset-pipeline ue probe --args '{"script": "unreal/probes/preset_genders.py"}'`. Fab karakterlerini de `raw/characters_genders.json`'a yazar; kayıt olmazsa dönüştürücü cinsiyeti gövde şeklinden tahmin eder.
+  4. `uv run asset-pipeline ue probe --args '{"script": "C:/Users/Asus/Desktop/ai-sims/pipeline/unreal/probes/preset_genders.py"}'` (mutlak yol; göreli yol editörde bulunmuyor). Fab karakterlerini de `raw/characters_genders.json`'a yazar; kayıt olmazsa dönüştürücü cinsiyeti gövde şeklinden tahmin eder.
   5. `uv run asset-pipeline mh-convert --character <ad> ... --manifest`.
   - Paketlerin kendi saç ve sakalı gelmez (`grooms` işi yalnız Epic'in groom klasörünü tarar); saç kütüphaneden seçilir.
   - UE 5.8 riski: Skotukeda ve Frey 5.8'i listelemiyor. `fab_import` "created no assets" derse sebep bu olabilir.
@@ -229,6 +229,8 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Mümkünse sayısal ölçüm de: kıyafetin altında görünen cilt vertex'i, kafanın içine giren kart sayısı.
   - En kötü vakalar `docs/handoff.md`'ye kaydedilir; kullanıcıya telefondan 3-4 ekran görüntüsüyle önce/sonra gösterilir.
   - Bilinenler:
+    - **Mason (2026-10-27, A2):** kafa mesh'inin boyun ve göğüs parçası diğer erkek yüzlerden ~3.5 cm önde (z 0.130, diğerleri ~0.095); paylaşılan gövdeye takılınca tişört ve kazak yakasından ten taşıyor. Kafa parçası boyun dikişinden aşağıda gövdeye uydurulmalı (dönüştürücü ya da montaj), ya da kıyafet altında kalan kafa köşeleri de gizlenmeli.
+    - **Kalem etek (2026-10-27, A4.0):** kalça ±1'de bacak arasını köprüleyen kumaş iç uyluk morph'unu izliyor; dönüştürücüde düzeltiliyor (1c.5).
     - Kıyafet morph'ları her kaydırıcı ucunda deri normali boyunca dışarı itiliyor (`pipeline/src/asset_pipeline/mh/outfits.py`: `stack_push` :787, `clear_morphs` :956).
     - Cildi gizleyen maske `body_hide` (:1117). Web'de bağlama `web/src/features/avatar/mh/garments.ts` (`bindGarment` :30).
     - Birden çok kaydırıcının birlikte morph toplamı ayrıca denenmeli (her biri tek başına temiz olsa da).
