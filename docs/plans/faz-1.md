@@ -80,7 +80,7 @@
   - `/dev/stage`: 5 saç × en az 3 yüz (iki cinsiyet, kısa/uzun boyun) önden, yandan, arkadan; kafa derisi açıkta değil, kartlar kafaya girmiyor.
   - `/dev/thumbs`, `node scripts/r2-sync.mjs grooms`, manifest. Commit + push. A3 `[x]`.
   - Durum (2026-10-27): Ponytail, Male 11 ve MessyWavy yayında (R2 manifest 53 saç; GLB'ler validate'te temiz, küçük resimler yeniden çizildi). **Nomad tutuldu:** tıraşlı arka ve yanlar yamalı tutam ve yatay çizgi gibi görünüyor, tepe girdabında açık deri lekesi var. Web çıktısı silindi (manifest atlıyor); düzeltme subagent'ta: uzun üst kart kalır, kısa fade deriye boyanır. Bilinen küçük kusurlar: Ponytail'de önden alnın üstüne biraz saç düşüyor; Male 11'in paketteki eski kart mesh'i dışa aktarımda duruyor, dönüştürücü yok sayıyor.
-- [ ] **1b.5 Üç saçı kaldır (A3b).** Tahmin 1 · Gerçek —
+- [x] **1b.5 Üç saçı kaldır (A3b).** Tahmin 1 · Gerçek ~0.3
   - `/[locale]/curate`'te gizle: `groom.hair.Hair_S_HairLoss`, `groom.hair.Hair_M_Layered`, `groom.hair.Hair_L_MessyClumps`.
   - `uv run asset-pipeline mh-prune` (deneme) → plan özeti kullanıcıya; onayla `mh-prune --apply --plan <özet>`.
   - `mh-convert --manifest`, `node scripts/r2-sync.mjs`. Bu saçları giyen kayıtlı karakter açılınca `reconcile.ts` saçı boşa düşürüyor (dev'de denenir). A3b `[x]`.

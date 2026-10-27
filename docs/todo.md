@@ -112,7 +112,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - Sonra: `ue grooms --args '{"only": [...]}'` ve `mh-convert --grooms --groom <stil> --manifest`. Tek cinsiyete özgü saç varsa `mh/gender_compat.json`'a yaz.
   - **Bitti sayılır:** 5 saç oluşturucuda seçilebiliyor; her yüze oturuyor ve kafa derisi açıkta kalmıyor.
 
-- [ ] **A3b. Üç saçı kaldır** (kullanıcı kararı, 2026-10-27):
+- [x] **A3b. Üç saçı kaldır** (kullanıcı kararı, 2026-10-27). Bitti (2026-10-27): kullanıcı onayıyla `mh-prune --apply --plan 0b529ff0a6` (0.15 GB); manifest 50 saç, R2'de. R2'deki eski dosyaları `r2-sync` silmiyor; manifest artık göstermiyor. Silinen bir saçı giyen karakterde `reconcile.ts` saçı ilk uygun saçla değiştiriyor (`reconcile.test.ts:66`). `mh-prune` dry run'ı 4 yeni yüzün Fab paketlerini "kullanılmayan" diye listeliyor; muhtemelen yanlış tespit, `--unused-packages` çalıştırılmamalı (B5'te bakılır).
   - "Kısa, alnı açık / Short receding" (`groom.hair.Hair_S_HairLoss`) yalnız erkek saçı (`gender_compat.json:19`). Erkekten kalkması tamamen silinmesi demek: Medium layered ile aynı yol (curate'te gizle, onayla prune).
   - "Orta boy katlı kesim / Medium layered" (`groom.hair.Hair_M_Layered`) yalnız kadın saçı (`pipeline/src/asset_pipeline/mh/gender_compat.json:7`). Kadından kalkması tamamen silinmesi demek: `/[locale]/curate`'te gizle, sonra kullanıcı onayıyla `mh-prune --apply --plan <özet>`.
   - "Uzun dağınık / Long messy" (`groom.hair.Hair_L_MessyClumps`) unisex. İki cinsiyetten de tamamen silinir (kullanıcı kararı): Medium layered ile aynı yol.
