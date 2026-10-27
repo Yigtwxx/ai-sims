@@ -11,7 +11,7 @@ export function isProviderId(value: string): value is ProviderId {
 }
 
 /** UI languages the companion speaks. Mirrors `routing.locales` in `src/i18n/routing.ts`. */
-export const CHAT_LOCALES = ['tr', 'en'] as const;
+export const CHAT_LOCALES = ['en', 'tr'] as const;
 export type ChatLocale = (typeof CHAT_LOCALES)[number];
 
 /** Request limits shared by `POST /api/chat` and its browser client. */

@@ -1,6 +1,8 @@
 # AI Sims
 
-A photorealistic, customizable 3D character creator that runs in the browser. The characters are MetaHumans, exported once from Unreal Engine and converted to web assets. After a character is created it talks to you: LLM chat with voice and word-synced lip-sync, in Turkish and English. Internal demo / POC.
+![AI Sims: create your character, then talk to it](docs/assets/social-preview.png)
+
+A photorealistic, customizable 3D character creator that runs in the browser. The characters are MetaHumans, exported once from Unreal Engine and converted to web assets. After a character is created it talks to you: LLM chat with voice and word-synced lip-sync, in English and Turkish. Internal demo / POC.
 
 > Status (2026-10-21): the MetaHuman library is exported and converted; creator, character list, talk screen and dev curation all work. Current state, open work and the Mac move: [`docs/handoff.md`](docs/handoff.md) (Turkish).
 
