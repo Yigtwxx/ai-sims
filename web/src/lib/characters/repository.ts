@@ -21,6 +21,9 @@ export type { CharacterStatus };
 
 export const MAX_THUMBNAIL_BYTES = 512 * 1024;
 
+/** Thumbnails saved before this schema version show the retired anime (VRM) model. */
+const FIRST_MH_SCHEMA_VERSION = 2;
+
 const NameSchema = z.string().trim().min(1).max(40);
 const StatusSchema = z.enum(['draft', 'finalized']);
 
@@ -105,7 +108,7 @@ function toCharacter(doc: CharacterDoc): Character {
     config,
     schemaVersion: config.schemaVersion,
     status: doc.status,
-    hasThumbnail: doc.hasThumbnail,
+    hasThumbnail: doc.hasThumbnail && doc.schemaVersion >= FIRST_MH_SCHEMA_VERSION,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
@@ -182,7 +185,16 @@ export async function updateCharacter(
     set.schemaVersion = config.schemaVersion;
   }
 
-  const { characters } = await getCollections();
+  const { characters, thumbnails } = await getCollections();
+  if (patch.config !== undefined) {
+    // The first save under the MetaHuman schema retires an anime-era portrait for good:
+    // the creator autosaves before it takes a new one.
+    const legacy = await characters.updateOne(
+      { _id, userId, schemaVersion: { $lt: FIRST_MH_SCHEMA_VERSION }, hasThumbnail: true },
+      { $set: { hasThumbnail: false } },
+    );
+    if (legacy.modifiedCount > 0) await thumbnails.deleteOne({ _id, userId });
+  }
   const doc = await characters.findOneAndUpdate(
     { _id, userId },
     { $set: set },

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import net from 'node:net';
-import { ObjectId } from 'mongodb';
+import { Binary, ObjectId } from 'mongodb';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDefaultConfig } from '@/lib/character/defaults';
 
@@ -23,6 +23,28 @@ function webp(size = 64): Uint8Array {
   data.set(new TextEncoder().encode('RIFF'), 0);
   data.set(new TextEncoder().encode('WEBP'), 8);
   return data;
+}
+
+// A stored anime-era (schema v1) config.
+function v1Config() {
+  return {
+    schemaVersion: 1,
+    style: 'anime',
+    base: 'male',
+    face: { preset: 'masc_vroid__base', blend: {} },
+    skin: { tone: 0 },
+    eyes: { color: '#ffffff' },
+    hair: { style: 'masc_vroid__hair', color: '#ffffff' },
+    facialHair: { style: null, color: '#ffffff' },
+    outfit: {
+      top: { id: 'none', color: '#ffffff' },
+      bottom: { id: 'none', color: '#ffffff' },
+      shoes: { id: 'none', color: '#ffffff' },
+    },
+    body: { build: 'athletic', height: 1 },
+    accessories: [],
+    tattoos: [],
+  };
 }
 
 describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
@@ -136,24 +158,6 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
   it('reads v1 documents through the migration and skips unreadable ones in lists', async () => {
     const { getCollections } = await import('@/lib/db/collections');
     const { characters } = await getCollections();
-    const legacy = {
-      schemaVersion: 1,
-      style: 'anime',
-      base: 'male',
-      face: { preset: 'masc_vroid__base', blend: {} },
-      skin: { tone: 0 },
-      eyes: { color: '#ffffff' },
-      hair: { style: 'masc_vroid__hair', color: '#ffffff' },
-      facialHair: { style: null, color: '#ffffff' },
-      outfit: {
-        top: { id: 'none', color: '#ffffff' },
-        bottom: { id: 'none', color: '#ffffff' },
-        shoes: { id: 'none', color: '#ffffff' },
-      },
-      body: { build: 'athletic', height: 1 },
-      accessories: [],
-      tattoos: [],
-    };
     const now = new Date();
     const base = { userId: 'user-legacy', status: 'draft' as const, hasThumbnail: false };
     const legacyId = new ObjectId();
@@ -164,7 +168,7 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
         name: 'old',
         style: 'anime',
         base: 'male',
-        config: legacy,
+        config: v1Config(),
         schemaVersion: 1,
         createdAt: now,
         updatedAt: now,
@@ -190,6 +194,46 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
     expect((await repo.getCharacter('user-legacy', legacyId.toHexString()))?.style).toBe(
       'realistic',
     );
+  });
+
+  it('hides anime-era thumbnails and retires them on the first MetaHuman save', async () => {
+    const { getCollections } = await import('@/lib/db/collections');
+    const { characters, thumbnails } = await getCollections();
+    const owner = 'user-anime';
+    const _id = new ObjectId();
+    const id = _id.toHexString();
+    const now = new Date();
+    await characters.insertOne({
+      _id,
+      userId: owner,
+      name: 'Defne',
+      style: 'anime',
+      base: 'male',
+      config: v1Config(),
+      schemaVersion: 1,
+      status: 'finalized',
+      hasThumbnail: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await thumbnails.insertOne({
+      _id,
+      userId: owner,
+      contentType: 'image/webp',
+      data: new Binary(webp()),
+      updatedAt: now,
+    });
+
+    // The stored portrait shows the anime model, not the migrated MetaHuman.
+    expect((await repo.listCharacters(owner))[0]?.hasThumbnail).toBe(false);
+
+    // The creator autosaves the migrated config before it takes a new portrait.
+    await repo.updateCharacter(owner, id, { config: config() });
+    expect((await repo.getCharacter(owner, id))?.hasThumbnail).toBe(false);
+    expect(await repo.getThumbnail(owner, id)).toBeNull();
+
+    expect(await repo.saveThumbnail(owner, id, webp())).toBe(true);
+    expect((await repo.getCharacter(owner, id))?.hasThumbnail).toBe(true);
   });
 
   it('stores thumbnails, enforces the size limit and removes them on delete', async () => {
