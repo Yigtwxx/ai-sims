@@ -60,8 +60,9 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 - [ ] **A3b. Üç saçı kaldır** (kullanıcı kararı, 2026-10-27):
   - "Kısa, alnı açık / Short receding" (`groom.hair.Hair_S_HairLoss`) yalnız erkek saçı (`gender_compat.json:19`). Erkekten kalkması tamamen silinmesi demek: Medium layered ile aynı yol (curate'te gizle, onayla prune).
   - "Orta boy katlı kesim / Medium layered" (`groom.hair.Hair_M_Layered`) yalnız kadın saçı (`pipeline/src/asset_pipeline/mh/gender_compat.json:7`). Kadından kalkması tamamen silinmesi demek: `/[locale]/curate`'te gizle, sonra kullanıcı onayıyla `mh-prune --apply --plan <özet>`.
-  - "Uzun dağınık / Long messy" (`groom.hair.Hair_L_MessyClumps`) unisex. Yalnız kadından kalkar, erkekte kalır: `gender_compat.json`'a `"Hair_L_MessyClumps": "male"`. Kullanıcı tamamen silinsin derse Medium layered gibi prune edilir.
-  - Sonra `mh-convert --manifest`, `node scripts/r2-sync.mjs`. Bu saçı giyen kayıtlı kadın karakterleri `reconcile.ts` boşa düşürmeli; denenir.
+  - "Uzun dağınık / Long messy" (`groom.hair.Hair_L_MessyClumps`) unisex. İki cinsiyetten de tamamen silinir (kullanıcı kararı): Medium layered ile aynı yol.
+  - Üçü tek prune planında silinebilir.
+  - Sonra `mh-convert --manifest`, `node scripts/r2-sync.mjs`. Bu saçları giyen kayıtlı karakterleri `reconcile.ts` boşa düşürmeli; denenir.
 - [ ] **A4. Kendi kıyafetimiz: düz tişört.** Plan `docs/handoff.md` "Kendi kıyafetimiz" bölümünde.
 
 ## B. Panelde olan ama sahnede çalışmayan ayarlar
