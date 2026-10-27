@@ -476,6 +476,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
      - `related_assets()` yalnız `/MetaHumanCharacter/` önekli bağımlılıkları alır (`PLUGIN_PREFIX`). Fab paketinin kart mesh'leri ve atlasları `/Game/Fab/` altında olur.
      - Önce `probe` ile paketin klasör düzeni, `GroomAsset` adı ve kart LOD'ları (`*_CardsMesh_Group<g>_LOD<n>`) olup olmadığı okunur. Kart yoksa Hair Card Generator gerekir.
    - Sonrası: `ue grooms --args '{"only": ["<stil>"]}'`, `mh-convert --grooms --groom <stil> --manifest`, `/dev/thumbs`, `node scripts/r2-sync.mjs`.
+   - Elenen (kullanıcı kararı): groom olmayan düz saç mesh'leri (NoEdge'in iki saçı, Pocolov Hair 06) ve Blender eğrisi (Fluffy Short Hair). Web shader'ı groom atlaslarını (kaplama, kök-uç, tel yönü) istiyor; bunlarda yok. Yalnız `.mhpkg` groom'lar alınır. Kartı olmayan strand groom'lar için Hair Card Generator gerekir.
 0. **PC'ye geçince, kendi kıyafetimiz:** yukarıdaki plan, ilk parça düz tişört.
 0. **PC'ye geçince (kullanıcı kararı, 2026-10-27):** `/dev/thumbs` ile yüz, saç ve kıyafet küçük resimlerini yeniden üret (A-pose hatası `motion.ts`'te düzeldi; mevcut görseller A-pozunda ve koyu fonda), sonra `node scripts/r2-sync.mjs` ile R2'ye yükle. Açık fonla çizmek de o sırada düşünülebilir.
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
