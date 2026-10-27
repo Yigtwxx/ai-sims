@@ -49,7 +49,7 @@
 
 ## 1b — Saçlar (A3 → A3b), tahmin ~8
 
-- [ ] **1b.1 Paket düzenini oku.** Tahmin 1 · Gerçek —
+- [x] **1b.1 Paket düzenini oku.** Tahmin 1 · Gerçek ~1
   - `pipeline/unreal/probes/` altına bir probe: her yeni saç paketinin `/Game/Fab/<paket>/` altındaki `GroomAsset`, `GroomBindingAsset`, kart mesh'leri (`*_CardsMesh_Group<g>_LOD<n>`), doku ve malzeme yolları, bağımlılıkların öneki. Çıktı `raw/fab_grooms_layout.json`.
   - `fab_extras\*.zip` içerikleri listelenir (FBX kart var mı).
   - Sonuç (2026-10-27, `raw/fab_grooms_layout.json`, probe `unreal/probes/fab_grooms.py`):
@@ -64,19 +64,22 @@
 
     Frey paketinin kendi saçı (`Middle_part`) da tel; kullanılmıyor. Kart üretimi (Hair Card Generator headless mi, yoksa telden kendi kart üreticimiz mi) 1b.2'nin başında karar verilir.
   - 1b.2 sırası: (A) `grooms.py` `/Game/Fab/<paket>/` altındaki groom'ları bulur (karakter paketleri hariç); stil adı wardrobe item'ın adı (`WI_` öneki atılır: `Hair_L_HighPonytail`, `SC_Hairstyle_Male_11`, `Hair_F_Ponytail_MessyWavy_01`, `NomadWaveUndercut`, `Ponytail`); binding ve WI paketin kendi klasöründen. (B) Dönüştürücü: `TEXTURE_ROLES` Epic'in `CardsAltas_Attribute` yazım hatasını da tanır. (C) MessyWavy: zip'teki kart FBX'leri Blender'la GLB'ye, `fiber_Tangent`/`fiber_Attribue` atlas rollerine. (D) Male 11'in tek mesh'i ve dokusu incelenir. (E) Nomad ve PonytailGroom: Hair Card Generator.
-- [ ] **1b.2 Keşif kodunu genişlet.** Tahmin 2.5 · Gerçek —
+- [x] **1b.2 Keşif kodunu genişlet.** Tahmin 2.5 · Gerçek ~4.5 (kart üretimi dahil)
+  - Kart üretimi bitti (2026-10-27, `bff8ccd`): `ue groom_cards` Hair Card Generator'ı Dataflow düğümleriyle pencere açmadan sürüyor (LOD başına iki değerlendirme: üretim, sonra mesh + atlas). Ponytail, Male 11 ve Nomad üretildi; MessyWavy'de sanatçının FBX kartları seçildi (üretilen sürüm kalın tutamlı). Dönüştürücü Fab saçını paketin kendi groom başına bağlıyor (ortak baştan 4-19 mm farklı; Ponytail kök p95 17.3 → 1.6 mm), root-UV atlası yoksa kafa derisi `density` haritasını kartlardan hesaplıyor. MessyWavy'nin tanjant atlası aslında Epic kodlamasında (önceki "G≈0 / 0.43" ölçümü yanlıştı).
+  - Hair Card Generator'ın Python paketleri (torch cu124) projenin `Intermediate/PipInstall`'ında 4.9 GB; yeniden üretim için duruyor.
   - Durum (2026-10-27, `8ee8fbb`): (A) ve (B) bitti. `ue grooms` beş Fab stilini dışa aktardı; Long High Ponytail dönüştü (4.7 MB, LOD0 56k köşe), Seo'da önden ve yandan temiz, küçük resmi çizildi, R2'de (manifest bekliyor). Kalan dördünde kart atlası yok: Male 11'in tek kart mesh'i var ama doku slotları boş (pakettteki `T_SC_Hairstyle_Male_11` yalnız önizleme resmi); MessyWavy, Nomad ve Ponytail'de kart da yok. MessyWavy'nin zip'teki tanjant atlası Epic kodlamasından farklı (Epic G≈0, burada 0.43). Kart üretimi Hair Card Generator (UE 5.8, `Plugins/Experimental/HairCardGenerator`, torch + Dataflow; projede kapalı) ile, ayrı bir subagent işi.
   - Dönüştürücünün yazdığı saç ve yüz küçük resimleri Unreal önizlemesi; `/dev/thumbs`'ta tek tek "Render" ile değiştirilmeli ("Render missing only" onları var sayıyor).
   - `pipeline/unreal/mh_export/grooms.py`: `style_folders()` (:148) Epic'in `GroomAssets/<slot>/<style>` klasörüne ek olarak `/Game/Fab/<paket>/` altındaki groom'ları bulur; slot (`Hair`) ve stil adı paketten türetilir. `related_assets()` `PLUGIN_PREFIX` dışında paketin kendi klasörünü de alır.
   - Saf fonksiyonlar (yol → slot/stil eşlemesi, önek filtresi) editörsüz test edilebilir hale getirilir; testler `pipeline/tests/`.
   - Kartı olmayan pakete editörde Hair Card Generator; MessyWavy'nin zip'teki kartları FBX ise groom'un kart LOD'una atanır.
-- [ ] **1b.3 Dışa aktar ve dönüştür.** Tahmin 2 · Gerçek —
+- [x] **1b.3 Dışa aktar ve dönüştür.** Tahmin 2 · Gerçek ~0.5 (1b.2'nin içinde)
   - `uv run asset-pipeline ue grooms --args '{"only": [<5 stil>]}'`.
   - `uv run asset-pipeline mh-convert --grooms --groom <stil> ... --manifest`; GLB validate.
   - Tek cinsiyete özgü saç `pipeline/src/asset_pipeline/mh/gender_compat.json`'a; etiketler (TR/EN) saçların etiket dosyasına.
 - [ ] **1b.4 Sahnede kontrol ve yayın.** Tahmin 1.5 · Gerçek —
   - `/dev/stage`: 5 saç × en az 3 yüz (iki cinsiyet, kısa/uzun boyun) önden, yandan, arkadan; kafa derisi açıkta değil, kartlar kafaya girmiyor.
   - `/dev/thumbs`, `node scripts/r2-sync.mjs grooms`, manifest. Commit + push. A3 `[x]`.
+  - Durum (2026-10-27): Ponytail, Male 11 ve MessyWavy yayında (R2 manifest 53 saç; GLB'ler validate'te temiz, küçük resimler yeniden çizildi). **Nomad tutuldu:** tıraşlı arka ve yanlar yamalı tutam ve yatay çizgi gibi görünüyor, tepe girdabında açık deri lekesi var. Web çıktısı silindi (manifest atlıyor); düzeltme subagent'ta: uzun üst kart kalır, kısa fade deriye boyanır. Bilinen küçük kusurlar: Ponytail'de önden alnın üstüne biraz saç düşüyor; Male 11'in paketteki eski kart mesh'i dışa aktarımda duruyor, dönüştürücü yok sayıyor.
 - [ ] **1b.5 Üç saçı kaldır (A3b).** Tahmin 1 · Gerçek —
   - `/[locale]/curate`'te gizle: `groom.hair.Hair_S_HairLoss`, `groom.hair.Hair_M_Layered`, `groom.hair.Hair_L_MessyClumps`.
   - `uv run asset-pipeline mh-prune` (deneme) → plan özeti kullanıcıya; onayla `mh-prune --apply --plan <özet>`.
