@@ -1,70 +1,15 @@
-/*
- * THESIS: The landing is a premiere, not a product page: one lit, empty stage
- * waiting for a photoreal character, with the copy set like opening credits.
- * It refuses the centred-hero-plus-three-feature-cards template.
- * OWN-WORLD: Warm graphite backstage, one marquee amber, tungsten spotlight
- * cones and floor pools, film grain, Mona Sans expanded in sentence case,
- * 1px hairlines and an amber spike mark.
- * STORY: See the stage, learn it is your character's; look closer (realism),
- * see what you can change, hear it speak with word-synced lips, then press
- * "Karakterini oluştur".
- * FIRST VIEWPORT: Full-bleed stage under a transparent header, spot at 64%
- * width with a floor mark; two-line title, one-sentence lede and the amber
- * CTA anchored bottom-left in the dark.
- * FORM: Brief-pinned "Karanlık sinematik" (photoreal Premiere Wall); no seed
- * roll, the user chose the direction.
- */
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import Image from 'next/image';
-import type { ReactNode } from 'react';
-
-import { ClosingSection } from '@/components/landing/ClosingSection';
-import { CustomizeSection } from '@/components/landing/customize/CustomizeSection';
-import { Hero } from '@/components/landing/Hero';
-import { RealismSection } from '@/components/landing/RealismSection';
-import { TalkDemo } from '@/components/landing/talk/TalkDemo';
-import { TechMarquee } from '@/components/landing/TechMarquee';
 import { PageTransition } from '@/components/shell/PageTransition';
-
-const SAMPLE_AUDIO = '/assets/samples/tr-greeting.wav';
-const TALK_ANCHOR = 'konusma';
-
-/** Transcript of the sample recording, read once at build time. */
-async function getSampleTranscript(): Promise<string> {
-  'use cache';
-  const file = path.join(process.cwd(), 'public', 'assets', 'samples', 'tr-greeting.txt');
-  return (await readFile(file, 'utf8')).trim();
-}
-
-/** Slot for the main session: pass the live 3D character here; until then the poster renders. */
-const heroStage: ReactNode = undefined;
+import { ParticleStory } from '@/features/landing/ParticleStory';
 
 /**
- * Realism close-up: a render of our MetaHuman (Ada, studio light rig, brows
- * camera) from /dev/mh. The frame's aria-label describes it, so alt is empty.
+ * Landing ("Paper and Ink", DESIGN.md): no character on screen, only ink dots
+ * on paper that tell the product in five chapters as the page scrolls, ending
+ * on a human silhouette sampled from a real MetaHuman and the start button.
  */
-const closeUp = (
-  <Image
-    src="/assets/landing/mh-ada-eyes.webp"
-    alt=""
-    fill
-    sizes="(min-width: 1024px) 58vw, 100vw"
-    className="object-cover"
-  />
-);
-
-export default async function LandingPage() {
-  const transcript = await getSampleTranscript();
-
+export default function LandingPage() {
   return (
     <PageTransition>
-      <Hero stage={heroStage} talkAnchor={TALK_ANCHOR} />
-      <TechMarquee />
-      <RealismSection closeUp={closeUp} />
-      <CustomizeSection />
-      <TalkDemo id={TALK_ANCHOR} audioSrc={SAMPLE_AUDIO} transcript={transcript} />
-      <ClosingSection />
+      <ParticleStory />
     </PageTransition>
   );
 }

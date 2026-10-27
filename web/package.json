@@ -19,7 +19,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
     "@google/genai": "^2.30.0",
-    "@gsap/react": "^2.1.2",
     "@phosphor-icons/react": "^2.1.10",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
@@ -29,7 +28,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "groq-sdk": "^1.6.0",
-    "gsap": "^3.15.0",
     "microsoft-cognitiveservices-speech-sdk": "^1.52.0",
     "mongodb": "^7.7.0",
     "motion": "^14.3.1",

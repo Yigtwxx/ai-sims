@@ -172,9 +172,6 @@ importers:
       '@google/genai':
         specifier: ^2.30.0
         version: 2.30.0(supports-color@7.2.0)
-      '@gsap/react':
-        specifier: ^2.1.2
-        version: 2.1.2(gsap@3.15.0)(react@19.3.0)
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -202,9 +199,6 @@ importers:
       groq-sdk:
         specifier: ^1.6.0
         version: 1.6.0
-      gsap:
-        specifier: ^3.15.0
-        version: 3.15.0
       microsoft-cognitiveservices-speech-sdk:
         specifier: ^1.52.0
         version: 1.52.0(supports-color@7.2.0)
@@ -652,12 +646,6 @@ packages:
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
-
-  '@gsap/react@2.1.2':
-    resolution: {integrity: sha512-JqliybO1837UcgH2hVOM4VO+38APk3ECNrsuSM4MuXp+rbf+/2IG2K1YJiqfTcXQHH7XlA0m3ykniFYstfq0Iw==}
-    peerDependencies:
-      gsap: ^3.12.5
-      react: '>=17'
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -3215,9 +3203,6 @@ packages:
     resolution: {integrity: sha512-ggMgo6n84aZdNObgkSbSxWrdAq4wABsViIRb5e4N15bMUtDLZVhqlgZOI7X4TeqdBMdaVUOuUdZxAZIp06u0vw==}
     hasBin: true
 
-  gsap@3.15.0:
-    resolution: {integrity: sha512-dMW4CWBTUK1AEEDeZc1g4xpPGIrSf9fJF960qbTZmN/QwZIWY5wgliS6JWl9/25fpTGJrMRtSjGtOmPnfjZB+A==}
-
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
     engines: {node: '>= 0.4'}
@@ -5190,11 +5175,6 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
-
-  '@gsap/react@2.1.2(gsap@3.15.0)(react@19.3.0)':
-    dependencies:
-      gsap: 3.15.0
-      react: 19.3.0
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -7701,8 +7681,6 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   groq-sdk@1.6.0: {}
-
-  gsap@3.15.0: {}
 
   has-bigints@1.1.0: {}
 

@@ -30,9 +30,7 @@
     "signInFailed": "Giriş yapılamadı. Bağlantını kontrol edip tekrar dene."
   },
   "Footer": {
-    "tagline": "Fotogerçekçi karakterler, Türkçe konuşan.",
-    "demo": "Şirket içi demo.",
-    "trademark": "MetaHuman ve Unreal Engine, Epic Games, Inc. şirketinin ticari markalarıdır."
+    "tagline": "Fotogerçekçi karakterler, Türkçe konuşan."
   },
   "Status": {
     "loading": "Sahne hazırlanıyor",
@@ -47,146 +45,43 @@
     "notifications": "Bildirimler"
   },
   "Landing": {
-    "hero": {
-      "titleLine1": "Karakterini yarat.",
-      "titleLine2": "Sonra onunla konuş.",
-      "lede": "Fotogerçekçi bir dijital karakter tasarla. Bitti dediğinde seninle konuşur, dudakları her kelimeyle birlikte oynar.",
-      "cta": "Karakterini oluştur",
-      "listen": "Konuşmayı dinle",
-      "stageLabel": "Karakterinin duracağı, ışığı yanmış boş sahne"
-    },
-    "marquee": {
-      "label": "Altyapı",
-      "items": ["MetaHuman", "three.js", "ARKit 52", "15 viseme", "Türkçe lip-sync"]
-    },
-    "realism": {
-      "title": "Yakından bak. Hâlâ gerçek.",
-      "lede": "Ten, göz, saç ve ışık ayrı malzemeler olarak hesaplanır; yakın planda da plastik durmaz.",
-      "stageLabel": "Yakın plan: stüdyo ışığında MetaHuman yüzü, gözler ve ten dokusu",
-      "layers": {
-        "skin": {
-          "title": "Ten",
-          "body": "Gözenek dokusu, ince kırışıklar ve ışığın tenin altında dağılması."
-        },
-        "eyes": {
-          "title": "Gözler",
-          "body": "Kornea parlaklığı, iris derinliği ve göz kenarındaki ıslaklık. Bakış imleci izler."
-        },
-        "hair": {
-          "title": "Saç",
-          "body": "Tel tel saç kartları. Renk, kökler, ombre ve röfle gerçek zamanlı değişir."
-        },
-        "light": {
-          "title": "Işık",
-          "body": "Stüdyo portre ışığı yüze göre sabit kalır. Karakter döner, ışık bozulmaz."
-        }
-      }
-    },
-    "customize": {
-      "title": "Yüz, ten, saç, kıyafet. Seçim senin.",
-      "lede": "Her seçim karakterin üzerinde anında görünür. Beğenmezsen geri al, karıştır, yeniden dene.",
-      "categoriesLabel": "Kişiselleştirme kategorileri",
-      "categories": {
-        "face": {
-          "label": "Yüz",
-          "hint": "Hazır yüzler arasında karışım yap.",
-          "blendLabel": "İki yüz arasında karışım",
-          "blendValue": "%{left} {leftName}, %{right} {rightName}",
-          "weight": "%{value}"
-        },
-        "skin": {
-          "label": "Ten",
-          "hint": "Gerçek cilt setleri, açıktan koyuya; renkler sahne ışığındaki hâlleri."
-        },
-        "eyes": {
-          "label": "Gözler",
-          "hint": "İris rengi ve dokusu.",
-          "colors": {
-            "darkBrown": "Koyu kahve",
-            "brown": "Kahve",
-            "hazel": "Ela",
-            "amber": "Bal rengi",
-            "green": "Yeşil",
-            "grey": "Gri",
-            "blue": "Mavi",
-            "deepBlue": "Lacivert"
-          }
-        },
-        "hair": {
-          "label": "Saç",
-          "hint": "Stil, renk ve boya deseni.",
-          "colorsLabel": "Renk",
-          "patternsLabel": "Desen",
-          "stylesLabel": "Stil",
-          "colors": {
-            "black": "Siyah",
-            "darkBrown": "Koyu kahve",
-            "chestnut": "Kestane",
-            "auburn": "Kızıl kahve",
-            "copper": "Bakır",
-            "darkBlonde": "Koyu sarı",
-            "blonde": "Sarı",
-            "platinum": "Platin"
-          },
-          "patterns": {
-            "ombre": "Ombre",
-            "roots": "Kökler",
-            "highlights": "Röfle",
-            "underlayer": "İç katman"
-          },
-          "styles": {
-            "dutchBraid": "Hollanda örgüsü",
-            "messyBun": "Dağınık topuz",
-            "highPonytail": "Yüksek at kuyruğu",
-            "slickPonytail": "Sıkı at kuyruğu",
-            "bantuKnots": "Bantu düğümleri",
-            "cornrows": "Cornrow örgü"
-          }
-        },
-        "wardrobe": {
-          "label": "Kıyafet",
-          "hint": "Üst, alt ve ayakkabı, her biri kendi rengiyle.",
-          "items": {
-            "hoodie": "Kapüşonlu",
-            "tshirt": "Tişört",
-            "sweater": "Kazak",
-            "rolledShirt": "Kolları kıvrık gömlek",
-            "jeans": "Kot pantolon",
-            "cargo": "Kargo pantolon",
-            "chelsea": "Chelsea bot",
-            "sneakers": "Spor ayakkabı",
-            "loafers": "Loafer"
-          }
-        },
-        "jewelry": {
-          "label": "Takı",
-          "hint": "İnce takılar, piercing ve küçük dövmeler.",
-          "items": {
-            "studs": "Küpe",
-            "hoops": "Halka küpe",
-            "nose": "Burun piercingi",
-            "brow": "Kaş piercingi",
-            "lip": "Dudak piercingi",
-            "helix": "Kıkırdak",
-            "fineTattoo": "Minimal dövme"
-          }
-        }
-      }
-    },
-    "talk": {
-      "title": "Konuştuğunda dudakları her kelimeyi takip eder.",
-      "lede": "Ses ve ağız şekli aynı zaman çizelgesinden gelir: kelime, hece ve 15 viseme.",
-      "play": "Dinle",
-      "pause": "Durdur",
-      "sample": "Örnek kayıt, Türkçe",
-      "waveformLabel": "Örnek kaydın ses dalgası",
-      "visemeLabel": "Ağız şekli (viseme)",
-      "loading": "Ses hazırlanıyor",
-      "error": "Ses çalınamadı. Sayfayı yenileyip tekrar dene."
-    },
-    "closing": {
-      "title": "Sahne hazır. Karakterin seni bekliyor.",
-      "lede": "Bir dakikada kendi karakterini kur, sonra ona “nasılsın?” diye sor."
+    "story": {
+      "label": "Karakterden sese: AI Sims nasıl çalışır",
+      "idea": {
+        "kicker": "AI Sims",
+        "title": "Karakterini yarat. Sonra onunla konuş.",
+        "body": "Fotogerçekçi bir dijital insan tasarla. Bitti dediğinde seninle sesli konuşur."
+      },
+      "voice": {
+        "kicker": "01 · Ses",
+        "title": "Önce ona bir ses ver.",
+        "body": "Yapay zekâ cevabı yazar, ses Türkçe ya da İngilizce okunur."
+      },
+      "viseme": {
+        "kicker": "02 · Ağız şekli",
+        "title": "Her ses bir ağız şekli.",
+        "body": "Konuşma 15 visemeye ayrılır; her biri doğru anda oynar."
+      },
+      "lips": {
+        "kicker": "03 · Dudak",
+        "title": "Dudaklar kelimeyi söyler.",
+        "body": "Ses ile ağız aynı zaman çizelgesinden gelir. Kapanmalar sesten birkaç milisaniye önce başlar."
+      },
+      "start": {
+        "kicker": "04 · Başla",
+        "title": "Şimdi sıra senin karakterinde.",
+        "body": "Bir dakikada karakterini kur, sonra ona “nasılsın?” diye sor.",
+        "cta": "Karakterini oluştur"
+      },
+      "steps": {
+        "label": "Bölümler",
+        "idea": "Fikir",
+        "voice": "Ses",
+        "viseme": "Viseme",
+        "lips": "Dudak",
+        "start": "Başla"
+      },
+      "scrollHint": "Aşağı kaydır"
     }
   },
   "Characters": {
@@ -363,7 +258,15 @@
       "patternColor": "Desen rengi",
       "amount": "Yoğunluk",
       "dyeHint": "Boya, doğal rengin yerine geçer.",
-      "patternHint": "Desen, boyanın ya da doğal rengin üstüne ikinci bir renk ekler."
+      "patternHint": "Desen, boyanın ya da doğal rengin üstüne ikinci bir renk ekler.",
+      "lengthFilter": "Saç uzunluğu",
+      "lengths": {
+        "all": "Tümü",
+        "short": "Kısa",
+        "medium": "Orta",
+        "long": "Uzun"
+      },
+      "noneOfLength": "Bu uzunlukta saç modeli yok."
     },
     "facialHair": {
       "eyebrows": "Kaş",
@@ -395,7 +298,8 @@
       "empty": "Bu bölümde bu taban için kıyafet yok.",
       "comingSoon": "Gardırop hazırlanıyor.",
       "comingSoonBody": "Kıyafetler dışa aktarılıp kütüphaneye eklenince burada görünecek. Şimdilik karakter MetaHuman taban kıyafetiyle görünür.",
-      "colorsHint": "Kıyafetin bu bölümünü istediğin renge boya."
+      "colorsHint": "Kıyafetin bu bölümünü istediğin renge boya.",
+      "colorways": "{count} renk"
     },
     "jewelry": {
       "count": "{count}/{max} parça",
@@ -495,10 +399,38 @@
       "pending": "Kaydedilecek…",
       "saving": "Taslak kaydediliyor…",
       "saved": "Taslak kaydedildi",
-      "error": "Taslak kaydedilemedi. Tekrar denenecek."
+      "error": "Taslak kaydedilemedi. Tekrar denenecek.",
+      "short": {
+        "needsName": "Bu sekmede",
+        "error": "Kaydedilemedi"
+      }
     },
     "saveFailed": "Kaydedilemedi. Bağlantını kontrol edip tekrar dene.",
-    "dragHint": "Döndürmek için sürükle",
+    "dragHint": "Sürükle: döndür · Tekerlek: yakınlaş",
+    "stageControls": "Sahne ayarları",
+    "camera": {
+      "label": "Kadraj",
+      "presets": {
+        "body": "Tam boy",
+        "torso": "Büst",
+        "head": "Yüz"
+      }
+    },
+    "quality": {
+      "label": "Kalite",
+      "options": {
+        "auto": "Otomatik",
+        "high": "Yüksek",
+        "balanced": "Dengeli",
+        "battery": "Pil"
+      },
+      "hints": {
+        "auto": "Kare hızına göre kendini ayarlar",
+        "high": "Tam çözünürlük ve gölgeleme",
+        "balanced": "Daha akıcı, biraz daha yumuşak",
+        "battery": "30 kare/sn, hafif saç ve gölgeleme"
+      }
+    },
     "loadingStage": "Sahne hazırlanıyor",
     "manifest": {
       "loading": "Parça kütüphanesi yükleniyor",
@@ -512,7 +444,18 @@
     "premiere": {
       "tagline": "Sahne senin.",
       "start": "Sohbete başla",
-      "edit": "Düzenlemeye dön"
+      "edit": "Düzenlemeye dön",
+      "status": {
+        "saving": "Kaydediliyor",
+        "framing": "Portre",
+        "ready": "Hazır"
+      },
+      "saved": "Karakterlerim'e eklendi",
+      "spec": {
+        "face": "Yüz {name}",
+        "hair": "Saç {name}",
+        "outfit": "{count} parça kıyafet"
+      }
     },
     "colors": {
       "burgundy": "Bordo",

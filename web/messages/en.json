@@ -30,9 +30,7 @@
     "signInFailed": "Could not sign in. Check your connection and try again."
   },
   "Footer": {
-    "tagline": "Photoreal characters that speak Turkish.",
-    "demo": "Internal demo.",
-    "trademark": "MetaHuman and Unreal Engine are trademarks of Epic Games, Inc."
+    "tagline": "Photoreal characters that speak Turkish."
   },
   "Status": {
     "loading": "Setting the stage",
@@ -47,146 +45,43 @@
     "notifications": "Notifications"
   },
   "Landing": {
-    "hero": {
-      "titleLine1": "Create your character.",
-      "titleLine2": "Then talk to it.",
-      "lede": "Design a photoreal digital character. Press Done and it talks back, its lips moving with every word.",
-      "cta": "Create your character",
-      "listen": "Hear it speak",
-      "stageLabel": "An empty, lit stage where your character will stand"
-    },
-    "marquee": {
-      "label": "Built with",
-      "items": ["MetaHuman", "three.js", "ARKit 52", "15 visemes", "Turkish lip-sync"]
-    },
-    "realism": {
-      "title": "Look closer. Still real.",
-      "lede": "Skin, eyes, hair and light are computed as separate materials, so a close-up never turns to plastic.",
-      "stageLabel": "Close-up: a MetaHuman face under studio light, eyes and skin texture",
-      "layers": {
-        "skin": {
-          "title": "Skin",
-          "body": "Pore detail, fine wrinkles and light scattering beneath the surface."
-        },
-        "eyes": {
-          "title": "Eyes",
-          "body": "Corneal gloss, iris depth and the wet line along the lid. The gaze follows your cursor."
-        },
-        "hair": {
-          "title": "Hair",
-          "body": "Strand-based hair cards. Colour, roots, ombre and highlights change in real time."
-        },
-        "light": {
-          "title": "Light",
-          "body": "Studio portrait light stays fixed to the face. The character turns, the light holds."
-        }
-      }
-    },
-    "customize": {
-      "title": "Face, skin, hair, wardrobe. Your call.",
-      "lede": "Every choice shows on the character at once. Not right? Undo, mix, try again.",
-      "categoriesLabel": "Customization categories",
-      "categories": {
-        "face": {
-          "label": "Face",
-          "hint": "Blend between ready-made faces.",
-          "blendLabel": "Blend between two faces",
-          "blendValue": "{left}% {leftName}, {right}% {rightName}",
-          "weight": "{value}%"
-        },
-        "skin": {
-          "label": "Skin",
-          "hint": "Real skin sets, fair to deep, shown as lit on stage."
-        },
-        "eyes": {
-          "label": "Eyes",
-          "hint": "Iris colour and texture.",
-          "colors": {
-            "darkBrown": "Dark brown",
-            "brown": "Brown",
-            "hazel": "Hazel",
-            "amber": "Amber",
-            "green": "Green",
-            "grey": "Grey",
-            "blue": "Blue",
-            "deepBlue": "Deep blue"
-          }
-        },
-        "hair": {
-          "label": "Hair",
-          "hint": "Style, colour and dye pattern.",
-          "colorsLabel": "Colour",
-          "patternsLabel": "Pattern",
-          "stylesLabel": "Style",
-          "colors": {
-            "black": "Black",
-            "darkBrown": "Dark brown",
-            "chestnut": "Chestnut",
-            "auburn": "Auburn",
-            "copper": "Copper",
-            "darkBlonde": "Dark blonde",
-            "blonde": "Blonde",
-            "platinum": "Platinum"
-          },
-          "patterns": {
-            "ombre": "Ombre",
-            "roots": "Roots",
-            "highlights": "Highlights",
-            "underlayer": "Underlayer"
-          },
-          "styles": {
-            "dutchBraid": "Dutch braid",
-            "messyBun": "Messy bun",
-            "highPonytail": "High ponytail",
-            "slickPonytail": "Slick ponytail",
-            "bantuKnots": "Bantu knots",
-            "cornrows": "Cornrows"
-          }
-        },
-        "wardrobe": {
-          "label": "Wardrobe",
-          "hint": "Top, bottom and shoes, each in its own colour.",
-          "items": {
-            "hoodie": "Hoodie",
-            "tshirt": "T-shirt",
-            "sweater": "Sweater",
-            "rolledShirt": "Rolled-sleeve shirt",
-            "jeans": "Jeans",
-            "cargo": "Cargo pants",
-            "chelsea": "Chelsea boots",
-            "sneakers": "Sneakers",
-            "loafers": "Loafers"
-          }
-        },
-        "jewelry": {
-          "label": "Jewellery",
-          "hint": "Fine jewellery, piercings and small tattoos.",
-          "items": {
-            "studs": "Studs",
-            "hoops": "Hoops",
-            "nose": "Nose piercing",
-            "brow": "Brow piercing",
-            "lip": "Lip piercing",
-            "helix": "Helix",
-            "fineTattoo": "Fine-line tattoo"
-          }
-        }
-      }
-    },
-    "talk": {
-      "title": "When it speaks, its lips follow every word.",
-      "lede": "Voice and mouth shapes come from one timeline: words, syllables and 15 visemes.",
-      "play": "Listen",
-      "pause": "Pause",
-      "sample": "Sample recording, in Turkish",
-      "waveformLabel": "Waveform of the sample recording",
-      "visemeLabel": "Mouth shape (viseme)",
-      "loading": "Preparing audio",
-      "error": "The audio could not play. Reload the page and try again."
-    },
-    "closing": {
-      "title": "The stage is set. Your character is waiting.",
-      "lede": "Build your own character in a minute, then ask it how it is doing."
+    "story": {
+      "label": "From character to voice: how AI Sims works",
+      "idea": {
+        "kicker": "AI Sims",
+        "title": "Create your character. Then talk to it.",
+        "body": "Design a photoreal digital human. When you are done, it talks with you out loud."
+      },
+      "voice": {
+        "kicker": "01 · Voice",
+        "title": "First, give it a voice.",
+        "body": "The AI writes the reply; the voice reads it in Turkish or English."
+      },
+      "viseme": {
+        "kicker": "02 · Mouth shapes",
+        "title": "Every sound is a mouth shape.",
+        "body": "Speech splits into 15 visemes, and each one plays at the right moment."
+      },
+      "lips": {
+        "kicker": "03 · Lips",
+        "title": "The lips say the word.",
+        "body": "Sound and mouth come from the same timeline. Closures start a few milliseconds before the sound."
+      },
+      "start": {
+        "kicker": "04 · Start",
+        "title": "Now it is your character's turn.",
+        "body": "Build your character in a minute, then ask it “how are you?”",
+        "cta": "Create your character"
+      },
+      "steps": {
+        "label": "Chapters",
+        "idea": "Idea",
+        "voice": "Voice",
+        "viseme": "Viseme",
+        "lips": "Lips",
+        "start": "Start"
+      },
+      "scrollHint": "Scroll down"
     }
   },
   "Characters": {
@@ -363,7 +258,15 @@
       "patternColor": "Pattern colour",
       "amount": "Strength",
       "dyeHint": "Dye replaces the natural colour.",
-      "patternHint": "A pattern adds a second colour over the dye or natural colour."
+      "patternHint": "A pattern adds a second colour over the dye or natural colour.",
+      "lengthFilter": "Hair length",
+      "lengths": {
+        "all": "All",
+        "short": "Short",
+        "medium": "Medium",
+        "long": "Long"
+      },
+      "noneOfLength": "No hairstyles of this length."
     },
     "facialHair": {
       "eyebrows": "Brows",
@@ -395,7 +298,8 @@
       "empty": "No clothes in this section for this base.",
       "comingSoon": "The wardrobe is on its way.",
       "comingSoonBody": "Clothes appear here once they are exported into the library. Until then the character wears the MetaHuman base outfit.",
-      "colorsHint": "Paint this part of the garment any colour."
+      "colorsHint": "Paint this part of the garment any colour.",
+      "colorways": "{count, plural, one {# colourway} other {# colourways}}"
     },
     "jewelry": {
       "count": "{count}/{max} pieces",
@@ -495,10 +399,38 @@
       "pending": "Saving shortly…",
       "saving": "Saving draft…",
       "saved": "Draft saved",
-      "error": "Could not save the draft. Will retry."
+      "error": "Could not save the draft. Will retry.",
+      "short": {
+        "needsName": "In this tab",
+        "error": "Not saved"
+      }
     },
     "saveFailed": "Could not save. Check your connection and try again.",
-    "dragHint": "Drag to turn",
+    "dragHint": "Drag: turn · Wheel: zoom",
+    "stageControls": "Stage settings",
+    "camera": {
+      "label": "Framing",
+      "presets": {
+        "body": "Full body",
+        "torso": "Bust",
+        "head": "Face"
+      }
+    },
+    "quality": {
+      "label": "Quality",
+      "options": {
+        "auto": "Auto",
+        "high": "High",
+        "balanced": "Balanced",
+        "battery": "Battery"
+      },
+      "hints": {
+        "auto": "Adjusts itself to the frame rate",
+        "high": "Full resolution and shading",
+        "balanced": "Smoother, slightly softer",
+        "battery": "30 fps, lighter hair and shading"
+      }
+    },
     "loadingStage": "Setting the stage",
     "manifest": {
       "loading": "Loading the parts library",
@@ -512,7 +444,18 @@
     "premiere": {
       "tagline": "The stage is yours.",
       "start": "Start talking",
-      "edit": "Back to editing"
+      "edit": "Back to editing",
+      "status": {
+        "saving": "Saving",
+        "framing": "Portrait",
+        "ready": "Ready"
+      },
+      "saved": "Added to My characters",
+      "spec": {
+        "face": "Face {name}",
+        "hair": "Hair {name}",
+        "outfit": "{count, plural, one {# garment} other {# garments}}"
+      }
     },
     "colors": {
       "burgundy": "Burgundy",
