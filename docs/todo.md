@@ -5,14 +5,14 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 ## Çalışma kuralları
 
 - **Başlarken:** önce `git pull` (liste Mac'te de güncellenebilir), sonra `CLAUDE.md`, `docs/handoff.md` ve bu dosya. Kararları tekrar sorma.
-- **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir. Saatler toplam iştir; 1 subagent'la geçen süre yaklaşık %25-35 kısalır (toplam ~570 saatlik iş ~400 saatte biter).
+- **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir. Saatler toplam iştir; 1 subagent'la geçen süre yaklaşık %25-35 kısalır (toplam ~550 saatlik iş ~390 saatte biter).
   - **Faz 1, temel (~30 sa):** A1 → A2 → A3 → A3b (Fab ve Unreal, uzun işler arka planda) → A4.0 kalem etek (Blender yolu ve paketleyici) → B5 oturma hataları (düzeltmeler dönüştürücüde kalır ve sonraki kıyafetlerin hepsine geçer).
   - **Faz 2, panel düzeltmeleri ve temel kıyafet (~60 sa):** B1 → B2 → B3 → B4 → D1 küçük resimler (A-pozlu eski görseller gider) → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu (file çorap hariç).
   - **Faz 3, iş seti ve karakter (~60 sa):** A4.1'den kumaş pantolon ve gömlek (blazer Faz 7'de) → A4.6'dan polo, chino, kravatlı gömlek → A4.15 varyantlar → C1 kişilik → C2 ses → C3 ifade önizleme.
   - **Faz 4, günlük (~75 sa):** A4.4 günlük çeşit (elbise, hafif ceket, desen varyantları) → A4.6'nın kalanı (atlet, jogger, düz eşofman altı, A kesim etek, biker şort, triko balıkçı, hırka, sweatshirt, tulum ve salopet, gömlek elbise, kısa kollu gömlek; kot ceket Faz 7'de).
   - **Faz 5, görünüm (~70 sa):** C4 makyaj → C5 cilt detayları → C6 kaş ve kirpik → C7 yüz ince ayarı → C8 gözlük ve şapka → C10 yüz küçük resimlerinde ten.
-  - **Faz 6, spor, ev, ayakkabı, meslek, kış (~90 sa):** A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.16'dan scrubs ve aşçı ceketi → A4.17'den atkı ve eldiven.
-  - **Faz 7, zor parçalar (~130 sa):** C9 kat kat giyim → blazer + gömlek (A4.1) → kot ceket (A4.6) → doktor önlüğü ve reflektörlü yelek (A4.16) → şişme mont (A4.17) → A4.10 topuklu ve ayak pozu → A4.7 uzun parçalar (maksi etek, trençkot, kaban, palto).
+  - **Faz 6, spor, ev, ayakkabı, meslek (~80 sa):** A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.16 meslek (scrubs ve aşçı ceketi).
+  - **Faz 7, zor parçalar (~120 sa):** C9 kat kat giyim → blazer + gömlek (A4.1) → kot ceket (A4.6) → A4.17 şişme mont → A4.10 topuklu ve ayak pozu → A4.7 uzun parçalar (maksi etek, trençkot, kaban, palto).
   - **Faz 8, hot ve sexy, kapanış (~60 sa):** A4.8 gece ve seksi çizgi (file çorap dahil) → A4.9 iç giyim → A4.11 mayo ve bikini → D2 son kontrol.
   - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): her fazın başında oturum fazı alt adımlara böler ve `docs/plans/faz-<n>.md` dosyasına yazar (`superpowers:writing-plans`).
     - Bir alt adım en çok ~4-6 saatlik iştir ve kendi başına bitebilir: doğrulama, commit, push. Yarım alt adım push'lanmaz.
@@ -20,7 +20,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Faz planı kullanıcıya telefondan kısa bir liste olarak gönderilir; onay beklenmeden başlanır.
     - Oturum kesilirse yenisi plan dosyasındaki ilk açık adımdan devam eder.
   - Her faz sonunda kısa bir kontrol yapılır: landing, yeni karakter, o fazın eklediği şeyler ve konuşma ekranı. Kullanıcıya telefondan ekran görüntüleriyle faz özeti gönderilir.
-  - Görevi iki faza bölünmüş maddelerin (A4.1, A4.5, A4.6, A4.16, A4.17) kutusu son parçası bitene kadar açık kalır; yanına bitenler not edilir.
+  - Görevi iki faza bölünmüş maddelerin (A4.1, A4.5, A4.6) kutusu son parçası bitene kadar açık kalır; yanına bitenler not edilir.
   - Unreal ya da Blender arka planda çalışırken aynı fazdaki engelsiz bir web görevine geçilebilir; iş bitince sıraya geri dönülür.
 - **Engel:** bir görev kullanıcıya bağlıysa (indirme, seçim, karar) soruyu aşağıdaki "Kullanıcıya sorular" bölümüne yaz, kullanıcıya kısaca sor ve beklemeden sıradaki engelsiz göreve geç.
 - **Unreal işleri uzun sürer** (yüz başına ~11 dk). `asset-pipeline ue ...` komutlarını arka planda başlat, beklerken web görevlerine devam et. Aynı anda tek editör açılır (RAM yetmiyor).
@@ -166,16 +166,10 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Ayakkabılar kumaş simülasyonuyla yapılmaz. Taban ayak izinden ekstrüde edilir, üst kısım ayak yüzeyinin ofset kabuğundan kesim çizgileriyle çıkar. Dikiş, bağcık ve taban dokusu normal haritaya bake'lenir. Çizmenin konçu baldırın ofset kabuğudur.
     - Kapalı ayakkabıda parmaklar mevcut kuralla gizlenir (`hide_closed_toes`); sandalet ve espadrilde ayak görünür, `soleDepth` doğru ölçülmeli.
   - [ ] **A4.15 Varyantlar** (kullanıcı isteği, 2026-10-27). Aynı kalıptan ayrı katalog öğeleri, şema değişmez: gömlek ve tişörtte sıvanmış kol, gömlekte içe sokulu ve dışarıda, yaka düğmesi açık ve kapalı. İçe sokulu varyant belde hafif bir kabarıklıkla biter, pantolon ve eteğin bel bandının altında kalır.
-  - [ ] **A4.16 Meslek kıyafetleri** (kullanıcı isteği, 2026-10-27).
-    - C9'suz yapılabilenler: hemşire / sağlık forması (scrubs; V yaka üst + alt, K/E), aşçı ceketi (kruvaze, K/E).
-    - C9'dan sonra: doktor önlüğü (diz boyu, önü açık; önü açık eteği A4.7'deki bacak arası sorununa da girer), reflektörlü iş yeleği (üste giyilir).
+  - [ ] **A4.16 Meslek kıyafetleri** (kullanıcı isteği, 2026-10-27; doktor önlüğü ve reflektörlü yelek aynı gün çıkarıldı, ekleme).
+    - Hemşire / sağlık forması (scrubs; V yaka üst + alt, K/E), aşçı ceketi (kruvaze, K/E).
     - C1'de rol veya meslek seçilince ilgili kıyafet önerilebilir. Bu bir öneridir, zorunlu değil; C1 yapılırken değerlendirilir.
-    - C9'suz parçalar bitince kutu açık kalır, yanına "kalanlar C9'dan sonra" notu düşülür.
-  - [ ] **A4.17 Kış** (kullanıcı isteği, 2026-10-27).
-    - Atkı (K/E): Blender'da boyna sarılı simüle edilir. Baş dönünce çeneye girmemesi kontrol edilir.
-    - Eldiven (K/E): mesh değil, çorap gibi cilt shader'ında bir katman olur (el UV'sinde maske; örgü ve deri, renk seçilebilir). Parmaklarla birlikte hareket eder, mesh'teki parmak kırılması sorunu olmaz. Şema: `gloves: { style, color }`; A4.5 ve A4.9 ile aynı sürüme (v3) sığarsa birlikte.
-    - C9'dan sonra: kalça boyu şişme mont (K/E, üste giyilir).
-    - C9'suz parçalar bitince kutu açık kalır, yanına "kalanlar C9'dan sonra" notu düşülür.
+  - [ ] **A4.17 Kış** (kullanıcı isteği, 2026-10-27; atkı ve eldiven aynı gün çıkarıldı, ekleme): kalça boyu şişme mont (K/E, üste giyilir; C9'dan sonra).
   - [ ] **A4.7 Uzun parçalar (deneme, en son):** maksi etek (K), trençkot, kaban, uzun palto (K/E).
     - Sorun: bacak arasındaki kumaş en yakın bacağın ağırlığını alıyor ve adım ya da jestte yırtılıyor. Önce maksi etekle dene: bacak arasındaki vertex'lere iki uyluğun ağırlıklarının karışımı (`build_transfer`'ın Gauss ortalamasını genişleterek, `outfits.py:705`). İdle ve talk'ta temiz değilse dur ve kullanıcıya ekran görüntüsüyle sor.
     - Trençkot, kaban ve palto tek başına `top` olarak bile gövdenin üstüne giyilir. İç kıyafet içinden çıkacağı için C9'daki (`outer` slotu ve iç giysi gizleme) çözüm gerekir. C9 bitmeden başlanmaz.
