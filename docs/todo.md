@@ -7,7 +7,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 - **Başlarken:** önce `git pull` (liste Mac'te de güncellenebilir), sonra `CLAUDE.md`, `docs/handoff.md` ve bu dosya. Kararları tekrar sorma.
 - **Sıra:** işaretlenmemiş (`[ ]`) ilk görev. Bir görev kullanıcıya bağlıysa (indirme, seçim, karar) soruyu aşağıdaki "Kullanıcıya sorular" bölümüne yaz, kullanıcıya kısaca sor ve beklemeden sıradaki engelsiz göreve geç.
 - **Unreal işleri uzun sürer** (yüz başına ~11 dk). `asset-pipeline ue ...` komutlarını arka planda başlat, beklerken web görevlerine devam et. Aynı anda tek editör açılır (RAM yetmiyor).
-- **Büyük görevlerde** (B2, C1, C2, C7, C9) önce tasarım: `superpowers:brainstorming` + `superpowers:writing-plans`. Kullanıcıya en fazla 2-3 seçenekli, telefondan cevaplanabilir soru sor.
+- **Büyük görevlerde** (B2, B5, C1, C2, C7, C9) önce tasarım: `superpowers:brainstorming` + `superpowers:writing-plans`. Kullanıcıya en fazla 2-3 seçenekli, telefondan cevaplanabilir soru sor.
 - **Her görevde:**
   - Küçük adımlar.
   - Doğrulama: `pnpm typecheck && pnpm lint && pnpm test`; pipeline'da `uv run ruff check && uv run ruff format --check && uv run pytest`; üretilen GLB `gltf-transform validate`'ten temiz geçmeli; görsel değişiklik tarayıcıda ekran görüntüsüyle kontrol edilir.
@@ -73,6 +73,25 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 - [ ] **B2. Yüz karıştırma** (`face.blend`, `FacePanel.tsx`; `randomize.ts` de yazıyor). MetaHuman kafalarının topolojisi ortak: vertex konumları, morph delta'ları (ARKit + viseme) ve kafa eklemleri (göz, çene) ağırlıkla karıştırılır. Cilt seçili kalır. C7 bu altyapıyı kullanacak. **Bitti sayılır:** karışık yüz konuşurken dudak senkronu ve göz kırpma bozulmuyor.
 - [ ] **B3. Dövme** (`tattoos`, `schema.ts:103`, `TattooPanel.tsx`, `web/src/features/creator/tattoos.ts`). Cilt shader'ında gövde ve kafa UV'sine bir katman eklenir. Tasarımlar küçük ve ölçülü kalır; yerleşim UV'leri gövde GLB'sinden ölçülür.
 - [ ] **B4. Takı** (`accessories`, `JewelryPanel.tsx`, `web/src/features/avatar/accessories/`). Bu kod anime döneminden kalma (VRoid kulak arama vb.); MetaHuman kafa ve gövde mesh'ine ve eklemlerine bağlanır. **Bitti sayılır:** küpe, kolye ve yüzük idle ve konuşma sırasında yerinde kalıyor ve mesh'e girmiyor.
+
+- [ ] **B5. Oturma hataları: kıyafet ve saç** (kullanıcı şikâyeti, 2026-10-27).
+  - Belirtiler:
+    - Kıyafetler hâlâ yer yer vücudun içine giriyor, tam oturmuyor.
+    - Gövde kaydırıcıları değişince kıyafet bozulabiliyor.
+    - Saçlar düzgün durmuyor.
+    - "Genel olarak bu tarz hatalar" da düzeltilecek.
+  - Önce `superpowers:systematic-debugging`. Tahminle düzeltme yapma, önce kanıt topla:
+    - Dev sayfasında ekran görüntüsü matrisi: her kıyafet × iki cinsiyet × gövde presetleri ve her kaydırıcının uçları × idle ve talk karesi.
+    - Saç için: her saç × birkaç yüz (kısa/uzun boyun, geniş/dar kafa) × önden, yandan, arkadan.
+    - Mümkünse sayısal ölçüm de: kıyafetin altında görünen cilt vertex'i, kafanın içine giren kart sayısı.
+  - En kötü vakalar `docs/handoff.md`'ye kaydedilir; kullanıcıya telefondan 3-4 ekran görüntüsüyle önce/sonra gösterilir.
+  - Bilinenler:
+    - Kıyafet morph'ları her kaydırıcı ucunda deri normali boyunca dışarı itiliyor (`pipeline/src/asset_pipeline/mh/outfits.py`: `stack_push` :787, `clear_morphs` :956).
+    - Cildi gizleyen maske `body_hide` (:1117). Web'de bağlama `web/src/features/avatar/mh/garments.ts` (`bindGarment` :30).
+    - Birden çok kaydırıcının birlikte morph toplamı ayrıca denenmeli (her biri tek başına temiz olsa da).
+    - Saç: `web/src/features/avatar/mh/grooms.ts` (`refitPositions` :52, `fitCards` :154, `bindToHead` :194). Yoğunluk/kafa derisi `groomDensity.ts`.
+  - Düzeltme pipeline'daysa etkilenen kıyafet ve saçlar yeniden dönüştürülür, GLB'ler `gltf-transform validate`'ten geçer, R2'ye yüklenir.
+  - **Bitti sayılır:** matristeki hiçbir karede kıyafetin altından cilt görünmüyor, kaydırıcı uçlarında kıyafet kırılmıyor, saç kartları kafanın içine girmiyor ve havada durmuyor.
 
 ## C. Yeni özellikler (kullanıcı seçimi, 2026-10-27: listedeki 1-8)
 
