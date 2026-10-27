@@ -469,9 +469,19 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
      6. `uv run asset-pipeline mh-convert --character <ad> ... --manifest`, sonra `/dev/thumbs` ile yüz küçük resimleri ve `node scripts/r2-sync.mjs`.
    - Paketlerin kendi saç ve sakalı gelmez: `grooms` işi yalnız `/MetaHumanCharacter/Optional/Grooms`'u tarar. Yüz ve cilt gelir, saç kütüphaneden seçilir (Frey'in uzun saçı ve sakalı dahil).
    - UE 5.8 riski: Skotukeda ve Frey 5.8'i listelemiyor. `fab_import` "created no assets" derse sebep bu olabilir.
-0. **PC'ye geçince, Fab saçı: Epic Long High Ponytail (kullanıcı seçimi, 2026-10-27):**
-   - İlan: https://www.fab.com/listings/d48ad98a-e343-4a2c-abb3-08730c3bf7d9. Personal ve Professional $0, `.mhpkg`, strand groom + "full set of LODs" + wardrobe item.
-   - `grooms` işi bugün onu görmez, önce editörde değiştirilip denenmeli:
+0. **PC'ye geçince, Fab'den 5 saç (kullanıcı seçimi, 2026-10-27):**
+   - Hepsi MetaHuman formatında groom (Fab API'de `metahumanAssetType: Groom`). Lisans ve UE sürümleri 2026-10-27'de Fab'in `/i/listings/search` cevabından okundu; kart bilgisi ilan açıklamasından:
+
+     | Saç | Lisans | Fab'in yazdığı UE | Kart | İlan |
+     |---|---|---|---|---|
+     | Long High Ponytail (Epic) | iki lisans da $0 | 5.6–5.8 | strand + "full set of LODs" | https://www.fab.com/listings/d48ad98a-e343-4a2c-abb3-08730c3bf7d9 |
+     | Ponytail MessyWavy (WhiteCap) | iki lisans da $0 | 5.8 | elle yapılmış kart FBX + Alembic strand | https://www.fab.com/listings/a3425afb-5801-455e-a6a1-e27632d493db |
+     | Hairstyle Male 11 (Superior Content) | Personal $0 (Professional $14.99) | 5.7 | belirtilmemiş | https://www.fab.com/listings/eb7f2500-56d2-49ed-bbf4-ce48f639b373 |
+     | Nomad Wave Undercut (Quang Phan) | iki lisans da $0 | 5.7 | açıklama Hair Card Generator'dan söz ediyor | https://www.fab.com/listings/0d3d4066-49b8-4c7c-a416-a0b5c12ba7d0 |
+     | PonytailGroom (DropBear) | iki lisans da $0 | 5.6 | belirtilmemiş | https://www.fab.com/listings/d8c790ae-3b8c-4238-b520-1db8a99cac0f |
+
+   - Kart LOD'u olmayan groom'a editörde Hair Card Generator ile kart üretilir. MessyWavy'nin kartları ayrı FBX olarak geliyorsa groom'un kart LOD'una atanır.
+   - `grooms` işi bugün bunları görmez, önce editörde değiştirilip denenmeli:
      - `style_folders()` yalnız `GROOM_ASSETS`'i (`/MetaHumanCharacter/Optional/Grooms/GroomAssets/<slot>/<style>`) tarar (`pipeline/unreal/mh_export/grooms.py:148`). Paket `/Game/Fab/<paket>/` altına iner.
      - `related_assets()` yalnız `/MetaHumanCharacter/` önekli bağımlılıkları alır (`PLUGIN_PREFIX`). Fab paketinin kart mesh'leri ve atlasları `/Game/Fab/` altında olur.
      - Önce `probe` ile paketin klasör düzeni, `GroomAsset` adı ve kart LOD'ları (`*_CardsMesh_Group<g>_LOD<n>`) olup olmadığı okunur. Kart yoksa Hair Card Generator gerekir.
@@ -513,5 +523,5 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 - **Repo:** 2026-10-27'den beri public. Secret, gerçek token ya da `.env` değeri commit'lenmez.
 - **Dövme ve piercing:** ölçülü.
 - **Kıyafet:** iş ve günlük karışık.
-- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği, 2026-10-25'te kullanıcının seçtiği Clara body, 2026-10-27'de seçilen 4 yüz: Skotukeda, Mason, Seo, Frey; arşivde 2026-10-25'te 24 `.mhpkg` var: 21 `oa_*`, 3 `khaosmdf*`). Fab liste sayfası fiyatı eski gösterebiliyor: Romantic Casual Overalls listede "Free" iken 2026-10-25'te ücretliye dönmüştü ve alınmadı. İndirmeden önce öğenin kendi sayfasındaki lisans kutusuna bakılır. Animasyonlar da yalnız ücretsiz paketlerden.
+- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği, 2026-10-25'te kullanıcının seçtiği Clara body, 2026-10-27'de seçilen 4 yüz: Skotukeda, Mason, Seo, Frey ve 5 saç: Long High Ponytail, Ponytail MessyWavy, Hairstyle Male 11, Nomad Wave Undercut, PonytailGroom; arşivde 2026-10-25'te 24 `.mhpkg` var: 21 `oa_*`, 3 `khaosmdf*`). Fab liste sayfası fiyatı eski gösterebiliyor: Romantic Casual Overalls listede "Free" iken 2026-10-25'te ücretliye dönmüştü ve alınmadı. İndirmeden önce öğenin kendi sayfasındaki lisans kutusuna bakılır. Animasyonlar da yalnız ücretsiz paketlerden.
 - **Lisans:** UE EULA MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor. LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
