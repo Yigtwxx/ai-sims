@@ -188,6 +188,112 @@ def test_transfer_rows_sum_to_one_and_follow_the_skin() -> None:
     assert np.all(transfer.signed[:7] > 0) and np.all(transfer.distance[7:] > 0.09)
 
 
+LEG_X = 0.08  # metres from the middle to each leg's axis
+SHEET_SPACING = 0.005
+
+
+def _two_legs() -> BodyFit:
+    """Two 6 cm legs (joints 1 and 2) whose `body_hips_max` moves them 1 cm apart."""
+    leg, leg_triangles = _tube(0.06, 0.0, 0.8, rings=81, segments=64)
+    offset = np.array([LEG_X, 0.0, 0.0])
+    left, right = leg + offset, leg - offset
+    positions = np.vstack([left, right])
+    triangles = np.vstack([leg_triangles, leg_triangles + len(leg)])
+    body = _body(positions, triangles)
+    skeleton = dataclasses.replace(
+        body.skeleton,
+        names=("root", "thigh_l", "thigh_r"),
+        parents=np.array([-1, 0, 0]),
+        translations=np.zeros((3, 3)),
+        rotations=np.tile([0.0, 0.0, 0.0, 1.0], (3, 1)),
+        scales=np.ones((3, 3)),
+        inverse_binds=np.tile(np.eye(4), (3, 1, 1)),
+    )
+    joints = np.zeros((len(positions), 4), dtype=np.int64)
+    joints[: len(leg), 0], joints[len(leg) :, 0] = 1, 2
+    apart = np.zeros_like(positions)
+    apart[:, 0] = np.sign(positions[:, 0]) * 0.01
+    return dataclasses.replace(
+        body, joints=joints, skeleton=skeleton, morphs={"body_hips_max": apart}
+    )
+
+
+def _front_panel(z: float) -> GarmentPart:
+    """A flat panel at depth z in front of both legs, 5 mm grid, facing forward (+z)."""
+    xs = np.arange(-0.12, 0.12 + 1e-9, SHEET_SPACING)
+    ys = np.arange(0.3, 0.5 + 1e-9, 0.01)
+    vertices = np.array([[x, y, z] for y in ys for x in xs])
+    columns = len(xs)
+    triangles = []
+    for r in range(len(ys) - 1):
+        for c in range(columns - 1):
+            a, b = r * columns + c, r * columns + c + 1
+            triangles += [(a, b, a + columns), (b, b + columns, a + columns)]
+    triangles = np.array(triangles, dtype=np.int64)
+    return GarmentPart(
+        material="MI_test",
+        positions=vertices,
+        normals=vertex_normals(vertices, triangles),
+        uvs=np.zeros((len(vertices), 2)),
+        triangles=triangles,
+    )
+
+
+def test_cloth_spanning_two_legs_moves_like_a_sheet_over_both() -> None:
+    body = _two_legs()
+    panel = _front_panel(0.10)  # 4 cm in front of the legs, 6.8 cm off the skin mid-way
+    fit = fit_garment(Garment(parts=[panel]), body)
+    part = fit.parts[0]
+    x = panel.positions[:, 0]
+    moved = part.morphs["body_hips_max"][:, 0]
+    middle = np.isclose(x, 0.0)
+    assert np.abs(moved[middle]).max() < 1e-3, "the middle should stay between the legs"
+    over_legs = np.isclose(np.abs(x), LEG_X)
+    np.testing.assert_allclose(moved[over_legs], np.sign(x[over_legs]) * 0.01, atol=1e-3)
+    # Neighbours are 5 mm apart. The near kernel took one leg on each side of the middle:
+    # the panel split there by the full 2 cm (10 mm between neighbours). As a sheet it
+    # stretches evenly over the span between the legs.
+    rows = moved.reshape(-1, len(np.unique(x)))
+    step = np.abs(np.diff(rows, axis=1)).max()
+    assert step < 0.3 * SHEET_SPACING, f"panel tears: neighbours differ by {step * 1e3:.1f} mm"
+    # Skin weights: the middle hangs from both thighs alike.
+    for joints, weights in zip(part.joints[middle], part.weights[middle], strict=True):
+        share = {int(j): float(w) for j, w in zip(joints, weights, strict=True) if w > 0}
+        assert share.get(1, 0.0) > 0.4 and share.get(2, 0.0) > 0.4, share
+    assert fit.stats["bridged"]["full"] > 0
+
+
+def test_cloth_over_one_leg_or_on_the_skin_keeps_its_rows(monkeypatch) -> None:
+    legs = _two_legs()
+    angles = np.linspace(-np.pi / 3, np.pi / 3, 9)  # the outer side of the +x leg
+    loose = np.array(
+        [[LEG_X + 0.09 * np.cos(a), y, 0.09 * np.sin(a)] for y in (0.3, 0.5) for a in angles]
+    )
+    near = np.array([[LEG_X - 0.0605, y, 0.0] for y in (0.3, 0.4, 0.5)])  # in the gap
+    points = np.vstack([loose, near])
+    transfer = build_transfer(points, legs)
+    assert not transfer.bridge.any(), "cloth over one leg or on the skin bridged"
+    monkeypatch.setattr(outfits, "BRIDGE_SHARE", np.inf)  # bridging off: the near kernel
+    reference = build_transfer(points, legs)
+    np.testing.assert_allclose(transfer.matrix.toarray(), reference.matrix.toarray(), atol=1e-15)
+
+
+def test_body_limbs_are_the_legs_side_by_side() -> None:
+    legs = _two_legs()
+    half = len(legs.positions) // 2
+    np.testing.assert_allclose(legs.limbs[:half], [[1.0, 0.0]] * half)
+    np.testing.assert_allclose(legs.limbs[half:], [[0.0, 1.0]] * half)
+    # An arm hangs from its own clavicle: it is no side-by-side limb.
+    names = ("pelvis", "spine_01", "clavicle_l", "upperarm_l", "clavicle_r", "upperarm_r")
+    skeleton = dataclasses.replace(
+        legs.skeleton, names=names, parents=np.array([-1, 0, 1, 2, 1, 4])
+    )
+    joints = np.zeros_like(legs.joints)
+    joints[:half, 0], joints[half:, 0] = 3, 5
+    arms = dataclasses.replace(legs, skeleton=skeleton, joints=joints)
+    assert arms.limbs.shape == (len(legs.positions), 0)
+
+
 def test_fit_moves_scales_and_clears_the_skin() -> None:
     base, triangles = _tube(0.1, 0.0, 1.0)
     web = base * np.array([1.05, 1.0, 1.05])  # wider: the sleeve would sink into it

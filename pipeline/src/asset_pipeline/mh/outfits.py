@@ -18,9 +18,12 @@ space rather than copied:
 3. Transfer. Every garment vertex gets a row of body-vertex weights: the barycentrics of its
    closest base-body point near the skin, blended with distance into a Gaussian average
    over nearby body vertices (width grows with the distance), so loose cloth stays smooth
-   where the closest point jumps (crotch, armpits, hood). The same row moves the garment by
-   the body displacement (web minus base body), transfers the web body's skin weights (top
-   4) and its slider morphs, so a garment follows the skin it covers.
+   where the closest point jumps (crotch, armpits, hood). Cloth that hangs across the gap
+   between the legs (a skirt or a coat between the thighs) takes a wider average over both
+   legs instead (`bridging`), so it moves like a sheet over them rather than splitting
+   along the middle. The same row moves the garment by the body displacement (web minus
+   base body), transfers the web body's skin weights (top 4) and its slider morphs, so a
+   garment follows the skin it covers.
 4. Clearance. Vertices that end up closer than 2 mm to the skin are pushed out along the
    skin normal (tight bands sit slightly inside the body in Unreal, which hides the body).
    Cloth with thickness has an inner layer about 2 mm under the outer one, and both are
@@ -65,7 +68,7 @@ from typing import Any, Literal
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import coo_matrix, csr_matrix, diags
 from scipy.spatial import cKDTree
 
 from asset_pipeline.mh.compat import COMPAT_FILE, curated_compat
@@ -107,7 +110,7 @@ F64 = NDArray[np.float64]
 I64 = NDArray[np.int64]
 Bool = NDArray[np.bool_]
 
-OUTFITS_VERSION = "outfit-v6"  # v6: cloth layers keep their order when pushed out
+OUTFITS_VERSION = "outfit-v7"  # v7: cloth between the legs hangs on both (`bridging`)
 TEXTURE_RECIPE = "outfit-v1"  # part of every map's content name; bump to re-encode all maps
 GENERATOR = "ai-sims mh-convert (outfits)"
 GENDERS = ("female", "male")
@@ -134,6 +137,14 @@ KERNEL_NEIGHBOURS = 32
 KERNEL_SIGMA_MIN = 0.006  # metres
 KERNEL_SIGMA_SCALE = 0.5  # sigma grows by this times the distance to the skin
 EXACT_RADIUS = 0.02  # closest-point weights fade out over this distance
+# Bridging kernel (`bridging`): cloth hanging across the gap between the legs.
+BRIDGE_SIGMA_SCALE = 1.0  # its sigma is this times the distance to the skin
+BRIDGE_CUT = 0.01  # it reaches out to where its weight falls to this share of its peak
+BRIDGE_SHARE = 0.15  # kernel weight on the second leg at which a vertex bridges in full
+BRIDGE_FADE = 0.012  # metres past KERNEL_SIGMA_MIN over which bridging fades in
+BRIDGE_BATCH = 512  # vertices per ball query batch
+# The trunk's joints; the limbs (arms, legs) hang off them (`BodyFit.limbs`).
+TRUNK = re.compile(r"^(root|pelvis|spine_\d+|clavicle_[lr]|neck_\d+|head)$")
 CLEARANCE = 0.002  # metres between skin and garment after the fit
 PUSH_DEPTH_LIMIT = 0.02  # deeper vertices are inner layers or leftovers: not pushed
 LAYER_REACH = 0.006  # metres over the skin: vertices this close move out as one layer stack
@@ -332,6 +343,35 @@ class BodyFit:
     @cached_property
     def base_tree(self) -> cKDTree:
         return cKDTree(self.base_positions)
+
+    @cached_property
+    def limbs(self) -> F64:
+        """(V, L) skin weight of every vertex on each limb that hangs side by side with
+        another from one trunk joint (TRUNK): the legs from the pelvis. Each arm hangs from
+        its own clavicle, with the trunk between them, so arms are not counted. Rows of
+        other skin sum to 0."""
+        names = self.skeleton.names
+        parents = self.skeleton.parents
+        root_of: dict[int, int] = {}  # joint -> the joint of its limb that hangs off the trunk
+        for joint in range(len(names)):
+            node = joint
+            while not TRUNK.match(names[node]) and parents[node] >= 0:
+                if TRUNK.match(names[parents[node]]):
+                    root_of[joint] = node
+                    break
+                node = int(parents[node])
+        skinned = {root_of.get(int(j), -1) for j in np.unique(self.joints[self.weights > 0.0])}
+        roots = sorted(skinned - {-1})
+        hangs_from = [int(parents[root]) for root in roots]
+        roots = [r for r, p in zip(roots, hangs_from, strict=True) if hangs_from.count(p) > 1]
+        column = {root: i for i, root in enumerate(roots)}
+        limb_of = np.array([column.get(root_of.get(j, -1), -1) for j in range(len(names))])
+        on = np.zeros((len(self.positions), len(roots)))
+        limb = limb_of[self.joints]
+        rows = np.broadcast_to(np.arange(len(self.positions))[:, None], limb.shape)
+        mask = limb >= 0
+        np.add.at(on, (rows[mask], limb[mask]), self.weights[mask])
+        return on
 
     @classmethod
     def load(cls, body_glb: Path, base_glb: Path, gender: str) -> "BodyFit":
@@ -678,11 +718,13 @@ def pack_udim_parts(
 @dataclass(frozen=True, eq=False)
 class Transfer:
     """Body-vertex weights of every garment vertex (rows sum to 1) and its relation to the
-    base body: closest-point distance and signed distance along the skin normal."""
+    base body: closest-point distance, signed distance along the skin normal and how far
+    the vertex hangs across the gap between the legs (0..1, `bridging`)."""
 
     matrix: csr_matrix  # (N, V)
     distance: F64
     signed: F64
+    bridge: F64
 
 
 def smoothstep(x: F64) -> F64:
@@ -703,7 +745,10 @@ def _signed_distance(
 
 
 def build_transfer(points: F64, body: BodyFit) -> Transfer:
-    """Rows of body-vertex weights for garment `points` in the base body's space."""
+    """Rows of body-vertex weights for garment `points` in the base body's space: the
+    closest point's barycentrics on the skin, fading into the near kernel (the nearest
+    KERNEL_NEIGHBOURS body vertices), which gives way to the wide kernel where the cloth
+    spans the gap between the legs (`bridging`)."""
     distance, signed, triangle, bary, _ = _signed_distance(
         points, body.base_positions, body.base_normals, body.triangles
     )
@@ -715,13 +760,79 @@ def build_transfer(points: F64, body: BodyFit) -> Transfer:
     sigma = np.maximum(KERNEL_SIGMA_MIN, KERNEL_SIGMA_SCALE * distance)[:, None]
     kernel = np.exp(-(radii**2 - radii[:, :1] ** 2) / (2.0 * sigma**2))
     kernel /= kernel.sum(axis=1, keepdims=True)
-    exact = smoothstep(1.0 - distance / EXACT_RADIUS)[:, None]
+    exact = smoothstep(1.0 - distance / EXACT_RADIUS)
+    wide, bridge = bridging(points, distance, radii[:, 0], body)
+    near = ((1.0 - exact) * (1.0 - bridge))[:, None] * kernel
     rows = np.concatenate([np.repeat(np.arange(count), 3), np.repeat(np.arange(count), k)])
     cols = np.concatenate([body.triangles[triangle].ravel(), neighbours.ravel()])
-    values = np.concatenate([(exact * bary).ravel(), ((1.0 - exact) * kernel).ravel()])
+    values = np.concatenate([(exact[:, None] * bary).ravel(), near.ravel()])
     matrix = coo_matrix((values, (rows, cols)), shape=(count, len(body.base_positions))).tocsr()
+    matrix = (matrix + diags((1.0 - exact) * bridge) @ wide).tocsr()
     matrix.sum_duplicates()
-    return Transfer(matrix=matrix, distance=distance, signed=signed)
+    return Transfer(matrix=matrix, distance=distance, signed=signed, bridge=bridge)
+
+
+def bridging(points: F64, distance: F64, nearest: F64, body: BodyFit) -> tuple[csr_matrix, F64]:
+    """The wide kernel rows (each summing to 1) of cloth that hangs across the gap between
+    the legs, and how far every vertex does (0..1). `nearest` is each point's distance to
+    the closest body vertex.
+
+    The near kernel averages the skin within about half the cloth's distance of the closest
+    point, and the KERNEL_NEIGHBOURS cap narrows it to the skin right behind the cloth. A
+    skirt panel between the legs has its closest point on one thigh left of the middle and
+    on the other right of it: at a slider end the two halves follow their own thighs, so
+    the panel parts or folds along the middle, and next to the crotch it follows the groin
+    folds into the gap. The same split tears it when the legs move. Such cloth hangs on
+    both legs like a sheet instead. The wide kernel is a Gaussian over the base body's
+    vertices as wide as the cloth is far from the skin (BRIDGE_SIGMA_SCALE), with no
+    neighbour cap, out to BRIDGE_CUT of its peak: in the middle it takes both thighs and
+    the crotch alike. Its weight on the leg it weighs less (`BodyFit.limbs`) sets the
+    strength, in full from BRIDGE_SHARE, so the wide kernel takes over smoothly toward the
+    middle. The strength fades in over BRIDGE_FADE from the distance where the wide kernel
+    outgrows the near one, so cloth on the skin (leggings, the inside of a trouser leg)
+    keeps its rows, and so does cloth over one leg, the trunk or the arms; a gradual fade
+    also keeps layered details close to the skin (a jeans fly) from parting where their
+    layers sit at slightly different distances."""
+    count = len(points)
+    sigma = np.maximum(KERNEL_SIGMA_MIN, BRIDGE_SIGMA_SCALE * distance)
+    fade = smoothstep((BRIDGE_SIGMA_SCALE * distance - KERNEL_SIGMA_MIN) / BRIDGE_FADE)
+    reach = np.sqrt(nearest**2 + 2.0 * sigma**2 * np.log(1.0 / BRIDGE_CUT))
+    limbs = body.limbs
+    bridge = np.zeros(count)
+    rows: list[I64] = [np.zeros(0, dtype=np.int64)]
+    cols: list[I64] = [np.zeros(0, dtype=np.int64)]
+    values: list[F64] = [np.zeros(0)]
+    candidates = np.flatnonzero(fade > 0.0) if limbs.shape[1] > 1 else np.zeros(0, np.int64)
+    for start in range(0, len(candidates), BRIDGE_BATCH):
+        batch = candidates[start : start + BRIDGE_BATCH]
+        balls = body.base_tree.query_ball_point(points[batch], reach[batch])
+        owner = np.repeat(np.arange(len(batch)), [len(ball) for ball in balls])
+        members = np.concatenate([np.asarray(ball, dtype=np.int64) for ball in balls])
+        vertex = batch[owner]
+        skin = body.base_positions[members]
+        squared = np.sum((skin - points[vertex]) ** 2, axis=1)
+        weight = np.exp(-(squared - nearest[vertex] ** 2) / (2.0 * sigma[vertex] ** 2))
+        total = np.bincount(owner, weight, minlength=len(batch))
+        on_limb = np.stack(
+            [
+                np.bincount(owner, weight * limbs[members, limb], minlength=len(batch))
+                for limb in range(limbs.shape[1])
+            ]
+            + [np.zeros(len(batch))],
+            axis=1,
+        )
+        share = (on_limb.sum(axis=1) - on_limb.max(axis=1)) / total
+        strength = smoothstep(share / BRIDGE_SHARE) * fade[batch]
+        bridge[batch] = strength
+        keep = strength[owner] > 0.0
+        rows.append(vertex[keep])
+        cols.append(members[keep])
+        values.append(weight[keep] / total[owner[keep]])
+    wide = coo_matrix(
+        (np.concatenate(values), (np.concatenate(rows), np.concatenate(cols))),
+        shape=(count, len(body.base_positions)),
+    ).tocsr()
+    return wide, bridge
 
 
 def rotate_between(vectors: F64, before: F64, after: F64) -> F64:
@@ -943,6 +1054,10 @@ def fit_garment(garment: Garment, body: BodyFit, *, hug: float = 0.0) -> Fit:
             "p95": _mm(np.percentile(transfer.distance, 95)),
         },
         "pushed_out": int(push.sum()),
+        "bridged": {
+            "any": int(np.count_nonzero(transfer.bridge > 0.0)),
+            "full": int(np.count_nonzero(transfer.bridge > 0.99)),
+        },
         "hug": {"over_1mm": int((pulled > 0.001).sum()), "max_mm": _mm(pulled.max(initial=0.0))},
         "morph_cleared": cleared,
         "inside_after_fit": int(
