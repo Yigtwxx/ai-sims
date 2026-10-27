@@ -78,7 +78,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - `AS_` öneki bizim öğelerimizi Epic'inkilerden ayırır. `ue outfits` yalnız kendi birim klasörlerini siler (`archive.py` `run_units`), bunlara dokunmaz.
   - **Her parça için:** `mh-convert --outfits --outfit AS_<Ad> --manifest`, `gltf-transform validate`. Etiket `outfit_labels.json`'a (TR/EN), tek cinsiyetse `gender_compat.json`'a, renkler `outfit_tints.json`'a (ilk preset varsayılan) yazılır. `/dev/stage`'de iki cinsiyet × nötr ve slider uçları × idle ve talk kontrol edilir. Sonra `/dev/thumbs`, `node scripts/r2-sync.mjs`, commit + push (yalnız bitmiş parça). Kullanıcıya telefondan önden ve yandan birer ekran görüntüsü gönderilir.
   - **Bitti sayılır (her parça):** kumaş deriye girmiyor, altından cilt görünmüyor, slider uçlarında kırılmıyor, idle ve talk'ta kol ve bacak hareketiyle yırtılmıyor, renk presetleri çalışıyor.
-  - **Kapsam dışı:** topuklu ayakkabı (ayak pozu değişmesi gerekir), uzun etek ve maksi elbise (bacak arasında kemik ağırlığı kumaşı yırtar), kat kat giyim (C9).
+  - **Kapsam dışı:** topuklu ayakkabı (ayak pozu değişmesi gerekir). Uzun parçalar (maksi etek, trençkot, kaban, palto) en sonda deneme olarak A4.7'de.
 
   - [ ] **A4.0 Yol denemesi: kalem etek (kadın).** En basit kalıp (ön + arka, bel bandı, arka yırtmaç); iş setini de açar. Zincir uçtan uca çalışınca paketleyici ve kalıp altyapısı hazır sayılır. Blender'da sim ya da otomasyon 2-3 denemede yürümezse dur, nedenini "Kullanıcıya sorular"a yaz, Unreal yoluna geçmeyi sor ve beklerken B görevlerine geç.
   - [ ] **A4.1 İş seti:**
@@ -100,8 +100,17 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Mesh değil, cilt shader'ında bir katman olur, iç çamaşırıyla aynı yoldan: gövde UV'sinde maske, kumaş albedo ve normal, renk (`web/src/features/avatar/mh/materials.ts`, `skinTextures.ts`; iç çamaşırı maskesi `web/skins/underwear/`). Böylece ayakkabının içinden taşmaz ve slider'larla bozulmaz.
     - Boylar: kısa (bilek) ve uzun (diz altı). Maskeler gövde UV'sinde ayak bileği ve diz yükseklik çizgilerinden script'le üretilir; kenarda ince bir lastik bandı (normal haritada).
     - Görünürlük: alt giysi ya da ayakkabının örttüğü yerde zaten çizilmez (`body_hide`); çıplak ayakta ve terlikte çorap görünür.
-    - Şema: `CharacterConfig`'e `socks: { style: 'none' | 'ankle' | 'knee', color }` eklenir, `schemaVersion` 2 → 3, migration `none` yazar (`web/src/lib/character/`). Panelde Ayakkabı'nın yanında boy seçici ve renk presetleri (siyah, beyaz, gri melanj, lacivert, bej, bordo); metinler `web/messages/{tr,en}.json`'da.
-    - **Bitti sayılır:** iki cinsiyette iki boy, her renk; idle ve talk'ta çorap bacakla birlikte hareket ediyor; ayakkabı ve pantolonla birlikte doğru katmanlanıyor; eski kayıtlı karakterler migration'la açılıyor.
+    - **Külotlu çorap** (kullanıcı isteği, 2026-10-27), kadın: aynı katman, maske belden ayak ucuna kadar. İç çamaşırının üstünde çizilir. Şeffaflık (denye) ayarlanabilir: ince olanda cilt alttan görünür, opak olanda görünmez. Renkler: ten rengi, siyah, lacivert, antrasit.
+    - Şema: `CharacterConfig`'e `socks: { style: 'none' | 'ankle' | 'knee' | 'tights', color, sheer }` eklenir, `schemaVersion` 2 → 3, migration `none` yazar (`web/src/lib/character/`). Panelde Ayakkabı'nın yanında boy seçici, renk presetleri (siyah, beyaz, gri melanj, lacivert, bej, bordo; külotluda yukarıdaki dört renk) ve külotlu için şeffaflık kaydırıcısı olur. Metinler `web/messages/{tr,en}.json`'da.
+    - **Bitti sayılır:** iki cinsiyette iki boy, kadında külotlu, her renk; idle ve talk'ta çorap bacakla birlikte hareket ediyor; ayakkabı, pantolon ve etekle doğru katmanlanıyor; ince külotluda cilt doğal görünüyor; eski kayıtlı karakterler migration'la açılıyor.
+  - [ ] **A4.6 Ek parçalar** (kullanıcı isteği, 2026-10-27: hepsi). Kolaydan zora:
+    - Kolay: polo tişört (K/E), chino pantolon (K/E), atlet ya da askılı bluz (K/E), jogger (K/E), A kesim diz üstü etek (K), biker şort (K).
+    - Kolay: kravatlı gömlek, A4.1 gömleğinin varyantı (E, isteğe bağlı K). Kravat gömleğin içinde modellenir, ayrı renk parametresi olur.
+    - Orta: triko balıkçı kazak (K/E), düğmeli hırka (K/E), kot ceket (K/E), kapüşonsuz sweatshirt (K/E), tulum ve salopet (K, `full`), gömlek elbise (K), kısa kollu gömlek (E).
+    - Takım elbise ayrı parça değildir: A4.1'in blazer'ı ve kumaş pantolonu aynı renk presetleriyle (lacivert, antrasit, siyah) çıkar. İkisi aynı ada ve sıraya sahip olsun ki kullanıcı takımı kolayca eşleştirsin.
+  - [ ] **A4.7 Uzun parçalar (deneme, en son):** maksi etek (K), trençkot, kaban, uzun palto (K/E).
+    - Sorun: bacak arasındaki kumaş en yakın bacağın ağırlığını alıyor ve adım ya da jestte yırtılıyor. Önce maksi etekle dene: bacak arasındaki vertex'lere iki uyluğun ağırlıklarının karışımı (`build_transfer`'ın Gauss ortalamasını genişleterek, `outfits.py:705`). İdle ve talk'ta temiz değilse dur ve kullanıcıya ekran görüntüsüyle sor.
+    - Trençkot, kaban ve palto tek başına `top` olarak bile gövdenin üstüne giyilir. İç kıyafet içinden çıkacağı için C9'daki (`outer` slotu ve iç giysi gizleme) çözüm gerekir. C9 bitmeden başlanmaz.
 
 ## B. Panelde olan ama sahnede çalışmayan ayarlar
 
