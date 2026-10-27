@@ -6,52 +6,49 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 - **Başlarken:** önce `git pull` (liste Mac'te de güncellenebilir), sonra `CLAUDE.md`, `docs/handoff.md` ve bu dosya. Kararları tekrar sorma.
 - **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir. Saatler toplam iştir; 1 subagent'la geçen süre yaklaşık %25-35 kısalır (toplam ~480 saatlik iş ~335 saatte biter).
-  - **Faz 1, temel (~30 sa):**
-    - 1a Fab ve yüzler (~6 sa): A1 → A2. Unreal işleri arka planda.
-    - 1b Saçlar (~8 sa): A3 → A3b.
-    - 1c Kalem etek (~10 sa): A4.0, Blender yolu ve paketleyici.
-    - 1d Oturma hataları (~6 sa): B5. Düzeltmeler dönüştürücüde kalır ve sonraki kıyafetlerin hepsine geçer.
-  - **Faz 2, panel düzeltmeleri ve temel kıyafet (~60 sa):**
-    - 2a Göz tonu ve yüz karıştırma (~14 sa): B1 → B2.
-    - 2b Dövme ve takı (~16 sa): B3 → B4.
-    - 2c Küçük resimler (~5 sa): D1. A-pozlu eski görseller gider.
-    - 2d Tişört ve şortlar (~13 sa): A4.2 → A4.3.
-    - 2e Çorap ve külotlu (~12 sa): A4.5, file çorap hariç (şema v3).
-  - **Faz 3, iş seti ve karakter (~55 sa):**
-    - 3a Kumaş pantolon ve gömlek (~13 sa): A4.1'den; blazer Faz 7'de.
-    - 3b Polo, chino, kravatlı gömlek, sıvanmış kol (~12 sa): A4.6'dan üçü → A4.15.
-    - 3c Kişilik ve ses (~22 sa): C1 → C2.
-    - 3d İfade önizleme (~8 sa): C3.
-  - **Faz 4, günlük (~65 sa):**
-    - 4a Elbise ve hafif ceket (~10 sa): A4.4.
-    - 4b Desen varyantları (~10 sa): A4.4'ten çizgili tişört, ekose gömlek, keten pantolon.
-    - 4c Kolay parçalar (~16 sa): A4.6'dan atlet, düz eşofman altı, A kesim etek, biker şort.
-    - 4d Örgüler (~12 sa): A4.6'dan triko balıkçı ve hırka.
-    - 4e Gömlek kalıbından parçalar ve salopet (~17 sa): A4.6'dan resort yakalı kısa kollu gömlek, gömlek elbise, salopet. Kot ceket Faz 7'de.
-  - **Faz 5, görünüm (~70 sa):**
-    - 5a Makyaj (~12 sa): C4.
-    - 5b Cilt detayları (~12 sa): C5.
-    - 5c Kaş ve kirpik (~8 sa): C6.
-    - 5d Yüz ince ayarı (~20 sa): C7.
-    - 5e Gözlük ve şapka (~14 sa): C8.
-    - 5f Yüz küçük resimlerinde ten (~4 sa): C10.
-  - **Faz 6, spor, ev, ayakkabı, meslek (~60 sa):**
-    - 6a Spor (~14 sa): A4.12.
-    - 6b Ev (~10 sa): A4.13.
-    - 6c Ayakkabılar (~22 sa): A4.14. Yöntem yeni (kumaş simülasyonu yok); süre ilk ayakkabıdan sonra düzeltilir.
-    - 6d Meslek (~14 sa): A4.16.
-  - **Faz 7, zor parçalar (~85 sa):**
-    - 7a Kat kat giyim (~25 sa): C9.
-    - 7b Blazer ve kot ceket (~20 sa): A4.1'den blazer + gömlek → A4.6'dan kot ceket.
-    - 7c Topuklu ve ayak pozu (~22 sa): A4.10.
-    - 7d Uzun parçalar (~18 sa): A4.7, maksi etek ve uzun palto.
-  - **Faz 8, hot ve sexy, kapanış (~55 sa):**
-    - 8a Gece elbiseleri ve üstler (~16 sa): A4.8'den bodycon mini elbise, slip elbise, açık sırtlı ya da V yaka üst, korse üst.
-    - 8b Gece altları, saten gömlek, file çorap (~14 sa): A4.8'den deri mini etek, yırtmaçlı etek, deri pantolon, erkek saten gömlek, file çorap.
-    - 8c İç giyim (~10 sa): A4.9.
-    - 8d Mayo ve bikini (~10 sa): A4.11.
-    - 8e Son kontrol (~5 sa): D2.
-  - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): fazlar yukarıdaki alt fazlara bölünmüştür (1a, 1b, ...) ve alt fazlar yazılan sırayla yapılır. Her fazın başında oturum her alt fazı adımlara böler ve `docs/plans/faz-<n>.md` dosyasına alt faz başlıklarıyla yazar (`superpowers:writing-plans`).
+
+  | Faz | Alt faz | İçerik | Görev | Saat |
+  |---|---|---|---|---|
+  | **1 Temel** (~30 sa) | 1a | Fab ve yüzler; Unreal işleri arka planda | A1 → A2 | ~6 |
+  |  | 1b | Saçlar | A3 → A3b | ~8 |
+  |  | 1c | Kalem etek, Blender yolu ve paketleyici | A4.0 | ~10 |
+  |  | 1d | Oturma hataları; düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer | B5 | ~6 |
+  | **2 Panel ve temel kıyafet** (~60 sa) | 2a | Göz tonu, yüz karıştırma | B1 → B2 | ~14 |
+  |  | 2b | Dövme, takı | B3 → B4 | ~16 |
+  |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 |
+  |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 |
+  |  | 2e | Çorap ve külotlu, file çorap hariç (şema v3) | A4.5 | ~12 |
+  | **3 İş seti ve karakter** (~55 sa) | 3a | Kumaş pantolon, gömlek; blazer 7b'de | A4.1 | ~13 |
+  |  | 3b | Polo, chino, kravatlı gömlek, sıvanmış kol | A4.6 → A4.15 | ~12 |
+  |  | 3c | Kişilik ve ses | C1 → C2 | ~22 |
+  |  | 3d | İfade önizleme | C3 | ~8 |
+  | **4 Günlük** (~65 sa) | 4a | Elbise, hafif ceket | A4.4 | ~10 |
+  |  | 4b | Desenler: çizgili tişört, ekose gömlek, keten pantolon | A4.4 | ~10 |
+  |  | 4c | Atlet, düz eşofman altı, A kesim etek, biker şort | A4.6 | ~16 |
+  |  | 4d | Triko balıkçı, hırka | A4.6 | ~12 |
+  |  | 4e | Resort yakalı kısa kollu gömlek, gömlek elbise, salopet; kot ceket 7b'de | A4.6 | ~17 |
+  | **5 Görünüm** (~70 sa) | 5a | Makyaj | C4 | ~12 |
+  |  | 5b | Cilt detayları | C5 | ~12 |
+  |  | 5c | Kaş ve kirpik | C6 | ~8 |
+  |  | 5d | Yüz ince ayarı | C7 | ~20 |
+  |  | 5e | Gözlük ve şapka | C8 | ~14 |
+  |  | 5f | Yüz küçük resimlerinde ten | C10 | ~4 |
+  | **6 Spor, ev, ayakkabı, meslek** (~60 sa) | 6a | Eşofman üstü, tayt + sütyen seti, tenis eteği | A4.12 | ~14 |
+  |  | 6b | Pijama, kimono | A4.13 | ~10 |
+  |  | 6c | Çizme, sandalet, loafer; yöntem yeni (kumaş simülasyonu yok), süre ilk ayakkabıdan sonra düzeltilir | A4.14 | ~22 |
+  |  | 6d | Scrubs, aşçı ceketi | A4.16 | ~14 |
+  | **7 Zor parçalar** (~85 sa) | 7a | Kat kat giyim | C9 | ~25 |
+  |  | 7b | Blazer + gömlek, kot ceket | A4.1 → A4.6 | ~20 |
+  |  | 7c | Topuklu ve ayak pozu: stiletto, topuklu bilek botu | A4.10 | ~22 |
+  |  | 7d | Maksi etek, uzun palto | A4.7 | ~18 |
+  | **8 Hot ve sexy, kapanış** (~55 sa) | 8a | Bodycon mini elbise, slip elbise, açık sırtlı ya da V yaka üst, korse üst | A4.8 | ~16 |
+  |  | 8b | Deri mini etek, yırtmaçlı etek, deri pantolon, erkek saten gömlek, file çorap | A4.8 | ~14 |
+  |  | 8c | İç giyim | A4.9 | ~10 |
+  |  | 8d | Mayo, bikini, deniz şortu | A4.11 | ~10 |
+  |  | 8e | Son kontrol | D2 | ~5 |
+  | **Toplam** | 37 alt faz | | | **~480** (1 subagent'la ~335) |
+
+  - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): fazlar yukarıdaki tablodaki alt fazlara bölünmüştür (1a, 1b, ...) ve alt fazlar tablodaki sırayla yapılır. Her fazın başında oturum her alt fazı adımlara böler ve `docs/plans/faz-<n>.md` dosyasına alt faz başlıklarıyla yazar (`superpowers:writing-plans`).
     - Bir alt adım en çok ~4-6 saatlik iştir ve kendi başına bitebilir: doğrulama, commit, push. Yarım alt adım push'lanmaz.
     - Plan dosyasında her adımın kutusu, tahmini süresi ve gerçek süresi tutulur. Gerçek süreler sonraki fazların tahminlerini düzeltir; bu dosyadaki faz saatleri de güncellenir.
     - Faz planı kullanıcıya telefondan kısa bir liste olarak gönderilir; onay beklenmeden başlanır.
