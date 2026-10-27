@@ -5,15 +5,15 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 ## Çalışma kuralları
 
 - **Başlarken:** önce `git pull` (liste Mac'te de güncellenebilir), sonra `CLAUDE.md`, `docs/handoff.md` ve bu dosya. Kararları tekrar sorma.
-- **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir. Saatler toplam iştir; 1 subagent'la geçen süre yaklaşık %25-35 kısalır (toplam ~550 saatlik iş ~390 saatte biter).
+- **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir. Saatler toplam iştir; 1 subagent'la geçen süre yaklaşık %25-35 kısalır (toplam ~500 saatlik iş ~350 saatte biter).
   - **Faz 1, temel (~30 sa):** A1 → A2 → A3 → A3b (Fab ve Unreal, uzun işler arka planda) → A4.0 kalem etek (Blender yolu ve paketleyici) → B5 oturma hataları (düzeltmeler dönüştürücüde kalır ve sonraki kıyafetlerin hepsine geçer).
   - **Faz 2, panel düzeltmeleri ve temel kıyafet (~60 sa):** B1 → B2 → B3 → B4 → D1 küçük resimler (A-pozlu eski görseller gider) → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu (file çorap hariç).
-  - **Faz 3, iş seti ve karakter (~60 sa):** A4.1'den kumaş pantolon ve gömlek (blazer Faz 7'de) → A4.6'dan polo, chino, kravatlı gömlek → A4.15 varyantlar → C1 kişilik → C2 ses → C3 ifade önizleme.
-  - **Faz 4, günlük (~75 sa):** A4.4 günlük çeşit (elbise, hafif ceket, desen varyantları) → A4.6'nın kalanı (atlet, jogger, düz eşofman altı, A kesim etek, biker şort, triko balıkçı, hırka, sweatshirt, tulum ve salopet, gömlek elbise, kısa kollu gömlek; kot ceket Faz 7'de).
+  - **Faz 3, iş seti ve karakter (~55 sa):** A4.1'den kumaş pantolon ve gömlek (blazer Faz 7'de) → A4.6'dan polo, chino, kravatlı gömlek → A4.15 varyantlar → C1 kişilik → C2 ses → C3 ifade önizleme.
+  - **Faz 4, günlük (~70 sa):** A4.4 günlük çeşit (elbise, hafif ceket, desen varyantları) → A4.6'nın kalanı (atlet, düz eşofman altı, A kesim etek, biker şort, triko balıkçı, hırka, sweatshirt, salopet, gömlek elbise, kısa kollu gömlek; kot ceket Faz 7'de).
   - **Faz 5, görünüm (~70 sa):** C4 makyaj → C5 cilt detayları → C6 kaş ve kirpik → C7 yüz ince ayarı → C8 gözlük ve şapka → C10 yüz küçük resimlerinde ten.
-  - **Faz 6, spor, ev, ayakkabı, meslek (~80 sa):** A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.16 meslek (scrubs ve aşçı ceketi).
-  - **Faz 7, zor parçalar (~120 sa):** C9 kat kat giyim → blazer + gömlek (A4.1) → kot ceket (A4.6) → A4.17 şişme mont → A4.10 topuklu ve ayak pozu → A4.7 uzun parçalar (maksi etek, trençkot, kaban, palto).
-  - **Faz 8, hot ve sexy, kapanış (~60 sa):** A4.8 gece ve seksi çizgi (file çorap dahil) → A4.9 iç giyim → A4.11 mayo ve bikini → D2 son kontrol.
+  - **Faz 6, spor, ev, ayakkabı, meslek (~65 sa):** A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.16 meslek (scrubs ve aşçı ceketi).
+  - **Faz 7, zor parçalar (~95 sa):** C9 kat kat giyim → blazer + gömlek (A4.1) → kot ceket (A4.6) → A4.17 şişme mont → A4.10 topuklu ve ayak pozu → A4.7 uzun parçalar (maksi etek ve uzun palto).
+  - **Faz 8, hot ve sexy, kapanış (~55 sa):** A4.8 gece ve seksi çizgi (file çorap dahil) → A4.9 iç giyim → A4.11 mayo ve bikini → D2 son kontrol.
   - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): her fazın başında oturum fazı alt adımlara böler ve `docs/plans/faz-<n>.md` dosyasına yazar (`superpowers:writing-plans`).
     - Bir alt adım en çok ~4-6 saatlik iştir ve kendi başına bitebilir: doğrulama, commit, push. Yarım alt adım push'lanmaz.
     - Plan dosyasında her adımın kutusu, tahmini süresi ve gerçek süresi tutulur. Gerçek süreler sonraki fazların tahminlerini düzeltir; bu dosyadaki faz saatleri de güncellenir.
@@ -99,7 +99,8 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - `AS_` öneki bizim öğelerimizi Epic'inkilerden ayırır. `ue outfits` yalnız kendi birim klasörlerini siler (`archive.py` `run_units`), bunlara dokunmaz.
   - **Her parça için:** `mh-convert --outfits --outfit AS_<Ad> --manifest`, `gltf-transform validate`. Etiket `outfit_labels.json`'a (TR/EN), tek cinsiyetse `gender_compat.json`'a, renkler `outfit_tints.json`'a (ilk preset varsayılan) yazılır. `/dev/stage`'de iki cinsiyet × nötr ve slider uçları × idle ve talk kontrol edilir. Sonra `/dev/thumbs`, `node scripts/r2-sync.mjs`, commit + push (yalnız bitmiş parça). Kullanıcıya telefondan önden ve yandan birer ekran görüntüsü gönderilir.
   - **Bitti sayılır (her parça):** kumaş deriye girmiyor, altından cilt görünmüyor, slider uçlarında kırılmıyor, idle ve talk'ta kol ve bacak hareketiyle yırtılmıyor, renk presetleri çalışıyor.
-  - **Ayrı görevler:** uzun parçalar (maksi etek, trençkot, kaban, palto) en sonda deneme olarak A4.7'de; topuklu ayakkabı A4.10'da.
+  - **Ayrı görevler:** uzun parçalar (maksi etek, uzun palto) en sonda deneme olarak A4.7'de; topuklu ayakkabı A4.10'da.
+  - **Çıkarılanlar** (kullanıcı kararı, 2026-10-27; ekleme, önerme): doktor önlüğü, reflektörlü iş yeleği, atkı, eldiven; jogger, tulum, koşu şortu, espadril; gece serisinden erkek dar atlet, erkek vücuda oturan tişört ve yüksek bel mini şort; pijamanın şortlu varyantı, açık burun terlik; gömlekte içe sokulu ve yaka düğmesi açık/kapalı varyantları; trençkot, kaban; ince bantlı topuklu sandalet, kalın topuklu ayakkabı.
 
   - [ ] **A4.0 Yol denemesi: kalem etek (kadın).** En basit kalıp (ön + arka, bel bandı, arka yırtmaç); iş setini de açar. Zincir uçtan uca çalışınca paketleyici ve kalıp altyapısı hazır sayılır. Blender'da sim ya da otomasyon 2-3 denemede yürümezse dur, nedenini "Kullanıcıya sorular"a yaz, Unreal yoluna geçmeyi sor ve beklerken B görevlerine geç.
   - [ ] **A4.1 İş seti:**
@@ -125,14 +126,14 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Şema: `CharacterConfig`'e `socks: { style: 'none' | 'ankle' | 'knee' | 'tights', color, sheer }` eklenir, `schemaVersion` 2 → 3, migration `none` yazar (`web/src/lib/character/`). Panelde Ayakkabı'nın yanında boy seçici, renk presetleri (siyah, beyaz, gri melanj, lacivert, bej, bordo; külotluda yukarıdaki dört renk) ve külotlu için şeffaflık kaydırıcısı olur. Metinler `web/messages/{tr,en}.json`'da.
     - **Bitti sayılır:** iki cinsiyette iki boy, kadında külotlu, her renk; idle ve talk'ta çorap bacakla birlikte hareket ediyor; ayakkabı, pantolon ve etekle doğru katmanlanıyor; ince külotluda cilt doğal görünüyor; eski kayıtlı karakterler migration'la açılıyor.
   - [ ] **A4.6 Ek parçalar** (kullanıcı isteği, 2026-10-27: hepsi). Kolaydan zora:
-    - Kolay: polo tişört (K/E), chino pantolon (K/E), atlet ya da askılı bluz (K/E), jogger (K/E), A kesim diz üstü etek (K), biker şort (K).
-    - Kolay: düz eşofman altı (K/E; kullanıcı isteği, 2026-10-27). Düz paça, manşetsiz, lastikli bel ve bağcık; desensiz pamuklu örgü. Paçası daralan ve manşetli jogger'dan ayrı bir öğedir. Renkler: gri melanj, siyah, lacivert, antrasit, haki.
+    - Kolay: polo tişört (K/E), chino pantolon (K/E), atlet ya da askılı bluz (K/E), A kesim diz üstü etek (K), biker şort (K).
+    - Kolay: düz eşofman altı (K/E; kullanıcı isteği, 2026-10-27). Düz paça, manşetsiz, lastikli bel ve bağcık; desensiz pamuklu örgü. Renkler: gri melanj, siyah, lacivert, antrasit, haki.
     - Kolay: kravatlı gömlek, A4.1 gömleğinin varyantı (E, isteğe bağlı K). Kravat gömleğin içinde modellenir, ayrı renk parametresi olur.
-    - Orta: triko balıkçı kazak (K/E), düğmeli hırka (K/E), kot ceket (K/E), kapüşonsuz sweatshirt (K/E), tulum ve salopet (K, `full`), gömlek elbise (K), kısa kollu gömlek (E).
+    - Orta: triko balıkçı kazak (K/E), düğmeli hırka (K/E), kot ceket (K/E), kapüşonsuz sweatshirt (K/E), salopet (K, `full`), gömlek elbise (K), kısa kollu gömlek (E).
     - Takım elbise ayrı parça değildir: A4.1'in blazer'ı ve kumaş pantolonu aynı renk presetleriyle (lacivert, antrasit, siyah) çıkar. İkisi aynı ada ve sıraya sahip olsun ki kullanıcı takımı kolayca eşleştirsin.
   - [ ] **A4.8 Gece ve seksi çizgi** (kullanıcı isteği, 2026-10-27). Yetişkin işi, şık ve açık parçalar, müstehcen değil. İç giyim A4.9'da, mayo A4.11'de.
-    - Kadın: bodycon mini elbise, saten askılı (slip) elbise (diz üstü), açık sırtlı ya da derin V yaka üst, korse (bustier) üst, deri mini etek, yırtmaçlı diz boyu etek, dar deri pantolon, yüksek bel mini şort (A4.3 ile ortak kalıp).
-    - Erkek: dar atlet, yakası açık saten gömlek (A4.1 gömlek kalıbından), vücuda oturan tişört (A4.2 kalıbından).
+    - Kadın: bodycon mini elbise, saten askılı (slip) elbise (diz üstü), açık sırtlı ya da derin V yaka üst, korse (bustier) üst, deri mini etek, yırtmaçlı diz boyu etek, dar deri pantolon.
+    - Erkek: yakası açık saten gömlek (A4.1 gömlek kalıbından).
     - File çorap, kadın: A4.5 katmanında desenli bir maske, külotlu ve diz üstü boy.
     - Saten ve deri parlak malzemeler: önce kumaş shader'ının parlama ayarları denenir, yetmezse bake'lenmiş PBR kullanılır.
     - Kalıplar diz boyunu geçmez. Daha uzun yırtmaçlı ya da maksi parçalar A4.7'deki bacak arası sorununa girer.
@@ -146,7 +147,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Şema: `underwear: { style, color }`. A4.5 ile aynı şema sürümüne (v3) sığarsa birlikte yapılır; migration bugünkü takımı yazar.
     - **Bitti sayılır:** iki cinsiyette her stil ve renk idle ve talk'ta doğru; kıyafetle ve külotluyla doğru katmanlanıyor.
   - [ ] **A4.10 Topuklu ayakkabı ve ayak pozu** (kullanıcı onayı, 2026-10-27). Büyük görev: önce `superpowers:writing-plans`.
-    - Parçalar, kadın: stiletto (pump), ince bantlı topuklu sandalet, kalın topuklu ayakkabı, topuklu bilek botu. Topuk 5-10 cm.
+    - Parçalar, kadın: stiletto (pump) ve topuklu bilek botu. Topuk 5-10 cm.
     - Ayak pozu: her ayakkabının `footPose`'u (ayak bileği ve parmak kökü açısı, topuk yüksekliği) manifest'e girer (zod `web/src/lib/assets/manifest.ts`, pipeline `manifest.py`). Web her karede animasyondan sonra bu açıları ayak eklemlerine ekler (`web/src/features/avatar/mh/motion.ts` sonrası) ve karakteri topuk yüksekliği kadar kaldırır. Bunun için mevcut `soleDepth` mekanizması (`garments.ts`, `MhCharacter.tsx`) genişletilir.
     - Modelleme: Blender'da taban gövdenin ayağı bu pozla bükülür ve ayakkabı onun üstünde modellenir. Paketlemeden önce ayak eklemlerinin ters dönüşümüyle bind pozuna geri çevrilir; böylece dönüştürücü ağırlıkları her zamanki gibi aktarır.
     - Çıplak ayak ve düz ayakkabılar etkilenmez (`footPose` yoksa sıfır).
@@ -160,19 +161,19 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Renkler: siyah, beyaz, lacivert, kırmızı, haki, pudra; desen varyantı (çizgili ya da çiçekli) A4.4'teki desen yöntemiyle.
     - Sınır A4.9 ile aynı: çıplaklık yok, her stil göğüs ucunu ve kasığı opak örter.
     - **Bitti sayılır:** iki cinsiyette her stil ve renk idle ve talk'ta doğru; deniz şortu A4.0 ölçütlerini karşılıyor.
-  - [ ] **A4.12 Spor** (kullanıcı isteği, 2026-10-27): fermuarlı eşofman üstü (K/E), spor tayt + spor sütyeni seti (K), koşu şortu (K/E), pileli tenis eteği (K). Malzeme teknik örgü, hafif parlak.
-  - [ ] **A4.13 Ev** (kullanıcı isteği, 2026-10-27): pijama takımı (K/E; uzun kollu üst + uzun alt, bir de şortlu varyantı), diz boyu kimono sabahlık (K/E, kuşaklı; iç giyimin ya da pijamanın üstüne tek başına giyilir), ev terliği (K/E, kapalı ve açık burun).
-  - [ ] **A4.14 Ayakkabı çeşitleri** (kullanıcı isteği, 2026-10-27): diz boyu çizme (K), espadril (K/E), düz sandalet (K/E), platform spor ayakkabı (K), loafer (K/E; Epic'inki budanmıştı).
+  - [ ] **A4.12 Spor** (kullanıcı isteği, 2026-10-27): fermuarlı eşofman üstü (K/E), spor tayt + spor sütyeni seti (K), pileli tenis eteği (K). Malzeme teknik örgü, hafif parlak.
+  - [ ] **A4.13 Ev** (kullanıcı isteği, 2026-10-27): pijama takımı (K/E; uzun kollu üst + uzun alt), diz boyu kimono sabahlık (K/E, kuşaklı; iç giyimin ya da pijamanın üstüne tek başına giyilir), ev terliği (K/E, kapalı burun).
+  - [ ] **A4.14 Ayakkabı çeşitleri** (kullanıcı isteği, 2026-10-27): diz boyu çizme (K), düz sandalet (K/E), platform spor ayakkabı (K), loafer (K/E; Epic'inki budanmıştı).
     - Ayakkabılar kumaş simülasyonuyla yapılmaz. Taban ayak izinden ekstrüde edilir, üst kısım ayak yüzeyinin ofset kabuğundan kesim çizgileriyle çıkar. Dikiş, bağcık ve taban dokusu normal haritaya bake'lenir. Çizmenin konçu baldırın ofset kabuğudur.
-    - Kapalı ayakkabıda parmaklar mevcut kuralla gizlenir (`hide_closed_toes`); sandalet ve espadrilde ayak görünür, `soleDepth` doğru ölçülmeli.
-  - [ ] **A4.15 Varyantlar** (kullanıcı isteği, 2026-10-27). Aynı kalıptan ayrı katalog öğeleri, şema değişmez: gömlek ve tişörtte sıvanmış kol, gömlekte içe sokulu ve dışarıda, yaka düğmesi açık ve kapalı. İçe sokulu varyant belde hafif bir kabarıklıkla biter, pantolon ve eteğin bel bandının altında kalır.
-  - [ ] **A4.16 Meslek kıyafetleri** (kullanıcı isteği, 2026-10-27; doktor önlüğü ve reflektörlü yelek aynı gün çıkarıldı, ekleme).
+    - Kapalı ayakkabıda parmaklar mevcut kuralla gizlenir (`hide_closed_toes`); sandalette ayak görünür, `soleDepth` doğru ölçülmeli.
+  - [ ] **A4.15 Varyantlar** (kullanıcı isteği, 2026-10-27). Aynı kalıptan ayrı katalog öğeleri, şema değişmez: gömlek ve tişörtte sıvanmış kol.
+  - [ ] **A4.16 Meslek kıyafetleri** (kullanıcı isteği, 2026-10-27).
     - Hemşire / sağlık forması (scrubs; V yaka üst + alt, K/E), aşçı ceketi (kruvaze, K/E).
     - C1'de rol veya meslek seçilince ilgili kıyafet önerilebilir. Bu bir öneridir, zorunlu değil; C1 yapılırken değerlendirilir.
-  - [ ] **A4.17 Kış** (kullanıcı isteği, 2026-10-27; atkı ve eldiven aynı gün çıkarıldı, ekleme): kalça boyu şişme mont (K/E, üste giyilir; C9'dan sonra).
-  - [ ] **A4.7 Uzun parçalar (deneme, en son):** maksi etek (K), trençkot, kaban, uzun palto (K/E).
+  - [ ] **A4.17 Kış** (kullanıcı isteği, 2026-10-27): kalça boyu şişme mont (K/E, üste giyilir; C9'dan sonra).
+  - [ ] **A4.7 Uzun parçalar (deneme, en son):** maksi etek (K), uzun palto (K/E).
     - Sorun: bacak arasındaki kumaş en yakın bacağın ağırlığını alıyor ve adım ya da jestte yırtılıyor. Önce maksi etekle dene: bacak arasındaki vertex'lere iki uyluğun ağırlıklarının karışımı (`build_transfer`'ın Gauss ortalamasını genişleterek, `outfits.py:705`). İdle ve talk'ta temiz değilse dur ve kullanıcıya ekran görüntüsüyle sor.
-    - Trençkot, kaban ve palto tek başına `top` olarak bile gövdenin üstüne giyilir. İç kıyafet içinden çıkacağı için C9'daki (`outer` slotu ve iç giysi gizleme) çözüm gerekir. C9 bitmeden başlanmaz.
+    - Palto tek başına `top` olarak bile gövdenin üstüne giyilir. İç kıyafet içinden çıkacağı için C9'daki (`outer` slotu ve iç giysi gizleme) çözüm gerekir. C9 bitmeden başlanmaz.
 
 ## B. Panelde olan ama sahnede çalışmayan ayarlar
 
