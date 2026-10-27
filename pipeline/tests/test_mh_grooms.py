@@ -1,5 +1,6 @@
 """Groom cards: surface queries, groom-head correspondence and card binding."""
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -202,3 +203,118 @@ def test_empty_skin_slots_point_at_a_skin_joint() -> None:
 def test_texture_roles_match_epic_atlas_names_including_typo(file_name, role):
     matched = [r for pattern, r, _, _ in grooms.TEXTURE_ROLES if pattern.search(file_name)]
     assert matched[:1] == [role], f"{file_name} matched {matched}"
+
+
+def _generated_slots(size: int = 8) -> dict[int, np.ndarray]:
+    """Hair Card Generator layout 0 slots with a distinct value per channel."""
+    depth = np.full((size, size), 10, dtype=np.uint8)
+    coverage = np.full((size, size), 200, dtype=np.uint8)
+    direction = np.zeros((size, size, 3), dtype=np.uint8)
+    direction[...] = (127, 255, 128)
+    attributes = np.zeros((size, size, 4), dtype=np.uint8)
+    attributes[..., 2] = 70  # strand coordinate
+    attributes[..., 3] = 33  # seed
+    return {0: depth, 1: coverage, 2: direction, 3: attributes}
+
+
+def test_generated_atlas_packs_into_epics_attribute_and_tangent_maps() -> None:
+    attribute, tangent = grooms.pack_generated_atlas(_generated_slots())
+    assert attribute.shape == (8, 8, 3), attribute.shape
+    assert tuple(attribute[0, 0]) == (200, 10, 33), "coverage, depth, seed"
+    assert tangent.shape == (8, 8, 4), tangent.shape
+    assert tuple(tangent[0, 0]) == (127, 255, 128, 70), "direction, strand coordinate"
+
+
+def test_generated_atlas_accepts_rgba_exports_of_grey_and_rgb_slots() -> None:
+    slots = _generated_slots()
+    slots[1] = np.repeat(slots[1][..., None], 4, axis=2)  # an exporter wrote RGBA
+    slots[2] = np.concatenate([slots[2], np.full((8, 8, 1), 255, np.uint8)], axis=2)
+    attribute, tangent = grooms.pack_generated_atlas(slots)
+    assert tuple(attribute[0, 0]) == (200, 10, 33)
+    assert tuple(tangent[0, 0]) == (127, 255, 128, 70), "TS2's own alpha is dropped"
+
+
+@pytest.mark.parametrize(
+    "change, message",
+    [
+        (lambda s: s.pop(3), "TS0-TS3"),
+        (lambda s: s.__setitem__(0, np.zeros((4, 4), np.uint8)), "differ in size"),
+    ],
+)
+def test_generated_atlas_rejects_incomplete_slots(change, message) -> None:
+    slots = _generated_slots()
+    change(slots)
+    with pytest.raises(GroomError, match=message):
+        grooms.pack_generated_atlas(slots)
+
+
+def test_generated_card_meshes_of_multi_group_grooms_are_card_lods(tmp_path: Path) -> None:
+    unit = tmp_path / "Hair" / "Nomad"
+    (unit / "meshes").mkdir(parents=True)
+    for name in ("Nomad_CardsMesh_LOD0_PG0", "Nomad_CardsMesh_LOD2_PG0", "SK_Head"):
+        (unit / "meshes" / f"{name}.glb").write_bytes(b"")
+    (unit / "cards.json").write_text("{}", encoding="utf-8")
+    lods = GroomUnit.load(unit).lod_files()
+    assert sorted(lods) == ["LOD0", "LOD2"], lods
+    assert lods["LOD0"][0].stem == "Nomad_CardsMesh_LOD0_PG0"
+
+
+SPAN = 0.5  # metres of skin per unit of head UV, about a MetaHuman scalp's
+
+
+def _flat_head(size: int = 101) -> GroomHead:
+    """Flat skin in the xz plane, UV = (x, z) / SPAN."""
+    vertices, triangles = _grid(size)
+    vertices[:, 1] = 0.0
+    vertices *= SPAN
+    return GroomHead("flat", vertices, triangles, 1.0, vertices[:, [0, 2]] / SPAN)
+
+
+def _card(u: float, v: float, height: float) -> tuple[np.ndarray, np.ndarray]:
+    """A 1 cm square card lying flat `height` above the skin, centred on head UV (u, v)."""
+    x, z = u * SPAN - 0.005, v * SPAN - 0.005
+    positions = np.array(
+        [[x, height, z], [x + 0.01, height, z], [x, height, z + 0.01], [x + 0.01, height, z + 0.01]]
+    )
+    return positions, np.array([[0, 1, 2], [1, 3, 2]], dtype=np.int64)
+
+
+def _cards(*parts: tuple[np.ndarray, np.ndarray], uvs: np.ndarray | None = None) -> CardMesh:
+    positions = np.concatenate([p for p, _ in parts])
+    indices = np.concatenate([i + 4 * n for n, (_, i) in enumerate(parts)])
+    return CardMesh(positions, None, None, uvs, None, indices)
+
+
+def _density_at(density: np.ndarray, u: float, v: float) -> int:
+    size = density.shape[0]
+    return int(density[int(v * size), int(u * size), 3])
+
+
+def test_card_density_covers_skin_under_cards_near_it() -> None:
+    cards = _cards(_card(0.25, 0.25, 0.002), _card(0.75, 0.75, 0.05))
+    density = grooms.density_from_cards(cards, _flat_head(), None)
+    under, lifted = _density_at(density, 0.25, 0.25), _density_at(density, 0.75, 0.75)
+    assert under == 255, f"skin 2 mm under a card is covered, got {under}"
+    assert lifted == 0, f"a card 5 cm off the skin covers nothing, got {lifted}"
+
+
+def test_card_density_follows_the_atlas_coverage() -> None:
+    # Two cards on the skin; the first maps opaque atlas texels, the second empty ones.
+    uvs = np.array([[0.1, 0.1], [0.2, 0.1], [0.1, 0.2], [0.2, 0.2]] * 2)
+    uvs[4:, 0] += 0.6
+    coverage = np.zeros((16, 16), dtype=np.float32)
+    coverage[:, :8] = 1.0
+    cards = _cards(_card(0.25, 0.25, 0.001), _card(0.75, 0.75, 0.001), uvs=uvs)
+    density = grooms.density_from_cards(cards, _flat_head(), coverage)
+    assert _density_at(density, 0.25, 0.25) == 255, "strands cover the skin"
+    assert _density_at(density, 0.75, 0.75) == 0, "an empty atlas region does not"
+
+
+def test_units_without_their_groom_head_use_the_stand_in_heads(tmp_path: Path) -> None:
+    unit = tmp_path / "Hair" / "Style"
+    (unit / "meshes").mkdir(parents=True)
+    bindings = {"b": {"source_skeletal_mesh": "/Game/Fab/x/SKM_Missing.SKM_Missing"}}
+    (unit / "cards.json").write_text(json.dumps({"bindings": bindings}), encoding="utf-8")
+    groom = GroomUnit.load(unit)
+    assert groom.source_head == "SKM_Missing"
+    assert groom.own_head(None) is None, "no GLB of the source head in the unit"  # type: ignore[arg-type]

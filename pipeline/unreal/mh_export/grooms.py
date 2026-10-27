@@ -201,12 +201,17 @@ def fab_styles() -> list[tuple[str, str, str]]:
 
 def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
     """Args: slots (list, default all), only (list of style names), fab (Fab packages,
-    default true), force."""
+    default true), force.
+
+    With `only`, `force` re-exports the listed styles alone: the shared groom head and
+    eyelash units are still exported when missing, but not again (a new groom head
+    `done.json` would make the converter rebuild every groom)."""
     inventory.scan((GROOMS_ROOT,))
     slots = set(args.get("slots") or [])
     only = set(args.get("only") or [])
+    force = bool(args.get("force"))
     inventory.scan((EYELASH_TEXTURES,))
-    units = [
+    shared = [
         Unit("grooms/_groom_head", archive.unit_dir("grooms", "_groom_head"), export_groom_head),
         Unit(
             "grooms/_eyelash_textures",
@@ -214,6 +219,7 @@ def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
             export_eyelash_textures,
         ),
     ]
+    units: list[Unit] = []
     for slot, style_path in style_folders():
         style = style_path.rsplit("/", 1)[-1]
         if (slots and slot not in slots) or (only and style not in only):
@@ -240,5 +246,10 @@ def run(archive: Archive, args: dict[str, Any]) -> dict[str, Any]:
             )
         )
     log = JobLog(archive.logs, "grooms")
-    summary = run_units(units, log, force=bool(args.get("force")), skip=SkipList(archive.skip_file))
-    return {"units": len(units), "log": str(log.path), **summary.as_dict()}
+    skip = SkipList(archive.skip_file)
+    head = run_units(shared, log, force=force and not only, skip=skip)
+    summary = run_units(units, log, force=force, skip=skip)
+    for name in ("done", "skipped", "excluded", "deferred"):
+        getattr(summary, name)[:0] = getattr(head, name)
+    summary.failed = {**head.failed, **summary.failed}
+    return {"units": len(shared) + len(units), "log": str(log.path), **summary.as_dict()}

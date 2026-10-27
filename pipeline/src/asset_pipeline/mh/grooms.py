@@ -108,7 +108,16 @@ TEXTURE_ROLES = (
     (re.compile(r"highlightmask", re.I), "highlight", "highlight", False),
 )
 THUMB = re.compile(r"_thumb", re.I)
-CARD_MESH = re.compile(r"Cards?Mesh(?:_Group\d+)?_LOD(\d+)$", re.I)
+# `_PG<g>`: Hair Card Generator meshes of grooms with several groups.
+CARD_MESH = re.compile(r"Cards?Mesh(?:_Group\d+)?_LOD(\d+)(?:_PG\d+)?$", re.I)
+# Hair Card Generator atlases (pipeline/unreal/mh_export/groom_cards.py): one texture per
+# slot of the plugin's layout 0, `<base>_LOD0_TS<slot>`. TS0 depth (L), TS1 coverage (L),
+# TS2 strand direction in card tangent space (RGB), TS3 root UV (RG, left empty), strand
+# coordinate (B) and seed (A). `pack_generated_atlas` turns them into Epic's two maps.
+GENERATED_SLOT = re.compile(r"_TS(\d)$", re.I)
+# `density` for grooms without Unreal's root-UV atlas: card surface this close to the skin
+# covers it (scalp, combed-over crowns, hairlines), weighted by the atlas coverage.
+COVER_DISTANCE = 0.006  # metres
 LINEAR = Ktx2Settings("linear", rdo=2.0)
 COLOR = Ktx2Settings("srgb", rdo=1.0)
 
@@ -209,6 +218,8 @@ class GroomHead:
     positions: F64  # (P, 3)
     triangles: I64  # (T, 3) DNA position indices
     edge_agreement: float  # share of DNA polygon edges present in the GLB triangles
+    # (P, 2) head UV of every position (glTF top-left origin); one of a seam's UVs
+    uvs: F64 | None = None
 
     @classmethod
     def load(cls, path: Path, head: Mesh) -> "GroomHead":
@@ -231,7 +242,9 @@ class GroomHead:
         following[ends - 1] = head.face_offsets[:-1]
         dna_edges = set(map(tuple, np.sort(np.stack([corners, corners[following]], 1), 1).tolist()))
         agreement = len(dna_edges & glb_edges) / max(len(dna_edges), 1)
-        return cls(path.stem, ordered, triangles, agreement)
+        position_uvs = np.zeros((len(head.positions), 2))
+        position_uvs[head.layout_positions] = _layout_uvs(head)
+        return cls(path.stem, ordered, triangles, agreement, position_uvs)
 
 
 # ---------------------------------------------------------------------------- cards
@@ -451,6 +464,20 @@ class GroomUnit:
                 flags[Path(str(info["file"])).name.lower()] = bool(info.get("srgb", False))
         return flags
 
+    def own_head(self, dna_head: Mesh) -> GroomHead | None:
+        """The head the groom's binding was authored on, when the unit carries it and it has
+        the DNA head topology. Fab packages bring MetaHuman heads of their own shape
+        (Ponytail's and MessyWavy's sit ~4-5 mm, up to 19 mm, off the closest legacy groom
+        head); binding their cards to a stand-in head pushes parts of them into the skin."""
+        name = self.source_head
+        path = self.unit / "meshes" / f"{name}.glb" if name else None
+        if path is None or not path.is_file() or CARD_MESH.search(path.stem):
+            return None
+        try:
+            return GroomHead.load(path, dna_head)
+        except (GroomError, KeyError, IndexError):
+            return None  # another topology (a sculpted bust): the stand-in heads remain
+
 
 def list_groom_units(archive: Path) -> list[Path]:
     root = archive / "raw" / "grooms"
@@ -512,10 +539,18 @@ def density_from_roots(root_uv_seed_coverage: NDArray[np.uint8]) -> NDArray[np.u
     rgba = root_uv_seed_coverage.astype(np.float32) / 255.0
     coverage = rgba[..., 3]
     grown = coverage > ROOT_COVERAGE
-    cols = np.clip((rgba[..., 0][grown] * ROOT_GRID).astype(np.int64), 0, ROOT_GRID - 1)
-    rows = np.clip((rgba[..., 1][grown] * ROOT_GRID).astype(np.int64), 0, ROOT_GRID - 1)
+    return _density_from_uvs(rgba[..., 0][grown], rgba[..., 1][grown], coverage[grown])
+
+
+def _density_from_uvs(
+    u: NDArray[np.float32], v: NDArray[np.float32], weights: NDArray[np.float32]
+) -> NDArray[np.uint8]:
+    """Splat head UVs (top-left origin) with their weights, blur, and count half the median
+    density as full cover; the shared core of `density_from_roots` and `density_from_cards`."""
+    cols = np.clip((u * ROOT_GRID).astype(np.int64), 0, ROOT_GRID - 1)
+    rows = np.clip((v * ROOT_GRID).astype(np.int64), 0, ROOT_GRID - 1)
     grid = np.zeros((ROOT_GRID, ROOT_GRID), dtype=np.float32)
-    np.add.at(grid, (rows, cols), coverage[grown])
+    np.add.at(grid, (rows, cols), weights)
     grid = gaussian_filter(grid, ROOT_SIGMA)
     present = grid[grid > grid.max() * 0.01] if grid.max() > 0 else grid[:0]
     full = float(np.median(present)) * ROOT_FULL if present.size else 1.0
@@ -545,6 +580,101 @@ def groom_density(
     return density
 
 
+def density_from_cards(
+    cards: CardMesh, head: GroomHead, coverage: NDArray[np.float32] | None
+) -> NDArray[np.uint8]:
+    """The `density` map of a groom whose cards come without Unreal's root-UV atlas (Hair
+    Card Generator and hand-made cards), in head UV, through the same blur and
+    normalisation as `density_from_roots`.
+
+    Every card triangle within `COVER_DISTANCE` of the skin adds its area times the strand
+    coverage the atlas shows at its UV (`coverage`, the cards' atlas coverage box-filtered,
+    `None` counts every card as opaque). Weighting by coverage keeps wisps lying on the
+    forehead from tinting it like the scalp under dense cards. Each sample takes the UV of
+    the nearest corner of its closest head triangle, so a triangle across a UV seam cannot
+    blend two islands."""
+    if head.uvs is None:
+        raise GroomError(f"{head.name} has no UVs for a density map")
+    corners = cards.positions[cards.indices]  # (T, 3, 3)
+    area = 0.5 * np.linalg.norm(
+        np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0]), axis=1
+    )
+    # Four samples per triangle: its centroid and the midpoints towards each corner.
+    weights = np.array([[1 / 3, 1 / 3, 1 / 3], [2 / 3, 1 / 6, 1 / 6], [1 / 6, 2 / 3, 1 / 6]])
+    weights = np.vstack([weights, [[1 / 6, 1 / 6, 2 / 3]]])
+    points = np.einsum("sk,tkj->tsj", weights, corners).reshape(-1, 3)
+    sample_area = np.repeat(area / len(weights), len(weights))
+    if coverage is not None and cards.uv0 is not None:
+        uv = np.einsum("sk,tkj->tsj", weights, cards.uv0[cards.indices]).reshape(-1, 2)
+        size = coverage.shape[0]
+        cols = np.clip((uv[:, 0] * size).astype(np.int64), 0, size - 1)
+        rows = np.clip((uv[:, 1] * size).astype(np.int64), 0, size - 1)
+        sample_area = sample_area * coverage[rows, cols]
+    triangle, bary, distance = closest_triangles(points, head.positions, head.triangles)
+    near = (distance <= COVER_DISTANCE) & (sample_area > 0)
+    corner = head.triangles[triangle[near], np.argmax(bary[near], axis=1)]
+    head_uv = head.uvs[corner].astype(np.float32)
+    return _density_from_uvs(head_uv[:, 0], head_uv[:, 1], sample_area[near].astype(np.float32))
+
+
+def card_coverage(groom: "GroomUnit", size: int = 512) -> NDArray[np.float32] | None:
+    """The cards atlas coverage (0..1) box-filtered to `size`: how much of each block of
+    texels strands cover. From the Hair Card Generator's TS1 or the attribute map's R."""
+    pngs = sorted((groom.unit / "textures").glob("*.png"))
+    source = next(
+        (p for p in pngs if (m := GENERATED_SLOT.search(p.stem)) and m.group(1) == "1"), None
+    )
+    if source is None:
+        source = next((p for p in pngs if TEXTURE_ROLES[0][0].search(p.stem)), None)
+    if source is None:
+        return None
+    pixels = _texture_pixels(source)
+    channel = pixels if pixels.ndim == 2 else pixels[..., 0]
+    small = Image.fromarray(channel).resize((size, size), Image.Resampling.BOX)
+    return np.asarray(small, dtype=np.float32) / 255.0
+
+
+def _texture_pixels(path: Path) -> NDArray[np.uint8]:
+    """8-bit pixels as stored: (H, W) for grey images, (H, W, C) otherwise."""
+    with Image.open(path) as image:
+        if image.mode in ("L", "I;16", "I", "F"):
+            return np.asarray(image.convert("L"))
+        return np.asarray(image.convert("RGBA" if "A" in image.mode else "RGB"))
+
+
+def pack_generated_atlas(
+    slots: Mapping[int, NDArray[np.uint8]],
+) -> tuple[NDArray[np.uint8], NDArray[np.uint8]]:
+    """(attribute, tangent) in the layout of Epic's card atlases, which the web hair material
+    reads, from the Hair Card Generator's layout 0 slots (see `GENERATED_SLOT`): attribute
+    RGB = coverage, depth, seed; tangent RGBA = strand direction, strand coordinate. Epic's
+    own cards use the plugin's layout 2, which packs exactly these channels."""
+    if sorted(slots) != [0, 1, 2, 3]:
+        raise GroomError(f"expected Hair Card Generator slots TS0-TS3, got {sorted(slots)}")
+
+    def grey(pixels: NDArray[np.uint8]) -> NDArray[np.uint8]:
+        return pixels if pixels.ndim == 2 else pixels[..., 0]
+
+    depth, coverage, direction, attributes = (slots[i] for i in range(4))
+    shapes = {p.shape[:2] for p in (depth, coverage, direction, attributes)}
+    if len(shapes) != 1:
+        raise GroomError(f"Hair Card Generator slots differ in size: {sorted(shapes)}")
+    if direction.ndim != 3 or attributes.ndim != 3 or attributes.shape[2] < 4:
+        raise GroomError("TS2 must be RGB(A) and TS3 RGBA")
+    attribute = np.stack([grey(coverage), grey(depth), attributes[..., 3]], axis=-1)
+    tangent = np.concatenate([direction[..., :3], attributes[..., 2:3]], axis=-1)
+    return attribute, tangent
+
+
+def _fit_texture(pixels: NDArray[np.uint8], limit: int) -> NDArray[np.uint8]:
+    """Downsize to the slot's cap; drop an alpha channel that is opaque everywhere."""
+    if max(pixels.shape[:2]) > limit:
+        pixels = _resize_straight(pixels, limit)
+    if pixels.ndim == 3 and pixels.shape[2] == 4 and pixels[..., 3].min() == 255:
+        pixels = pixels[..., :3]
+    return pixels
+
+
 def convert_textures(
     groom: GroomUnit, folder: Path, web_root: Path
 ) -> tuple[dict[str, str], str | None]:
@@ -554,7 +684,22 @@ def convert_textures(
     thumbnail = None
     roots: NDArray[np.uint8] | None = None
     baked_cover: NDArray[np.uint8] | None = None
-    for path in sorted((groom.unit / "textures").glob("*.png")):
+    limit = MAX_TEXTURE.get(groom.slot, DEFAULT_MAX_TEXTURE)
+    pngs = sorted((groom.unit / "textures").glob("*.png"))
+    generated = {
+        int(match.group(1)): path for path in pngs if (match := GENERATED_SLOT.search(path.stem))
+    }
+    if generated:
+        attribute, tangent = pack_generated_atlas(
+            {slot: _texture_pixels(path) for slot, path in generated.items()}
+        )
+        for name, pixels in (("attribute", attribute), ("tangent", tangent)):
+            output = folder / f"{name}.ktx2"
+            encode_ktx2(_fit_texture(pixels, limit), output, LINEAR)
+            textures[name] = output.relative_to(web_root).as_posix()
+    for path in pngs:
+        if path in generated.values():
+            continue
         if THUMB.search(path.stem):
             output = folder / "thumbnail.webp"
             # Keep an existing thumbnail: the web app's thumbnail bench renders its own.
@@ -577,14 +722,9 @@ def convert_textures(
         if role is None:
             continue
         name, file_name, keep_alpha = role
-        limit = MAX_TEXTURE.get(groom.slot, DEFAULT_MAX_TEXTURE)
         with Image.open(path) as image:
             mode = "L" if image.mode in ("L", "I;16") else ("RGBA" if keep_alpha else "RGB")
-            pixels = np.asarray(image.convert(mode))
-        if max(pixels.shape[:2]) > limit:
-            pixels = _resize_straight(pixels, limit)
-        if pixels.ndim == 3 and pixels.shape[2] == 4 and pixels[..., 3].min() == 255:
-            pixels = pixels[..., :3]
+            pixels = _fit_texture(np.asarray(image.convert(mode)), limit)
         output = folder / f"{file_name}.ktx2"
         encode_ktx2(pixels, output, _texture_settings(path, flags.get(path.name.lower(), False)))
         textures[name] = output.relative_to(web_root).as_posix()
@@ -800,18 +940,30 @@ def convert_groom(
     heads: Mapping[str, GroomHead],
     reference: ReferenceHead,
     web_root: Path,
+    dna_head: Mesh | None = None,
 ) -> tuple[dict[str, Any], list[Path], dict[str, Any]]:
-    """Write `grooms/<slot>/<style>/` and return (manifest entry, outputs, stats)."""
+    """Write `grooms/<slot>/<style>/` and return (manifest entry, outputs, stats).
+    `dna_head` (the reference DNA head mesh) lets the unit's own groom head join the
+    candidate heads (`GroomUnit.own_head`)."""
     lods = groom.lod_files()
     if "LOD0" not in lods:
         return convert_painted(groom, web_root)
     light = next((name for name in LIGHT_LODS if name in lods), None)
     chosen = ["LOD0", *([light] if light else [])]
     meshes = {name: CardMesh.load(lods[name]) for name in chosen}
+    own = groom.own_head(dna_head) if dna_head is not None else None
+    if own is not None and own.name not in heads:
+        heads = {**heads, own.name: own}
     head, score = choose_head(meshes["LOD0"], heads, groom.source_head)
     bound = [(name, mesh, bind_cards(mesh, head)) for name, mesh in meshes.items()]
     folder = web_root / "grooms" / groom.slot / groom.style
     textures, thumbnail = convert_textures(groom, folder, web_root)
+    if "density" not in textures and head.uvs is not None:
+        # Cards without Unreal's root-UV atlas: without a density the skin between them
+        # stays bare scalp.
+        density = folder / "density.ktx2"
+        encode_ktx2(density_from_cards(meshes["LOD0"], head, card_coverage(groom)), density, LINEAR)
+        textures["density"] = density.relative_to(web_root).as_posix()
     roots = bound[0][2].root_distance
     extras = {
         "kind": "groom",

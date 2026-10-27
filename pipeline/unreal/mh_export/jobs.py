@@ -41,6 +41,7 @@ JOBS: dict[str, Job] = {
         for name in (
             "characters",
             "grooms",
+            "groom_cards",
             "statics",
             "animations",
             "lighting",

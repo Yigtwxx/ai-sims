@@ -48,7 +48,7 @@ from asset_pipeline.mh.convert import (
     preset_gender,
     skin_fingerprint,
 )
-from asset_pipeline.mh.dna import read_dna
+from asset_pipeline.mh.dna import Mesh, read_dna
 from asset_pipeline.mh.groom_labels import with_label
 from asset_pipeline.mh.grooms import HEADS as GROOM_HEADS
 from asset_pipeline.mh.grooms import (
@@ -385,7 +385,7 @@ class Builder:
 
     # ------------------------------------------------------------------------ grooms
 
-    def _groom_setup(self, reference: str) -> tuple[dict[str, GroomHead], ReferenceHead]:
+    def _groom_setup(self, reference: str) -> tuple[dict[str, GroomHead], ReferenceHead, Mesh]:
         source = CharacterSource.find(self.archive, reference)
         dna = read_dna(source.head_dna, lods=[0])
         _, targets, _ = bake_head(dna, self.mapping_path, VISEME_RECIPES)
@@ -402,7 +402,7 @@ class Builder:
         }
         if not heads:
             raise ConversionError(f"no groom head GLBs in {folder}")
-        return heads, head
+        return heads, head, mesh
 
     def grooms(self, only: Sequence[str] = ()) -> None:
         units = list_groom_units(self.archive)
@@ -434,8 +434,8 @@ class Builder:
         def build() -> tuple[Iterable[Path], dict[str, Any], str]:
             if "setup" not in state:
                 state["setup"] = self._groom_setup(reference)
-            heads, head = state["setup"]
-            entry, outputs, stats = convert_groom(groom, heads, head, self.web)
+            heads, head, mesh = state["setup"]
+            entry, outputs, stats = convert_groom(groom, heads, head, self.web, dna_head=mesh)
             if stats.get("painted"):
                 detail = f"painted on the skin ({', '.join(stats['textures'])})"
                 return outputs, {"groom": entry, "stats": stats}, detail
