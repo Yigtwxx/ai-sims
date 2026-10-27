@@ -424,7 +424,7 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 ## Kendi kıyafetimiz (plan, PC'de yapılacak; 2026-10-27)
 
 - **Güncelleme (2026-10-27, Mac):** varsayılan yol artık Unreal değil, Blender'dan doğrudan arşiv birimi. Parça listesi (iş seti, tişört, şortlar, günlük çeşit, çorap ve külotlu, ek parçalar, uzun parçalar), yöntem ve sıra `docs/todo.md` A4'te. Aşağıdaki Unreal adımları yalnız A4.0 başarısız olursa kullanılır.
-- **Karar (kullanıcı):** Fab'den tek tek kıyafet alınmaz. Kıyafetleri kendimiz üretiriz; iş PC'de ve Unreal üzerinden yapılır. Hedef "iyi", AAA değil. Araçlar ücretsiz olmalı. Fab'de abonelik yok; Blender'ın dikiş eklentileri (Garment Tool, Simply Cloth) ve Marvelous Designer / CLO ücretli, bu yüzden elendi.
+- **Karar (kullanıcı):** Fab'den tek tek kıyafet alınmaz. Kıyafetleri kendimiz üretiriz; iş PC'de ve Unreal üzerinden yapılır. Hedef: yapabildiğimizin en kalitelisi (kullanıcı, 2026-10-27; önceki "iyi, AAA değil" hedefinin yerine). Araçlar ücretsiz olmalı. Fab'de abonelik yok; Blender'ın dikiş eklentileri (Garment Tool, Simply Cloth) ve Marvelous Designer / CLO ücretli, bu yüzden elendi.
 - **Bizim için kolaylaştıran şey:** `mh-convert` kemik ağırlıklarını ve vücut slider morph'larını kıyafete vücuttan kendisi aktarıyor (`pipeline/src/asset_pipeline/mh/outfits.py`, adım 3). `ue outfits` yalnızca nötr gövdeyi kuruyor. Yani Unreal'ın kıyafeti yalnızca her cinsiyetin **nötr** gövdesine oturtması yeterli. Epic'in birden çok kaynak bedenli resizable kurulumu (slider uçlarında bozulmayı önlemek için) bizde gerekmeyebilir; önce tek kaynak bedenle denenir.
 - **Araçlar:**
   - Blender: render mesh ve UV. Kumaş simülasyonu yerleşik ve ücretsiz.
