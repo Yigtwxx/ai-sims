@@ -5,7 +5,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 ## Çalışma kuralları
 
 - **Başlarken:** önce `git pull` (liste Mac'te de güncellenebilir), sonra `CLAUDE.md`, `docs/handoff.md` ve bu dosya. Kararları tekrar sorma.
-- **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir.
+- **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir. Saatler toplam iştir; 1 subagent'la geçen süre yaklaşık %25-35 kısalır (toplam ~570 saatlik iş ~400 saatte biter).
   - **Faz 1, temel (~30 sa):** A1 → A2 → A3 → A3b (Fab ve Unreal, uzun işler arka planda) → A4.0 kalem etek (Blender yolu ve paketleyici) → B5 oturma hataları (düzeltmeler dönüştürücüde kalır ve sonraki kıyafetlerin hepsine geçer).
   - **Faz 2, panel düzeltmeleri ve temel kıyafet (~60 sa):** B1 → B2 → B3 → B4 → D1 küçük resimler (A-pozlu eski görseller gider) → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu (file çorap hariç).
   - **Faz 3, iş seti ve karakter (~60 sa):** A4.1'den kumaş pantolon ve gömlek (blazer Faz 7'de) → A4.6'dan polo, chino, kravatlı gömlek → A4.15 varyantlar → C1 kişilik → C2 ses → C3 ifade önizleme.
@@ -19,6 +19,10 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - Unreal ya da Blender arka planda çalışırken aynı fazdaki engelsiz bir web görevine geçilebilir; iş bitince sıraya geri dönülür.
 - **Engel:** bir görev kullanıcıya bağlıysa (indirme, seçim, karar) soruyu aşağıdaki "Kullanıcıya sorular" bölümüne yaz, kullanıcıya kısaca sor ve beklemeden sıradaki engelsiz göreve geç.
 - **Unreal işleri uzun sürer** (yüz başına ~11 dk). `asset-pipeline ue ...` komutlarını arka planda başlat, beklerken web görevlerine devam et. Aynı anda tek editör açılır (RAM yetmiyor).
+- **Paralellik** (kullanıcı kararı, 2026-10-27): ana oturumun yanında aynı anda **en fazla 1 subagent** çalışır. Workflow ya da birden çok agent başlatılmaz.
+  - Subagent'a aynı fazdan, ana oturumla dosyaları çakışmayan bağımsız bir iş verilir. Örneğin ana oturum Blender'da kıyafet yaparken subagent bir web görevini yapar.
+  - Unreal'ı yalnız biri açar. İki Blender simülasyonu aynı anda koşmaz, çünkü CPU'yu paylaşırlar ve ikisi de yavaşlar.
+  - Subagent commit ya da push yapmaz. Değişikliğini ana oturum doğrular ve commit'ler.
 - **Büyük görevlerde** (B2, B5, C1, C2, C7, C9) önce tasarım: `superpowers:brainstorming` + `superpowers:writing-plans`. Kullanıcıya en fazla 2-3 seçenekli, telefondan cevaplanabilir soru sor.
 - **Her görevde:**
   - Küçük adımlar.
