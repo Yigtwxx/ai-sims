@@ -21,6 +21,20 @@ const DEFAULT_RETRY_DELAYS_MS = [300, 900] as const;
 const RETRYABLE_KINDS: ReadonlySet<TtsFailureKind> = new Set(['network', 'service']);
 /** A refused websocket handshake, as msedge-tts words it: "Unexpected server response: 429". */
 const HANDSHAKE_STATUS = /Unexpected server response: (\d{3})/;
+/**
+ * Voices Edge stopped serving, and the voice that reads the same language instead.
+ * Since 2026-10-27 tr-TR-AhmetNeural closes the stream without audio on almost every
+ * request (Azure still serves it). Brian Multilingual detects Turkish by itself,
+ * sounds native and reports word boundaries; an SSML `<lang>` tag is refused.
+ */
+const EDGE_VOICE_SUBSTITUTES: Readonly<Record<string, string>> = {
+  'tr-TR-AhmetNeural': 'en-US-BrianMultilingualNeural',
+};
+
+/** The voice Edge is asked for in place of `voice`. */
+export function edgeVoiceFor(voice: string): string {
+  return EDGE_VOICE_SUBSTITUTES[voice] ?? voice;
+}
 
 export const EDGE_SPEECH_MIME = 'audio/mpeg';
 
@@ -121,9 +135,13 @@ async function synthesizeOnce(params: EdgeSynthesizeParams): Promise<EdgeSpeech>
   const abort = () => tts.close();
   params.signal?.addEventListener('abort', abort, { once: true });
   try {
-    await tts.setMetadata(params.voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3, {
-      wordBoundaryEnabled: true,
-    });
+    await tts.setMetadata(
+      edgeVoiceFor(params.voice),
+      OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3,
+      {
+        wordBoundaryEnabled: true,
+      },
+    );
     const { audioStream, metadataStream } = tts.toStream(escapeSsml(params.text));
     const [audioParts, metadataParts] = await Promise.all([
       collect(audioStream),

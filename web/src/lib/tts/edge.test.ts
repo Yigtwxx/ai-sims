@@ -9,13 +9,15 @@ import { parseWordBoundaries, synthesizeWithEdge } from './edge';
 const edge = vi.hoisted(() => ({
   attempts: [] as Array<'ok' | Error>,
   connections: 0,
+  voices: [] as string[],
 }));
 
 vi.mock('msedge-tts', () => ({
   OUTPUT_FORMAT: { AUDIO_24KHZ_48KBITRATE_MONO_MP3: 'mp3' },
   MsEdgeTTS: class {
     private readonly outcome = edge.attempts[edge.connections++] ?? 'ok';
-    async setMetadata() {
+    async setMetadata(voice: string) {
+      edge.voices.push(voice);
       if (this.outcome instanceof Error) throw this.outcome;
     }
     toStream() {
@@ -64,6 +66,13 @@ describe('synthesizeWithEdge', () => {
   beforeEach(() => {
     edge.attempts = [];
     edge.connections = 0;
+    edge.voices = [];
+  });
+
+  it('asks for the stand-in of a voice Edge no longer serves', async () => {
+    await synthesizeWithEdge({ text: 'Merhaba', voice: 'tr-TR-AhmetNeural' });
+    await synthesizeWithEdge({ text: 'Merhaba', voice: 'tr-TR-EmelNeural' });
+    expect(edge.voices).toEqual(['en-US-BrianMultilingualNeural', 'tr-TR-EmelNeural']);
   });
 
   it('retries a dropped connection instead of giving up on word timings', async () => {
