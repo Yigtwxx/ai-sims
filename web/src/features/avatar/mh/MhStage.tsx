@@ -57,6 +57,8 @@ export interface MhStageProps {
   speech?: SpeechPlayer | null;
   /** Talk mode: the model is composing a reply (thinking gaze and gestures). */
   thinking?: boolean;
+  /** Talk mode: a reply is playing; lip-sync keeps the display frame rate. */
+  speaking?: boolean;
   /** Pixels covered by a panel on the left so the character centres in the rest. */
   insetLeft?: number;
   /** Pixels covered by a panel on the right (talk mode chat). */
@@ -114,6 +116,7 @@ export const MhStage = memo(function MhStage({
   onZoomChange,
   speech = null,
   thinking = false,
+  speaking = false,
   insetLeft = 0,
   insetRight = 0,
   onReady,
@@ -349,6 +352,7 @@ export const MhStage = memo(function MhStage({
         // Every new creator framing starts with the character facing the viewer.
         turnHome={mode === 'creator' ? focus : undefined}
         quality={quality}
+        lively={talk && speaking}
         className="size-full"
       >
         {slots.map(({ resolved: character, incoming }) => {

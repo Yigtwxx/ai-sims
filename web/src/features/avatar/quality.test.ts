@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { autoStep, QUALITY } from './quality';
+import { autoStep, frameCap, IDLE_FPS, QUALITY } from './quality';
 
 describe('autoStep', () => {
   it('steps down to balanced and no further', () => {
@@ -19,5 +19,21 @@ describe('autoStep', () => {
     expect(battery.dpr[1]).toBeLessThan(balanced.dpr[1]);
     expect(battery.ao).toBeNull();
     expect(battery.maxFps).toBe(30);
+  });
+});
+
+describe('frameCap', () => {
+  it('leaves the tier alone while someone is interacting', () => {
+    expect(frameCap(null, false)).toBeNull();
+    expect(frameCap(QUALITY.battery.maxFps, false)).toBe(30);
+  });
+
+  it('drops an uncapped tier to the idle rate', () => {
+    expect(frameCap(QUALITY.high.maxFps, true)).toBe(IDLE_FPS);
+    expect(frameCap(QUALITY.balanced.maxFps, true)).toBe(IDLE_FPS);
+  });
+
+  it('never raises a tier that is already capped lower', () => {
+    expect(frameCap(24, true)).toBe(24);
   });
 });

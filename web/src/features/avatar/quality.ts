@@ -45,6 +45,23 @@ export function autoStep(quality: RenderQuality, direction: 'down' | 'up'): Rend
   return ORDER[direction === 'down' ? Math.min(index + 1, AUTO_FLOOR) : Math.max(index - 1, 0)]!;
 }
 
+/**
+ * Frame rate while nobody touches the page and the character is not speaking.
+ * Idle life (breathing, sway, blinks) reads fine at 30; drags, edits, camera
+ * moves and lip-sync keep the display rate. Uncapped, the high tier held an
+ * M4 Pro's GPU at 99% with nothing happening (2026-10-27).
+ */
+export const IDLE_FPS = 30;
+
+/** How long after the last input the stage drops to `IDLE_FPS`. */
+export const IDLE_AFTER_MS = 3000;
+
+/** The stage's frame cap: the tier's own, lowered to `IDLE_FPS` while idle. */
+export function frameCap(maxFps: number | null, idle: boolean): number | null {
+  if (!idle) return maxFps;
+  return maxFps === null ? IDLE_FPS : Math.min(maxFps, IDLE_FPS);
+}
+
 /** Settings of the tier the stage currently renders at, for scene components. */
 export const QualityContext = createContext<QualitySettings>(QUALITY.high);
 

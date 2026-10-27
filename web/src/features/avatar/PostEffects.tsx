@@ -1,5 +1,6 @@
 'use client';
 
+import { useThree } from '@react-three/fiber';
 import {
   Bloom,
   EffectComposer,
@@ -29,6 +30,7 @@ export const PostEffects = memo(function PostEffects({
   ao?: 'high' | 'medium' | null;
 }) {
   const anime = look === 'anime';
+  const dpr = useThree((state) => state.viewport.dpr);
   return (
     <EffectComposer multisampling={0}>
       {ao && (
@@ -37,6 +39,10 @@ export const PostEffects = memo(function PostEffects({
           distanceFalloff={0.5}
           intensity={anime ? 0.9 : 1.6}
           quality={ao}
+          // AO is soft; past 1.5 device pixels per CSS pixel half resolution still
+          // samples about once per CSS pixel. On an M4 Pro at DPR 2 full-res AO cost
+          // 18.7 ms a frame (53 fps), half-res 10.8 ms, with no visible difference.
+          halfRes={dpr > 1.5}
         />
       )}
       <Bloom intensity={0.12} luminanceThreshold={0.92} luminanceSmoothing={0.2} mipmapBlur />

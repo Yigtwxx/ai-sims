@@ -18,14 +18,17 @@ import { Cyclorama } from './Cyclorama';
 import { Platform, PLATFORM_HEIGHT } from './Platform';
 import { PostEffects, type RenderLook } from './PostEffects';
 import {
+  IDLE_AFTER_MS,
   QUALITY,
   QualityContext,
   autoStep,
+  frameCap,
   type QualityPreference,
   type RenderQuality,
 } from './quality';
 import { StudioLighting } from './StudioLighting';
 import { Turntable } from './Turntable';
+import { useInputIdle } from './useInputIdle';
 import { ViewInset } from './ViewInset';
 import { applySmoothShadowFilter } from './shadowFilter';
 
@@ -63,6 +66,11 @@ interface StageProps {
   anchor?: RefObject<Vector3 | null>;
   /** Render tier; `auto` starts high and steps down while frames drop. */
   quality?: QualityPreference;
+  /**
+   * Keep the display rate without any input (the character is speaking). The
+   * stage otherwise drops to IDLE_FPS a few seconds after the last input.
+   */
+  lively?: boolean;
   /** When this changes, a turned subject glides back to face the viewer. */
   turnHome?: unknown;
   /** Stand the subject on a low plinth (the floor drops to meet its base). */
@@ -97,12 +105,15 @@ export function Stage({
   follow,
   anchor,
   quality = 'auto',
+  lively = false,
   turnHome,
   platform = false,
 }: StageProps) {
   const [autoTier, setAutoTier] = useState<RenderQuality>('high');
   const tier = quality === 'auto' ? autoTier : quality;
   const settings = QUALITY[tier];
+  const idle = useInputIdle(IDLE_AFTER_MS) && !lively;
+  const cap = frameCap(settings.maxFps, idle);
   const initial =
     zoom === undefined ? getCameraPose(focus, subjectHeight) : zoomPose(zoom, subjectHeight);
   return (
@@ -115,7 +126,7 @@ export function Stage({
         .join(' ')}
       shadows={{ type: PCFShadowMap }}
       dpr={settings.dpr}
-      frameloop={settings.maxFps ? 'demand' : 'always'}
+      frameloop={cap ? 'demand' : 'always'}
       gl={{
         antialias: false,
         // Tone mapping runs in the post stack; without post the renderer applies it.
@@ -127,7 +138,8 @@ export function Stage({
       camera={{ fov: 24, near: 0.05, far: 50, position: [...initial.position] }}
       onCreated={onCreated}
     >
-      {quality === 'auto' && (
+      {/* Judged only at the full rate: a capped stage would read as a slow one. */}
+      {quality === 'auto' && !cap && (
         <PerformanceMonitor
           onDecline={() => setAutoTier((current) => autoStep(current, 'down'))}
           onIncline={() => setAutoTier((current) => autoStep(current, 'up'))}
@@ -135,7 +147,7 @@ export function Stage({
           flipflops={4}
         />
       )}
-      {settings.maxFps && <FrameCap fps={settings.maxFps} />}
+      {cap && <FrameCap fps={cap} />}
       <QualityContext.Provider value={settings}>
         <Suspense fallback={null}>
           <StudioSet

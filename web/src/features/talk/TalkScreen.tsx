@@ -121,6 +121,7 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
               onZoomChange={setZoom}
               speech={talk.player}
               thinking={thinking}
+              speaking={talk.speaking}
               insetRight={panelWidth}
               onSettled={markStageShown}
               className="size-full"
