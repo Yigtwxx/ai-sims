@@ -115,6 +115,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - **Bitti sayılır:** iki cinsiyette iki boy, kadında külotlu, her renk; idle ve talk'ta çorap bacakla birlikte hareket ediyor; ayakkabı, pantolon ve etekle doğru katmanlanıyor; ince külotluda cilt doğal görünüyor; eski kayıtlı karakterler migration'la açılıyor.
   - [ ] **A4.6 Ek parçalar** (kullanıcı isteği, 2026-10-27: hepsi). Kolaydan zora:
     - Kolay: polo tişört (K/E), chino pantolon (K/E), atlet ya da askılı bluz (K/E), jogger (K/E), A kesim diz üstü etek (K), biker şort (K).
+    - Kolay: düz eşofman altı (K/E; kullanıcı isteği, 2026-10-27). Düz paça, manşetsiz, lastikli bel ve bağcık; desensiz pamuklu örgü. Paçası daralan ve manşetli jogger'dan ayrı bir öğedir. Renkler: gri melanj, siyah, lacivert, antrasit, haki.
     - Kolay: kravatlı gömlek, A4.1 gömleğinin varyantı (E, isteğe bağlı K). Kravat gömleğin içinde modellenir, ayrı renk parametresi olur.
     - Orta: triko balıkçı kazak (K/E), düğmeli hırka (K/E), kot ceket (K/E), kapüşonsuz sweatshirt (K/E), tulum ve salopet (K, `full`), gömlek elbise (K), kısa kollu gömlek (E).
     - Takım elbise ayrı parça değildir: A4.1'in blazer'ı ve kumaş pantolonu aynı renk presetleriyle (lacivert, antrasit, siyah) çıkar. İkisi aynı ada ve sıraya sahip olsun ki kullanıcı takımı kolayca eşleştirsin.
