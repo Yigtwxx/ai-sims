@@ -57,6 +57,10 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - Sonra: `ue grooms --args '{"only": [...]}'` ve `mh-convert --grooms --groom <stil> --manifest`. Tek cinsiyete özgü saç varsa `mh/gender_compat.json`'a yaz.
   - **Bitti sayılır:** 5 saç oluşturucuda seçilebiliyor; her yüze oturuyor ve kafa derisi açıkta kalmıyor.
 
+- [ ] **A3b. İki saçı kadın listesinden kaldır** (kullanıcı kararı, 2026-10-27):
+  - "Orta boy katlı kesim / Medium layered" (`groom.hair.Hair_M_Layered`) yalnız kadın saçı (`pipeline/src/asset_pipeline/mh/gender_compat.json:7`). Kadından kalkması tamamen silinmesi demek: `/[locale]/curate`'te gizle, sonra kullanıcı onayıyla `mh-prune --apply --plan <özet>`.
+  - "Uzun dağınık / Long messy" (`groom.hair.Hair_L_MessyClumps`) unisex. Yalnız kadından kalkar, erkekte kalır: `gender_compat.json`'a `"Hair_L_MessyClumps": "male"`. Kullanıcı tamamen silinsin derse Medium layered gibi prune edilir.
+  - Sonra `mh-convert --manifest`, `node scripts/r2-sync.mjs`. Bu saçı giyen kayıtlı kadın karakterleri `reconcile.ts` boşa düşürmeli; denenir.
 - [ ] **A4. Kendi kıyafetimiz: düz tişört.** Plan `docs/handoff.md` "Kendi kıyafetimiz" bölümünde.
 
 ## B. Panelde olan ama sahnede çalışmayan ayarlar
