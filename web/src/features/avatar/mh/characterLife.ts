@@ -59,6 +59,9 @@ const BROW_RAISE: [string, number][] = [
   ['browOuterUpRight', 0.22],
 ];
 
+/** Arm-collision step (s) a still stage uses, so pushes it no longer needs fade out. */
+const STILL_ARM_STEP = 1 / 60;
+
 /** Face loops the life layer plays under blinks, gaze and lip-sync. */
 export interface FaceLayers {
   idle?: FaceClip;
@@ -127,7 +130,10 @@ export class CharacterLife {
     );
     // The arms are posed: keep them out of the body (clips copy the actor's arm
     // directions, and a MetaHuman's hips and waist are wider than an actor's).
-    this.arms!.step(delta);
+    // A still (dt 0) poses one frame, but its pushes must still be able to
+    // relax: without a release, a push taken while the character assembled
+    // (clips and clothes still loading) held the arms out like the bind pose.
+    this.arms!.step(delta > 0 ? delta : STILL_ARM_STEP);
 
     // The head turns part of the way toward the viewer (a clip's actor looks
     // around; in a conversation people face whom they talk to)...

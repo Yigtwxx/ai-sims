@@ -2,6 +2,7 @@ import {
   AnimationClip,
   Bone,
   Group,
+  Quaternion,
   QuaternionKeyframeTrack,
   Vector3,
   VectorKeyframeTrack,
@@ -248,5 +249,50 @@ describe('MotionPlayer', () => {
     const { root, pelvis } = rig();
     const player = new MotionPlayer(root, sets({ idle: ['a'] }), pelvis, new Vector3(), 'full');
     expect(player.upper).toBe(1);
+  });
+
+  it('holds a still at one clip time once a clip plays', () => {
+    const { root, pelvis } = rig();
+    const player = new MotionPlayer(
+      root,
+      { idle: [{ clip: clip('a', 2, [1.0, 1.2]), pelvisRest: new Vector3(0, 1, 0) }] },
+      pelvis,
+      new Vector3(),
+    );
+    expect(player.hold(0.5)).toBe(false);
+    expect(player.duration).toBe(0);
+    player.update(0);
+    expect(player.duration).toBe(2);
+    // Wrapped to the clip length: 2.5 s is 0.5 s in, a quarter of the way.
+    expect(player.hold(2.5)).toBe(true);
+    for (let i = 0; i < 3; i += 1) player.update(0);
+    expect(pelvis.position.y).toBeCloseTo(0.05, 5);
+    player.dispose();
+  });
+
+  it('poses a still every update, also after the bones were reset to rest', () => {
+    const { root, pelvis } = rig();
+    const arm = root.getObjectByName('upperarm_l')!;
+    const turned = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), 0.5);
+    const lowered = new AnimationClip('a', 2, [
+      new QuaternionKeyframeTrack(
+        'upperarm_l.quaternion',
+        [0, 2],
+        [...turned.toArray(), ...turned.toArray()],
+      ),
+    ]);
+    const player = new MotionPlayer(
+      root,
+      { idle: [{ clip: lowered, pelvisRest: null }] },
+      pelvis,
+      null,
+    );
+    for (let frame = 0; frame < 3; frame += 1) {
+      // The life layer sets the bones back to rest before every update.
+      arm.quaternion.identity();
+      player.update(0);
+      expect(arm.quaternion.angleTo(turned)).toBeCloseTo(0, 5);
+    }
+    player.dispose();
   });
 });

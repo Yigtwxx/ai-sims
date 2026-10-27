@@ -1,12 +1,14 @@
 import {
   AnimationMixer,
   LoopRepeat,
+  PropertyBinding,
   Vector3,
   type AnimationAction,
   type AnimationClip,
   type Interpolant,
   type KeyframeTrack,
   type Object3D,
+  type Quaternion,
 } from 'three';
 
 /** Cross-fade between idle clips (seconds). */
@@ -57,6 +59,12 @@ interface PelvisPath {
   interpolant: Interpolant;
 }
 
+/** One track of a clip, bound for writing a still pose (see MotionPlayer.writeStill). */
+interface StillTrack {
+  target: Vector3 | Quaternion;
+  interpolant: Interpolant;
+}
+
 /**
  * Plays mocap body clips on the assembled character: one at a time, looping,
  * cross-fading to another clip of the current role (never the same one twice
@@ -91,6 +99,8 @@ export class MotionPlayer {
   private holdLeft = 0;
   private readonly offset = new Vector3();
   private readonly sample = new Vector3();
+  /** Per clip, its tracks bound for still frames (built on the first one). */
+  private readonly stills = new Map<number, StillTrack[]>();
 
   constructor(
     private readonly root: Object3D,
@@ -174,6 +184,24 @@ export class MotionPlayer {
     return Math.min(1, weight);
   }
 
+  /**
+   * Pins the clip playing now at `seconds` into it (wrapped to its length).
+   * A still stage steps by zero, so every later update poses exactly that
+   * frame: dev benches use it for one repeatable pose. False before a clip plays.
+   */
+  hold(seconds: number): boolean {
+    if (this.current < 0) return false;
+    const action = this.actions[this.current]!;
+    const duration = action.getClip().duration;
+    action.time = duration > 0 ? ((seconds % duration) + duration) % duration : 0;
+    return true;
+  }
+
+  /** Length (s) of the clip playing now, or 0 before one plays. */
+  get duration(): number {
+    return this.current < 0 ? 0 : this.actions[this.current]!.getClip().duration;
+  }
+
   /** The role to play from the next update: talk starts at once and outlasts short pauses. */
   setRole(role: MotionRole): void {
     this.wanted = role;
@@ -186,7 +214,29 @@ export class MotionPlayer {
     if (this.current < 0 || this.nextIn <= 0) this.switchTo(this.pickNext(), IDLE_FADE);
     this.stepFades(dt);
     this.mixer.update(dt);
+    if (dt === 0) this.writeStill();
     this.applyPelvis();
+  }
+
+  /**
+   * The mixer only writes a bone whose value differs from the last update's
+   * (three's PropertyMixer), but the life layer puts the posed bones back to
+   * rest before every update: a still stage (dt 0) showed the clip for one
+   * frame and the bind pose ever after. With one clip at full weight (a still
+   * never fades), its pose at the action's time is written directly.
+   */
+  private writeStill(): void {
+    if (this.current < 0 || this.weights[this.current] !== 1) return;
+    if (this.weights.some((weight, i) => i !== this.current && weight > 0)) return;
+    const action = this.actions[this.current]!;
+    let tracks = this.stills.get(this.current);
+    if (!tracks) {
+      tracks = bindStill(this.root, action.getClip());
+      this.stills.set(this.current, tracks);
+    }
+    for (const { target, interpolant } of tracks) {
+      target.fromArray(interpolant.evaluate(action.time));
+    }
   }
 
   private stepRole(dt: number): void {
@@ -275,4 +325,27 @@ export class MotionPlayer {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
   }
+}
+
+/** The clip's position, rotation and scale tracks with the objects they move. */
+function bindStill(root: Object3D, clip: AnimationClip): StillTrack[] {
+  return clip.tracks.flatMap((track) => {
+    const { nodeName, propertyName } = PropertyBinding.parseTrackName(track.name);
+    const node = PropertyBinding.findNode(root, nodeName) as Object3D | null;
+    if (!node) return [];
+    const target =
+      propertyName === 'quaternion'
+        ? node.quaternion
+        : propertyName === 'position'
+          ? node.position
+          : propertyName === 'scale'
+            ? node.scale
+            : null;
+    if (!target) return [];
+    // The track's own interpolation (glTF clips may carry a cubic-spline one).
+    const interpolant = (
+      track as KeyframeTrack & { createInterpolant(): Interpolant }
+    ).createInterpolant();
+    return [{ target, interpolant }];
+  });
 }
