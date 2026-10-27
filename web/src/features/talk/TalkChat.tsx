@@ -2,6 +2,7 @@
 
 import {
   ArrowUpIcon,
+  CalendarXIcon,
   HourglassIcon,
   KeyIcon,
   SignInIcon,
@@ -52,6 +53,7 @@ interface TalkChatProps {
 const CHAT_ERROR_KEYS = {
   unauthenticated: 'unauthenticated',
   not_configured: 'notConfigured',
+  rate_limited: 'rateLimited',
   unavailable: 'unavailable',
   invalid: 'invalid',
   network: 'network',
@@ -62,6 +64,7 @@ const CHAT_ERROR_KEYS = {
 const CHAT_ERROR_ICONS: Record<ApiFailureKind, Icon> = {
   unauthenticated: SignInIcon,
   not_configured: KeyIcon,
+  rate_limited: CalendarXIcon,
   unavailable: HourglassIcon,
   invalid: WarningCircleIcon,
   network: WifiSlashIcon,
@@ -171,6 +174,7 @@ export function TalkChat({
   const canRetry =
     notice?.source === 'chat' &&
     notice.kind !== 'not_configured' &&
+    notice.kind !== 'rate_limited' &&
     notice.kind !== 'unauthenticated';
 
   return (

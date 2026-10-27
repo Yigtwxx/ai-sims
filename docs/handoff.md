@@ -421,6 +421,8 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
   - Sonuç (LPM kapalı, `auto`): oluşturucu boşta **30 fps, GPU %57** (önce %99), etkileşimde **92 fps** ve `high`'da kalıyor (önce 53). Konuşma ekranı: karakter konuştuğu sürece ~100 fps (girdi penceresi dolduktan sonra da), bitince hemen 30. Asset gelirken ve kamera kayarken bileşenlerin `invalidate`'i 30'un üstüne çıkarır; bu istenen bir şey.
 - Yerel `.env.local` PC'den kopyalandı ve `TTS_ENABLE_EDGE=1` eksikti; yerelde ses "could not be generated" veriyordu. 2026-10-27'de eklendi.
 
+- **Günlük kota** (2026-10-27, Mac): `/api/chat` ve `/api/tts` anonim oturumla sınırsız çağrılabiliyordu. Artık kullanıcı başına (100 mesaj, 40 bin TTS karakteri) ve tüm site için (2000 mesaj, 400 bin karakter) günlük sınır var; Claude günde en çok 200 cevap verir, sonra zincirden çıkar. Sohbet ekranı TR/EN bildirim gösterir, ses yazıya düşer. Ayrıntı `CLAUDE.md` "AI sohbet ve TTS".
+
 ## Kendi kıyafetimiz (plan, PC'de yapılacak; 2026-10-27)
 
 - **Güncelleme (2026-10-27, Mac):** varsayılan yol artık Unreal değil, Blender'dan doğrudan arşiv birimi. Parça listesi (iş seti, tişört, şortlar, günlük çeşit, çorap ve külotlu, iç giyim, mayo ve bikini, ek parçalar, topuklu, gece ve seksi çizgi, spor, ev, ayakkabı çeşitleri, varyantlar, meslek, kış, uzun parçalar), yöntem ve sıra `docs/todo.md` A4'te. Aşağıdaki Unreal adımları yalnız A4.0 başarısız olursa kullanılır.

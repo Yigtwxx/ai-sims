@@ -2,7 +2,7 @@ import { ChatRequestSchema } from '@/lib/ai/chatRequest';
 import { normalizeConversation } from '@/lib/ai/conversation';
 import { AiNotConfiguredError, AiUnavailableError, toFailure } from '@/lib/ai/errors';
 import { buildSystemPrompt } from '@/lib/ai/persona';
-import { hasConfiguredProvider } from '@/lib/ai/providers';
+import { getOrderedProviders, hasConfiguredProvider } from '@/lib/ai/providers';
 import { streamWithFallback } from '@/lib/ai/router';
 import { toTextStream } from '@/lib/ai/textStream';
 import { getSession } from '@/lib/auth/session';
@@ -12,8 +12,15 @@ import {
   CLIENT_CLOSED_REQUEST,
   errorResponse,
   invalidRequest,
+  rateLimited,
   toRequestIssues,
 } from '@/lib/http/responses';
+import {
+  cappedProviders,
+  consumeChatMessage,
+  recordProviderUse,
+  retryAfterSeconds,
+} from '@/lib/usage/quota';
 
 // 24 messages of 2000 characters fit in well under this, even with JSON escaping.
 const MAX_BODY_BYTES = 512 * 1024;
@@ -25,7 +32,9 @@ const MAX_BODY_BYTES = 512 * 1024;
  * so there is deliberately no `runtime` export (it is rejected there).
  *
  * Order matters: session (401), then "no provider configured" (503) so a bare
- * curl shows the real blocker, then the body (400/413), then the character (404).
+ * curl shows the real blocker, then the body (400/413), then the character (404),
+ * then the daily quota (429). Paid providers past today's cap are left out of the
+ * chain; when nothing else is configured that is a 429 too.
  * Once the first token is in hand the status is 200 and the provider is final.
  */
 export async function POST(request: Request): Promise<Response> {
@@ -55,11 +64,30 @@ export async function POST(request: Request): Promise<Response> {
   const character = characterId ? await getCharacter(user.id, characterId) : undefined;
   if (characterId && !character) return errorResponse('character_not_found', 404);
 
+  const quota = await consumeChatMessage(user.id);
+  if (!quota.ok) return rateLimited(quota.retryAfterSeconds);
+
+  const capped = await cappedProviders();
+  const providers = getOrderedProviders().filter((candidate) => !capped.includes(candidate.id));
+  if (!providers.some((candidate) => candidate.isConfigured())) {
+    return rateLimited(retryAfterSeconds());
+  }
+
   try {
-    const { provider, stream } = await streamWithFallback({
-      system: buildSystemPrompt({ character: character ?? undefined, locale }),
-      messages,
-      signal: request.signal,
+    const { provider, stream } = await streamWithFallback(
+      {
+        system: buildSystemPrompt({ character: character ?? undefined, locale }),
+        messages,
+        signal: request.signal,
+      },
+      { providers },
+    );
+    recordProviderUse(provider).catch((error: unknown) => {
+      // Counting must not cost the user the reply; only the provider and the error class are logged.
+      console.error('[api/chat] usage not recorded', {
+        provider,
+        error: error instanceof Error ? error.name : 'unknown',
+      });
     });
 
     const textStream = toTextStream(stream, (error) => {

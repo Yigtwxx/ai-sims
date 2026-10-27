@@ -5,6 +5,7 @@ import {
   CLIENT_CLOSED_REQUEST,
   errorResponse,
   invalidRequest,
+  rateLimited,
   toRequestIssues,
 } from '@/lib/http/responses';
 import { TtsError } from '@/lib/tts/errors';
@@ -12,6 +13,7 @@ import { cleanSpeechText } from '@/lib/tts/speechText';
 import type { TtsResponseBody } from '@/lib/tts/types';
 import { TtsRequestSchema } from '@/lib/tts/ttsRequest';
 import { speechProviders, synthesizeWithFallback } from '@/lib/tts/providers';
+import { consumeSpeechChars } from '@/lib/usage/quota';
 
 const MAX_BODY_BYTES = 16 * 1024;
 
@@ -44,6 +46,10 @@ export async function POST(request: Request): Promise<Response> {
   // Emojis and markdown that slipped through the LLM would be read out loud.
   const text = cleanSpeechText(parsed.data.text);
   if (!text) return invalidRequest([{ path: 'text', message: 'Nothing speakable in the text' }]);
+
+  // Counted in characters, the unit every TTS provider bills and rate-limits by.
+  const quota = await consumeSpeechChars(user.id, text.length);
+  if (!quota.ok) return rateLimited(quota.retryAfterSeconds);
 
   try {
     const speech = await synthesizeWithFallback(env.order, speechProviders(env), {

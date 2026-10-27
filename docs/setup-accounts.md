@@ -29,6 +29,13 @@ Sohbet ve ses için gereken servislerin hesaplarını açıp anahtarları `web/.
 | `TTS_PROVIDER_ORDER` | Ses sırası | Hayır | `azure,edge,gemini` |
 | `TTS_ENABLE_EDGE` | Edge sesleri | Hayır | kapalı (`1` açar) |
 | `GEMINI_TTS_MODEL` | Gemini TTS | Hayır | `gemini-3.8-flash-tts` |
+| `CHAT_DAILY_LIMIT_PER_USER` | Günlük kota | Hayır | `100` mesaj |
+| `CHAT_DAILY_LIMIT_TOTAL` | Günlük kota, tüm site | Hayır | `2000` mesaj |
+| `TTS_DAILY_CHARS_PER_USER` | Günlük kota | Hayır | `40000` karakter |
+| `TTS_DAILY_CHARS_TOTAL` | Günlük kota, tüm site | Hayır | `400000` karakter |
+| `ANTHROPIC_DAILY_LIMIT` | Claude günlük tavanı | Hayır | `200` cevap |
+
+Kotalar UTC gününe göre sıfırlanır; sayaçlar MongoDB'nin `usage` koleksiyonunda durur ve TTL ile silinir. Kota dolunca `/api/chat` ve `/api/tts` `429 rate_limited` ve `Retry-After` döner. Claude tavanı dolunca Claude o günün geri kalanında zincirden çıkar; başka sağlayıcı yoksa yine 429 döner.
 
 ## Varsayılan modeller nasıl seçildi
 

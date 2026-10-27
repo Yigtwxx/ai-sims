@@ -253,3 +253,42 @@ export function getTtsEnv(): TtsEnv {
   );
   return { order, azure, edgeEnabled, gemini };
 }
+
+/**
+ * Daily caps per UTC day. Per-user caps keep one visitor from draining the shared
+ * free tiers; the totals bound the whole site, since anyone can open another
+ * anonymous session; the paid cap takes Claude out of the chain for the rest of
+ * the day so abuse cannot run up a bill.
+ */
+export interface UsageEnv {
+  chatPerUser: number;
+  chatTotal: number;
+  ttsCharsPerUser: number;
+  ttsCharsTotal: number;
+  anthropicTotal: number;
+}
+
+export const DEFAULT_USAGE_LIMITS: Readonly<UsageEnv> = {
+  chatPerUser: 100,
+  chatTotal: 2000,
+  ttsCharsPerUser: 40_000,
+  ttsCharsTotal: 400_000,
+  anthropicTotal: 200,
+};
+
+/** A positive integer, or the default for anything else. */
+function readLimit(name: string, fallback: number): number {
+  const value = Number(readEnv(name));
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+
+/** Never throws; read on each call. */
+export function getUsageEnv(): UsageEnv {
+  return {
+    chatPerUser: readLimit('CHAT_DAILY_LIMIT_PER_USER', DEFAULT_USAGE_LIMITS.chatPerUser),
+    chatTotal: readLimit('CHAT_DAILY_LIMIT_TOTAL', DEFAULT_USAGE_LIMITS.chatTotal),
+    ttsCharsPerUser: readLimit('TTS_DAILY_CHARS_PER_USER', DEFAULT_USAGE_LIMITS.ttsCharsPerUser),
+    ttsCharsTotal: readLimit('TTS_DAILY_CHARS_TOTAL', DEFAULT_USAGE_LIMITS.ttsCharsTotal),
+    anthropicTotal: readLimit('ANTHROPIC_DAILY_LIMIT', DEFAULT_USAGE_LIMITS.anthropicTotal),
+  };
+}

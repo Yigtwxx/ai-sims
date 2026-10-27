@@ -7,7 +7,13 @@ import {
 
 /** Why a chat or TTS request failed, in terms the UI can explain. */
 export type ApiFailureKind =
-  'unauthenticated' | 'not_configured' | 'unavailable' | 'invalid' | 'network' | 'interrupted';
+  | 'unauthenticated'
+  | 'not_configured'
+  | 'rate_limited'
+  | 'unavailable'
+  | 'invalid'
+  | 'network'
+  | 'interrupted';
 
 export class ApiFailure extends Error {
   readonly kind: ApiFailureKind;
@@ -41,6 +47,8 @@ export async function failureFromResponse(
   if (response.status === 401) return new ApiFailure('unauthenticated');
   if (response.status === 503 && code === notConfiguredCode)
     return new ApiFailure('not_configured');
+  // Our daily quota; a provider's own 429 reaches the client as a 502.
+  if (response.status === 429 && code === 'rate_limited') return new ApiFailure('rate_limited');
   if (response.status >= 500) return new ApiFailure('unavailable');
   if (response.status >= 400) return new ApiFailure('invalid');
   return new ApiFailure('unavailable');

@@ -535,6 +535,7 @@
     "errors": {
       "unauthenticated": "Oturumun kapanmış. Ana sayfadan yeniden giriş yap.",
       "notConfigured": "Yapay zekâ servisi yapılandırılmamış. web/.env.local dosyasına bir sağlayıcı anahtarı ekle.",
+      "rateLimited": "Bugünkü mesaj sınırına ulaştın. Yarın yeniden konuşabilirsin.",
       "unavailable": "Servisler şu an yoğun ya da kullanım sınırında. Birkaç saniye sonra tekrar dene.",
       "invalid": "Bu mesaj gönderilemedi. Biraz kısaltıp tekrar dene.",
       "network": "Sunucuya ulaşılamadı. Bağlantını kontrol et.",
@@ -542,6 +543,7 @@
     },
     "voice": {
       "notConfigured": "Ses servisi yapılandırılmamış; yanıtlar yazı olarak gelecek.",
+      "rateLimited": "Bugünkü ses sınırı doldu; yanıtlar yazı olarak gelecek.",
       "unavailable": "Ses şu an üretilemedi; yanıt yazı olarak geldi.",
       "failed": "Bir cümle seslendirilemedi."
     },

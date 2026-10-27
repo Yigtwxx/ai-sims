@@ -535,6 +535,7 @@
     "errors": {
       "unauthenticated": "Your session has ended. Sign in again from the home page.",
       "notConfigured": "No AI provider is configured. Add a provider key to web/.env.local.",
+      "rateLimited": "You've reached today's message limit. You can talk again tomorrow.",
       "unavailable": "The services are busy or rate-limited right now. Try again in a few seconds.",
       "invalid": "This message could not be sent. Shorten it a little and try again.",
       "network": "Could not reach the server. Check your connection.",
@@ -542,6 +543,7 @@
     },
     "voice": {
       "notConfigured": "Voice is not configured; replies will arrive as text.",
+      "rateLimited": "Today's voice limit is used up; replies will arrive as text.",
       "unavailable": "The voice could not be generated; the reply arrived as text.",
       "failed": "A sentence could not be spoken."
     },

@@ -20,7 +20,7 @@ export type TalkPhase = 'idle' | 'connecting' | 'thinking' | 'writing';
 
 export type TalkNotice =
   | { source: 'chat'; kind: ApiFailureKind }
-  | { source: 'voice'; kind: 'notConfigured' | 'unavailable' | 'failed' };
+  | { source: 'voice'; kind: 'notConfigured' | 'rateLimited' | 'unavailable' | 'failed' };
 
 interface UseTalkOptions {
   characterId: string;
@@ -58,13 +58,18 @@ export function useTalk({ characterId, locale, voice }: UseTalkOptions) {
       // These hit every sentence: report once, then stop asking for audio.
       isFatal: (error) =>
         error instanceof ApiFailure &&
-        (error.kind === 'not_configured' || error.kind === 'unauthenticated'),
+        (error.kind === 'not_configured' ||
+          error.kind === 'rate_limited' ||
+          error.kind === 'unauthenticated'),
       onError: (error) => {
         const kind = error instanceof ApiFailure ? error.kind : undefined;
-        if (kind === 'not_configured') {
+        if (kind === 'not_configured' || kind === 'rate_limited') {
           voiceOnRef.current = false;
           setVoiceOn(false);
-          setNotice({ source: 'voice', kind: 'notConfigured' });
+          setNotice({
+            source: 'voice',
+            kind: kind === 'rate_limited' ? 'rateLimited' : 'notConfigured',
+          });
         } else {
           setNotice({ source: 'voice', kind: kind === 'unavailable' ? 'unavailable' : 'failed' });
         }

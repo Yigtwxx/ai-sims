@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   getCharacter: vi.fn(),
   hasConfiguredProvider: vi.fn(),
   getOrderedProviders: vi.fn(),
+  consumeChatMessage: vi.fn(),
+  cappedProviders: vi.fn(),
+  recordProviderUse: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({ getSession: mocks.getSession }));
@@ -17,6 +20,12 @@ vi.mock('@/lib/characters/repository', () => ({ getCharacter: mocks.getCharacter
 vi.mock('@/lib/ai/providers', () => ({
   hasConfiguredProvider: mocks.hasConfiguredProvider,
   getOrderedProviders: mocks.getOrderedProviders,
+}));
+vi.mock('@/lib/usage/quota', () => ({
+  consumeChatMessage: mocks.consumeChatMessage,
+  cappedProviders: mocks.cappedProviders,
+  recordProviderUse: mocks.recordProviderUse,
+  retryAfterSeconds: () => 3600,
 }));
 
 const { POST } = await import('./route');
@@ -49,6 +58,9 @@ beforeEach(() => {
   mocks.getCharacter.mockResolvedValue(null);
   mocks.hasConfiguredProvider.mockReturnValue(true);
   mocks.getOrderedProviders.mockReturnValue([provider('anthropic', () => chunks('Selam!'))]);
+  mocks.consumeChatMessage.mockResolvedValue({ ok: true });
+  mocks.cappedProviders.mockResolvedValue([]);
+  mocks.recordProviderUse.mockResolvedValue(undefined);
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -249,5 +261,67 @@ describe('POST /api/chat', () => {
       expect(second.stream).not.toHaveBeenCalled();
       expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain('SECRET');
     });
+  });
+});
+
+describe('POST /api/chat daily quota', () => {
+  it('answers 429 with Retry-After once the user is out of messages', async () => {
+    const anthropic = provider('anthropic', () => chunks('Selam!'));
+    mocks.getOrderedProviders.mockReturnValue([anthropic]);
+    mocks.consumeChatMessage.mockResolvedValue({ ok: false, retryAfterSeconds: 120 });
+
+    const response = await POST(post(VALID_BODY));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('120');
+    expect(await response.json()).toEqual({ error: 'rate_limited' });
+    expect(mocks.consumeChatMessage).toHaveBeenCalledWith('user-1');
+    expect(anthropic.stream).not.toHaveBeenCalled();
+  });
+
+  it('does not count a request that fails validation', async () => {
+    const response = await POST(post({ locale: 'tr', messages: [] }));
+
+    expect(response.status).toBe(400);
+    expect(mocks.consumeChatMessage).not.toHaveBeenCalled();
+  });
+
+  it('leaves a capped paid provider out of the chain', async () => {
+    const anthropic = provider('anthropic', () => chunks('pahalı'));
+    const gemini = provider('gemini', () => chunks('Merhaba!'));
+    mocks.getOrderedProviders.mockReturnValue([anthropic, gemini]);
+    mocks.cappedProviders.mockResolvedValue(['anthropic']);
+
+    const response = await POST(post(VALID_BODY));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-AI-Provider')).toBe('gemini');
+    expect(await response.text()).toBe('Merhaba!');
+    expect(anthropic.stream).not.toHaveBeenCalled();
+  });
+
+  it('answers 429 when only capped providers are left', async () => {
+    mocks.cappedProviders.mockResolvedValue(['anthropic']);
+
+    const response = await POST(post(VALID_BODY));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('3600');
+  });
+
+  it('records the provider that answered', async () => {
+    const response = await POST(post(VALID_BODY));
+    await response.text();
+
+    expect(mocks.recordProviderUse).toHaveBeenCalledWith('anthropic');
+  });
+
+  it('still streams the reply when recording fails', async () => {
+    mocks.recordProviderUse.mockRejectedValue(new Error('db down'));
+
+    const response = await POST(post(VALID_BODY));
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('Selam!');
   });
 });

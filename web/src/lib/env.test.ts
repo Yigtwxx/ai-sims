@@ -8,8 +8,10 @@ import {
   DEFAULT_GROQ_MODEL,
   DEFAULT_PROVIDER_ORDER,
   DEFAULT_TTS_VOICES,
+  DEFAULT_USAGE_LIMITS,
   getAiEnv,
   getAzureSpeechEnv,
+  getUsageEnv,
   isAzureSpeechConfigured,
   parseProviderOrder,
 } from './env';
@@ -28,6 +30,11 @@ const MANAGED_VARS = [
   'AZURE_TTS_VOICE_TR_MALE',
   'AZURE_TTS_VOICE_EN_FEMALE',
   'AZURE_TTS_VOICE_EN_MALE',
+  'CHAT_DAILY_LIMIT_PER_USER',
+  'CHAT_DAILY_LIMIT_TOTAL',
+  'TTS_DAILY_CHARS_PER_USER',
+  'TTS_DAILY_CHARS_TOTAL',
+  'ANTHROPIC_DAILY_LIMIT',
 ];
 
 beforeEach(() => {
@@ -151,5 +158,22 @@ describe('getAzureSpeechEnv', () => {
     const voices = getAzureSpeechEnv()?.voices;
     expect(voices?.en.female).toBe('en-GB-SoniaNeural');
     expect(voices?.en.male).toBe(DEFAULT_TTS_VOICES.en.male);
+  });
+});
+
+describe('getUsageEnv', () => {
+  it('uses the defaults when nothing is set', () => {
+    expect(getUsageEnv()).toEqual(DEFAULT_USAGE_LIMITS);
+  });
+
+  it('reads positive integer overrides', () => {
+    vi.stubEnv('CHAT_DAILY_LIMIT_PER_USER', ' 20 ');
+    vi.stubEnv('ANTHROPIC_DAILY_LIMIT', '5');
+    expect(getUsageEnv()).toMatchObject({ chatPerUser: 20, anthropicTotal: 5 });
+  });
+
+  it.each(['0', '-3', '1.5', 'many', ''])('keeps the default for %j', (value) => {
+    vi.stubEnv('TTS_DAILY_CHARS_TOTAL', value);
+    expect(getUsageEnv().ttsCharsTotal).toBe(DEFAULT_USAGE_LIMITS.ttsCharsTotal);
   });
 });

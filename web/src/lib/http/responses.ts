@@ -27,5 +27,12 @@ export function invalidRequest(issues: RequestIssue[]): Response {
   return errorResponse('invalid_request', 400, { issues });
 }
 
+/** 429 for a spent daily quota; `Retry-After` says when the next UTC day starts. */
+export function rateLimited(retryAfterSeconds: number): Response {
+  const response = errorResponse('rate_limited', 429);
+  response.headers.set('Retry-After', String(retryAfterSeconds));
+  return response;
+}
+
 /** Status for a request the client abandoned (nginx convention); nobody is listening anyway. */
 export const CLIENT_CLOSED_REQUEST = 499;

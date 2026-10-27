@@ -92,6 +92,8 @@ describe('openChatStream', () => {
       ['401', 401, { error: 'unauthenticated' }, 'unauthenticated'],
       ['503 ai_not_configured', 503, { error: 'ai_not_configured' }, 'not_configured'],
       ['503 for another reason', 503, { error: 'database_not_configured' }, 'unavailable'],
+      ['429 rate_limited', 429, { error: 'rate_limited' }, 'rate_limited'],
+      ['429 from something else', 429, { error: 'slow_down' }, 'invalid'],
       ['502', 502, { error: 'ai_unavailable' }, 'unavailable'],
       ['400', 400, { error: 'invalid_request' }, 'invalid'],
       ['404', 404, { error: 'character_not_found' }, 'invalid'],

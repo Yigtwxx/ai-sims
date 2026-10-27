@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getAzureSpeechEnv: vi.fn(),
   synthesizeSpeech: vi.fn(),
+  consumeSpeechChars: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({ getSession: mocks.getSession }));
@@ -24,6 +25,7 @@ vi.mock('@/lib/env', () => ({
   },
 }));
 vi.mock('@/lib/tts/azure', () => ({ synthesizeSpeech: mocks.synthesizeSpeech }));
+vi.mock('@/lib/usage/quota', () => ({ consumeSpeechChars: mocks.consumeSpeechChars }));
 
 const { POST } = await import('./route');
 
@@ -58,6 +60,7 @@ beforeEach(() => {
   mocks.getSession.mockResolvedValue({ id: 'user-1', isAnonymous: true });
   mocks.getAzureSpeechEnv.mockReturnValue(AZURE_ENV);
   mocks.synthesizeSpeech.mockResolvedValue(SPEECH);
+  mocks.consumeSpeechChars.mockResolvedValue({ ok: true });
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
@@ -169,5 +172,24 @@ describe('POST /api/tts', () => {
     const response = await POST(post(VALID_BODY));
     expect(response.status).toBe(502);
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain('SECRET');
+  });
+});
+
+describe('POST /api/tts daily quota', () => {
+  it('counts the cleaned text in characters', async () => {
+    await POST(post({ ...VALID_BODY, text: '**Merhaba** dünya.' }));
+
+    expect(mocks.consumeSpeechChars).toHaveBeenCalledWith('user-1', 'Merhaba dünya.'.length);
+  });
+
+  it('answers 429 with Retry-After without synthesizing', async () => {
+    mocks.consumeSpeechChars.mockResolvedValue({ ok: false, retryAfterSeconds: 90 });
+
+    const response = await POST(post(VALID_BODY));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('90');
+    expect(await response.json()).toEqual({ error: 'rate_limited' });
+    expect(mocks.synthesizeSpeech).not.toHaveBeenCalled();
   });
 });

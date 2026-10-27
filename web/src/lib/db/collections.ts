@@ -31,9 +31,17 @@ export type ThumbnailDoc = {
   updatedAt: Date;
 };
 
+/** A daily usage counter (`<scope>:<YYYY-MM-DD>`), removed by a TTL index once expired. */
+export type UsageDoc = {
+  _id: string;
+  count: number;
+  expiresAt: Date;
+};
+
 export type Collections = {
   characters: Collection<CharacterDoc>;
   thumbnails: Collection<ThumbnailDoc>;
+  usage: Collection<UsageDoc>;
 };
 
 // One promise per process; reset on failure so the next call retries.
@@ -48,6 +56,9 @@ export async function ensureIndexes(): Promise<void> {
     .collection<CharacterDoc>('characters')
     .createIndex({ userId: 1, updatedAt: -1 }, { name: 'userId_1_updatedAt_-1' });
   // thumbnails are keyed by _id, which MongoDB indexes by default.
+  await db
+    .collection<UsageDoc>('usage')
+    .createIndex({ expiresAt: 1 }, { name: 'expiresAt_ttl', expireAfterSeconds: 0 });
 }
 
 /** Returns typed collections, ensuring indexes once per process. */
@@ -62,5 +73,6 @@ export async function getCollections(): Promise<Collections> {
   return {
     characters: db.collection<CharacterDoc>('characters'),
     thumbnails: db.collection<ThumbnailDoc>('thumbnails'),
+    usage: db.collection<UsageDoc>('usage'),
   };
 }
