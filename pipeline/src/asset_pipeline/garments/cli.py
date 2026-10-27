@@ -32,6 +32,7 @@ class Item:
     genders: tuple[str, ...]
     draft: Callable[[BaseBody], tuple[GarmentMesh, GarmentLines]]
     switches: dict[str, bool]
+    sim: dict[str, float]  # cloth settings over garment_sim.py's defaults
 
 
 def _pencil_skirt(body: BaseBody) -> tuple[GarmentMesh, GarmentLines]:
@@ -40,8 +41,8 @@ def _pencil_skirt(body: BaseBody) -> tuple[GarmentMesh, GarmentLines]:
 
 
 ITEMS = {
-    # Suiting: no pilling.
-    "AS_PencilSkirt": Item(("female",), _pencil_skirt, {"DoPill": False}),
+    # Wool suiting: no pilling, and stiff enough not to fold into the gap between the legs.
+    "AS_PencilSkirt": Item(("female",), _pencil_skirt, {"DoPill": False}, {"bending": 8.0}),
 }
 
 
@@ -71,7 +72,7 @@ def build(archive: Path, name: str, gender: str, frames: int) -> dict[str, objec
     body = load_base_body(base_body_path(archive, gender))
     mesh, lines = item.draft(body)
     work = archive / "build" / "garments" / name / gender
-    job = write_job(work, mesh, body, f"MI_{name}", {"frames": frames}, thickness=0.002)
+    job = write_job(work, mesh, body, f"MI_{name}", {**item.sim, "frames": frames}, thickness=0.002)
     report = run_sim(job)
     draped = Path(str(report["out"]))
     gap = clearance(draped, body)

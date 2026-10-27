@@ -230,7 +230,8 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - En kötü vakalar `docs/handoff.md`'ye kaydedilir; kullanıcıya telefondan 3-4 ekran görüntüsüyle önce/sonra gösterilir.
   - Bilinenler:
     - **Mason (2026-10-27, A2):** kafa mesh'inin boyun ve göğüs parçası diğer erkek yüzlerden ~3.5 cm önde (z 0.130, diğerleri ~0.095); paylaşılan gövdeye takılınca tişört ve kazak yakasından ten taşıyor. Kafa parçası boyun dikişinden aşağıda gövdeye uydurulmalı (dönüştürücü ya da montaj), ya da kıyafet altında kalan kafa köşeleri de gizlenmeli.
-    - **Kalem etek (2026-10-27, A4.0):** kalça ±1'de bacak arasını köprüleyen kumaş iç uyluk morph'unu izliyor; dönüştürücüde düzeltiliyor (1c.5).
+    - **Kalem etek (2026-10-27, A4.0):** kalça ±1'de bacak arasını köprüleyen kumaş iç uyluk morph'unu izliyordu; `3df9de4` (`bridging`, outfit-v7) düzeltti, bütün kıyafetler yeniden dönüştürüldü.
+    - **AO gürültüsü (2026-10-27):** `high` kalitede N8AO, kalem eteğin bacak arasındaki sığ oluğunda kesik koyu noktalar çiziyor; `battery`'de (AO kapalı) yok. Katmanlar ayrık (en az 1.5 mm), geometri sağlam. Başka kıyafetlerin kıvrımlarında da bakılmalı; AO yarıçapı ya da örnek sayısı denenir.
     - Kıyafet morph'ları her kaydırıcı ucunda deri normali boyunca dışarı itiliyor (`pipeline/src/asset_pipeline/mh/outfits.py`: `stack_push` :787, `clear_morphs` :956).
     - Cildi gizleyen maske `body_hide` (:1117). Web'de bağlama `web/src/features/avatar/mh/garments.ts` (`bindGarment` :30).
     - Birden çok kaydırıcının birlikte morph toplamı ayrıca denenmeli (her biri tek başına temiz olsa da).
