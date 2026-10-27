@@ -469,6 +469,13 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
      6. `uv run asset-pipeline mh-convert --character <ad> ... --manifest`, sonra `/dev/thumbs` ile yüz küçük resimleri ve `node scripts/r2-sync.mjs`.
    - Paketlerin kendi saç ve sakalı gelmez: `grooms` işi yalnız `/MetaHumanCharacter/Optional/Grooms`'u tarar. Yüz ve cilt gelir, saç kütüphaneden seçilir (Frey'in uzun saçı ve sakalı dahil).
    - UE 5.8 riski: Skotukeda ve Frey 5.8'i listelemiyor. `fab_import` "created no assets" derse sebep bu olabilir.
+0. **PC'ye geçince, Fab saçı: Epic Long High Ponytail (kullanıcı seçimi, 2026-10-27):**
+   - İlan: https://www.fab.com/listings/d48ad98a-e343-4a2c-abb3-08730c3bf7d9. Personal ve Professional $0, `.mhpkg`, strand groom + "full set of LODs" + wardrobe item.
+   - `grooms` işi bugün onu görmez, önce editörde değiştirilip denenmeli:
+     - `style_folders()` yalnız `GROOM_ASSETS`'i (`/MetaHumanCharacter/Optional/Grooms/GroomAssets/<slot>/<style>`) tarar (`pipeline/unreal/mh_export/grooms.py:148`). Paket `/Game/Fab/<paket>/` altına iner.
+     - `related_assets()` yalnız `/MetaHumanCharacter/` önekli bağımlılıkları alır (`PLUGIN_PREFIX`). Fab paketinin kart mesh'leri ve atlasları `/Game/Fab/` altında olur.
+     - Önce `probe` ile paketin klasör düzeni, `GroomAsset` adı ve kart LOD'ları (`*_CardsMesh_Group<g>_LOD<n>`) olup olmadığı okunur. Kart yoksa Hair Card Generator gerekir.
+   - Sonrası: `ue grooms --args '{"only": ["<stil>"]}'`, `mh-convert --grooms --groom <stil> --manifest`, `/dev/thumbs`, `node scripts/r2-sync.mjs`.
 0. **PC'ye geçince, kendi kıyafetimiz:** yukarıdaki plan, ilk parça düz tişört.
 0. **PC'ye geçince (kullanıcı kararı, 2026-10-27):** `/dev/thumbs` ile yüz, saç ve kıyafet küçük resimlerini yeniden üret (A-pose hatası `motion.ts`'te düzeldi; mevcut görseller A-pozunda ve koyu fonda), sonra `node scripts/r2-sync.mjs` ile R2'ye yükle. Açık fonla çizmek de o sırada düşünülebilir.
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
