@@ -6,21 +6,58 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 - **Başlarken:** önce `git pull` (liste Mac'te de güncellenebilir), sonra `CLAUDE.md`, `docs/handoff.md` ve bu dosya. Kararları tekrar sorma.
 - **Sıra: fazlar** (kullanıcı onaylı, 2026-10-27). Bölüm harfleri konuyu gösterir, sırayı fazlar belirler. Bir faz bitmeden sonrakine geçilmez; faz içinde yazılan sırayla gidilir. Saatler kaba tahmindir (ölçüm yok); A4.0'dan sonra gerçek süreye göre güncellenir. Saatler toplam iştir; 1 subagent'la geçen süre yaklaşık %25-35 kısalır (toplam ~480 saatlik iş ~335 saatte biter).
-  - **Faz 1, temel (~30 sa):** A1 → A2 → A3 → A3b (Fab ve Unreal, uzun işler arka planda) → A4.0 kalem etek (Blender yolu ve paketleyici) → B5 oturma hataları (düzeltmeler dönüştürücüde kalır ve sonraki kıyafetlerin hepsine geçer).
-  - **Faz 2, panel düzeltmeleri ve temel kıyafet (~60 sa):** B1 → B2 → B3 → B4 → D1 küçük resimler (A-pozlu eski görseller gider) → A4.2 tişört → A4.3 şortlar → A4.5 çorap ve külotlu (file çorap hariç).
-  - **Faz 3, iş seti ve karakter (~55 sa):** A4.1'den kumaş pantolon ve gömlek (blazer Faz 7'de) → A4.6'dan polo, chino, kravatlı gömlek → A4.15 varyantlar → C1 kişilik → C2 ses → C3 ifade önizleme.
-  - **Faz 4, günlük (~65 sa):** A4.4 günlük çeşit (elbise, hafif ceket, desen varyantları) → A4.6'nın kalanı (atlet, düz eşofman altı, A kesim etek, biker şort, triko balıkçı, hırka, salopet, gömlek elbise, resort yakalı kısa kollu gömlek; kot ceket Faz 7'de).
-  - **Faz 5, görünüm (~70 sa):** C4 makyaj → C5 cilt detayları → C6 kaş ve kirpik → C7 yüz ince ayarı → C8 gözlük ve şapka → C10 yüz küçük resimlerinde ten.
-  - **Faz 6, spor, ev, ayakkabı, meslek (~60 sa):** A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.16 meslek (scrubs ve aşçı ceketi).
-  - **Faz 7, zor parçalar (~85 sa):** C9 kat kat giyim → blazer + gömlek (A4.1) → kot ceket (A4.6) → A4.10 topuklu ve ayak pozu → A4.7 uzun parçalar (maksi etek ve uzun palto).
-  - **Faz 8, hot ve sexy, kapanış (~55 sa):** A4.8 gece ve seksi çizgi (file çorap dahil) → A4.9 iç giyim → A4.11 mayo ve bikini → D2 son kontrol.
-  - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): her fazın başında oturum fazı alt adımlara böler ve `docs/plans/faz-<n>.md` dosyasına yazar (`superpowers:writing-plans`).
+  - **Faz 1, temel (~30 sa):**
+    - 1a Fab ve yüzler (~6 sa): A1 → A2. Unreal işleri arka planda.
+    - 1b Saçlar (~8 sa): A3 → A3b.
+    - 1c Kalem etek (~10 sa): A4.0, Blender yolu ve paketleyici.
+    - 1d Oturma hataları (~6 sa): B5. Düzeltmeler dönüştürücüde kalır ve sonraki kıyafetlerin hepsine geçer.
+  - **Faz 2, panel düzeltmeleri ve temel kıyafet (~60 sa):**
+    - 2a Göz tonu ve yüz karıştırma (~14 sa): B1 → B2.
+    - 2b Dövme ve takı (~16 sa): B3 → B4.
+    - 2c Küçük resimler (~5 sa): D1. A-pozlu eski görseller gider.
+    - 2d Tişört ve şortlar (~13 sa): A4.2 → A4.3.
+    - 2e Çorap ve külotlu (~12 sa): A4.5, file çorap hariç (şema v3).
+  - **Faz 3, iş seti ve karakter (~55 sa):**
+    - 3a Kumaş pantolon ve gömlek (~13 sa): A4.1'den; blazer Faz 7'de.
+    - 3b Polo, chino, kravatlı gömlek, sıvanmış kol (~12 sa): A4.6'dan üçü → A4.15.
+    - 3c Kişilik ve ses (~22 sa): C1 → C2.
+    - 3d İfade önizleme (~8 sa): C3.
+  - **Faz 4, günlük (~65 sa):**
+    - 4a Elbise ve hafif ceket (~10 sa): A4.4.
+    - 4b Desen varyantları (~10 sa): A4.4'ten çizgili tişört, ekose gömlek, keten pantolon.
+    - 4c Kolay parçalar (~16 sa): A4.6'dan atlet, düz eşofman altı, A kesim etek, biker şort.
+    - 4d Örgüler (~12 sa): A4.6'dan triko balıkçı ve hırka.
+    - 4e Gömlek kalıbından parçalar ve salopet (~17 sa): A4.6'dan resort yakalı kısa kollu gömlek, gömlek elbise, salopet. Kot ceket Faz 7'de.
+  - **Faz 5, görünüm (~70 sa):**
+    - 5a Makyaj (~12 sa): C4.
+    - 5b Cilt detayları (~12 sa): C5.
+    - 5c Kaş ve kirpik (~8 sa): C6.
+    - 5d Yüz ince ayarı (~20 sa): C7.
+    - 5e Gözlük ve şapka (~14 sa): C8.
+    - 5f Yüz küçük resimlerinde ten (~4 sa): C10.
+  - **Faz 6, spor, ev, ayakkabı, meslek (~60 sa):**
+    - 6a Spor (~14 sa): A4.12.
+    - 6b Ev (~10 sa): A4.13.
+    - 6c Ayakkabılar (~22 sa): A4.14. Yöntem yeni (kumaş simülasyonu yok); süre ilk ayakkabıdan sonra düzeltilir.
+    - 6d Meslek (~14 sa): A4.16.
+  - **Faz 7, zor parçalar (~85 sa):**
+    - 7a Kat kat giyim (~25 sa): C9.
+    - 7b Blazer ve kot ceket (~20 sa): A4.1'den blazer + gömlek → A4.6'dan kot ceket.
+    - 7c Topuklu ve ayak pozu (~22 sa): A4.10.
+    - 7d Uzun parçalar (~18 sa): A4.7, maksi etek ve uzun palto.
+  - **Faz 8, hot ve sexy, kapanış (~55 sa):**
+    - 8a Gece elbiseleri ve üstler (~16 sa): A4.8'den bodycon mini elbise, slip elbise, açık sırtlı ya da V yaka üst, korse üst.
+    - 8b Gece altları, saten gömlek, file çorap (~14 sa): A4.8'den deri mini etek, yırtmaçlı etek, deri pantolon, erkek saten gömlek, file çorap.
+    - 8c İç giyim (~10 sa): A4.9.
+    - 8d Mayo ve bikini (~10 sa): A4.11.
+    - 8e Son kontrol (~5 sa): D2.
+  - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): fazlar yukarıdaki alt fazlara bölünmüştür (1a, 1b, ...) ve alt fazlar yazılan sırayla yapılır. Her fazın başında oturum her alt fazı adımlara böler ve `docs/plans/faz-<n>.md` dosyasına alt faz başlıklarıyla yazar (`superpowers:writing-plans`).
     - Bir alt adım en çok ~4-6 saatlik iştir ve kendi başına bitebilir: doğrulama, commit, push. Yarım alt adım push'lanmaz.
     - Plan dosyasında her adımın kutusu, tahmini süresi ve gerçek süresi tutulur. Gerçek süreler sonraki fazların tahminlerini düzeltir; bu dosyadaki faz saatleri de güncellenir.
     - Faz planı kullanıcıya telefondan kısa bir liste olarak gönderilir; onay beklenmeden başlanır.
     - Oturum kesilirse yenisi plan dosyasındaki ilk açık adımdan devam eder.
   - Her faz sonunda kısa bir kontrol yapılır: landing, yeni karakter, o fazın eklediği şeyler ve konuşma ekranı. Kullanıcıya telefondan ekran görüntüleriyle faz özeti gönderilir.
-  - Görevi iki faza bölünmüş maddelerin (A4.1, A4.5, A4.6) kutusu son parçası bitene kadar açık kalır; yanına bitenler not edilir.
+  - Görevi birden çok faza ya da alt faza bölünmüş maddelerin (A4.1, A4.4, A4.5, A4.6, A4.8) kutusu son parçası bitene kadar açık kalır; yanına bitenler not edilir.
   - Unreal ya da Blender arka planda çalışırken aynı fazdaki engelsiz bir web görevine geçilebilir; iş bitince sıraya geri dönülür.
 - **Engel:** bir görev kullanıcıya bağlıysa (indirme, seçim, karar) soruyu aşağıdaki "Kullanıcıya sorular" bölümüne yaz, kullanıcıya kısaca sor ve beklemeden sıradaki engelsiz göreve geç.
 - **Unreal işleri uzun sürer** (yüz başına ~11 dk). `asset-pipeline ue ...` komutlarını arka planda başlat, beklerken web görevlerine devam et. Aynı anda tek editör açılır (RAM yetmiyor).
