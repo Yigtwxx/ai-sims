@@ -14,6 +14,11 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - **Faz 6, spor, ev, ayakkabı, meslek, kış (~90 sa):** A4.12 spor → A4.13 ev → A4.14 ayakkabı çeşitleri → A4.16'dan scrubs ve aşçı ceketi → A4.17'den atkı ve eldiven.
   - **Faz 7, zor parçalar (~130 sa):** C9 kat kat giyim → blazer + gömlek (A4.1) → kot ceket (A4.6) → doktor önlüğü ve reflektörlü yelek (A4.16) → şişme mont (A4.17) → A4.10 topuklu ve ayak pozu → A4.7 uzun parçalar (maksi etek, trençkot, kaban, palto).
   - **Faz 8, hot ve sexy, kapanış (~60 sa):** A4.8 gece ve seksi çizgi (file çorap dahil) → A4.9 iç giyim → A4.11 mayo ve bikini → D2 son kontrol.
+  - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): her fazın başında oturum fazı alt adımlara böler ve `docs/plans/faz-<n>.md` dosyasına yazar (`superpowers:writing-plans`).
+    - Bir alt adım en çok ~4-6 saatlik iştir ve kendi başına bitebilir: doğrulama, commit, push. Yarım alt adım push'lanmaz.
+    - Plan dosyasında her adımın kutusu, tahmini süresi ve gerçek süresi tutulur. Gerçek süreler sonraki fazların tahminlerini düzeltir; bu dosyadaki faz saatleri de güncellenir.
+    - Faz planı kullanıcıya telefondan kısa bir liste olarak gönderilir; onay beklenmeden başlanır.
+    - Oturum kesilirse yenisi plan dosyasındaki ilk açık adımdan devam eder.
   - Her faz sonunda kısa bir kontrol yapılır: landing, yeni karakter, o fazın eklediği şeyler ve konuşma ekranı. Kullanıcıya telefondan ekran görüntüleriyle faz özeti gönderilir.
   - Görevi iki faza bölünmüş maddelerin (A4.1, A4.5, A4.6, A4.16, A4.17) kutusu son parçası bitene kadar açık kalır; yanına bitenler not edilir.
   - Unreal ya da Blender arka planda çalışırken aynı fazdaki engelsiz bir web görevine geçilebilir; iş bitince sıraya geri dönülür.
