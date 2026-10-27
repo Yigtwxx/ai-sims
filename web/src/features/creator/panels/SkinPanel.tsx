@@ -56,7 +56,7 @@ export function SkinPanel({ manifest }: PanelProps) {
 
       <Section title={t('makeup')}>
         <div className="flex items-center justify-between gap-6">
-          <label htmlFor={makeupId} className="text-body-sm text-ink-muted max-w-[34ch]">
+          <label htmlFor={makeupId} className="text-ui text-ink-muted max-w-[34ch]">
             {hasMakeup ? t('makeupHint') : t('makeupUnavailable')}
           </label>
           <Switch

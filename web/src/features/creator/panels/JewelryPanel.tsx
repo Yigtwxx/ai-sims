@@ -42,7 +42,7 @@ export function JewelryPanel() {
     <>
       <div className="flex items-baseline justify-between gap-3">
         <Hint>{t('hint')}</Hint>
-        <span className="text-label text-ink-muted shrink-0 whitespace-nowrap tabular-nums">
+        <span className="text-ink-muted shrink-0 font-mono text-[11px] tracking-[0.08em] whitespace-nowrap uppercase tabular-nums">
           {t('count', { count: config.accessories.length, max: MAX_ACCESSORIES })}
         </span>
       </div>
@@ -64,19 +64,25 @@ export function JewelryPanel() {
                     disabled={!on && full && !slotTaken}
                     onClick={() => toggle(def)}
                     className={cn(
-                      'rounded-tile text-ui inline-flex h-9 items-center gap-2 border px-3 transition-colors duration-200 disabled:opacity-40',
+                      'text-ui inline-flex h-8 items-center gap-2 rounded-full pr-3 pl-2.5 transition-[background-color,color,box-shadow,scale] duration-200 active:scale-[0.97] active:duration-100 disabled:opacity-40',
                       on
-                        ? 'border-marquee bg-backstage-lift text-ink'
-                        : 'border-hairline text-ink-muted hover:border-ink-faint hover:text-ink',
+                        ? 'bg-paper-lift text-ink shadow-[inset_0_0_0_1.5px_var(--color-ink)]'
+                        : 'text-ink-muted hover:text-ink shadow-[inset_0_0_0_1px_rgb(23_26_33/0.18)] hover:shadow-[inset_0_0_0_1px_rgb(23_26_33/0.45)]',
                     )}
                   >
                     <span
                       aria-hidden="true"
-                      className="ring-hairline size-2.5 rounded-full ring-1"
+                      className="size-2.5 rounded-full shadow-[inset_0_0_0_1px_rgb(23_26_33/0.2)]"
                       style={{ background: def.defaultColor }}
                     />
                     {t(`items.${def.id as ItemKey}`)}
-                    {on ? <CheckIcon weight="bold" className="text-marquee size-3.5" /> : null}
+                    {on ? (
+                      <CheckIcon
+                        weight="bold"
+                        aria-hidden="true"
+                        className="text-cobalt animate-mark-in size-3.5"
+                      />
+                    ) : null}
                   </button>
                 );
               })}

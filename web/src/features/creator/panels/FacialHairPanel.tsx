@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 
 import { groomsFor } from '../reconcile';
 import { thumbnailSrc } from '../useMhManifest';
-import { OptionGrid, OptionTile } from '../ui/OptionGrid';
+import { OptionList } from '../ui/OptionList';
 import { Hint, Section } from '../ui/controls';
 
 import { useConfig, useLabel, type PanelProps } from './shared';
@@ -27,23 +27,19 @@ export function FacialHairPanel({ manifest }: PanelProps) {
             {options.length === 0 ? (
               <Hint>{t('unavailable')}</Hint>
             ) : (
-              <OptionGrid label={t(slot)} columns="grid-cols-4">
-                <OptionTile
-                  label={t('none')}
-                  none
-                  selected={current === null}
-                  onSelect={() => update((draft) => void (draft[slot].style = null))}
-                />
-                {options.map((groom) => (
-                  <OptionTile
-                    key={groom.id}
-                    label={label(groom.label)}
-                    image={thumbnailSrc(groom.thumbnail)}
-                    selected={current === groom.id}
-                    onSelect={() => update((draft) => void (draft[slot].style = groom.id))}
-                  />
-                ))}
-              </OptionGrid>
+              <OptionList
+                label={t(slot)}
+                items={[
+                  { value: null, label: t('none') },
+                  ...options.map((groom) => ({
+                    value: groom.id,
+                    label: label(groom.label),
+                    image: thumbnailSrc(groom.thumbnail),
+                  })),
+                ]}
+                value={current}
+                onChange={(style) => update((draft) => void (draft[slot].style = style))}
+              />
             )}
           </Section>
         );

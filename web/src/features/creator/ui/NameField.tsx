@@ -11,27 +11,53 @@ interface NameFieldProps {
   maxLength: number;
   onChange: (value: string) => void;
   error?: string;
+  /** A quiet line under the field (where an unnamed draft is kept). */
+  note?: string;
   disabled?: boolean;
+  className?: string;
 }
 
-/** The character's name as the title of the panel: display type, amber rule on focus. */
+/**
+ * The character's name at the head of the panel: a mono kicker over the name
+ * itself, the count on the name's baseline, and a hairline that draws in
+ * cobalt while it is edited.
+ */
 export const NameField = forwardRef<HTMLInputElement, NameFieldProps>(function NameField(
-  { label, placeholder, value, maxLength, onChange, error, disabled },
+  { label, placeholder, value, maxLength, onChange, error, note, disabled, className },
   ref,
 ) {
   const id = useId();
   const errorId = `${id}-error`;
+  const noteId = `${id}-note`;
   // The count is noise until it matters: shown while typing or near the limit.
   const nearLimit = value.length >= maxLength - 8;
+  const describedBy = error ? errorId : note ? noteId : undefined;
   return (
-    <div className="group/name px-5 pt-2 pb-3 lg:px-6 lg:pt-4 lg:pb-5">
-      <div className="flex items-baseline justify-between lg:mb-1">
-        <label htmlFor={id} className="text-label text-ink-muted">
-          {label}
-        </label>
+    <div className={cn('group/name min-w-0', className)}>
+      <label
+        htmlFor={id}
+        className="text-ink-faint block truncate font-mono text-[11px] leading-tight tracking-[0.12em] uppercase"
+      >
+        {label}
+      </label>
+      <div className="mt-1.5 flex items-baseline gap-3">
+        <input
+          ref={ref}
+          id={id}
+          value={value}
+          maxLength={maxLength}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          autoComplete="off"
+          spellCheck={false}
+          aria-invalid={Boolean(error)}
+          aria-describedby={describedBy}
+          className="text-ink caret-cobalt placeholder:text-ink-faint/70 min-w-0 flex-1 truncate bg-transparent text-[1.3125rem] leading-tight font-medium tracking-[-0.015em] outline-none focus-visible:outline-none disabled:opacity-50"
+        />
         <span
           className={cn(
-            'text-label tabular-nums transition-opacity duration-200 group-focus-within/name:opacity-100',
+            'shrink-0 font-mono text-[11px] tabular-nums transition-opacity duration-200 group-focus-within/name:opacity-100',
             nearLimit ? 'text-ink-muted opacity-100' : 'text-ink-faint opacity-0',
           )}
           aria-hidden="true"
@@ -39,31 +65,21 @@ export const NameField = forwardRef<HTMLInputElement, NameFieldProps>(function N
           {value.length}/{maxLength}
         </span>
       </div>
-      <input
-        ref={ref}
-        id={id}
-        value={value}
-        maxLength={maxLength}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        autoComplete="off"
-        spellCheck={false}
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? errorId : undefined}
-        className="font-display text-ink caret-marquee placeholder:text-ink-faint w-full bg-transparent text-[1.75rem] outline-none focus-visible:outline-none disabled:opacity-50 lg:text-[clamp(2.25rem,3vw,3rem)]"
-      />
-      <div className="bg-hairline relative mt-1 h-px lg:mt-2">
+      <div className="bg-hairline relative mt-2 h-px">
         <span
           className={cn(
             'ease-out-expo absolute inset-0 origin-left transition-transform duration-500 group-focus-within/name:scale-x-100',
-            error ? 'bg-alert scale-x-100' : 'bg-marquee scale-x-0',
+            error ? 'bg-alert scale-x-100' : 'bg-cobalt scale-x-0',
           )}
         />
       </div>
       {error ? (
-        <p id={errorId} role="alert" className="text-label text-alert mt-2">
+        <p id={errorId} role="alert" className="text-label text-alert mt-1.5">
           {error}
+        </p>
+      ) : note ? (
+        <p id={noteId} className="text-ink-faint mt-1.5 text-[12px] leading-snug">
+          {note}
         </p>
       ) : null}
     </div>

@@ -94,6 +94,27 @@ test.describe('creator options (fixture manifest)', () => {
     expect(FIXTURE_SKINS.female).toContain(await back.getAttribute('aria-label'));
   });
 
+  test('a framing picked over the stage reads as pressed until the next category', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openCreator(page);
+    const framing = page.getByRole('group', { name: c.camera.label, exact: true });
+    const preset = (name: keyof typeof c.camera.presets) =>
+      framing.getByRole('button', { name: c.camera.presets[name], exact: true });
+
+    // Identity frames the whole body; the bust is a pick of one's own.
+    await expect(preset('body')).toHaveAttribute('aria-pressed', 'true');
+    await preset('torso').click();
+    await expect(preset('torso')).toHaveAttribute('aria-pressed', 'true');
+    await expect(preset('body')).toHaveAttribute('aria-pressed', 'false');
+
+    // A new category frames itself again: the face tab shows the face.
+    await openCategory(page, c.categories.face);
+    await expect(preset('head')).toHaveAttribute('aria-pressed', 'true');
+    await expect(preset('torso')).toHaveAttribute('aria-pressed', 'false');
+  });
+
   test('the male body has no curvy preset and a curvy pick lands on average', async ({ page }) => {
     test.setTimeout(120_000);
     await openCreator(page);

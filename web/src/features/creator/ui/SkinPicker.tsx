@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 import { groupByToneBand, stageSwatchBackground, type ToneBand } from '../skinSwatch';
 
-import { SlidingIndicator } from './controls';
+import { SlidingIndicator, SWATCH_RING } from './controls';
 import { onGridKeyDown } from './OptionGrid';
 
 export interface SkinOption {
@@ -27,8 +27,6 @@ interface SkinPickerProps {
   onChange: (id: string) => void;
 }
 
-const RING = '-inset-[5px] rounded-full shadow-[inset_0_0_0_2px_var(--color-marquee)]';
-
 /**
  * Skin sets as named, lit swatches in light / medium / deep bands. Neighbouring
  * presets can share an average colour and differ only in texture, so every
@@ -46,10 +44,13 @@ export function SkinPicker({ label, bandLabels, options, value, onChange }: Skin
     >
       {groupByToneBand(options).map(({ band, items }) => (
         <div key={band} role="group" aria-label={bandLabels[band]} className="flex flex-col gap-2">
-          <p aria-hidden="true" className="text-label text-ink-faint">
+          <p
+            aria-hidden="true"
+            className="text-ink-faint font-mono text-[11px] tracking-[0.1em] uppercase"
+          >
             {bandLabels[band]}
           </p>
-          <div className="stagger-in grid grid-cols-[repeat(auto-fill,minmax(3.75rem,1fr))] gap-x-1 gap-y-3">
+          <div className="stagger-in grid grid-cols-[repeat(auto-fill,minmax(3.5rem,1fr))] gap-x-1 gap-y-3">
             {items.map((option) => {
               const selected = option.id === value;
               return (
@@ -60,22 +61,21 @@ export function SkinPicker({ label, bandLabels, options, value, onChange }: Skin
                   aria-checked={selected}
                   aria-label={option.label}
                   onClick={() => onChange(option.id)}
-                  className="group/skin flex min-w-0 flex-col items-center gap-2 pt-1.5 outline-none"
+                  className="group/skin flex min-w-0 flex-col items-center gap-2 pt-1 outline-none"
                 >
                   <span
-                    className={cn(
-                      'ease-out-expo group-focus-visible/skin:outline-marquee relative block size-10 shrink-0 rounded-full transition-[scale,box-shadow] duration-300 group-hover/skin:scale-105 group-focus-visible/skin:outline-2 group-focus-visible/skin:outline-offset-[6px] group-active/skin:scale-95 group-active/skin:duration-100',
-                      selected ? 'ring-0' : 'ring-hairline ring-1',
-                    )}
+                    className="ease-out-expo group-focus-visible/skin:outline-cobalt relative block size-[30px] shrink-0 rounded-full shadow-[inset_0_0_0_1px_rgb(23_26_33/0.12)] transition-[scale] duration-300 group-hover/skin:scale-[1.06] group-focus-visible/skin:outline-2 group-focus-visible/skin:outline-offset-[5px] group-active/skin:scale-95 group-active/skin:duration-100"
                     style={{ background: stageSwatchBackground(option.swatch) }}
                   >
-                    {selected ? <SlidingIndicator layoutId={ringId} className={RING} /> : null}
+                    {selected ? (
+                      <SlidingIndicator layoutId={ringId} className={SWATCH_RING} />
+                    ) : null}
                   </span>
                   <span
                     className={cn(
                       'text-label max-w-full truncate leading-tight transition-colors duration-200',
                       selected
-                        ? 'text-ink font-medium'
+                        ? 'text-ink font-semibold'
                         : 'text-ink-muted group-hover/skin:text-ink',
                     )}
                   >

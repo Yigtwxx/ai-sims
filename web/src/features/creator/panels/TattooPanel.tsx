@@ -69,14 +69,16 @@ export function TattooPanel() {
                 aria-checked={active}
                 onClick={() => setDesign(id)}
                 className={cn(
-                  'rounded-tile flex aspect-square flex-col items-center justify-center gap-1.5 border transition-colors duration-200',
+                  'rounded-tile flex aspect-square flex-col items-center justify-center gap-1.5 transition-[background-color,color,box-shadow,scale] duration-200 active:scale-[0.97] active:duration-100',
                   active
-                    ? 'border-marquee bg-backstage-lift text-ink'
-                    : 'border-hairline text-ink-muted hover:border-ink-faint hover:text-ink',
+                    ? 'bg-paper-lift text-ink shadow-[inset_0_0_0_2px_var(--color-ink)]'
+                    : 'text-ink-muted hover:text-ink shadow-[inset_0_0_0_1px_rgb(23_26_33/0.12)] hover:shadow-[inset_0_0_0_1px_rgb(23_26_33/0.35)]',
                 )}
               >
                 <Glyph weight="thin" className="size-8" aria-hidden="true" />
-                <span className="text-label">{t(`designs.${id}`)}</span>
+                <span className={cn('text-label', active && 'font-semibold')}>
+                  {t(`designs.${id}`)}
+                </span>
               </button>
             );
           })}

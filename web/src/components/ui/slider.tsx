@@ -6,9 +6,11 @@ import { Slider as SliderPrimitive } from 'radix-ui';
 import { cn } from '@/lib/utils';
 
 /*
- * shadcn/ui Slider (new-york), restyled: a hairline track, an amber range from
- * the origin and an amber thumb with a soft halo on hover and focus. Set
- * `centered` for -1..1 values so the range grows from the middle. aria-label,
+ * shadcn/ui Slider (new-york), restyled as an instrument: a 2px hairline
+ * track, an ink range from the origin and a slim cobalt handle (2×14 px drawn,
+ * a 24 px invisible hit area around it). The handle grows a little under the
+ * pointer and carries the focus ring. Set `centered` for -1..1 values so the
+ * range grows from the middle, which is marked by a short tick. aria-label,
  * aria-labelledby and aria-valuetext are applied to the thumb (the element
  * with role="slider"), not the wrapper.
  */
@@ -41,29 +43,29 @@ function Slider({
       min={min}
       max={max}
       className={cn(
-        'relative flex h-6 w-full touch-none items-center select-none data-[disabled]:opacity-40',
+        'group/slider relative flex h-6 w-full cursor-pointer touch-none items-center select-none data-[disabled]:cursor-default data-[disabled]:opacity-40',
         className,
       )}
       {...props}
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
-        className="bg-hairline relative h-[3px] w-full grow overflow-hidden rounded-full"
+        className="bg-hairline relative h-0.5 w-full grow overflow-hidden"
       >
         {centered ? (
           <span
             aria-hidden="true"
-            className="bg-marquee absolute inset-y-0"
+            className="bg-ink absolute inset-y-0"
             style={{ left: `${Math.min(origin, at)}%`, width: `${Math.abs(at - origin)}%` }}
           />
         ) : (
-          <SliderPrimitive.Range data-slot="slider-range" className="bg-marquee absolute h-full" />
+          <SliderPrimitive.Range data-slot="slider-range" className="bg-ink absolute h-full" />
         )}
       </SliderPrimitive.Track>
       {centered ? (
         <span
           aria-hidden="true"
-          className="bg-ink-faint absolute top-1/2 h-2.5 w-px -translate-y-1/2"
+          className="bg-ink-faint absolute top-1/2 h-2 w-px -translate-y-1/2"
           style={{ left: `${origin}%` }}
         />
       ) : null}
@@ -75,7 +77,7 @@ function Slider({
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledBy}
           aria-valuetext={ariaValueText}
-          className="bg-marquee border-backstage block size-[18px] shrink-0 cursor-grab rounded-full border-[3px] shadow-[0_1px_4px_rgb(5_5_4/0.6)] transition-[box-shadow,scale] duration-200 hover:shadow-[0_1px_4px_rgb(5_5_4/0.6),0_0_0_5px_rgb(255_181_71/0.16)] focus-visible:shadow-[0_1px_4px_rgb(5_5_4/0.6),0_0_0_6px_rgb(255_181_71/0.3)] focus-visible:outline-none active:scale-110 active:cursor-grabbing"
+          className="bg-cobalt focus-visible:outline-cobalt relative block h-3.5 w-0.5 shrink-0 cursor-grab rounded-full transition-[height,width] duration-200 ease-out group-hover/slider:h-[18px] after:absolute after:-inset-x-[11px] after:-inset-y-[5px] after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-[5px] active:h-5 active:w-[3px] active:cursor-grabbing"
         />
       ))}
     </SliderPrimitive.Root>

@@ -1,8 +1,8 @@
 'use client';
 
-import { CheckIcon, ProhibitIcon } from '@phosphor-icons/react';
+import { ProhibitIcon } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
-import { memo, useId, type ReactNode } from 'react';
+import { memo, useId, type KeyboardEvent, type ReactNode } from 'react';
 
 import { SPRING_SNAP } from '@/components/motion/tokens';
 import { Slider } from '@/components/ui/slider';
@@ -35,7 +35,10 @@ export const SlidingIndicator = memo(function SlidingIndicator({
   );
 });
 
-/** A titled block inside a category: more space above than below. */
+/**
+ * A titled block inside a category: a mono kicker with its count or current
+ * value on the right ("SAÇ MODELİ · 24"), more space above than below.
+ */
 export function Section({
   title,
   aside,
@@ -49,16 +52,13 @@ export function Section({
 }) {
   const id = useId();
   return (
-    <section
-      aria-labelledby={id}
-      className={cn('flex flex-col gap-3.5 pt-9 first:pt-0', className)}
-    >
-      <header className="flex min-h-5 items-baseline justify-between gap-3">
-        <h3 id={id} className="text-ui text-ink font-semibold">
+    <section aria-labelledby={id} className={cn('flex flex-col gap-3 pt-8 first:pt-0', className)}>
+      <header className="flex min-h-4 items-baseline justify-between gap-3">
+        <h3 id={id} className="text-kicker text-ink-faint">
           {title}
         </h3>
-        {aside ? (
-          <span className="text-label text-ink-faint min-w-0 truncate tabular-nums">{aside}</span>
+        {aside !== undefined && aside !== null ? (
+          <span className="text-kicker text-ink-faint min-w-0 truncate tabular-nums">{aside}</span>
         ) : null}
       </header>
       {children}
@@ -100,11 +100,15 @@ interface LabeledSliderProps {
   adornment?: ReactNode;
   /**
    * The section title already names this slider: keep the label for screen
-   * readers only and drop the value row (the section shows it instead).
+   * readers only and drop the value column (the section shows it instead).
    */
   labelHidden?: boolean;
 }
 
+/**
+ * One measured row, like a channel on a mixing desk: the name, the track and
+ * the reading in a fixed mono column, so a column of sliders lines up.
+ */
 export function LabeledSlider({
   label,
   value,
@@ -120,88 +124,120 @@ export function LabeledSlider({
   labelHidden = false,
 }: LabeledSliderProps) {
   const id = useId();
-  return (
-    <div className="flex flex-col">
-      {labelHidden ? (
+  const slider = (
+    <Slider
+      aria-labelledby={id}
+      aria-valuetext={valueText}
+      value={[value]}
+      min={min}
+      max={max}
+      step={step}
+      centered={centered}
+      disabled={disabled}
+      onValueChange={([next]) => {
+        if (next !== undefined) onChange(next);
+      }}
+      // A drag is one undo step, not one per pointer move.
+      onPointerDown={() => useCreatorStore.getState().beginGesture()}
+      onPointerUp={endGesture}
+      onLostPointerCapture={endGesture}
+      onValueCommit={endGesture}
+    />
+  );
+  // Pulled up to the track: the ends belong to this slider, not the next row.
+  const endWords = ends ? (
+    <div
+      className="text-ink-faint -mt-1 flex justify-between text-[11px] leading-tight"
+      aria-hidden="true"
+    >
+      <span>{ends[0]}</span>
+      <span>{ends[1]}</span>
+    </div>
+  ) : null;
+
+  if (labelHidden) {
+    return (
+      <div className="flex flex-col">
         <label id={id} className="sr-only">
           {label}
         </label>
-      ) : (
-        <div className="flex items-baseline justify-between gap-3">
-          <label id={id} className="text-label text-ink-muted">
-            {label}
-          </label>
-          <span className="text-label text-ink flex items-center gap-2 font-medium tabular-nums">
-            {adornment}
-            {valueText}
-          </span>
-        </div>
-      )}
-      <Slider
-        className={labelHidden ? undefined : 'mt-1'}
-        aria-labelledby={id}
-        aria-valuetext={valueText}
-        value={[value]}
-        min={min}
-        max={max}
-        step={step}
-        centered={centered}
-        disabled={disabled}
-        onValueChange={([next]) => {
-          if (next !== undefined) onChange(next);
-        }}
-        // A drag is one undo step, not one per pointer move.
-        onPointerDown={() => useCreatorStore.getState().beginGesture()}
-        onPointerUp={endGesture}
-        onLostPointerCapture={endGesture}
-        onValueCommit={endGesture}
-      />
-      {ends ? (
-        // Pulled up to the track: the ends belong to this slider, not the next row.
-        <div
-          className="text-label text-ink-faint -mt-0.5 flex justify-between leading-tight"
-          aria-hidden="true"
-        >
-          <span>{ends[0]}</span>
-          <span>{ends[1]}</span>
-        </div>
-      ) : null}
+        {slider}
+        {endWords}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-[minmax(0,5.25rem)_minmax(0,1fr)_3.75rem] items-center gap-x-3.5">
+      <label id={id} className="text-label text-ink-muted leading-tight">
+        {label}
+      </label>
+      {slider}
+      <span className="text-ink flex items-center justify-end gap-1.5 font-mono text-[12px] tabular-nums">
+        {adornment}
+        {valueText}
+      </span>
+      {endWords ? <div className="col-start-2">{endWords}</div> : null}
     </div>
   );
 }
 
+interface PillOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+/**
+ * Pill segments in a hairline capsule; the picked one is an ink pill that
+ * slides between them. `mono` sets the labels as small tracked capitals (stage
+ * and filter controls); the default is the UI face (choices in a panel).
+ */
+function pillClasses(active: boolean, mono: boolean) {
+  return cn(
+    'relative min-w-0 rounded-full whitespace-nowrap transition-[color,scale] duration-200 active:scale-[0.97] active:duration-100 focus-visible:outline-offset-1 disabled:opacity-40',
+    mono ? 'h-7 px-3 font-mono text-[11px] tracking-[0.1em] uppercase' : 'text-ui h-8 px-3.5',
+    active ? 'text-paper' : 'text-ink-muted hover:text-ink',
+  );
+}
+
+const PILL_FILL = 'inset-0 rounded-full bg-ink';
+const PILL_BAR = 'border-ink/15 flex rounded-full border p-[3px]';
+
 interface SegmentedProps<T extends string> {
   label: string;
   value: T;
-  options: readonly { value: T; label: string }[];
+  options: readonly PillOption<T>[];
   onChange: (value: T) => void;
   className?: string;
+  mono?: boolean;
 }
 
-/** A radio group drawn as one segmented bar. */
+/** A radio group drawn as one segmented pill bar; arrow keys move the pick. */
 export function Segmented<T extends string>({
   label,
   value,
   options,
   onChange,
   className,
+  mono = false,
 }: SegmentedProps<T>) {
   const indicator = `segment-${useId()}`;
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const index = options.findIndex((option) => option.value === value);
+    const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!delta) return;
+    event.preventDefault();
+    const next = options[(index + delta + options.length) % options.length];
+    onChange(next.value);
+    const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+    buttons[options.indexOf(next)]?.focus();
+  };
   return (
     <div
       role="radiogroup"
       aria-label={label}
-      className={cn('rounded-control border-hairline bg-backstage flex border p-0.5', className)}
-      onKeyDown={(event) => {
-        const index = options.findIndex((option) => option.value === value);
-        const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-        if (!delta) return;
-        event.preventDefault();
-        const next = options[(index + delta + options.length) % options.length];
-        onChange(next.value);
-        const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]');
-        buttons[options.indexOf(next)]?.focus();
-      }}
+      className={cn(PILL_BAR, className)}
+      onKeyDown={onKeyDown}
     >
       {options.map((option) => {
         const active = option.value === value;
@@ -213,17 +249,54 @@ export function Segmented<T extends string>({
             aria-checked={active}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(option.value)}
-            className={cn(
-              'rounded-tile text-ui relative h-9 min-w-0 flex-1 px-2 transition-[color,scale] duration-200 active:scale-[0.97] active:duration-100',
-              active ? 'text-ink' : 'text-ink-muted hover:text-ink',
-            )}
+            className={cn(pillClasses(active, mono), 'flex-1')}
           >
-            {active ? (
-              <SlidingIndicator
-                layoutId={indicator}
-                className="rounded-tile bg-backstage-lift inset-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_1px_2px_rgb(5_5_4/0.4)]"
-              />
-            ) : null}
+            {active ? <SlidingIndicator layoutId={indicator} className={PILL_FILL} /> : null}
+            <span className="relative block truncate">{option.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+interface PressedPillsProps<T extends string> {
+  label: string;
+  /** The pressed option; null when none is. */
+  value: T | null;
+  options: readonly PillOption<T>[];
+  onChange: (value: T) => void;
+  className?: string;
+  mono?: boolean;
+}
+
+/**
+ * The same pill bar as toggle buttons (aria-pressed) for things that are not a
+ * value of the character: camera framings, list filters. Each pill is its own
+ * tab stop, like any row of buttons.
+ */
+export function PressedPills<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+  mono = true,
+}: PressedPillsProps<T>) {
+  const indicator = `pressed-${useId()}`;
+  return (
+    <div role="group" aria-label={label} className={cn(PILL_BAR, className)}>
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option.value)}
+            className={pillClasses(active, mono)}
+          >
+            {active ? <SlidingIndicator layoutId={indicator} className={PILL_FILL} /> : null}
             <span className="relative block truncate">{option.label}</span>
           </button>
         );
@@ -252,6 +325,9 @@ interface SwatchPickerProps {
   iris?: boolean;
 }
 
+/** The ink ring around a picked swatch, with a paper gap so it never touches the colour. */
+export const SWATCH_RING = '-inset-1 rounded-full shadow-[inset_0_0_0_2px_var(--color-ink)]';
+
 /** Circular colour radios, with an optional leading "none". */
 export function SwatchPicker({
   label,
@@ -263,18 +339,18 @@ export function SwatchPicker({
   iris = false,
 }: SwatchPickerProps) {
   const indicator = `swatch-${useId()}`;
-  const dimension = size === 'sm' ? 'size-8' : 'size-10';
-  const swatch = (selected: boolean) =>
-    cn(
-      'relative flex shrink-0 items-center justify-center rounded-full transition-[box-shadow,scale] duration-200 hover:scale-105 active:scale-95 active:duration-100 focus-visible:outline-2 focus-visible:outline-offset-[6px] focus-visible:outline-marquee',
-      dimension,
-      selected ? 'ring-0' : 'ring-1 ring-hairline',
-    );
-  // The amber ring travels between swatches; a 3px gap keeps it off the colour.
-  const ring = (
-    <SlidingIndicator
-      layoutId={indicator}
-      className="-inset-[5px] rounded-full shadow-[inset_0_0_0_2px_var(--color-marquee)]"
+  const dimension = size === 'sm' ? 'size-7' : 'size-[30px]';
+  const swatch = cn(
+    'relative flex shrink-0 items-center justify-center rounded-full transition-[scale] duration-200 hover:scale-[1.06] active:scale-95 active:duration-100 focus-visible:outline-offset-[5px]',
+    dimension,
+  );
+  // The ring travels between swatches.
+  const ring = <SlidingIndicator layoutId={indicator} className={SWATCH_RING} />;
+  // A hairline inside the edge keeps pale colours off the paper.
+  const edge = (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_rgb(23_26_33/0.12)]"
     />
   );
 
@@ -288,9 +364,10 @@ export function SwatchPicker({
           aria-label={noneLabel}
           title={noneLabel}
           onClick={() => onChange(null)}
-          className={cn(swatch(value === null), 'bg-backstage-raised text-ink-faint')}
+          className={cn(swatch, 'bg-paper text-ink-faint')}
         >
           {value === null ? ring : null}
+          {edge}
           <ProhibitIcon className="size-4" weight="light" aria-hidden="true" />
         </button>
       ) : null}
@@ -306,24 +383,18 @@ export function SwatchPicker({
             aria-label={color.label}
             title={color.label}
             onClick={() => onChange(color.value)}
-            className={swatch(selected)}
+            className={swatch}
             style={{
               background:
                 fill === null
-                  ? 'repeating-linear-gradient(135deg, var(--color-backstage-lift) 0 4px, var(--color-backstage-raised) 4px 8px)'
+                  ? 'repeating-linear-gradient(135deg, var(--color-paper-lift) 0 4px, var(--color-paper-raised) 4px 8px)'
                   : iris
                     ? `radial-gradient(circle, rgb(8 7 7) 0 21%, ${fill} 25%, ${fill} 56%, rgb(16 13 10) 70%)`
                     : fill,
             }}
           >
             {selected ? ring : null}
-            {selected && !iris ? (
-              <CheckIcon
-                weight="bold"
-                aria-hidden="true"
-                className="text-ink animate-mark-in size-3.5 mix-blend-difference"
-              />
-            ) : null}
+            {edge}
           </button>
         );
       })}
@@ -338,7 +409,7 @@ interface ChipRadioProps<T extends string> {
   onChange: (value: T) => void;
 }
 
-/** Wrapping chips for choices with longer or many labels. */
+/** Wrapping pills for choices with longer or many labels; the pick is filled with ink. */
 export function ChipRadio<T extends string>({
   label,
   value,
@@ -359,19 +430,13 @@ export function ChipRadio<T extends string>({
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-tile text-ui relative h-9 border px-3 transition-[border-color,color,scale] duration-200 active:scale-[0.97] active:duration-100 disabled:opacity-40',
+              'text-ui relative h-8 rounded-full px-3 transition-[color,box-shadow,scale] duration-200 active:scale-[0.97] active:duration-100 disabled:opacity-40',
               active
-                ? 'text-ink border-transparent'
-                : 'border-hairline text-ink-muted hover:border-ink-faint hover:text-ink',
+                ? 'text-paper'
+                : 'text-ink-muted hover:text-ink shadow-[inset_0_0_0_1px_rgb(23_26_33/0.18)] hover:shadow-[inset_0_0_0_1px_rgb(23_26_33/0.45)]',
             )}
           >
-            {/* Inset shadow, not a border: Motion keeps shadows crisp while it scales. */}
-            {active ? (
-              <SlidingIndicator
-                layoutId={indicator}
-                className="rounded-tile bg-backstage-lift -inset-px shadow-[inset_0_0_0_1px_var(--color-marquee)]"
-              />
-            ) : null}
+            {active ? <SlidingIndicator layoutId={indicator} className={PILL_FILL} /> : null}
             <span className="relative">{option.label}</span>
           </button>
         );

@@ -7,11 +7,10 @@ import {
   ShuffleIcon,
   SpinnerGapIcon,
 } from '@phosphor-icons/react';
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 
 interface ActionBarProps {
   labels: { undo: string; redo: string; randomize: string; done: string; saving: string };
@@ -25,63 +24,69 @@ interface ActionBarProps {
   onDone: () => void;
 }
 
-const isMac = () => typeof navigator !== 'undefined' && /Mac|iP(hone|ad)/.test(navigator.platform);
+type ShortcutKey = 'undo' | 'redo' | 'random';
 
-/** Shortcut text for tooltips; only rendered on the client, when a tooltip opens. */
-function Shortcut({ keys }: { keys: 'undo' | 'redo' | 'random' }) {
-  const mod = isMac() ? '⌘' : 'Ctrl';
-  const text = keys === 'undo' ? `${mod}+Z` : keys === 'redo' ? `${mod}+⇧+Z` : 'R';
-  return <kbd className="text-ink-faint ml-2 font-sans">{text}</kbd>;
+const isMac = () => typeof navigator !== 'undefined' && /Mac|iP(hone|ad)/.test(navigator.platform);
+const noSubscribe = () => () => {};
+
+/** The platform's key names; the server (and hydration) renders the Ctrl spelling. */
+function useShortcuts(): Record<ShortcutKey, string> {
+  const mac = useSyncExternalStore(noSubscribe, isMac, () => false);
+  return mac
+    ? { undo: '⌘Z', redo: '⇧⌘Z', random: 'R' }
+    : { undo: 'Ctrl Z', redo: 'Ctrl Y', random: 'R' };
 }
 
+const KEYSHORTCUTS: Record<ShortcutKey, string> = {
+  undo: 'Control+Z Meta+Z',
+  redo: 'Control+Shift+Z Meta+Shift+Z Control+Y',
+  random: 'R',
+};
+
+/** A quiet icon button with its key written beside the icon (desktop only). */
 function IconAction({
   label,
   shortcut,
+  keys,
   disabled,
   onClick,
-  className,
   children,
 }: {
   label: string;
-  shortcut: 'undo' | 'redo' | 'random';
+  shortcut: ShortcutKey;
+  keys: string;
   disabled?: boolean;
   onClick: () => void;
-  className?: string;
   children: ReactNode;
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
+        <button
           type="button"
-          variant="quiet"
-          size="icon"
           aria-label={label}
-          aria-keyshortcuts={
-            shortcut === 'undo'
-              ? 'Control+Z Meta+Z'
-              : shortcut === 'redo'
-                ? 'Control+Shift+Z Meta+Shift+Z'
-                : 'R'
-          }
+          aria-keyshortcuts={KEYSHORTCUTS[shortcut]}
           disabled={disabled}
           onClick={onClick}
-          className={cn('size-11', className)}
+          className="group/action text-ink-muted hover:text-ink hover:bg-ink/[0.05] inline-flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-2.5 transition-[background-color,color,scale] duration-200 active:scale-[0.96] active:duration-100 disabled:pointer-events-none disabled:opacity-35 lg:h-9 lg:justify-start lg:pr-2 lg:pl-2"
         >
           {children}
-        </Button>
+          <kbd className="border-hairline text-ink-faint group-hover/action:text-ink-muted hidden rounded-[5px] border px-1 py-px font-mono text-[10.5px] leading-tight tracking-[0.04em] whitespace-nowrap lg:inline">
+            {keys}
+          </kbd>
+        </button>
       </TooltipTrigger>
       <TooltipContent>
         {label}
-        <Shortcut keys={shortcut} />
+        <kbd className="text-ink-faint ml-2 font-mono text-[11px]">{keys}</kbd>
       </TooltipContent>
     </Tooltip>
   );
 }
 
 /**
- * Pinned to the bottom of the panel: history as one paired control, randomize,
- * and the amber "Bitti" that opens the premiere.
+ * Pinned to the bottom of the panel: undo, redo and randomize as quiet keys
+ * (each with its shortcut), and the ink "Bitti" pill that opens the premiere.
  */
 export function ActionBar({
   labels,
@@ -94,51 +99,48 @@ export function ActionBar({
   onRandomize,
   onDone,
 }: ActionBarProps) {
+  const keys = useShortcuts();
   return (
-    <footer className="border-hairline bg-backstage flex items-center gap-2.5 border-t px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:pt-4 lg:pb-[max(1rem,env(safe-area-inset-bottom))]">
-      {/* Undo and redo read as one control: a shared frame split by a hairline. */}
-      <div className="rounded-control border-hairline bg-backstage-raised flex shrink-0 items-center border shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
-        <IconAction
-          label={labels.undo}
-          shortcut="undo"
-          disabled={!canUndo || disabled}
-          onClick={onUndo}
-          className="hover:bg-backstage-lift rounded-r-none border-0 bg-transparent shadow-none"
-        >
-          <ArrowCounterClockwiseIcon className="size-5" aria-hidden="true" />
-        </IconAction>
-        <span aria-hidden="true" className="bg-hairline h-5 w-px" />
-        <IconAction
-          label={labels.redo}
-          shortcut="redo"
-          disabled={!canRedo || disabled}
-          onClick={onRedo}
-          className="hover:bg-backstage-lift rounded-l-none border-0 bg-transparent shadow-none"
-        >
-          <ArrowClockwiseIcon className="size-5" aria-hidden="true" />
-        </IconAction>
-      </div>
+    <footer className="border-hairline flex items-center gap-1 border-t px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] lg:px-3.5 lg:pt-3 lg:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <IconAction
+        label={labels.undo}
+        shortcut="undo"
+        keys={keys.undo}
+        disabled={!canUndo || disabled}
+        onClick={onUndo}
+      >
+        <ArrowCounterClockwiseIcon className="size-[18px]" aria-hidden="true" />
+      </IconAction>
+      <IconAction
+        label={labels.redo}
+        shortcut="redo"
+        keys={keys.redo}
+        disabled={!canRedo || disabled}
+        onClick={onRedo}
+      >
+        <ArrowClockwiseIcon className="size-[18px]" aria-hidden="true" />
+      </IconAction>
       <IconAction
         label={labels.randomize}
         shortcut="random"
+        keys={keys.random}
         disabled={disabled}
         onClick={onRandomize}
       >
-        <ShuffleIcon className="size-5" aria-hidden="true" />
+        <ShuffleIcon className="size-[18px]" aria-hidden="true" />
       </IconAction>
       <Button
         type="button"
         variant="primary"
-        size="lg"
         onClick={onDone}
         disabled={saving || disabled}
         aria-busy={saving || undefined}
-        className="group/done font-display ml-1.5 h-12 min-w-0 flex-1 text-[1.375rem] lg:h-13"
+        className="group/done ml-auto h-11 min-w-0 gap-2.5 pr-4.5 pl-5.5 text-[15px]"
       >
         {saving ? (
           <>
-            <SpinnerGapIcon className="size-5 animate-spin" aria-hidden="true" />
-            <span className="text-ui font-sans">{labels.saving}</span>
+            <SpinnerGapIcon className="size-4 animate-spin" aria-hidden="true" />
+            <span>{labels.saving}</span>
           </>
         ) : (
           <>
@@ -146,7 +148,7 @@ export function ActionBar({
             <ArrowRightIcon
               weight="bold"
               aria-hidden="true"
-              className="ease-out-expo size-5 transition-transform duration-300 group-hover/done:translate-x-1"
+              className="ease-out-expo size-4 transition-transform duration-300 group-hover/done:translate-x-1"
             />
           </>
         )}

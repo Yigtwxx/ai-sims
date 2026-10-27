@@ -1,14 +1,23 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
 
 import { HAIR_PATTERNS } from '@/lib/character/schema';
 
 import { HAIR_DYES, HAIR_PATTERN_COLORS, naturalHairColor } from '../palettes';
+import { HAIR_LENGTHS, hairLength, type HairLength } from '../hairLength';
 import { groomsFor } from '../reconcile';
 import { thumbnailSrc } from '../useMhManifest';
-import { OptionGrid, OptionTile } from '../ui/OptionGrid';
-import { ChipRadio, Hint, LabeledSlider, Section, SwatchPicker } from '../ui/controls';
+import { OptionList, type OptionListItem } from '../ui/OptionList';
+import {
+  ChipRadio,
+  Hint,
+  LabeledSlider,
+  PressedPills,
+  Section,
+  SwatchPicker,
+} from '../ui/controls';
 
 import { useConfig, useLabel, type PanelProps } from './shared';
 
@@ -17,8 +26,28 @@ export function HairPanel({ manifest }: PanelProps) {
   const colors = useTranslations('Creator.colors');
   const label = useLabel();
   const { config, update } = useConfig();
+  // A view filter, not part of the character: it never changes the pick.
+  const [length, setLength] = useState<HairLength | 'all'>('all');
 
   const styles = groomsFor(manifest, 'hair', config.base);
+  const lengths = new Map(styles.map((groom) => [groom.id, hairLength(groom.id)]));
+  // Only a library whose grooms carry their length gets the filter.
+  const filterable = [...lengths.values()].some(Boolean);
+  const shown =
+    length === 'all' ? styles : styles.filter((groom) => lengths.get(groom.id) === length);
+  const items: OptionListItem[] = [
+    // "No hair" belongs to no length.
+    ...(length === 'all' ? [{ value: null, label: t('none') }] : []),
+    ...shown.map((groom) => {
+      const groomLength = lengths.get(groom.id);
+      return {
+        value: groom.id,
+        label: label(groom.label),
+        meta: groomLength ? t(`lengths.${groomLength}`) : undefined,
+        image: thumbnailSrc(groom.thumbnail),
+      };
+    }),
+  ];
   const { melanin, redness, dye } = config.hair.color;
   const natural = naturalHairColor(melanin, redness);
   const pattern = config.hair.pattern;
@@ -32,28 +61,36 @@ export function HairPanel({ manifest }: PanelProps) {
 
   return (
     <>
-      <Section title={t('styles')} aside={styles.length}>
-        <OptionGrid label={t('styles')} revealSelected>
-          <OptionTile
-            label={t('none')}
-            none
-            selected={config.hair.style === null}
-            onSelect={() => update((draft) => void (draft.hair.style = null))}
+      <Section
+        title={t('styles')}
+        aside={length === 'all' ? styles.length : `${shown.length}/${styles.length}`}
+      >
+        {filterable ? (
+          <PressedPills
+            label={t('lengthFilter')}
+            value={length}
+            options={(['all', ...HAIR_LENGTHS] as const).map((value) => ({
+              value,
+              label: t(`lengths.${value}`),
+            }))}
+            onChange={setLength}
+            className="mb-1 self-start"
           />
-          {styles.map((groom) => (
-            <OptionTile
-              key={groom.id}
-              label={label(groom.label)}
-              image={thumbnailSrc(groom.thumbnail)}
-              selected={config.hair.style === groom.id}
-              onSelect={() => update((draft) => void (draft.hair.style = groom.id))}
-            />
-          ))}
-        </OptionGrid>
+        ) : null}
+        {/* Remounts per filter: the new rows stagger in and the list opens on its pick. */}
+        <OptionList
+          key={length}
+          label={t('styles')}
+          items={items}
+          value={config.hair.style}
+          onChange={(style) => update((draft) => void (draft.hair.style = style))}
+          revealSelected={length === 'all'}
+        />
+        {items.length === 0 ? <Hint>{t('noneOfLength')}</Hint> : null}
       </Section>
 
       <Section title={t('natural')}>
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           <LabeledSlider
             label={t('melanin')}
             value={melanin}
@@ -97,7 +134,7 @@ export function HairPanel({ manifest }: PanelProps) {
         />
         {pattern.type === 'none' ? <Hint>{t('patternHint')}</Hint> : null}
         {pattern.type !== 'none' ? (
-          <div className="flex flex-col gap-6 pt-2">
+          <div className="flex flex-col gap-5 pt-2">
             <SwatchPicker
               label={t('patternColor')}
               size="sm"

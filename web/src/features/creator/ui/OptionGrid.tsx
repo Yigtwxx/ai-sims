@@ -10,6 +10,7 @@ import {
   useState,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -19,13 +20,13 @@ import { SlidingIndicator } from './controls';
 /** The layout id of this grid's selection ring, so it travels only within its own grid. */
 const RingId = createContext<string | undefined>(undefined);
 
-const RING = 'rounded-tile inset-0 shadow-[inset_0_0_0_2px_var(--color-marquee)]';
+const RING = 'rounded-tile inset-0 shadow-[inset_0_0_0_2px_var(--color-ink)]';
 
 /**
  * Arrow keys move between the radios of a grid (visual order), Home/End jump
  * to the ends; Space/Enter select through the native button.
  */
-export function onGridKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+export function onGridKeyDown(event: KeyboardEvent<HTMLElement>) {
   const keys = ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'];
   if (!keys.includes(event.key)) return;
   const radios = Array.from(
@@ -51,22 +52,44 @@ export function onGridKeyDown(event: KeyboardEvent<HTMLDivElement>) {
   radios[next]?.focus();
 }
 
+/**
+ * Long lists: when a group opens with its pick below the fold, scroll the
+ * panel (before paint, no animation) so the current choice is in view. Once,
+ * on mount: later picks happen where the user already is.
+ */
+export function useRevealSelected(group: RefObject<HTMLElement | null>, enabled: boolean) {
+  useLayoutEffect(() => {
+    if (!enabled) return;
+    const picked = group.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+    const scroller = picked?.closest<HTMLElement>('[role="tabpanel"]');
+    if (!picked || !scroller) return;
+    const view = scroller.getBoundingClientRect();
+    const option = picked.getBoundingClientRect();
+    // Only a pick below the fold: one in the first row, or one that already
+    // peeks in, stays put. On a short panel (phones) centring it would scroll
+    // the controls above the group (the outfit slots) out of view.
+    const first = group.current?.querySelector<HTMLElement>('[role="radio"]');
+    const firstRow = !!first && Math.abs(first.getBoundingClientRect().top - option.top) < 1;
+    if (firstRow || option.top <= view.bottom - 40) return;
+    scroller.scrollTop += option.top - view.top - (view.height - option.height) / 2;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only, by design
+  }, []);
+}
+
 interface OptionGridProps {
   label: string;
   children: ReactNode;
   className?: string;
   /** Tile columns; swatch grids pass their own. */
   columns?: string;
-  /**
-   * Long lists: when the grid opens with its pick below the fold, scroll the
-   * panel (before paint, no animation) so the current choice is in view.
-   */
+  /** Long grids: open scrolled to the pick (see useRevealSelected). */
   revealSelected?: boolean;
 }
 
 /**
- * A grid of picks. Tiles arrive in a short stagger (CSS, once per mount) and
- * the amber selection ring slides from the old pick to the new one.
+ * A grid of portrait picks (faces, bases). Tiles arrive in a short stagger
+ * (CSS, once per mount) and the ink selection ring slides from the old pick
+ * to the new one.
  */
 export function OptionGrid({
   label,
@@ -77,24 +100,7 @@ export function OptionGrid({
 }: OptionGridProps) {
   const ringId = `tile-ring-${useId()}`;
   const grid = useRef<HTMLDivElement>(null);
-
-  // Once, on mount: later picks happen where the user already is.
-  useLayoutEffect(() => {
-    if (!revealSelected) return;
-    const picked = grid.current?.querySelector<HTMLElement>('[aria-checked="true"]');
-    const scroller = picked?.closest<HTMLElement>('[role="tabpanel"]');
-    if (!picked || !scroller) return;
-    const view = scroller.getBoundingClientRect();
-    const tile = picked.getBoundingClientRect();
-    // Only a pick below the fold: one in the first row, or one that already
-    // peeks in, stays put. On a short panel (phones) centring it would scroll
-    // the controls above the grid (the outfit slots) out of view.
-    const first = grid.current?.querySelector<HTMLElement>('[role="radio"]');
-    const firstRow = !!first && Math.abs(first.getBoundingClientRect().top - tile.top) < 1;
-    if (firstRow || tile.top <= view.bottom - 40) return;
-    scroller.scrollTop += tile.top - view.top - (view.height - tile.height) / 2;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only, by design
-  }, []);
+  useRevealSelected(grid, revealSelected);
 
   return (
     <RingId value={ringId}>
@@ -103,7 +109,7 @@ export function OptionGrid({
         role="radiogroup"
         aria-label={label}
         onKeyDown={onGridKeyDown}
-        className={cn('stagger-in grid gap-x-2.5 gap-y-4', columns ?? 'grid-cols-3', className)}
+        className={cn('stagger-in grid gap-x-2.5 gap-y-3.5', columns ?? 'grid-cols-3', className)}
       >
         {children}
       </div>
@@ -115,7 +121,7 @@ interface OptionTileProps {
   label: string;
   selected: boolean;
   onSelect: () => void;
-  /** Thumbnail URL; a lit monogram stands in when it is missing or fails. */
+  /** Thumbnail URL; a monogram stands in when it is missing or fails. */
   image?: string;
   /** The "none" choice: an empty tile with a muted mark. */
   none?: boolean;
@@ -126,7 +132,8 @@ interface OptionTileProps {
 
 /**
  * A 3:4 option with its label always visible (scanable). The frame lifts on
- * hover and sinks on press; the selected one carries the amber ring and tick.
+ * hover and sinks on press; the selected one carries the ink ring and the
+ * cobalt tick.
  */
 export function OptionTile({
   label,
@@ -157,12 +164,11 @@ export function OptionTile({
       <span className="ease-out-expo relative block transition-[translate,scale] duration-300 group-hover/tile:-translate-y-0.5 group-active/tile:translate-y-0 group-active/tile:scale-[0.98] group-active/tile:duration-100">
         <span
           className={cn(
-            'rounded-tile bg-backstage-raised group-focus-visible/tile:outline-marquee relative block aspect-[3/4] w-full overflow-hidden transition-[box-shadow] duration-300 group-hover/tile:shadow-[0_10px_24px_rgb(5_5_4/0.45)] group-focus-visible/tile:outline-2 group-focus-visible/tile:outline-offset-2',
-            selected ? 'ring-0' : 'ring-hairline group-hover/tile:ring-ink-faint ring-1',
-            // Until the art arrives the tile carries the slow tungsten sweep, not a blank box.
+            'rounded-tile bg-paper-deep group-focus-visible/tile:outline-cobalt relative block aspect-[3/4] w-full overflow-hidden transition-[box-shadow] duration-300 group-hover/tile:shadow-[0_10px_22px_rgb(23_26_33/0.14)] group-focus-visible/tile:outline-2 group-focus-visible/tile:outline-offset-2',
+            // Until the art arrives the tile carries a slow sweep, not a blank box.
             showImage &&
               !loaded &&
-              'after:animate-skeleton-sweep after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.06),transparent)]',
+              'after:animate-skeleton-sweep after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.45),transparent)]',
           )}
         >
           {showImage ? (
@@ -189,12 +195,12 @@ export function OptionTile({
               <ProhibitIcon className="size-7" weight="light" aria-hidden="true" />
             </span>
           ) : (
-            <span className="flex size-full items-end bg-[radial-gradient(90%_70%_at_50%_20%,rgb(255_226_176/0.12),transparent_70%)] p-2.5">
+            <span className="flex size-full items-end p-2.5">
               <span className="font-display text-subhead text-ink/25">{label.slice(0, 2)}</span>
             </span>
           )}
           {selected ? (
-            <span className="bg-marquee text-backstage animate-mark-in absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full shadow-[0_2px_6px_rgb(5_5_4/0.5)]">
+            <span className="bg-paper-raised text-cobalt animate-mark-in absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full shadow-[0_1px_3px_rgb(23_26_33/0.25)]">
               <CheckIcon weight="bold" className="size-3" aria-hidden="true" />
             </span>
           ) : null}
@@ -205,12 +211,17 @@ export function OptionTile({
           ) : (
             <span aria-hidden="true" className={cn('pointer-events-none absolute', RING)} />
           )
-        ) : null}
+        ) : (
+          <span
+            aria-hidden="true"
+            className="rounded-tile pointer-events-none absolute inset-0 shadow-[inset_0_0_0_1px_rgb(23_26_33/0.1)] transition-[box-shadow] duration-200 group-hover/tile:shadow-[inset_0_0_0_1px_rgb(23_26_33/0.3)]"
+          />
+        )}
       </span>
       <span
         className={cn(
           'text-label line-clamp-2 leading-tight transition-colors duration-200',
-          selected ? 'text-ink font-medium' : 'text-ink-muted group-hover/tile:text-ink',
+          selected ? 'text-ink font-semibold' : 'text-ink-muted group-hover/tile:text-ink',
         )}
       >
         {label}
@@ -221,7 +232,7 @@ export function OptionTile({
           {dots.map((color, index) => (
             <span
               key={`${index}-${color}`}
-              className="ring-hairline size-2 rounded-full ring-1"
+              className="size-2 rounded-full shadow-[inset_0_0_0_1px_rgb(23_26_33/0.15)]"
               style={{ background: color }}
             />
           ))}

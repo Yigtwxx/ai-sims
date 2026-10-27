@@ -9,7 +9,7 @@ import { GARMENT_COLORS } from '../palettes';
 import { colorParamLabels } from '../outfitParams';
 import { outfitsFor } from '../reconcile';
 import { thumbnailSrc } from '../useMhManifest';
-import { OptionGrid, OptionTile } from '../ui/OptionGrid';
+import { OptionList } from '../ui/OptionList';
 import { ChipRadio, Hint, Section, SwatchPicker } from '../ui/controls';
 
 import { useConfig, useLabel, type PanelProps } from './shared';
@@ -82,26 +82,29 @@ export function OutfitPanel({ manifest, slot, onSlotChange }: OutfitPanelProps) 
         {options.length === 0 ? (
           <Hint>{t('empty')}</Hint>
         ) : (
-          <OptionGrid label={t(`slots.${slot}`)} revealSelected>
-            <OptionTile
-              label={t('none')}
-              none
-              selected={item === null}
-              onSelect={() => choose(null)}
-            />
-            {options.map((option) => (
-              <OptionTile
-                key={option.id}
-                label={label(option.label)}
-                image={thumbnailSrc(option.thumbnail)}
-                selected={item?.id === option.id}
-                swatches={option.tintPresets
+          <OptionList
+            // One list per slot: switching slots opens the new one on its pick.
+            key={slot}
+            label={t(`slots.${slot}`)}
+            items={[
+              { value: null, label: t('none') },
+              ...options.map((option) => ({
+                value: option.id,
+                label: label(option.label),
+                meta:
+                  option.tintPresets.length > 1
+                    ? t('colorways', { count: option.tintPresets.length })
+                    : undefined,
+                image: thumbnailSrc(option.thumbnail),
+                swatches: option.tintPresets
                   .map((preset) => tintColor(preset.values))
-                  .filter((color): color is string => Boolean(color))}
-                onSelect={() => choose(option.id)}
-              />
-            ))}
-          </OptionGrid>
+                  .filter((color): color is string => Boolean(color)),
+              })),
+            ]}
+            value={item?.id ?? null}
+            onChange={choose}
+            revealSelected
+          />
         )}
       </Section>
 

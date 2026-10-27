@@ -1,81 +1,190 @@
 'use client';
 
-import { motion } from 'motion/react';
+import { ArrowRightIcon } from '@phosphor-icons/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { useLocale, useTranslations } from 'next-intl';
+import { useEffect, useRef, useState } from 'react';
+
+import { EASE } from '@/components/motion/tokens';
+import { Button } from '@/components/ui/button';
+import type { MhManifest } from '@/lib/assets/manifest';
+
+import { premiereSpec } from './premiereSpec';
+import { useCreatorStore } from './store';
 
 interface PremiereOverlayProps {
   name: string;
-  labels: { tagline: string; start: string; edit: string };
+  manifest: MhManifest;
+  /** The card portrait taken on "Bitti" (a data URL), when the browser could take one. */
+  portrait?: string;
+  /** Shared layout id of the still on the stage: the card flies in from it. */
+  portraitLayoutId?: string;
   onStart: () => void;
   onEdit: () => void;
 }
 
-const EASE = [0.16, 1, 0.3, 1] as const;
+/** Copy arrives after the panel has started to leave, one line every 120 ms. */
+const FIRST = 0.35;
+const STEP = 0.12;
+/** The copy steps back this long before the conversation opens. */
+const LEAVE_MS = 250;
 
 /**
- * The premiere: house lights dim to a spotlight on the character, the name
- * lands as a title card, then the two exits appear. Runs once per "Bitti".
+ * The premiere repeats the landing's last frame with the real character: it
+ * stands where the dots stood (60% of the width on desktop), and the title
+ * card sits in the lower left as the landing's chapters do. The portrait just
+ * taken lands in the card, then the kicker, the name (rising out of a mask),
+ * a one-line spec of the character and the two exits follow in turn. Reduced
+ * motion keeps the fades only.
  */
-export function PremiereOverlay({ name, labels, onStart, onEdit }: PremiereOverlayProps) {
+export function PremiereOverlay({
+  name,
+  manifest,
+  portrait,
+  portraitLayoutId,
+  onStart,
+  onEdit,
+}: PremiereOverlayProps) {
+  const t = useTranslations('Creator.premiere');
+  const locale = useLocale();
+  const reduceMotion = useReducedMotion() ?? false;
+  const config = useCreatorStore((state) => state.config);
+  const spec = premiereSpec(config, manifest, locale);
+  const specLine = [
+    spec.face ? t('spec.face', { name: spec.face }) : null,
+    spec.hair ? t('spec.hair', { name: spec.hair }) : null,
+    spec.garments > 0 ? t('spec.outfit', { count: spec.garments }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const [leaving, setLeaving] = useState(false);
+  const leaveTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(leaveTimer.current), []);
+  const start = () => {
+    if (leaving) return;
+    setLeaving(true);
+    leaveTimer.current = window.setTimeout(onStart, LEAVE_MS);
+  };
+
+  const rise = (index: number) =>
+    reduceMotion
+      ? {
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
+          transition: { delay: FIRST + index * STEP, duration: 0.4 },
+        }
+      : {
+          initial: { opacity: 0, y: 12 },
+          animate: { opacity: 1, y: 0 },
+          transition: { delay: FIRST + index * STEP, duration: 0.7, ease: EASE.outExpo },
+        };
+
   return (
     <motion.div
-      className="absolute inset-0 z-30"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.4 } }}
-      transition={{ duration: 0.9, ease: EASE }}
+      className="pointer-events-none absolute inset-0 z-30"
+      exit={{ opacity: 0, transition: { duration: 0.35, ease: EASE.outQuint } }}
       role="dialog"
       aria-modal="false"
       aria-label={name}
     >
-      {/* House lights: darken the edges, keep a soft pool on the character. */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(42%_62%_at_50%_44%,transparent_0%,rgba(8,7,9,0.25)_55%,rgba(8,7,9,0.88)_100%)]" />
+      {/* Phones: the stage ends above the title card; its lower edge dissolves into paper. */}
+      <motion.div
+        aria-hidden="true"
+        className="from-paper absolute inset-x-0 bottom-0 h-[54%] bg-gradient-to-t from-[72%] to-transparent lg:hidden"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2, duration: 0.6 }}
+      />
 
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-6 pb-14 text-center">
-        <motion.p
-          className="text-ink-muted text-[15px] font-medium"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7, duration: 0.6, ease: EASE }}
-        >
-          {labels.tagline}
+      <motion.div
+        className="pointer-events-auto absolute bottom-[max(2rem,env(safe-area-inset-bottom))] left-5 flex max-w-[min(540px,calc(100vw-2.5rem))] flex-col items-start gap-3 md:left-10 lg:bottom-[clamp(3.5rem,11svh,6rem)] lg:gap-4"
+        animate={leaving ? { opacity: 0, y: reduceMotion ? 0 : 8 } : { opacity: 1, y: 0 }}
+        transition={{ duration: LEAVE_MS / 1000, ease: EASE.outQuint }}
+      >
+        {portrait ? (
+          <div className="mb-1 flex items-end gap-3.5">
+            <motion.img
+              layoutId={portraitLayoutId}
+              src={portrait}
+              alt=""
+              className="border-hairline h-16 w-12 rounded-sm border object-cover lg:h-24 lg:w-[72px]"
+              initial={portraitLayoutId ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={
+                portraitLayoutId
+                  ? { layout: { duration: 0.95, ease: EASE.outExpo } }
+                  : { delay: FIRST, duration: 0.4 }
+              }
+            />
+            <motion.p
+              className="text-ink-faint pb-0.5 font-mono text-[11px] tracking-[0.12em] uppercase"
+              {...rise(0)}
+            >
+              {t('saved')}
+            </motion.p>
+          </div>
+        ) : null}
+
+        <motion.p className="text-kicker text-cobalt" {...rise(1)}>
+          {t('tagline')}
         </motion.p>
+
         <motion.h1
-          className="font-display text-ink mt-2 text-[clamp(3.5rem,9vw,7.5rem)] leading-[0.88]"
-          initial={{ opacity: 0, y: 30, clipPath: 'inset(0 0 100% 0)' }}
-          animate={{ opacity: 1, y: 0, clipPath: 'inset(0 0 -10% 0)' }}
-          transition={{ delay: 0.9, duration: 0.9, ease: EASE }}
+          className="font-display text-ink max-w-full text-[clamp(3rem,6vw,5.5rem)] leading-[0.95] tracking-[-0.03em] break-words"
+          initial={
+            reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24, clipPath: 'inset(0 0 100% 0)' }
+          }
+          animate={
+            reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, clipPath: 'inset(0 0 -12% 0)' }
+          }
+          transition={{
+            delay: FIRST + 2 * STEP,
+            duration: reduceMotion ? 0.4 : 0.9,
+            ease: EASE.outExpo,
+          }}
         >
           {name}
         </motion.h1>
-        <motion.span
-          className="bg-marquee mt-4 h-[3px] w-24 origin-center rounded-full"
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ delay: 1.35, duration: 0.7, ease: EASE }}
-        />
+
+        {specLine ? (
+          <motion.p
+            className="text-ink-muted font-mono text-[12px] leading-relaxed tracking-[0.08em] uppercase"
+            {...rise(3)}
+          >
+            {specLine}
+          </motion.p>
+        ) : null}
+
         <motion.div
-          className="mt-8 flex items-center gap-3"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.7, duration: 0.6, ease: EASE }}
+          className="mt-1 flex flex-wrap items-center gap-2.5 lg:mt-2 lg:gap-3"
+          {...rise(4)}
         >
-          <button
+          <Button
             type="button"
-            onClick={onEdit}
-            className="rounded-control text-ink-muted hover:text-ink h-12 px-5 text-[15px] font-medium ring-1 ring-white/15 transition-colors hover:bg-white/5"
-          >
-            {labels.edit}
-          </button>
-          <button
-            type="button"
-            onClick={onStart}
+            variant="primary"
+            onClick={start}
             autoFocus
-            className="rounded-control bg-marquee font-display text-backstage ease-out-expo hover:bg-marquee-deep h-12 px-6 text-[1.35rem] transition-[background-color,scale] duration-300 active:scale-[0.98]"
+            className="group/start h-12 gap-2.5 pr-4 pl-5 text-[15px] lg:h-[3.25rem] lg:pr-5 lg:pl-6 lg:text-[16px]"
           >
-            {labels.start}
-          </button>
+            {t('start')}
+            <ArrowRightIcon
+              weight="bold"
+              aria-hidden="true"
+              className="ease-out-expo size-[18px] transition-transform duration-300 group-hover/start:translate-x-1"
+            />
+          </Button>
+          <Button
+            type="button"
+            variant="quiet"
+            onClick={onEdit}
+            disabled={leaving}
+            className="h-12 px-4 text-[15px] lg:h-[3.25rem] lg:px-5"
+          >
+            {t('edit')}
+          </Button>
         </motion.div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
