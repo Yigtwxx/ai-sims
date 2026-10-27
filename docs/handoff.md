@@ -450,6 +450,25 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 
 ## Sıradaki iş (Mac)
 
+0. **PC'ye geçince, Fab'den 4 yeni yüz (kullanıcı seçimi, 2026-10-27):**
+   - Seçilenler (hepsi düzenlenebilir `.mhpkg`; fiyatlar 2026-10-27'de Fab'in `/i/listings/<id>/prices-infos` cevabından okundu):
+
+     | Yüz | Cinsiyet | Lisans | Fab'in yazdığı UE | İlan |
+     |---|---|---|---|---|
+     | Skotukeda | kadın | iki lisans da $0 | 5.7 | https://www.fab.com/listings/41e1b941-3b4e-468d-b6a7-2ce3e8ef1e32 |
+     | Mason | erkek | $0 lisans (öteki $29.99) | 5.6–5.8 | https://www.fab.com/listings/a8d33031-627b-4904-86b5-a7bb76805e9b |
+     | Seo | kadın | Personal $0 (Professional $4.99) | 5.6–5.8 | https://www.fab.com/listings/3693be83-9054-4fd3-9b2e-0b6d5b45fe22 |
+     | Frey (TOKYO Metahuman) | erkek | $0 lisans (öteki $50.99) | 5.6–5.7 | https://www.fab.com/listings/18777d2f-a05a-4509-80ea-ad87dc555f68 |
+
+   - Adımlar (`pipeline/` içinde):
+     1. Her ilanda $0 lisansı seçip kütüphaneye ekle, `.mhpkg`'yi indir, arşivin `fab/` klasörüne koy.
+     2. `uv run asset-pipeline ue fab_import`. Bitmiş paketleri atlar, yalnız yenileri alır.
+     3. Karakter adı her paketin `raw/fab_import/<paket>/import.json` dosyasında: `created` içindeki `MetaHumanCharacter` sınıflı asset'in son adı.
+     4. `uv run asset-pipeline ue characters --args '{"only": ["<ad1>", "<ad2>", "<ad3>", "<ad4>"]}'`. **`only` şart:** `characters` işi `pruned.json`'a bakmaz (yalnız `outfits` bakar); `raw/characters/` klasörü silinmiş budanan preset'leri baştan dışa aktarır (her biri ~11 dk, ~860 MB).
+     5. Cinsiyet kaydı: `uv run asset-pipeline ue probe --args '{"script": "unreal/probes/preset_genders.py"}'` Fab karakterlerini de `raw/characters_genders.json`'a yazar. Kayıt olmazsa dönüştürücü cinsiyeti gövde şeklinden tahmin eder.
+     6. `uv run asset-pipeline mh-convert --character <ad> ... --manifest`, sonra `/dev/thumbs` ile yüz küçük resimleri ve `node scripts/r2-sync.mjs`.
+   - Paketlerin kendi saç ve sakalı gelmez: `grooms` işi yalnız `/MetaHumanCharacter/Optional/Grooms`'u tarar. Yüz ve cilt gelir, saç kütüphaneden seçilir (Frey'in uzun saçı ve sakalı dahil).
+   - UE 5.8 riski: Skotukeda ve Frey 5.8'i listelemiyor. `fab_import` "created no assets" derse sebep bu olabilir.
 0. **PC'ye geçince, kendi kıyafetimiz:** yukarıdaki plan, ilk parça düz tişört.
 0. **PC'ye geçince (kullanıcı kararı, 2026-10-27):** `/dev/thumbs` ile yüz, saç ve kıyafet küçük resimlerini yeniden üret (A-pose hatası `motion.ts`'te düzeldi; mevcut görseller A-pozunda ve koyu fonda), sonra `node scripts/r2-sync.mjs` ile R2'ye yükle. Açık fonla çizmek de o sırada düşünülebilir.
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
@@ -486,5 +505,5 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 - **Repo:** 2026-10-27'den beri public. Secret, gerçek token ya da `.env` değeri commit'lenmez.
 - **Dövme ve piercing:** ölçülü.
 - **Kıyafet:** iş ve günlük karışık.
-- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği, 2026-10-25'te kullanıcının seçtiği Clara body; arşivde 2026-10-25'te 24 `.mhpkg` var: 21 `oa_*`, 3 `khaosmdf*`). Fab liste sayfası fiyatı eski gösterebiliyor: Romantic Casual Overalls listede "Free" iken 2026-10-25'te ücretliye dönmüştü ve alınmadı. İndirmeden önce öğenin kendi sayfasındaki lisans kutusuna bakılır. Animasyonlar da yalnız ücretsiz paketlerden.
+- **İçerik:** ücretli içerik alınmaz. Fab'den yalnız $0 öğeler (onaylı liste: 20 Epic kıyafeti, 6 saç, Vampire, 2 Nyanpasinka gömleği, 2026-10-25'te kullanıcının seçtiği Clara body, 2026-10-27'de seçilen 4 yüz: Skotukeda, Mason, Seo, Frey; arşivde 2026-10-25'te 24 `.mhpkg` var: 21 `oa_*`, 3 `khaosmdf*`). Fab liste sayfası fiyatı eski gösterebiliyor: Romantic Casual Overalls listede "Free" iken 2026-10-25'te ücretliye dönmüştü ve alınmadı. İndirmeden önce öğenin kendi sayfasındaki lisans kutusuna bakılır. Animasyonlar da yalnız ücretsiz paketlerden.
 - **Lisans:** UE EULA MetaHuman'ların AI eğitimi/testi için kullanımını yasaklıyor. LLM ile konuşturmak için ürünleşmeden önce hukuki kontrol gerekli.
