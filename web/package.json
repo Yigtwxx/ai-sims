@@ -31,7 +31,7 @@
     "microsoft-cognitiveservices-speech-sdk": "^1.52.0",
     "mongodb": "^7.7.0",
     "motion": "^14.3.1",
-    "msedge-tts": "2.1.0",
+    "msedge-tts": "2.1.1",
     "next": "16.4.2",
     "next-intl": "^4.14.9",
     "postprocessing": "^6.39.5",

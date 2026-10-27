@@ -47,3 +47,6 @@ pipeline/cache/
 pipeline/source/
 web/public/assets/spike/
 web/public/assets/vrm/
+
+# Cloudflare wrangler local state (pages deploy cache)
+.wrangler/
