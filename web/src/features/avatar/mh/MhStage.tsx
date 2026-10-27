@@ -75,8 +75,16 @@ export interface MhStageProps {
    * asks for, settled and drawn. The creator captures its thumbnail on true.
    */
   onCaughtUp?: (caughtUp: boolean) => void;
+  /**
+   * Dev benches only (product pages leave it unset): hands over the settled
+   * character with every onSettled, to probe its meshes or hold its pose
+   * (`handle.motion.hold`). Changes nothing about how the stage renders.
+   */
+  onCharacter?: (handle: MhCharacterHandle) => void;
   /** Render tier (default auto: starts high, steps down while frames drop). */
   quality?: QualityPreference;
+  /** Studio backdrop: the paper-toned photo studio (default) or the dark stage. */
+  backdrop?: 'light' | 'dark';
   className?: string;
 }
 
@@ -111,8 +119,10 @@ export const MhStage = memo(function MhStage({
   onReady,
   onSettled,
   onCaughtUp,
+  onCharacter,
   className,
   quality,
+  backdrop = 'light',
 }: MhStageProps) {
   const resolved = useMemo(() => resolveCharacter(config, manifest), [config, manifest]);
   const talk = mode === 'talk';
@@ -259,12 +269,19 @@ export const MhStage = memo(function MhStage({
     [lifeOf, frozen, facing, closeUp],
   );
   const latestOnSettled = useRef(onSettled);
+  const latestOnCharacter = useRef(onCharacter);
   useLayoutEffect(() => {
     latestOnSettled.current = onSettled;
-  }, [onSettled]);
+    latestOnCharacter.current = onCharacter;
+  }, [onSettled, onCharacter]);
   // Two frames later the settled character has been drawn, not just bound.
-  const handleSettled = useCallback(() => {
-    requestAnimationFrame(() => requestAnimationFrame(() => latestOnSettled.current?.()));
+  const handleSettled = useCallback((handle: MhCharacterHandle) => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        latestOnSettled.current?.();
+        latestOnCharacter.current?.(handle);
+      }),
+    );
   }, []);
   const slotSettled = useCallback(
     (handle: MhCharacterHandle, key: string, incoming: boolean) => {
@@ -276,7 +293,7 @@ export const MhStage = memo(function MhStage({
         if (!next || !swap.current.canPromote(handle, key)) return;
         setShown(next);
       }
-      handleSettled();
+      handleSettled(handle);
       reportCaughtUp();
     },
     [handleSettled, reportCaughtUp],
@@ -320,7 +337,7 @@ export const MhStage = memo(function MhStage({
         zoom={effectiveZoom}
         insetLeft={insetLeft}
         insetRight={insetRight}
-        backdrop="dark"
+        backdrop={backdrop}
         lighting={STUDIO_LIGHTING}
         // Thumbnails show the item alone, without the plinth.
         platform={mode !== 'thumbnail'}

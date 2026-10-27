@@ -1,17 +1,21 @@
-import { Mona_Sans } from 'next/font/google';
+import { Azeret_Mono, Geologica } from 'next/font/google';
 
 /**
- * Typography (see /DESIGN.md, "The Lit Stage"): one family, Mona Sans, at two
- * widths. Display type is expanded and tightly tracked like a title card; UI
- * type stays at normal width. The variable font carries both axes (wght, wdth)
- * and ships latin-ext for Turkish (ç ğ ı İ ö ş ü). Self-hosted by next/font.
+ * Typography (see /DESIGN.md, "Paper and Ink"): Geologica for everything people
+ * read, Azeret Mono for kickers, readouts and keyboard hints. Both are variable,
+ * ship latin-ext for Turkish (ç ğ ı İ ö ş ü) and are self-hosted by next/font.
  */
-export const sansFont = Mona_Sans({
+export const sansFont = Geologica({
   subsets: ['latin', 'latin-ext'],
-  axes: ['wdth'],
   variable: '--font-sans-face',
   display: 'swap',
 });
 
+export const monoFont = Azeret_Mono({
+  subsets: ['latin', 'latin-ext'],
+  variable: '--font-mono-face',
+  display: 'swap',
+});
+
 /** Apply to <html> so the CSS variables are available everywhere. */
-export const fontVariables = sansFont.variable;
+export const fontVariables = `${sansFont.variable} ${monoFont.variable}`;

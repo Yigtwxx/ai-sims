@@ -58,7 +58,7 @@ export function CurationScreen() {
   const curation = useCuration();
 
   return (
-    <main className="bg-backstage min-h-dvh">
+    <main className="bg-paper min-h-dvh">
       <div className="mx-auto w-full max-w-[1680px] px-5 pt-8 md:px-10">
         <Link
           href="/"
@@ -71,7 +71,7 @@ export function CurationScreen() {
           <div>
             {/* Sentence case (DESIGN.md): a quiet tag, not a tracked uppercase eyebrow. */}
             <p className="text-label border-hairline text-ink-muted inline-flex items-center gap-2 rounded-full border px-2.5 py-1">
-              <span aria-hidden="true" className="bg-marquee size-1.5 rounded-full" />
+              <span aria-hidden="true" className="bg-cobalt size-1.5 rounded-full" />
               {t('devOnly')}
             </p>
             <h1 className="font-headline text-headline text-ink mt-2">{t('title')}</h1>
@@ -296,7 +296,7 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
 
   return (
     <>
-      <div className="border-hairline bg-backstage sticky top-0 z-(--z-header) mt-8 border-y">
+      <div className="border-hairline bg-paper sticky top-0 z-(--z-header) mt-8 border-y">
         <div className="mx-auto flex w-full max-w-[1680px] flex-wrap items-center justify-between gap-x-6 px-5 md:px-10">
           <div
             role="tablist"
@@ -340,7 +340,7 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
                   {active ? (
                     <motion.span
                       layoutId="curate-tab-rule"
-                      className="bg-marquee absolute inset-x-3 bottom-0 h-0.5"
+                      className="bg-cobalt absolute inset-x-3 bottom-0 h-0.5"
                       transition={{ type: 'spring', stiffness: 520, damping: 42 }}
                     />
                   ) : null}
@@ -404,7 +404,7 @@ function CurationBoard({ manifest, fixture, curation }: BoardProps) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('searchPlaceholder')}
-              className="rounded-control border-hairline bg-backstage-raised text-ui text-ink placeholder:text-ink-faint focus-visible:border-marquee h-10 w-64 border px-3 outline-none"
+              className="rounded-control border-hairline bg-paper-raised text-ui text-ink placeholder:text-ink-faint focus-visible:border-cobalt h-10 w-64 border px-3 outline-none"
             />
           </label>
           <Segmented
@@ -625,7 +625,7 @@ function SelectionBar({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="rounded-control border-hairline bg-backstage-raised pointer-events-auto flex flex-wrap items-center gap-2 border py-2 pr-2 pl-4 shadow-[0_18px_40px_rgb(5_5_4/0.55)]"
+            className="rounded-control border-hairline bg-paper-raised pointer-events-auto flex flex-wrap items-center gap-2 border py-2 pr-2 pl-4 shadow-[0_18px_40px_rgb(23_26_33/0.12)]"
           >
             <p className="text-ui text-ink tabular-nums" aria-live="polite">
               {t('count', { count })}

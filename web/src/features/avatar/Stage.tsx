@@ -70,8 +70,9 @@ interface StageProps {
 }
 
 const BACKDROPS = {
-  light: { background: '#f2f1ee', cyc: '#f4f3f0', glow: 0.55 },
-  dark: { background: '#121113', cyc: '#121114', glow: 0.015 },
+  // Paper-toned: the studio continues the site's paper ground (DESIGN.md).
+  light: { background: '#e6e3dc', cyc: '#eceae4', glow: 0.55, platform: '#d4cfc5' },
+  dark: { background: '#121113', cyc: '#121114', glow: 0.015, platform: '#2a2826' },
 } as const;
 
 /**
@@ -191,7 +192,7 @@ const StudioSet = memo(function StudioSet({
         <Cyclorama color={theme.cyc} glow={theme.glow} />
         {backdrop === 'dark' && <Backlight height={subjectHeight} />}
       </group>
-      {platform && <Platform />}
+      {platform && <Platform color={theme.platform} />}
       {scenery}
     </>
   );

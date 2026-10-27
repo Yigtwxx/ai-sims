@@ -98,7 +98,7 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
   const thinking = talk.phase === 'connecting' || talk.phase === 'thinking';
 
   return (
-    <main className="bg-backstage relative flex h-dvh w-full flex-col overflow-hidden lg:block">
+    <main className="bg-paper relative flex h-dvh w-full flex-col overflow-hidden lg:block">
       <section
         aria-label={t('stageLabel', { name: character.name })}
         className="relative h-[46dvh] shrink-0 lg:absolute lg:inset-0 lg:h-auto"
@@ -189,7 +189,7 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
               </Button>
             </div>
           ) : talk.messages.length === 0 && zoom === 0 && stageShown ? (
-            <p className="border-hairline bg-backstage/70 text-label text-ink-muted hidden items-center gap-2 rounded-full border px-4 py-1.5 lg:inline-flex">
+            <p className="border-hairline bg-paper/70 text-label text-ink-muted hidden items-center gap-2 rounded-full border px-4 py-1.5 lg:inline-flex">
               <HandGrabbingIcon className="size-3.5" aria-hidden="true" />
               {t('dragHint')}
             </p>
@@ -231,7 +231,7 @@ export function TalkScreen({ character }: { character: TalkCharacter }) {
 
       <aside
         ref={panel}
-        className="border-hairline bg-backstage relative z-10 flex min-h-0 flex-1 flex-col border-t lg:absolute lg:inset-y-0 lg:right-0 lg:w-[clamp(360px,30vw,480px)] lg:border-t-0 lg:border-l lg:shadow-[-24px_0_60px_rgb(5_5_4/0.35)]"
+        className="border-hairline bg-paper relative z-10 flex min-h-0 flex-1 flex-col border-t lg:absolute lg:inset-y-0 lg:right-0 lg:w-[clamp(360px,30vw,480px)] lg:border-t-0 lg:border-l lg:shadow-[-24px_0_60px_rgb(23_26_33/0.1)]"
       >
         <TalkChat
           name={character.name}
@@ -278,7 +278,7 @@ function ZoomButton({
           aria-label={label}
           disabled={disabled}
           onClick={onClick}
-          className="bg-backstage/80"
+          className="bg-paper/80"
         >
           {children}
         </Button>

@@ -68,7 +68,7 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
       <Link
         href={`/characters/${character.id}/talk`}
         aria-label={`${name}, ${t('actions.talk')}`}
-        className="rounded-tile bg-backstage-raised ring-hairline group-hover:ring-ink-faint relative block aspect-[3/4] overflow-hidden ring-1 transition-[box-shadow] duration-300"
+        className="rounded-tile bg-paper-raised ring-hairline group-hover:ring-ink-faint relative block aspect-[3/4] overflow-hidden ring-1 transition-[box-shadow] duration-300"
       >
         {character.hasThumbnail && !broken ? (
           <>
@@ -111,7 +111,7 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
         )}
         {/* Finished is the normal state; only an unfinished draft needs a label. */}
         {character.status === 'draft' ? (
-          <span className="text-label border-hairline bg-backstage/85 text-ink-muted absolute top-3 left-3 rounded-full border px-2.5 py-1">
+          <span className="text-label border-hairline bg-paper/85 text-ink-muted absolute top-3 left-3 rounded-full border px-2.5 py-1">
             {t('status.draft')}
           </span>
         ) : null}
@@ -131,13 +131,13 @@ export function CharacterCard({ character }: { character: CharacterCardData }) {
           asChild
           variant="quiet"
           size="sm"
-          className="group-focus-within:border-marquee group-focus-within:bg-marquee group-focus-within:text-backstage group-hover:border-marquee group-hover:bg-marquee group-hover:text-backstage hover:bg-marquee-deep min-w-0 flex-1"
+          className="group-focus-within:border-cobalt group-focus-within:bg-cobalt group-focus-within:text-paper group-hover:border-cobalt group-hover:bg-cobalt group-hover:text-paper hover:bg-cobalt-deep min-w-0 flex-1"
         >
           <Link href={`/characters/${character.id}/talk`}>
             <ChatCircleDotsIcon
               weight="fill"
               aria-hidden="true"
-              className="text-marquee group-focus-within:text-backstage group-hover:text-backstage hidden transition-colors duration-200 min-[480px]:block"
+              className="text-cobalt group-focus-within:text-paper group-hover:text-paper hidden transition-colors duration-200 min-[480px]:block"
             />
             {t('actions.talk')}
           </Link>

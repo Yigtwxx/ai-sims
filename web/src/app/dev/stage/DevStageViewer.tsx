@@ -190,7 +190,7 @@ export function DevStageViewer() {
         quality={quality}
         className="absolute inset-0"
       />
-      <aside className="bg-backstage/90 absolute top-3 right-3 flex max-h-[calc(100%-1.5rem)] w-[396px] flex-col gap-2 overflow-y-auto rounded-lg p-3 text-xs">
+      <aside className="bg-paper/90 absolute top-3 right-3 flex max-h-[calc(100%-1.5rem)] w-[396px] flex-col gap-2 overflow-y-auto rounded-lg p-3 text-xs">
         <span data-testid="ready">{ready ? 'ready' : 'loading'}</span>
         <label className="flex flex-wrap gap-2">
           face

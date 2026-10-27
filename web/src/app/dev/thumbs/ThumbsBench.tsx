@@ -291,9 +291,9 @@ function Bench() {
         ) : null}
 
         <div className="flex flex-col gap-2" aria-live="polite">
-          <div className="bg-backstage-lift h-1 overflow-hidden rounded-full">
+          <div className="bg-paper-lift h-1 overflow-hidden rounded-full">
             <div
-              className="bg-marquee h-full transition-[width] duration-300"
+              className="bg-cobalt h-full transition-[width] duration-300"
               style={{ width: planned ? `${(100 * (done + failed)) / planned}%` : '0%' }}
             />
           </div>
@@ -307,7 +307,7 @@ function Bench() {
             {failed ? ` · ${t('failedCount', { count: failed })}` : ''}
           </p>
           {notInManifest.length > 0 ? (
-            <p className="text-label text-marquee">
+            <p className="text-label text-cobalt">
               {t('notInManifestCount', { count: notInManifest.length })}
             </p>
           ) : null}
@@ -315,7 +315,7 @@ function Bench() {
 
         <section
           aria-label={t('stageLabel')}
-          className="rounded-tile border-hairline bg-backstage-deep relative size-[512px] max-w-full shrink-0 overflow-hidden border"
+          className="rounded-tile border-hairline bg-paper-deep relative size-[512px] max-w-full shrink-0 overflow-hidden border"
         >
           {manifest && current && !recycle ? (
             <RenderJob
@@ -416,7 +416,7 @@ function KindChip({
       className={cn(
         'rounded-tile text-ui h-9 border px-3.5 transition-colors duration-200 disabled:opacity-40',
         active
-          ? 'border-marquee bg-backstage-lift text-ink'
+          ? 'border-cobalt bg-paper-lift text-ink'
           : 'border-hairline text-ink-muted hover:border-ink-faint hover:text-ink',
       )}
     >
@@ -440,8 +440,8 @@ function ThumbTile({
   const status = state?.status ?? 'idle';
   const src = item.exists ? `${assetUrl(item.file)}?v=${state?.version ?? 0}` : undefined;
   return (
-    <li className="rounded-tile border-hairline bg-backstage-raised flex flex-col overflow-hidden border">
-      <div className="bg-backstage-deep relative aspect-square">
+    <li className="rounded-tile border-hairline bg-paper-raised flex flex-col overflow-hidden border">
+      <div className="bg-paper-deep relative aspect-square">
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element -- a just-written local file, cache-busted
           <img src={src} alt="" className="size-full object-cover" />
@@ -451,7 +451,7 @@ function ThumbTile({
           </span>
         )}
         {status === 'rendering' || status === 'queued' ? (
-          <span className="bg-backstage/80 text-label text-ink absolute inset-x-2 top-2 rounded-[5px] px-2 py-1">
+          <span className="bg-paper/80 text-label text-ink absolute inset-x-2 top-2 rounded-[5px] px-2 py-1">
             {t(`status.${status}`)}
           </span>
         ) : null}
@@ -466,7 +466,7 @@ function ThumbTile({
             status === 'failed'
               ? 'text-alert'
               : status === 'done'
-                ? 'text-marquee'
+                ? 'text-cobalt'
                 : 'text-ink-faint',
           )}
         >

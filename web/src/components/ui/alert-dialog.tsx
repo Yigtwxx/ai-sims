@@ -28,12 +28,12 @@ function AlertDialogContent({
     <AlertDialogPrimitive.Portal>
       <AlertDialogPrimitive.Overlay
         data-slot="alert-dialog-overlay"
-        className="bg-backstage-deep/75 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 fixed inset-0 z-(--z-overlay)"
+        className="bg-paper-deep/75 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 fixed inset-0 z-(--z-overlay)"
       />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
-          'rounded-control border-hairline bg-backstage-raised data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 fixed top-1/2 left-1/2 z-(--z-overlay) grid w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 gap-5 border p-6 shadow-[0_18px_40px_rgb(5_5_4/0.55)] duration-200',
+          'rounded-control border-hairline bg-paper-raised data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 fixed top-1/2 left-1/2 z-(--z-overlay) grid w-[min(92vw,440px)] -translate-x-1/2 -translate-y-1/2 gap-5 border p-6 shadow-[0_18px_40px_rgb(23_26_33/0.12)] duration-200',
           className,
         )}
         {...props}

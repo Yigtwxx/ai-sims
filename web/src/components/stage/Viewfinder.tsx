@@ -79,7 +79,7 @@ export function Viewfinder() {
 
       <svg
         data-vf-focus
-        className="text-marquee/80 absolute top-1/2 left-1/2 size-[38%] max-h-64 max-w-64 -translate-x-1/2 -translate-y-1/2"
+        className="text-cobalt/80 absolute top-1/2 left-1/2 size-[38%] max-h-64 max-w-64 -translate-x-1/2 -translate-y-1/2"
         viewBox="0 0 100 100"
         fill="none"
       >

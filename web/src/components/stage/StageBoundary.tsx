@@ -56,7 +56,7 @@ export function StageFailed({
         className="absolute inset-y-0 flex items-center justify-center px-6"
         style={{ left: insetLeft, right: insetRight }}
       >
-        <div className="rounded-control border-hairline bg-backstage-raised flex max-w-sm flex-col items-center gap-4 border px-6 py-5 text-center">
+        <div className="rounded-control border-hairline bg-paper-raised flex max-w-sm flex-col items-center gap-4 border px-6 py-5 text-center">
           <p className="text-body-sm text-ink-muted">{t('stageFailed')}</p>
           <Button type="button" variant="quiet" size="sm" onClick={retry}>
             <ArrowClockwiseIcon aria-hidden="true" />

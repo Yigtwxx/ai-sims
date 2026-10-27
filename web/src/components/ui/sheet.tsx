@@ -34,7 +34,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'bg-backstage-deep/70 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 fixed inset-0 z-(--z-overlay)',
+        'bg-paper-deep/70 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 fixed inset-0 z-(--z-overlay)',
         className,
       )}
       {...props}
@@ -59,7 +59,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'bg-backstage-raised text-ink ease-out-quint data-[state=closed]:animate-out data-[state=open]:animate-in fixed z-(--z-overlay) flex flex-col gap-4 shadow-[0_18px_40px_rgb(5_5_4/0.55)] transition data-[state=closed]:duration-200 data-[state=open]:duration-300',
+          'bg-paper-raised text-ink ease-out-quint data-[state=closed]:animate-out data-[state=open]:animate-in fixed z-(--z-overlay) flex flex-col gap-4 shadow-[0_18px_40px_rgb(23_26_33/0.12)] transition data-[state=closed]:duration-200 data-[state=open]:duration-300',
           side === 'right' &&
             'border-hairline data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-[min(86vw,360px)] border-l',
           side === 'left' &&
@@ -74,7 +74,7 @@ function SheetContent({
       >
         {children}
         <SheetPrimitive.Close
-          className="rounded-control text-ink-muted hover:bg-backstage-lift hover:text-ink absolute top-3 right-3 inline-flex size-10 items-center justify-center transition-colors duration-200"
+          className="rounded-control text-ink-muted hover:bg-paper-lift hover:text-ink absolute top-3 right-3 inline-flex size-10 items-center justify-center transition-colors duration-200"
           aria-label={closeLabel}
         >
           <XIcon className="size-5" aria-hidden="true" />

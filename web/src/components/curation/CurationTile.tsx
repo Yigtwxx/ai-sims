@@ -140,28 +140,26 @@ export function CurationTile({
         aria-describedby={caption ? captionId : undefined}
         onClick={(event) => onSelect(item.id, event)}
         className={cn(
-          'rounded-tile bg-backstage-raised relative block w-full overflow-hidden border text-left transition-[border-color,box-shadow] duration-200',
+          'rounded-tile bg-paper-raised relative block w-full overflow-hidden border text-left transition-[border-color,box-shadow] duration-200',
           selected
-            ? 'border-marquee shadow-[0_0_0_1px_var(--color-marquee)]'
+            ? 'border-cobalt shadow-[0_0_0_1px_var(--color-cobalt)]'
             : 'border-hairline hover:border-ink-faint',
         )}
       >
-        <span className="bg-backstage-deep block aspect-[3/4] overflow-hidden">
+        <span className="bg-paper-deep block aspect-[3/4] overflow-hidden">
           <ItemPicture item={item} muted={hidden} />
         </span>
         <span
           aria-hidden="true"
           className={cn(
             'absolute top-2 left-2 flex size-5 items-center justify-center rounded-[5px] border transition-colors duration-150',
-            selected
-              ? 'border-marquee bg-marquee text-backstage'
-              : 'bg-backstage/70 border-white/25',
+            selected ? 'border-cobalt bg-cobalt text-paper' : 'bg-paper/70 border-white/25',
           )}
         >
           {selected ? <CheckIcon className="size-3.5" weight="bold" /> : null}
         </span>
         {hidden ? (
-          <span className="bg-backstage/85 text-label text-ink-muted absolute top-2 right-2 inline-flex items-center gap-1 rounded-[5px] px-1.5 py-0.5">
+          <span className="bg-paper/85 text-label text-ink-muted absolute top-2 right-2 inline-flex items-center gap-1 rounded-[5px] px-1.5 py-0.5">
             <EyeSlashIcon className="size-3.5" aria-hidden="true" />
             {t('hidden')}
           </span>
@@ -223,8 +221,8 @@ function IconAction({
       className={cn(
         'rounded-tile inline-flex size-8 items-center justify-center transition-colors duration-150',
         active
-          ? 'bg-backstage-lift text-marquee hover:text-ink'
-          : 'text-ink-faint hover:bg-backstage-lift hover:text-ink',
+          ? 'bg-paper-lift text-cobalt hover:text-ink'
+          : 'text-ink-faint hover:bg-paper-lift hover:text-ink',
       )}
     >
       {children}

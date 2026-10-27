@@ -21,12 +21,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: { default: t('name'), template: `%s | ${t('name')}` },
     description: t('description'),
+    // The image itself is `opengraph-image.png` next to this layout.
+    openGraph: { siteName: t('name'), type: 'website' },
+    twitter: { card: 'summary_large_image' },
   };
 }
 
 export const viewport: Viewport = {
-  themeColor: '#121211',
-  colorScheme: 'dark',
+  themeColor: '#eceae4',
+  colorScheme: 'light',
 };
 
 export default async function RootLayout({ children }: LayoutProps<'/[locale]'>) {
@@ -37,7 +40,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
     // suppressHydrationWarning: the inline script adds the `js` class before React hydrates.
     <html
       lang={locale}
-      className={`${fontVariables} dark h-full antialiased`}
+      className={`${fontVariables} h-full antialiased`}
       data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
@@ -49,7 +52,6 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
         <NextIntlClientProvider>
           <AppProviders>{children}</AppProviders>
         </NextIntlClientProvider>
-        <div aria-hidden="true" className="film-grain" />
       </body>
     </html>
   );

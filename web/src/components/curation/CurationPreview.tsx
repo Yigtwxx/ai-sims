@@ -97,14 +97,14 @@ export function CurationPreview({
       <DialogContent closeLabel={t('close')} onKeyDown={onKeyDown} className="md:p-6">
         {item ? (
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_17rem]">
-            <div className="rounded-tile bg-backstage-deep relative h-[min(68vh,600px)] overflow-hidden">
+            <div className="rounded-tile bg-paper-deep relative h-[min(68vh,600px)] overflow-hidden">
               {config && !fixture ? (
                 <StageBoundary
                   key={item.id}
                   fallback={() => (
                     <div className="relative size-full">
                       {still}
-                      <p className="text-label text-ink-muted bg-backstage/85 absolute inset-x-3 bottom-3 rounded-[5px] px-3 py-2">
+                      <p className="text-label text-ink-muted bg-paper/85 absolute inset-x-3 bottom-3 rounded-[5px] px-3 py-2">
                         {t('failed')}
                       </p>
                     </div>
@@ -121,7 +121,7 @@ export function CurationPreview({
               ) : (
                 <div className="relative size-full">
                   {still}
-                  <p className="text-label text-ink-muted bg-backstage/85 absolute inset-x-3 bottom-3 rounded-[5px] px-3 py-2">
+                  <p className="text-label text-ink-muted bg-paper/85 absolute inset-x-3 bottom-3 rounded-[5px] px-3 py-2">
                     {config ? t('fixture') : t('unavailable')}
                   </p>
                 </div>

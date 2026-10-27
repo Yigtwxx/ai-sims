@@ -249,7 +249,7 @@ export function TalkChat({
                   type="button"
                   disabled={busy}
                   onClick={() => submit(suggestion)}
-                  className="rounded-tile border-hairline text-ui text-ink-muted hover:border-ink-faint hover:bg-backstage-raised hover:text-ink h-9 border px-3.5 transition-[border-color,background-color,color,scale] duration-200 active:scale-[0.97] active:duration-100 disabled:opacity-40"
+                  className="rounded-tile border-hairline text-ui text-ink-muted hover:border-ink-faint hover:bg-paper-raised hover:text-ink h-9 border px-3.5 transition-[border-color,background-color,color,scale] duration-200 active:scale-[0.97] active:duration-100 disabled:opacity-40"
                 >
                   {suggestion}
                 </button>
@@ -280,7 +280,7 @@ export function TalkChat({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0, transition: SPRING_SOFT }}
             exit={{ opacity: 0, transition: { duration: 0.14, ease: EASE.inQuart } }}
-            className="rounded-tile border-hairline bg-backstage-raised mx-5 mb-3 flex items-start gap-3 border px-4 py-3"
+            className="rounded-tile border-hairline bg-paper-raised mx-5 mb-3 flex items-start gap-3 border px-4 py-3"
           >
             <NoticeIcon
               className={cn(
@@ -324,7 +324,7 @@ export function TalkChat({
         <label htmlFor={inputId} className="sr-only">
           {t('chat.inputLabel')}
         </label>
-        <div className="rounded-control border-hairline bg-backstage-raised focus-within:border-ink-faint flex items-end gap-2 border p-2 transition-colors duration-200">
+        <div className="rounded-control border-hairline bg-paper-raised focus-within:border-ink-faint flex items-end gap-2 border p-2 transition-colors duration-200">
           <textarea
             ref={input}
             id={inputId}
@@ -405,7 +405,7 @@ const MessageRow = memo(function MessageRow({
           className={cn(
             'text-body max-w-[92%] whitespace-pre-wrap',
             mine
-              ? 'rounded-control rounded-br-tile bg-backstage-lift text-ink px-4 py-2.5'
+              ? 'rounded-control rounded-br-tile bg-paper-lift text-ink px-4 py-2.5'
               : 'text-ink',
           )}
         >
@@ -425,7 +425,7 @@ const MessageRow = memo(function MessageRow({
 /** The status line's live mark: still dot, lifting dots, level meter or alert dot. */
 function StatusGlyph({ live }: { live: Live }) {
   if (live === 'connecting' || live === 'thinking') {
-    return <ThinkingDots className="text-marquee h-3" />;
+    return <ThinkingDots className="text-cobalt h-3" />;
   }
   if (live === 'speaking') {
     return (
@@ -446,7 +446,7 @@ function StatusGlyph({ live }: { live: Live }) {
       className={cn(
         'size-1.5 shrink-0 rounded-full',
         live === 'writing'
-          ? 'bg-marquee animate-pulse'
+          ? 'bg-cobalt animate-pulse'
           : live === 'failed' || live === 'offline'
             ? 'bg-alert'
             : 'bg-ink-faint',

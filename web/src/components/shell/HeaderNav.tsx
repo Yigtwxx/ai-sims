@@ -72,11 +72,11 @@ export function HeaderNav({ viewer }: HeaderNavProps) {
 
   const sessionAction =
     viewer === null ? (
-      <Skeleton className="rounded-control h-9 w-[72px]" />
+      <Skeleton className="h-9 w-[72px] rounded-full" />
     ) : viewer.signedIn ? (
       <SignOutForm />
     ) : (
-      <EnterForm next="/characters" variant="quiet" size="sm" />
+      <EnterForm next="/characters" variant="primary" size="sm" className="px-4" />
     );
 
   return (
@@ -95,7 +95,7 @@ export function HeaderNav({ viewer }: HeaderNavProps) {
 
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger
-            className="rounded-control text-ink hover:bg-backstage-raised inline-flex size-10 items-center justify-center transition-colors duration-200 md:hidden"
+            className="rounded-control text-ink hover:bg-paper-raised inline-flex size-10 items-center justify-center transition-colors duration-200 md:hidden"
             aria-label={t('menu')}
           >
             <ListIcon className="size-6" aria-hidden="true" />
@@ -156,7 +156,7 @@ function NavLinkView({
         <span
           aria-hidden="true"
           className={cn(
-            'bg-marquee ease-out-expo absolute inset-x-3 bottom-1 h-px origin-left transition-transform duration-300',
+            'bg-cobalt ease-out-expo absolute inset-x-3 bottom-1 h-px origin-left transition-transform duration-300',
             active ? 'scale-x-100' : 'group-hover:bg-hairline scale-x-0 group-hover:scale-x-100',
           )}
         />

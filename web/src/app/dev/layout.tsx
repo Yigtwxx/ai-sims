@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: 'AI Sims dev', robots: { index: false
 export default function DevLayout({ children }: { children: ReactNode }) {
   if (process.env.NODE_ENV === 'production') notFound();
   return (
-    <html lang="en" className={`${fontVariables} dark h-full`}>
-      <body className="bg-backstage text-ink h-full overflow-hidden">{children}</body>
+    <html lang="en" className={`${fontVariables} h-full`}>
+      <body className="bg-paper text-ink h-full overflow-hidden">{children}</body>
     </html>
   );
 }

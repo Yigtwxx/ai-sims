@@ -4,9 +4,9 @@ import { LocaleSwitcher } from '@/components/LocaleSwitcher';
 import { Link } from '@/i18n/navigation';
 
 /**
- * Quiet closing credits: wordmark, one line, language and the trademark
- * notice. Navigation lives in the header, which knows the session (protected
- * links here would bounce signed-out visitors).
+ * Quiet closing credits: wordmark, one line and language. Navigation lives in the header, which knows the session (protected
+ * links here would bounce signed-out visitors). Pages that end on their own
+ * closing frame mark it `data-hide-footer` (the landing).
  */
 export function SiteFooter() {
   const app = useTranslations('App');
@@ -14,7 +14,7 @@ export function SiteFooter() {
   const t = useTranslations('Footer');
 
   return (
-    <footer className="border-hairline bg-backstage border-t">
+    <footer className="border-hairline bg-paper border-t [body:has([data-hide-footer])_&]:hidden">
       <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-14 md:grid-cols-[1fr_auto] md:items-end md:px-8 lg:px-12">
         <div>
           <Link
@@ -28,11 +28,6 @@ export function SiteFooter() {
         </div>
 
         <LocaleSwitcher className="md:justify-self-end" />
-
-        <div className="border-hairline text-label text-ink-faint flex flex-col gap-1 border-t pt-6 md:col-span-2 md:flex-row md:justify-between">
-          <p>{t('demo')}</p>
-          <p>{t('trademark')}</p>
-        </div>
       </div>
     </footer>
   );

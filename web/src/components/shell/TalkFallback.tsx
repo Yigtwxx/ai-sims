@@ -9,7 +9,7 @@ export function TalkFallback() {
 
   return (
     <div
-      className="bg-backstage relative h-dvh w-full overflow-hidden"
+      className="bg-paper relative h-dvh w-full overflow-hidden"
       role="status"
       aria-live="polite"
     >
@@ -17,7 +17,7 @@ export function TalkFallback() {
       <div className="absolute inset-0 [--stage-floor:84%] [--stage-x:35%]">
         <StagePoster />
       </div>
-      <div className="border-hairline bg-backstage absolute inset-y-0 right-0 hidden w-[clamp(360px,30vw,480px)] flex-col gap-4 border-l p-5 lg:flex">
+      <div className="border-hairline bg-paper absolute inset-y-0 right-0 hidden w-[clamp(360px,30vw,480px)] flex-col gap-4 border-l p-5 lg:flex">
         <Skeleton className="h-5 w-24 rounded-full" />
         <Skeleton className="h-3 w-40 rounded-full" />
         <div className="mt-auto flex flex-col gap-3">

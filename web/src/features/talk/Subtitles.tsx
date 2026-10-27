@@ -51,7 +51,7 @@ export function Subtitles({ line, lang }: { line: SubtitleLine | null; lang: str
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="rounded-tile bg-backstage-deep/70 text-title text-ink-faint max-w-[46ch] px-5 py-3 text-center leading-snug"
+            className="rounded-tile bg-paper-deep/70 text-title text-ink-faint max-w-[46ch] px-5 py-3 text-center leading-snug"
           >
             {words.map((word, index) => (
               <span key={index}>
@@ -65,7 +65,7 @@ export function Subtitles({ line, lang }: { line: SubtitleLine | null; lang: str
                   {index === active ? (
                     <span
                       aria-hidden="true"
-                      className="bg-marquee absolute inset-x-0 -bottom-0.5 h-0.5 rounded-full"
+                      className="bg-cobalt absolute inset-x-0 -bottom-0.5 h-0.5 rounded-full"
                     />
                   ) : null}
                 </span>{' '}

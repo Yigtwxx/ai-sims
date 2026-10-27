@@ -44,23 +44,23 @@ function Toaster(props: ToasterProps) {
       gap={10}
       className="toaster group"
       icons={{
-        success: <CheckCircleIcon weight="fill" className="text-marquee size-[18px]" />,
+        success: <CheckCircleIcon weight="fill" className="text-cobalt size-[18px]" />,
         info: <InfoIcon weight="fill" className="text-ink-muted size-[18px]" />,
-        warning: <WarningIcon weight="fill" className="text-marquee size-[18px]" />,
+        warning: <WarningIcon weight="fill" className="text-cobalt size-[18px]" />,
         error: <XCircleIcon weight="fill" className="text-alert size-[18px]" />,
         loading: <SpinnerGapIcon className="text-ink-muted size-[18px] animate-spin" />,
       }}
       toastOptions={{
         classNames: {
           toast:
-            'font-sans !rounded-control !border-hairline !bg-backstage-raised !text-ink !shadow-[0_18px_40px_rgb(5_5_4/0.55)]',
+            'font-sans !rounded-control !border-hairline !bg-paper-raised !text-ink !shadow-[0_18px_40px_rgb(23_26_33/0.12)]',
           title: '!text-ui !font-semibold',
           description: '!text-label !text-ink-muted',
         },
       }}
       style={
         {
-          '--normal-bg': 'var(--color-backstage-raised)',
+          '--normal-bg': 'var(--color-paper-raised)',
           '--normal-text': 'var(--color-ink)',
           '--normal-border': 'var(--color-hairline)',
           '--border-radius': 'var(--radius-control)',

@@ -48,7 +48,7 @@ function LocaleLinks({ pathname }: { pathname: string }) {
               aria-label={t(locale)}
               className={cn(
                 'rounded-tile text-label flex h-8 min-w-9 items-center justify-center px-2 font-semibold tracking-[0.02em] transition-colors duration-200',
-                active ? 'bg-backstage-lift text-ink' : 'text-ink-faint hover:text-ink',
+                active ? 'bg-paper-lift text-ink' : 'text-ink-faint hover:text-ink',
               )}
             >
               {t(`short.${locale}`)}

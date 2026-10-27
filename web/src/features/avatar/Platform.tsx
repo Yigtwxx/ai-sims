@@ -6,14 +6,15 @@ import { LatheGeometry, Vector2 } from 'three';
 /** Low studio plinth the character stands on (metres); its top is the y = 0 floor. */
 export const PLATFORM_HEIGHT = 0.05;
 const RADIUS = 0.6;
-/** Rounded top edge: it catches the key light, so the plinth reads on a dark stage. */
+/** Rounded top edge: it catches the key light, so the plinth's rim reads on any backdrop. */
 const BEVEL = 0.012;
 const BEVEL_STEPS = 8;
 
 /**
- * A round plinth under the character: the dark stage floor is near black, so
- * without it the feet look like they float. Its top sits at y = 0 (where the
- * feet are) and the stage floor is lowered by PLATFORM_HEIGHT to meet its base.
+ * A round plinth under the character so the feet never look like they float.
+ * On the paper studio it is a shade darker than the floor; on the dark stage
+ * it is graphite. Its top sits at y = 0 (where the feet are) and the stage
+ * floor is lowered by PLATFORM_HEIGHT to meet its base.
  */
 export function Platform({ color = '#2a2826' }: { color?: string }) {
   const geometry = useMemo(() => {

@@ -37,7 +37,7 @@ export function StageLoading({
           className={cn('pointer-events-none', className)}
           style={style}
         >
-          <span className="border-hairline bg-backstage/75 text-label text-ink-muted inline-flex max-w-full items-center gap-2.5 rounded-full border py-1.5 pr-4 pl-3">
+          <span className="border-hairline bg-paper/75 text-label text-ink-muted inline-flex max-w-full items-center gap-2.5 rounded-full border py-1.5 pr-4 pl-3">
             <span
               aria-hidden="true"
               className="bg-hairline after:animate-skeleton-sweep relative h-px w-6 shrink-0 overflow-hidden after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.9),transparent)]"

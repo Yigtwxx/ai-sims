@@ -5,23 +5,23 @@ import { Slot } from 'radix-ui';
 import { cn } from '@/lib/utils';
 
 /*
- * shadcn/ui Button (new-york), restyled for "The Lit Stage": one marquee-amber
- * primary, quiet raised controls, 12px control radius. A press sinks to 0.97
- * in 100 ms and springs back in 200 ms (Tailwind's `scale` is its own CSS
+ * shadcn/ui Button (new-york), restyled for "Paper and Ink": an ink pill
+ * primary, quiet outlined pills, ghost text buttons. A press sinks to 0.97 in
+ * 100 ms and springs back in 200 ms (Tailwind's `scale` is its own CSS
  * property, so it must be listed in the transition to animate at all).
- * A disabled primary goes dark instead of half-transparent amber (the lamp is
- * off), except while busy: a pressed button that is working keeps its light.
+ * A disabled primary turns to an outlined pill instead of half-transparent ink,
+ * except while busy: a pressed button that is working keeps its fill.
  */
 const buttonVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-control font-semibold whitespace-nowrap transition-[background-color,color,border-color,box-shadow,scale] duration-200 ease-out-quint outline-none select-none active:scale-[0.97] active:duration-100 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "relative inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap transition-[background-color,color,border-color,box-shadow,scale] duration-200 ease-out-quint outline-none select-none active:scale-[0.97] active:duration-100 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         primary:
-          'bg-primary text-primary-foreground hover:bg-marquee-deep disabled:bg-backstage-raised disabled:text-ink-faint disabled:opacity-100 disabled:shadow-[inset_0_0_0_1px_var(--color-hairline)] aria-busy:bg-marquee aria-busy:text-backstage aria-busy:shadow-none',
+          'bg-primary text-primary-foreground hover:bg-ink/85 disabled:bg-transparent disabled:text-ink-faint disabled:opacity-100 disabled:shadow-[inset_0_0_0_1px_var(--color-input)] aria-busy:bg-ink aria-busy:text-paper aria-busy:shadow-none',
         quiet:
-          'border border-hairline bg-backstage-raised text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] hover:bg-backstage-lift',
-        ghost: 'text-ink-muted hover:bg-backstage-raised hover:text-ink',
+          'border border-ink/25 bg-transparent text-ink hover:border-ink/60 hover:bg-ink/[0.04]',
+        ghost: 'text-ink-muted hover:bg-ink/[0.05] hover:text-ink',
         link: 'h-auto px-0 text-ink-muted underline-offset-4 hover:text-ink hover:underline',
       },
       size: {

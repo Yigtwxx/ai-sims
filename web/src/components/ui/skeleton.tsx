@@ -10,7 +10,7 @@ function Skeleton({ className, ...props }: React.ComponentProps<'div'>) {
       data-slot="skeleton"
       aria-hidden="true"
       className={cn(
-        'rounded-tile bg-backstage-raised relative overflow-hidden',
+        'rounded-tile bg-paper-raised relative overflow-hidden',
         'after:animate-skeleton-sweep after:absolute after:inset-0 after:bg-[linear-gradient(90deg,transparent,rgb(255_226_176/0.06),transparent)]',
         className,
       )}

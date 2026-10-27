@@ -178,7 +178,7 @@ export function DevMhViewer() {
           />
         </Suspense>
       </Stage>
-      <aside className="bg-backstage/90 absolute top-3 left-3 flex max-h-[95vh] w-72 flex-col gap-2 overflow-y-auto rounded-lg p-3 text-xs">
+      <aside className="bg-paper/90 absolute top-3 left-3 flex max-h-[95vh] w-72 flex-col gap-2 overflow-y-auto rounded-lg p-3 text-xs">
         <label className="flex gap-2">
           face
           <select value={face} onChange={(e) => setFace(e.target.value)}>
