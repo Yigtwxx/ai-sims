@@ -401,15 +401,62 @@ Sıfır bir Mac'te (Apple Silicon), Terminal'de:
 - Boş ve bekleme durumları: `StagePoster` noktalı silüeti (`DotPoster`), 404/hata ekranı dağınık noktaları (`DustField`) gösterir.
 - Turbopack dev önbelleği (`web/.next/dev`) Mac'te 20 Ekim'den kalma CSS servis etti; garip stil görülürse sunucuyu durdurup bu klasörü sil.
 
+## Performans (2026-10-27, Mac)
+
+- Cihaz: MacBook M4 Pro, 120 Hz ProMotion, DPR 2, pencere 1440×874 CSS. Local production build (`pnpm build && pnpm start`); build Mac'te 9 sn, PC'deki symlink kırığı burada yok (varlıklar R2'den). Ölçüm: çizilen kare sayısı (WebGL draw hook) ve `ioreg` "Device Utilization %" (sudo gerekmez). `EXT_disjoint_timer_query_webgl2` ANGLE/Metal'de kareler arası örtüşüyor (%294 meşgul), kullanılmaz.
+
+  | Ölçüm | Sonuç |
+  |---|---|
+  | Boş masaüstü / landing | GPU %10 / 120 fps, GPU %20 |
+  | Oluşturucu `high` (önce) | **53 fps (18.7 ms), GPU %99.** `auto` 120 Hz'de drei'nin [50, 90] bandında kaldığı için inmiyordu |
+  | `high`, AO kapalı / AO medium / **AO yarım çözünürlük** | 120 / 81 / **92.6 fps (10.8 ms)** |
+  | `balanced` | 120 fps, GPU %98 (iki kat kare) |
+  | İlk yükleme (oluşturucu, Jelena) | 47 dosya, **73 MB** (KTX2 55, GLB 14.5). ~21 sn; bağlantı 3.3 MB/s, darboğaz ağ. Önbellekle 2.6 sn |
+  | R2 `Cache-Control` | dokular 1 saat, manifest 60 sn |
+
+- Yapılan:
+  - N8AO DPR > 1.5'te yarım çözünürlükte (`PostEffects.tsx`). Yüz yakın planında fark görülmedi.
+  - Boşta 30 fps (`IDLE_FPS`, `frameCap`, `useInputIdle`): 3 sn girdi yoksa (pointer, wheel, tuş) sahne 30 fps'e iner; konuşurken (`speaking` → Stage `lively`) tam hızda kalır. `PerformanceMonitor` yalnız sınırsızken ölçer, yoksa 30 fps'i yavaşlık sanardı.
+  - Sonuç (LPM kapalı, `auto`): oluşturucu boşta **30 fps, GPU %57** (önce %99), etkileşimde **92 fps** ve `high`'da kalıyor (önce 53). Konuşma ekranı: karakter konuştuğu sürece ~100 fps (girdi penceresi dolduktan sonra da), bitince hemen 30. Asset gelirken ve kamera kayarken bileşenlerin `invalidate`'i 30'un üstüne çıkarır; bu istenen bir şey.
+- Yerel `.env.local` PC'den kopyalandı ve `TTS_ENABLE_EDGE=1` eksikti; yerelde ses "could not be generated" veriyordu. 2026-10-27'de eklendi.
+
+## Kendi kıyafetimiz (plan, PC'de yapılacak; 2026-10-27)
+
+- **Karar (kullanıcı):** Fab'den tek tek kıyafet alınmaz. Kıyafetleri kendimiz üretiriz; iş PC'de ve Unreal üzerinden yapılır. Hedef "iyi", AAA değil. Araçlar ücretsiz olmalı. Fab'de abonelik yok; Blender'ın dikiş eklentileri (Garment Tool, Simply Cloth) ve Marvelous Designer / CLO ücretli, bu yüzden elendi.
+- **Bizim için kolaylaştıran şey:** `mh-convert` kemik ağırlıklarını ve vücut slider morph'larını kıyafete vücuttan kendisi aktarıyor (`pipeline/src/asset_pipeline/mh/outfits.py`, adım 3). `ue outfits` yalnızca nötr gövdeyi kuruyor. Yani Unreal'ın kıyafeti yalnızca her cinsiyetin **nötr** gövdesine oturtması yeterli. Epic'in birden çok kaynak bedenli resizable kurulumu (slider uçlarında bozulmayı önlemek için) bizde gerekmeyebilir; önce tek kaynak bedenle denenir.
+- **Araçlar:**
+  - Blender: render mesh ve UV. Kumaş simülasyonu yerleşik ve ücretsiz.
+  - z-weave Free: kalıptan giysi çıkarır, OBJ/FBX/glb dışa aktarır. Düz parçalarda (tişört, elbise) Blender'dan hızlı.
+  - Dokular CC0: [ambientCG](https://ambientcg.com/), [Poly Haven](https://polyhaven.com/).
+- **Epic dokümanları:**
+  - [Parametric clothing başlangıç](https://dev.epicgames.com/documentation/metahuman/getting-started-for-creating-parametric-clothing-in-metahuman)
+  - [Outfit Asset oluşturma](https://dev.epicgames.com/documentation/metahuman/create-a-metahuman-parametric-outfit-asset)
+  - [Test ve ayar](https://dev.epicgames.com/documentation/metahuman/testing-and-configuring-your-parametric-outfit-asset)
+  - [MetaHuman Manager ile paketleme](https://dev.epicgames.com/documentation/metahuman/packaging-your-outfit-asset-with-metahuman-manager)
+  - [Kendi wardrobe item'ın](https://dev.epicgames.com/documentation/metahuman/tailoring-your-own-wardrobe-items)
+- **Eğitimler:**
+  - [Nils Gallist, UE 5.6, Blender](https://dev.epicgames.com/community/learning/tutorials/b6EZ/custom-clothing-for-metahuman-2-0-in-ue5-6-step-by-step)
+  - [z-weave + UE 5.8](https://dev.epicgames.com/community/learning/tutorials/qzpo2/unreal-engine-create-metahuman-clothing-for-free-z-weave)
+  - [İndirilmiş modelden resizable kıyafet](https://www.youtube.com/watch?v=y8228NM-GHs)
+- **Adımlar** (ilk parça: düz tişört, tek cinsiyet):
+  1. Kaynak beden: `OutfitBase_<cinsiyet>`'in nötr gövdesi (`ue outfits`'in kurduğu karakter) Blender'a FBX olarak alınır; kıyafet onun üstünde modellenir.
+  2. UE'de Cloth Asset (`CA_`), sonra `Physics > Outfit Asset` (şablon "Resizable Outfit", ad klasör adıyla aynı `OA_`), Dataflow'da "Sized Outfit Source" (Size Name, Source Asset, Source Body Parts), "Evaluate Dataflow Graph". MetaHuman Creator'da slider'larla bakılır.
+  3. Malzeme `M_fabric_simpler`'ın instance'ı olursa web onu kendi kumaş shader'ıyla kurar (`NATIVE_MASTERS`, `pipeline/unreal/mh_export/outfits.py:37`) ve renk presetleri çalışır. Başka bir master'da da bake'lenir, ama düz PBR olur.
+  4. Wardrobe item `/Game/Custom/<ad>/WI_<ad>` altına konur, **`/Game/Fab` altına değil**: `mh-prune --unused-packages` `/Game/Fab/<paket>/`'i Fab paketi sayar (`src/asset_pipeline/mh/prune.py:55`). `ROOTS`'a `/Game/Custom` eklenir (`pipeline/unreal/mh_export/outfits.py:35`).
+  5. Sonrası Clara body ile aynı: `ue outfits --args '{"genders": ["female"], "only": ["WI_<ad>"]}'`, `mh-convert --outfits --outfit <ad> --manifest`, etiket `outfit_labels.json`, cinsiyet `gender_compat.json`, renk `outfit_tints.json`, `/dev/thumbs`, `node scripts/r2-sync.mjs`.
+- **Süre (tahmin, kaynaksız):** tişört 1-2 gün, kot ve elbise 2-4 gün, blazer 4-7 gün, öğrenme 1-2 hafta. En zor kısım blazer ve kot gibi katmanlı parçaların Outfit Asset'te düzgün warp etmesi.
+- **Lisans:** kullanıcı kararı (2026-10-27), bu araçlar ve Epic'in hazır kıyafetlerini değiştirmek için ayrıca sorulacak bir şey yok.
+
 ## Sıradaki iş (Mac)
 
+0. **PC'ye geçince, kendi kıyafetimiz:** yukarıdaki plan, ilk parça düz tişört.
 0. **PC'ye geçince (kullanıcı kararı, 2026-10-27):** `/dev/thumbs` ile yüz, saç ve kıyafet küçük resimlerini yeniden üret (A-pose hatası `motion.ts`'te düzeldi; mevcut görseller A-pozunda ve koyu fonda), sonra `node scripts/r2-sync.mjs` ile R2'ye yükle. Açık fonla çizmek de o sırada düşünülebilir.
 1. Aktarımı doğrula ("all files verified"), bağlantıyı kur, `pnpm dev` ile `/dev/stage` ve oluşturucuyu aç.
 2. İlk açılış kontrolü: landing, yeni karakter (kadın ve erkek), bir kıyafet ve renk değişikliği, Bitti, konuşma ekranında "Nasılsın?" (ses ve dudak). Konsolda `THREE.Clock` uyarısından başka hata olmamalı.
 3. Kürasyonu bitir; gizlenenleri kullanıcı `mh-prune --apply --plan <özet>` ile siler.
 4. Kalan kalite notları:
    - Erkek ve slider'lı gövdede klip pelvis ölçeği (`extras.mh.retarget.leg_lengths_m`).   - CC BY atfı: crowd idle klipleri (Vernac Studios, CC BY 4.0) için UI'da kredi satırı. Henüz yok.
-5. Mac'te performans ölçümü (fps, boşta 30) ve lip-sync'in TR + EN cümlelerle yeniden kontrolü.
+5. Lip-sync'in TR + EN cümlelerle yeniden kontrolü (performans bitti, yukarıda).
 
 ## AI ve ses
 
