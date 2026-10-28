@@ -163,6 +163,42 @@ describe('bindNeckSeam', () => {
     }
   });
 
+  it('moves the lower neck on the body skin, so a collar on the body stays over it', () => {
+    const root = new Group();
+    const spine = new Bone();
+    spine.name = 'spine_05';
+    const neck = new Bone();
+    neck.name = 'neck_01';
+    root.add(spine, neck);
+    root.updateMatrixWorld(true);
+    // The head's lower neck hangs on its neck joint, the body's edge on the spine.
+    const head = skinnedStrip(
+      'head',
+      [ring(0.06, 1.4), ring(0.06, 1.41), ring(0.06, 1.55)],
+      [spine, neck],
+      [0, 1, 0, 0],
+    );
+    const body = skinnedStrip(
+      'body',
+      [ring(0.06, 1.4), ring(0.06, 1.3)],
+      [spine, neck],
+      [1, 0, 0, 0],
+    );
+    root.add(body, head);
+    root.updateMatrixWorld(true);
+    const rig = createBodyRig(root, {});
+    const binding = bindNeckSeam([head], seam('head'), rig, seam('body'));
+    expect(binding).toBeDefined();
+    const lower = worldOf(head, RING);
+    const upper = worldOf(head, 2 * RING);
+
+    neck.rotation.set(0.4, 0, 0);
+    root.updateMatrixWorld(true);
+    // 1 cm above the seam the neck follows the body; 15 cm up, the head's own joint.
+    expect(worldOf(head, RING).distanceTo(lower)).toBeLessThan(1e-4);
+    expect(worldOf(head, 2 * RING).distanceTo(upper)).toBeGreaterThan(0.1);
+  });
+
   it('returns undefined when either side has no seam data', () => {
     const root = new Group();
     const bone = new Bone();

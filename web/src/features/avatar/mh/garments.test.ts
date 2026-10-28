@@ -305,6 +305,23 @@ describe('fitGarmentOverHead', () => {
     expect(radius(garment, 1) - radius(garment, 0)).toBeCloseTo(0.003, 4);
   });
 
+  it('clears head skin that pokes out between two garment vertices', () => {
+    const { garment, seam } = garmentAt([
+      [0.065, 1.09],
+      [0.065, 1.11],
+    ]);
+    // A head vertex between them stands 3 mm out past the cloth; neither garment
+    // vertex has it as its nearest head point.
+    const head = seam.head.geometry.getAttribute('position');
+    const bump = Array.from({ length: head.count }, (_, v) => v).find(
+      (v) =>
+        Math.abs(head.getY(v) - 1.1) < 1e-6 && Math.abs(head.getZ(v)) < 1e-6 && head.getX(v) > 0,
+    )!;
+    head.setX(bump, 0.068);
+    fitGarmentOverHead(garment, seam);
+    for (const v of [0, 1]) expect(radius(garment, v)).toBeGreaterThanOrEqual(0.068 + 0.0055);
+  });
+
   it('leaves a collar clear of the skin and a garment away from the head as they are', () => {
     const { garment, seam } = garmentAt([
       [0.075, 1.1],

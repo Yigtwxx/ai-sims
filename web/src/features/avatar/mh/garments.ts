@@ -143,7 +143,13 @@ const HEAD_BAND = 0.015;
 /** Points per k-d tree leaf. */
 const LEAF = 8;
 /** Clearance (m) a garment keeps over the head skin under it (see fitGarmentOverHead). */
-const HEAD_CLEARANCE = 0.003;
+const HEAD_CLEARANCE = 0.006;
+/**
+ * A garment point inside head skin asks to clear it when it lies within this
+ * distance (m) of the skin point's normal line: a collar edge beside the neck
+ * does not.
+ */
+const HEAD_BESIDE = 0.015;
 
 type Vec3Array = [number, number, number];
 
@@ -670,6 +676,7 @@ export function fitGarmentOverHead(garment: SkinnedMesh, seam: NeckSeamBinding):
   const nearDistance = new Float64Array(HEAD_NEIGHBOURS);
   const want = new Float32Array(headNormals.length / 3);
   const near: { v: number; index: Int32Array; distance: Float64Array }[] = [];
+  const nearPoints: number[] = [];
 
   // What each head point asks for: enough to clear the deepest garment vertex over it.
   for (let v = 0; v < position.count; v += 1) {
@@ -691,6 +698,7 @@ export function fitGarmentOverHead(garment: SkinnedMesh, seam: NeckSeamBinding):
     );
     if (found === 0) continue;
     near.push({ v, index: nearIndex.slice(0, found), distance: nearDistance.slice(0, found) });
+    nearPoints.push(x, y, z);
     const h = nearIndex[0]!;
     const out =
       (x - headTree.points[h * 3]!) * headNormals[h * 3]! +
@@ -699,11 +707,36 @@ export function fitGarmentOverHead(garment: SkinnedMesh, seam: NeckSeamBinding):
     want[h] = Math.max(want[h]!, HEAD_CLEARANCE - out);
   }
 
+  // And what each head point the garment lies behind asks for. Head skin is
+  // denser than most garments, so skin poking out between garment vertices is
+  // no garment vertex's nearest point: Mason's lower neck came through a crew
+  // neck at rest by up to 11 mm with no push asked for it.
+  if (near.length > 0) {
+    const garmentTree = buildTree(Float32Array.from(nearPoints));
+    const one = new Int32Array(1);
+    const oneDistance = new Float64Array(1);
+    for (let h = 0; h < want.length; h += 1) {
+      const x = headTree.points[h * 3]!;
+      const y = headTree.points[h * 3 + 1]!;
+      const z = headTree.points[h * 3 + 2]!;
+      if (!nearestPoints(garmentTree, x, y, z, 1, HEAD_REACH, one, oneDistance)) continue;
+      const g = one[0]! * 3;
+      const out =
+        (garmentTree.points[g]! - x) * headNormals[h * 3]! +
+        (garmentTree.points[g + 1]! - y) * headNormals[h * 3 + 1]! +
+        (garmentTree.points[g + 2]! - z) * headNormals[h * 3 + 2]!;
+      // Only a garment behind the skin, not a collar edge beside it.
+      const beside = Math.sqrt(Math.max(0, oneDistance[0]! ** 2 - out * out));
+      if (out < 0 && beside < HEAD_BESIDE) want[h] = Math.max(want[h]!, HEAD_CLEARANCE - out);
+    }
+  }
+
   // Every garment vertex near the head: the blended push of its head points.
   const e = garment.bindMatrixInverse.elements;
   let moved = 0;
   for (const { v, index, distance } of near) {
     let push = 0;
+    let most = 0;
     let total = 0;
     let nx = 0;
     let ny = 0;
@@ -712,15 +745,16 @@ export function fitGarmentOverHead(garment: SkinnedMesh, seam: NeckSeamBinding):
       const h = index[n]!;
       const w = 1 / Math.max(distance[n]!, 1e-5);
       push += w * want[h]!;
+      most = Math.max(most, want[h]!);
       nx += w * headNormals[h * 3]!;
       ny += w * headNormals[h * 3 + 1]!;
       nz += w * headNormals[h * 3 + 2]!;
       total += w;
     }
     const t = Math.min(1, Math.max(0, (HEAD_REACH - distance[0]!) / (HEAD_REACH / 2)));
-    // At least what its own nearest head point asks for: a blend with points
+    // What the neediest of its head points asks for: a blend with points
     // nothing comes near would leave the deepest vertices short of clearing.
-    const shift = Math.max(want[index[0]!]!, push / total) * t * t * (3 - 2 * t);
+    const shift = Math.max(most, push / total) * t * t * (3 - 2 * t);
     const length = Math.hypot(nx, ny, nz);
     if (shift <= 0 || length === 0) continue;
     // Bind-frame direction back into the garment's own frame.

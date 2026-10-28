@@ -433,6 +433,12 @@ export function createFabricMaterial(
     normalScale: source.normalScale.clone(),
     aoMap: source.aoMap ?? source.roughnessMap,
     side: DoubleSide,
+    // Skin-tight cloth and the skin around its openings lie within a depth step
+    // of each other: a bodysuit's straps on a slider end showed as skin and
+    // cloth in speckles. Drawn a step nearer, the cloth wins those ties.
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -4,
   });
   // Live uniforms, for inspection in dev tools.
   material.userData.fabric = uniforms;

@@ -287,6 +287,15 @@ export interface NeckSeamBinding {
   headSkinWeight: Float32Array;
   bodySkinIndex: Int32Array;
   bodySkinWeight: Float32Array;
+  /**
+   * Per ring vertex (the rest of the seam vertices): the head skin it was
+   * loaded with, the frame its rest position and normal are in, and that
+   * normal. It is drawn with that skin blended towards its boundary slots'
+   * body skin by its falloff (see blendRingSkin).
+   */
+  ringSkinIndex: Int32Array;
+  ringSkinWeight: Float32Array;
+  restNormal: Float32Array;
   /** Head skeleton entries added for the body's bones, as [head slot, body slot] pairs. */
   bodyEntries: Int32Array;
 }
@@ -535,12 +544,18 @@ export function bindNeckSeam(
     headSkinWeight: new Float32Array(count * 4),
     bodySkinIndex: new Int32Array(count * 4),
     bodySkinWeight: new Float32Array(count * 4),
+    ringSkinIndex: new Int32Array(count * 4),
+    ringSkinWeight: new Float32Array(count * 4),
+    restNormal: new Float32Array(count * 3),
     bodyEntries: addBodyEntries(head, headMeshes, body.mesh, bodyVertex),
   };
+  const normal = head.geometry.attributes.normal as Attribute | undefined;
   const point = new Vector3();
+  const restNormal = new Vector3();
   for (let i = 0; i < count; i += 1) {
     const vertex = binding.vertices[i]!;
     point.fromBufferAttribute(position, vertex).toArray(binding.rest, i * 3);
+    if (normal) restNormal.fromBufferAttribute(normal, vertex).toArray(binding.restNormal, i * 3);
     const slot = slotOfPosition.get(Math.round(dna.getX(vertex)));
     if (slot !== undefined) {
       binding.slotA[i] = binding.slotB[i] = slot;
@@ -564,8 +579,68 @@ export function bindNeckSeam(
   setSeamOutward(binding);
 
   copyBoundarySkin(binding);
+  blendRingSkin(binding);
   snapNeckSeam(binding);
   return binding;
+}
+
+/** Most influences a blended ring skin keeps (the shader reads four). */
+const SKIN_INFLUENCES = 4;
+
+/**
+ * Gives every ring vertex its own head skin blended towards the body skin of
+ * its two boundary slots by its falloff, and keeps the head skin it had as
+ * the frame its rest position is solved from (see snapNeckSeam).
+ *
+ * The boundary moves on the body's skin, the head above it on the head's.
+ * A head sculpted for another body binds its lower neck to its own spine and
+ * neck joints, so in a pose that neck swung off the body's: Mason's came out
+ * in front of a crew-neck tee, which follows the body, by more than 2 cm.
+ * Fading the body skin out up the neck with the seam offset makes the lower
+ * neck move as the body's neck does and the face keep the head's skin.
+ */
+function blendRingSkin(binding: NeckSeamBinding): void {
+  const { head, onBoundary, weights, slotA, slotB, blend } = binding;
+  const index = head.geometry.getAttribute('skinIndex') as Attribute;
+  const weight = head.geometry.getAttribute('skinWeight') as Attribute;
+  // Body skin of each boundary slot, from a boundary vertex on it.
+  const slotSkin = new Map<number, number>();
+  for (let i = 0; i < onBoundary.length; i += 1) {
+    if (onBoundary[i] && !slotSkin.has(slotA[i]!)) slotSkin.set(slotA[i]!, i);
+  }
+  const mix = new Map<number, number>();
+  const add = (slot: number, w: number) => {
+    if (w > 0) mix.set(slot, (mix.get(slot) ?? 0) + w);
+  };
+  for (let i = 0; i < onBoundary.length; i += 1) {
+    if (onBoundary[i]) continue;
+    const vertex = binding.vertices[i]!;
+    for (let k = 0; k < 4; k += 1) {
+      binding.ringSkinIndex[i * 4 + k] = index.getComponent(vertex, k);
+      binding.ringSkinWeight[i * 4 + k] = weight.getComponent(vertex, k);
+    }
+    const w = weights[i]!;
+    const a = slotSkin.get(slotA[i]!);
+    const b = slotSkin.get(slotB[i]!);
+    if (w <= 0 || a === undefined || b === undefined) continue;
+    mix.clear();
+    for (let k = 0; k < 4; k += 1) {
+      add(binding.ringSkinIndex[i * 4 + k]!, (1 - w) * binding.ringSkinWeight[i * 4 + k]!);
+      add(
+        binding.bodySkinIndex[a * 4 + k]!,
+        w * (1 - blend[i]!) * binding.bodySkinWeight[a * 4 + k]!,
+      );
+      add(binding.bodySkinIndex[b * 4 + k]!, w * blend[i]! * binding.bodySkinWeight[b * 4 + k]!);
+    }
+    const top = [...mix].sort((x, y) => y[1] - x[1]).slice(0, SKIN_INFLUENCES);
+    const total = top.reduce((sum, [, v]) => sum + v, 0);
+    for (let k = 0; k < 4; k += 1) {
+      index.setComponent(vertex, k, k < top.length ? top[k]![0] : 0);
+      weight.setComponent(vertex, k, k < top.length && total > 0 ? top[k]![1] / total : 0);
+    }
+  }
+  index.needsUpdate = true;
+  weight.needsUpdate = true;
 }
 
 /**
@@ -761,19 +836,40 @@ export function snapNeckSeam(binding: NeckSeamBinding): void {
       normal.setXYZ(vertex, n.x, n.y, n.z);
     }
   }
-  // Rings: the offset of their two boundary neighbours, faded out by the falloff.
+  // Rings: the offset of their two boundary neighbours, faded out by the falloff,
+  // in the frame of the head skin they were loaded with; then re-expressed in
+  // the blended skin they are drawn with (see blendRingSkin), so at rest they
+  // stay exactly where the offset puts them.
+  const own = new Matrix4();
+  const drawnInverse = new Matrix3();
+  const ownLinear = new Matrix3();
   for (let i = 0; i < binding.vertices.length; i += 1) {
     if (binding.onBoundary[i]) continue;
+    const vertex = binding.vertices[i]!;
     const a = binding.slotA[i]! * 3;
     const b = binding.slotB[i]! * 3;
     const t = binding.blend[i]!;
     const w = binding.weights[i]!;
-    position.setXYZ(
-      binding.vertices[i]!,
+    target.set(
       binding.rest[i * 3]! + w * ((1 - t) * offsets[a]! + t * offsets[b]!),
       binding.rest[i * 3 + 1]! + w * ((1 - t) * offsets[a + 1]! + t * offsets[b + 1]!),
       binding.rest[i * 3 + 2]! + w * ((1 - t) * offsets[a + 2]! + t * offsets[b + 2]!),
     );
+    skinTransformOf(head, binding.ringSkinIndex, binding.ringSkinWeight, i, own);
+    target.applyMatrix4(own);
+    skinTransform(head, vertex, drawn).invert();
+    target.applyMatrix4(drawn);
+    position.setXYZ(vertex, target.x, target.y, target.z);
+    if (normal) {
+      ownLinear.setFromMatrix4(own);
+      drawnInverse.setFromMatrix4(drawn);
+      const n = seamNormal
+        .fromArray(binding.restNormal, i * 3)
+        .applyMatrix3(ownLinear)
+        .applyMatrix3(drawnInverse)
+        .normalize();
+      normal.setXYZ(vertex, n.x, n.y, n.z);
+    }
   }
   position.needsUpdate = true;
   if (normal) normal.needsUpdate = true;
