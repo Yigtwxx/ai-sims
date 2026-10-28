@@ -581,6 +581,20 @@ def bare_body_albedo(albedo: NDArray[np.uint8], mask: NDArray[np.float32]) -> ND
     return np.clip(np.round(filled), 0, 255).astype(np.uint8)
 
 
+def bare_body_srmf(
+    srmf: NDArray[np.uint8], albedo: NDArray[np.uint8], mask: NDArray[np.float32]
+) -> NDArray[np.uint8]:
+    """The DCC body SRMF with its baked underwear filled from the skin around it, every
+    channel, over the texels the `albedo` shows the underwear on (same size). The bake
+    gives the cloth flat values (roughness 1, specular 0.5) that read as a matte band
+    wherever a high-cut garment leaves that skin bare (the Clara bodysuit's leg openings)."""
+    hole = underwear_texels(albedo, mask)
+    if not hole.any():
+        return srmf
+    filled = push_pull_fill(srmf.astype(np.float32), hole)
+    return np.clip(np.round(filled), 0, 255).astype(np.uint8)
+
+
 def find_straps(albedo: NDArray[np.uint8], flap: NDArray[np.bool_]) -> NDArray[np.bool_] | None:
     """Texels of grey cloth in the neck/chest flap of a face albedo (the only part from the
     DCC bake, which shows the default top's straps), or None when there is none (a man's
@@ -835,9 +849,6 @@ def skin_jobs(maps: PresetMaps) -> list[MapJob]:
             "normal",
             NORMAL,
         ),
-        MapJob(
-            "body_srmf", "body_srmf.ktx2", maps.maps / "Body_SRMF.png", BODY_SIZE, "data", SRMF, 4
-        ),
     ]
 
 
@@ -873,6 +884,32 @@ def convert_body_albedo(
         encode_ktx2(albedo, output, COLOR)
         cache.remember(output, print_)
     textures.add("body_albedo", output, web_root, output.stat().st_size)
+
+
+def convert_body_srmf(
+    maps: PresetMaps, folder: Path, web_root: Path, cache: TextureCache, textures: TextureSet
+) -> None:
+    """`body_srmf.ktx2`: the DCC body SRMF without its baked underwear (`bare_body_srmf`)."""
+    output = folder / "body_srmf.ktx2"
+    source = maps.maps / "Body_SRMF.png"
+    albedo_source = maps.maps / "Body_Basecolor.png"
+    mask_source = maps.body / UNDERWEAR_MASK
+    sources = [source, albedo_source, *([mask_source] if mask_source.is_file() else [])]
+    recipe = {
+        "size": BODY_SIZE,
+        "settings": SRMF.key,
+        "underwear": [UNDERWEAR_VERSION, UNDERWEAR_COVER, UNDERWEAR_GREY, UNDERWEAR_DILATE],
+    }
+    print_ = texture_print(recipe, *sources)
+    if not cache.fresh(output, print_):
+        srmf = prepare(source, BODY_SIZE, "data", 4)
+        mask = underwear_mask(maps, srmf.shape[0])
+        if mask is not None:
+            albedo = prepare(albedo_source, srmf.shape[0], "color")
+            srmf = bare_body_srmf(srmf, albedo, mask)
+        encode_ktx2(srmf, output, SRMF)
+        cache.remember(output, print_)
+    textures.add("body_srmf", output, web_root, output.stat().st_size)
 
 
 def strap_recipe() -> dict[str, Any]:
@@ -998,6 +1035,7 @@ def convert_skin(
     for retired in ("face_cavity.ktx2", "body_cavity.ktx2"):
         (folder / retired).unlink(missing_ok=True)
     convert_body_albedo(maps, folder, web_root, cache, textures)
+    convert_body_srmf(maps, folder, web_root, cache, textures)
     masks = write_masks(maps, web_root)
     underwear = write_underwear(maps, web_root)
 

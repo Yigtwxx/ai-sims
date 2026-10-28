@@ -428,7 +428,8 @@ def skin_fingerprint(archive: Path, name: str) -> str:
     # v4: underwear straps are filled from the head's UV island only (no pale wedges).
     # v5: the head's straps carry the bake's grey, normal and coverage (face_underwear).
     # v6: no cavity maps (the SRMF bake already carries them).
-    return fingerprint("skin-v6", CharacterSource.find(archive, name).done)
+    # v7: the body SRMF's baked underwear is filled from the skin too.
+    return fingerprint("skin-v7", CharacterSource.find(archive, name).done)
 
 
 def iris_fingerprint(archive: Path, name: str) -> str:

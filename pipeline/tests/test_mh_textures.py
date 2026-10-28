@@ -12,6 +12,7 @@ from asset_pipeline.mh import ktx
 from asset_pipeline.mh.textures import (
     TextureCache,
     bare_body_albedo,
+    bare_body_srmf,
     compose_face_albedo,
     downsample,
     feathered,
@@ -237,6 +238,16 @@ def test_bare_body_albedo_removes_the_cloth() -> None:
     bare = bare_body_albedo(albedo, mask)
     np.testing.assert_allclose(bare[20, 20], (150, 100, 80), atol=1)
     np.testing.assert_array_equal(bare[16:32, 40:48], albedo[16:32, 40:48])
+
+
+def test_bare_body_srmf_takes_the_skin_values_where_the_albedo_shows_cloth() -> None:
+    albedo, mask = _skin_with_underwear()
+    srmf = np.zeros((*albedo.shape[:2], 4), dtype=np.uint8)
+    srmf[:] = (160, 160, 0, 190)  # skin
+    srmf[16:32, 16:32] = (127, 255, 0, 200)  # the baked cloth: flat and fully rough
+    bare = bare_body_srmf(srmf, albedo, mask)
+    np.testing.assert_allclose(bare[20, 20], (160, 160, 0, 190), atol=1)
+    np.testing.assert_array_equal(bare[16:32, 40:48], srmf[16:32, 40:48])
 
 
 def test_find_straps_takes_grey_cloth_in_the_flap_only() -> None:
