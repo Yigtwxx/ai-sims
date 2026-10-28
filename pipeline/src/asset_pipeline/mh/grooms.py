@@ -29,7 +29,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, grey_closing
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 from scipy.spatial import cKDTree
@@ -91,6 +91,10 @@ ROOT_GRID = 512  # head-UV texels the roots are counted on
 ROOT_SIGMA = 4.0  # blur (grid texels): sparse roots stand for the scalp between them
 ROOT_COVERAGE = 0.05  # atlas texels fainter than this carry no strand
 ROOT_FULL = 0.5  # share of the median root density that already counts as full cover
+# Generated cards are clumps with skin between them: a sleek ponytail showed pink scalp
+# between the clumps at its crown and tie. Holes up to this radius (grid texels, ~1 mm
+# each) inside the cards' cover are closed; the hairline outline stays.
+CARD_GAP_CLOSE = 8
 DENSITY_SIZE = 1024
 DEFAULT_MAX_TEXTURE = 2048
 # The MetaHuman hair material is driven by melanin, redness and an optional dye.
@@ -574,10 +578,14 @@ def density_from_roots(root_uv_seed_coverage: NDArray[np.uint8]) -> NDArray[np.u
 
 
 def _density_from_uvs(
-    u: NDArray[np.float32], v: NDArray[np.float32], weights: NDArray[np.float32]
+    u: NDArray[np.float32],
+    v: NDArray[np.float32],
+    weights: NDArray[np.float32],
+    close: int = 0,
 ) -> NDArray[np.uint8]:
     """Splat head UVs (top-left origin) with their weights, blur, and count half the median
-    density as full cover; the shared core of `density_from_roots` and `density_from_cards`."""
+    density as full cover; the shared core of `density_from_roots` and `density_from_cards`.
+    `close` (grid texels) closes holes up to about that radius inside the cover."""
     cols = np.clip((u * ROOT_GRID).astype(np.int64), 0, ROOT_GRID - 1)
     rows = np.clip((v * ROOT_GRID).astype(np.int64), 0, ROOT_GRID - 1)
     grid = np.zeros((ROOT_GRID, ROOT_GRID), dtype=np.float32)
@@ -586,6 +594,10 @@ def _density_from_uvs(
     present = grid[grid > grid.max() * 0.01] if grid.max() > 0 else grid[:0]
     full = float(np.median(present)) * ROOT_FULL if present.size else 1.0
     t = np.clip(grid / max(full, 1e-9), 0.0, 1.0)
+    if close > 0:
+        span = np.arange(-close, close + 1)
+        disk = span[:, None] ** 2 + span[None, :] ** 2 <= close * close
+        t = grey_closing(t, footprint=disk)
     density = t * t * (3.0 - 2.0 * t)
     image = Image.fromarray(density.astype(np.float32))
     upsized = np.asarray(image.resize((DENSITY_SIZE, DENSITY_SIZE), Image.Resampling.BILINEAR))
@@ -645,7 +657,9 @@ def density_from_cards(
     near = (distance <= COVER_DISTANCE) & (sample_area > 0)
     corner = head.triangles[triangle[near], np.argmax(bary[near], axis=1)]
     head_uv = head.uvs[corner].astype(np.float32)
-    return _density_from_uvs(head_uv[:, 0], head_uv[:, 1], sample_area[near].astype(np.float32))
+    return _density_from_uvs(
+        head_uv[:, 0], head_uv[:, 1], sample_area[near].astype(np.float32), close=CARD_GAP_CLOSE
+    )
 
 
 def card_coverage(groom: "GroomUnit", size: int = 512) -> NDArray[np.float32] | None:

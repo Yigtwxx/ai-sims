@@ -310,6 +310,18 @@ def test_card_density_follows_the_atlas_coverage() -> None:
     assert _density_at(density, 0.75, 0.75) == 0, "an empty atlas region does not"
 
 
+def test_card_density_closes_the_skin_between_card_clumps() -> None:
+    # Two rows of clumps 1.5 cm apart (UV 0.03): the blur alone left the skin between
+    # them at 42 of 255, as generated cards left a ponytail's crown.
+    rows = [
+        _card(u, 0.5 + side * 0.025, 0.001) for u in np.linspace(0.4, 0.6, 11) for side in (-1, 1)
+    ]
+    density = grooms.density_from_cards(_cards(*rows), _flat_head(), None)
+    assert _density_at(density, 0.5, 0.5) == 255, "the gap between the rows is covered"
+    assert _density_at(density, 0.5, 0.65) == 0, "skin beyond the rows stays bare"
+    assert _density_at(density, 0.3, 0.5) == 0, "and so does skin past their ends"
+
+
 def test_units_without_their_groom_head_use_the_stand_in_heads(tmp_path: Path) -> None:
     unit = tmp_path / "Hair" / "Style"
     (unit / "meshes").mkdir(parents=True)
