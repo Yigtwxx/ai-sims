@@ -9,10 +9,10 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
   | Faz | Alt faz | İçerik | Görev | Saat |
   |---|---|---|---|---|
-  | **1 Temel** (~30 sa) | 1a | Fab ve yüzler; Unreal işleri arka planda | A1 → A2 | ~6 |
-  |  | 1b | Saçlar | A3 → A3b | ~8 |
-  |  | 1c | Kalem etek, Blender yolu ve paketleyici | A4.0 | ~10 |
-  |  | 1d | Oturma hataları; düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer | B5 | ~6 |
+  | **1 Temel** (~30 sa; gerçek ~30, bitti 2026-10-28) | 1a | Fab ve yüzler; Unreal işleri arka planda | A1 → A2 | ~6 (gerçek 3.3) |
+  |  | 1b | Saçlar | A3 → A3b | ~8 (gerçek ~9) |
+  |  | 1c | Kalem etek, Blender yolu ve paketleyici | A4.0 | ~10 (gerçek 5.4) |
+  |  | 1d | Oturma hataları; düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer | B5 | ~6 (gerçek ~12) |
   | **2 Panel ve temel kıyafet** (~60 sa) | 2a | Göz tonu, yüz karıştırma | B1 → B2 | ~14 |
   |  | 2b | Dövme, takı | B3 → B4 | ~16 |
   |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 |
@@ -53,7 +53,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Plan dosyasında her adımın kutusu, tahmini süresi ve gerçek süresi tutulur. Gerçek süreler sonraki fazların tahminlerini düzeltir; bu dosyadaki faz saatleri de güncellenir.
     - Faz planı kullanıcıya telefondan kısa bir liste olarak gönderilir; onay beklenmeden başlanır.
     - Oturum kesilirse yenisi plan dosyasındaki ilk açık adımdan devam eder.
-  - Her faz sonunda kısa bir kontrol yapılır: landing, yeni karakter, o fazın eklediği şeyler ve konuşma ekranı. Kullanıcıya telefondan ekran görüntüleriyle faz özeti gönderilir.
+  - Her faz sonunda kısa bir kontrol yapılır: landing, yeni karakter, o fazın eklediği şeyler ve konuşma ekranı. Kullanıcıya kısa bir metin özeti verilir; ekran görüntüsü gönderilmez (kullanıcı kararı, 2026-10-28).
   - Görevi birden çok faza ya da alt faza bölünmüş maddelerin (A4.1, A4.4, A4.5, A4.6, A4.8) kutusu son parçası bitene kadar açık kalır; yanına bitenler not edilir.
   - Unreal ya da Blender arka planda çalışırken aynı fazdaki engelsiz bir web görevine geçilebilir; iş bitince sıraya geri dönülür.
 - **Engel:** bir görev kullanıcıya bağlıysa (indirme, seçim, karar) soruyu aşağıdaki "Kullanıcıya sorular" bölümüne yaz, kullanıcıya kısaca sor ve beklemeden sıradaki engelsiz göreve geç.
@@ -217,7 +217,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 - [ ] **B3. Dövme** (`tattoos`, `schema.ts:103`, `TattooPanel.tsx`, `web/src/features/creator/tattoos.ts`). Cilt shader'ında gövde ve kafa UV'sine bir katman eklenir. Tasarımlar küçük ve ölçülü kalır; yerleşim UV'leri gövde GLB'sinden ölçülür.
 - [ ] **B4. Takı** (`accessories`, `JewelryPanel.tsx`, `web/src/features/avatar/accessories/`). Bu kod anime döneminden kalma (VRoid kulak arama vb.); MetaHuman kafa ve gövde mesh'ine ve eklemlerine bağlanır. **Bitti sayılır:** küpe, kolye ve yüzük idle ve konuşma sırasında yerinde kalıyor ve mesh'e girmiyor.
 
-- [ ] **B5. Oturma hataları: kıyafet ve saç** (kullanıcı şikâyeti, 2026-10-27; sırası A4.0'dan hemen sonra, bkz. "Sıra").
+- [x] **B5. Oturma hataları: kıyafet ve saç** (2026-10-28, `edc5198`, `c0afe0e`, `a676190`, `cbf0a83`, `373806d`, `e497f3a`, `7a6f2a2`; ölçüm aracı `mh-fit-audit` `b6de10f`; ayrıntı `docs/plans/faz-1.md` 1d. Bilinen küçük kusur: tişört kol ağzının koltuk altı kenarında pozda 1-2 piksellik iz.) (kullanıcı şikâyeti, 2026-10-27; sırası A4.0'dan hemen sonra, bkz. "Sıra").
   - Belirtiler:
     - Kıyafetler hâlâ yer yer vücudun içine giriyor, tam oturmuyor.
     - Gövde kaydırıcıları değişince kıyafet bozulabiliyor.
@@ -294,6 +294,8 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## Kullanıcıya sorular
 
-- **B5 açık kalanları (2026-10-28):** Faz 1d'de ölçülen ve düzeltilemeyen vakalar (`docs/plans/faz-1.md` 1d.2-1d.3: Mason'ın pozda alt boynu, erkek üstlerde kilo +1 koltuk altı delikleri, flipflops, KhaosMDF479, Street_Wear_01, farklı kafalarda uzun saç kartları). Faz 1 bunlarla kapanıp ayrı bir göreve mi alınsın, yoksa Faz 1 içinde mi bitirilsin?
+(Bekleyen soru yok.)
+
+- Cevaplanan (2026-10-28, B5): açık kalan vakalar Faz 1 içinde bitirildi (kullanıcı: "faz 1i tamamen bitir").
 
 - Cevaplanan (2026-10-27, A2): Mason'ın 8K yüz dokuları belleği tıkadı, Claude Code dışa aktarımı durdurdu. Kullanıcı kararı: web için 8K gerekmez, 4K ya da daha düşüğü olur ("sen karar ver"). Yeni Fab yüzleri `"face": "res4k"` ile dışa aktarılır: web yüzü zaten 4096 px (`textures.py` `FACE_SIZE`, en az 4096 ister), 1080 gözenek detayını kaybettirir. Gövde 4K kalır.

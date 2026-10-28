@@ -125,32 +125,31 @@
   - `/dev/stage`: nötr ve her slider ucu × idle ve talk; kumaş deriye girmiyor, cilt görünmüyor, yırtılmıyor, renk presetleri çalışıyor.
   - `/dev/thumbs`, `node scripts/r2-sync.mjs outfits`, commit + push; kullanıcıya önden ve yandan ekran görüntüsü. A4.0 `[x]`.
 
-## 1d — Oturma hataları (B5), tahmin ~6
+## 1d — Oturma hataları (B5), tahmin ~6 · gerçek ~12
 
 > `superpowers:systematic-debugging`: önce kanıt, sonra düzeltme. Düzeltmeler dönüştürücüde kalır ki sonraki kıyafetlere de geçsin.
 
 - [x] **1d.1 Kanıt matrisi.** Tahmin 2 · Gerçek ~1.5 (subagent ~67 dk)
   - `asset-pipeline mh-fit-audit` (`b6de10f`, `pipeline/src/asset_pipeline/mh/fit_audit.py`): görünür her kıyafet × iki gövde × nötr, her kaydırıcı ucu, presetler ve birkaç birleşik uç × dinlenme pozu + idle ve talk kareleri; ölçülenler: kumaştan taşan deri, görünen deriye batan kumaş, çaprazlanan katmanlar, gizli derinin açıkta kaldığı delikler, yakadan taşan kafa derisi. Saçta her saç × birkaç yüz: kafaya giren kart köşesi ve kafadan >5 mm uzak kök. Runtime'ın dikiş snap'i, yaka itmesi ve yeniden skinleme numpy'a taşındı. 1049 kıyafet + 304 saç vakası 6 dk 17 sn. Rapor `<arşiv>/build/fit/report.json`.
   - Sınır: pozlu kareler yalnız nötr kaydırıcıda; üst+alt birlikte ölçülmüyor; uzun saçın omuza girmesi ölçülmüyor; dikiş snap'i yaklaşık (Mason'ın pozdaki taşmasını gerçekte olduğundan küçük ölçüyor, aşağıda).
-- [ ] **1d.2 Kıyafet düzeltmesi.** Tahmin 2 · Gerçek ~3 (kısmen bitti)
-  - Bitti:
-    - **Eteğin kara noktaları** (`edc5198`): AO değilmiş, AO'suz (battery) da vardı. Gövdenin gölge geçişi `bodyHidden` maskesini uygulamıyordu; kıyafet altındaki gizli deri gölge düşürüyor, pozda deri altına birkaç mm giren kumaş o gölgede kapkara görünüyordu. Gövde artık gölgesini de maskeyle çiziyor.
-    - **Yakadan taşan alt boyun** (`5f7eb94`): her preset kafa paylaşılan gövdenin boynunu 1-4 cm ıskalıyor, dikiş ofseti ~2 cm'lik 4 halkada sönüyordu. Ofset artık ilk 3 cm'de tam, 9 cm'de sıfır (yüz dikişten en az 11.6 cm uzakta); yaka kafa derisinden 3 yerine 5 cm'ye kadar itiliyor. Denetimde Mason + tişört dinlenmede 150 köşe/9 mm → 5 köşe/1.1 mm; kaydırıcı uçlarında 35 mm → 3.8 mm; kazak nötrde temiz.
-    - `mh-prune` 4 Fab yüzünün paketini (1.9 GB) "kullanılmıyor" sayıyordu (`c0afe0e`).
-  - Açık (karar bekliyor):
-    - **Mason pozda:** idle ve talk'ta alt boyun tişörtün önüne geçiyor (yakanın altında ten lekeleri). Kanıt: gövde ve kafa gizlenince tişört kesintisiz; lekeler kafa derisi. Neden: Mason'ın alt boynu kendi kafa ağırlıklarıyla, tişört gövde ağırlıklarıyla dönüyor. Çözüm önerisi: dikiş bandının deri ağırlıklarını sönümle birlikte gövdenin ağırlıklarına karıştırmak (`assembly.ts` `snapNeckSeam`). Kumaşın örttüğü kafa derisini gizlemek denendi: yakada kara delik açtı, geri alındı.
-    - **Erkek tişört, kazak, kapüşonlu, kilo +1:** koltuk altında 140-190 delik üçgeni (gizli deri açıkta); tişörtte kol yeni kola 13 mm batıyor.
-    - **Flipflops:** kilo +1 ve kas +1'de başparmak arası kayış katmanları 14.7 mm çaprazlanıyor.
-    - **KhaosMDF479 (kadın):** kilo +1'de kumaş görünen derinin 6.7 mm altına giriyor (pelvis).
-    - **Street_Wear_01:** talk karesinde 202 delik üçgeni (pelvis, üst kol).
-    - Kol ağzında 1-2 piksellik arka plan sızıntısı (pozda kol ağzı kalkıyor; payı büyütmek deriyi kumaştan taşırır).
-- [ ] **1d.3 Saç düzeltmesi.** Tahmin 1 · Gerçek ~1 (kısmen bitti)
-  - Bitti: kart kaynaklı yoğunlukta kartlar arası 8 mm'ye kadar boşluklar kapanıyor (`a676190`): Ponytail'in tepesi ve tokası, Nomad'ın girdabı artık pembe değil. Fab saçları boy filtresinde (`cbf0a83`). Ponytail'in alnına düşen saç sanatçının tasarımı (Fab görselinde perçem var).
-  - Açık: kartlar kökleriyle yalnız ötelendiği için farklı kafa şekillerinde uzun kartlar kafaya giriyor (referans yüze göre: StraightBangs Dominic ve Mason'da ~3000 köşe/37 mm, Ponytail Skotukeda'da 4585/20.7 mm, HighPonytail Skotukeda'da 17 mm, Male 11 Dominic'te 20 mm). Çözüm kartı kökten uca kafa yüzeyine göre deforme etmek (kafa derisinden dışarı itme).
-- [ ] **1d.4 Yayın ve rapor.** Tahmin 1 · Gerçek —
-  - Saçlar R2'de; web düzeltmeleri `main`'e push'landı. Önce/sonra görüntüleri kullanıcıya gönderildi (2026-10-28). Açık maddelerin ne zaman yapılacağı kullanıcı kararı.
+- [x] **1d.2 Kıyafet düzeltmesi.** Tahmin 2 · Gerçek ~7
+  - **Eteğin kara noktaları** (`edc5198`): AO değilmiş, AO'suz (battery) da vardı. Gövdenin gölge geçişi `bodyHidden` maskesini uygulamıyordu; kıyafet altındaki gizli deri gölge düşürüyor, pozda deri altına birkaç mm giren kumaş o gölgede kapkara görünüyordu. Gövde artık gölgesini de maskeyle çiziyor.
+  - **Yakadan taşan alt boyun** (`5f7eb94`, `e497f3a`): her preset kafa paylaşılan gövdenin boynunu 1-4 cm ıskalıyor, dikiş ofseti ~2 cm'lik 4 halkada sönüyordu. Ofset artık ilk 3 cm'de tam, 9 cm'de sıfır (yüz dikişten en az 11.6 cm uzakta). Yaka itmesi kafa tarafından da bakıyor: kafa derisi kumaştan sık olduğu için iki kumaş köşesinin arasından taşan deri hiçbir kumaş köşesinin "en yakını" olmuyor ve itme istemiyordu (Mason dinlenmede 28 köşe). Boşluk 6 mm, erişim 5 cm. Dikiş halkaları sönümle birlikte gövde derisine karışıyor (`blendRingSkin`), alt boyun pozda tişörtle birlikte dönüyor.
+  - **Tene yapışık kumaşta benek** (`e497f3a`): kumaş bir derinlik adımı öne çiziliyor (polygon offset); Clara body askısı kilo +1'de temiz.
+  - **Bacak ağzında mat bant** (`373806d`): gövde SRMF'inde gömülü iç çamaşırı (pürüzlülük 1, speküler 0.5) doldurulmamıştı; albedo gibi çevredeki deriden dolduruluyor, 24 cilt yeniden üretildi (skin-v7).
+  - `mh-prune` 4 Fab yüzünün paketini (1.9 GB) "kullanılmıyor" sayıyordu (`c0afe0e`).
+  - Denetim (önce → sonra, `build/fit/report_final.json`): yakadan taşan kafa derisi 19.279 → 1.015 köşe, en derin 36.7 → 13.6 mm; Mason + tişört her durumda 0. Gövde ölçüleri aynı kaldı (kumaştan taşan deri 3.098 → 3.117).
+  - Denetimin geri kalan "delik" ve "katman" bulguları görsel kontrolde görünmüyor: kolun gövdeye bakan alt yüzü, kayışın iç yüzleri gibi gizli yerler (kapüşonlu kilo +1, Street_Wear_01 talk, flipflops kas +1, techwear ve Clara kilo +1 bakıldı).
+  - Denenip geri alınanlar: kumaşın örttüğü kafa derisini gizlemek (yakada kara delik açtı); kol ağzı payını torsoya bakan kenarda korumak (`548e255`, `2d471c2` ile geri alındı: hedeflediği izi gidermedi, kol ve ayakkabı ağzında görünen deri altına batan kumaşı %15 artırdı).
+  - Bilinen küçük kusur: tişört kol ağzının koltuk altına bakan kenarında pozda 1-2 piksellik arka plan izi.
+- [x] **1d.3 Saç düzeltmesi.** Tahmin 1 · Gerçek ~3 (subagent ~2.3 sa dahil)
+  - Kart kaynaklı yoğunlukta kartlar arası 8 mm'ye kadar boşluklar kapanıyor (`a676190`): Ponytail'in tepesi ve tokası, Nomad'ın girdabı artık pembe değil. Fab saçları boy filtresinde (`cbf0a83`). Ponytail'in alnına düşen saç sanatçının tasarımı (Fab görselinde perçem var).
+  - **Kartlar her kafada tasarlandıkları derinlikte** (`7a6f2a2`, groom-v4): dönüştürücü her kart köşesinin yazar kafasındaki en yakın deri noktasını ve normal boyunca derinliğini (`_SURFACE_DEPTH`), kökten uca hangi köşeyi izlediğini (`_SURFACE_PARENT`) yazıyor; runtime kök refit'inden sonra tasarımdan derine giren köşeyi dışarı itiyor, kartın kalanı izliyor, hiç içeri çekmiyor. Referans yüzden derine giren köşe 81.801 → 10.911, 100'ü aşan vaka 115 → 15, en derin 37.8 → 19.2 mm. `web/grooms` %2 büyüdü.
+  - Kartsız Epic kaş, sakal ve bıyıklar kart kaynaklı yoğunluk almıyor (Unreal'ın `baked`'i kalıyor); yeniden dönüşümde 15'ine eklenmişti, kaldırıldı.
+- [x] **1d.4 Yayın ve rapor.** Tahmin 1 · Gerçek ~1
+  - Ciltler, saçlar, kıyafetler ve manifest R2'de; kod `main`'de.
 
 ## Faz sonu kontrolü
 
-- [ ] Landing, yeni kadın ve erkek karakter, yeni yüzler ve saçlar, kalem etek, konuşma ekranı (TR + EN birer cümle). Kullanıcıya telefondan ekran görüntüleriyle faz özeti. Gerçek sürelerle `docs/todo.md` faz saatleri güncellenir.
+- [x] Landing, yeni kadın ve erkek karakter, yeni yüzler ve saçlar, kalem etek, konuşma ekranı (TR + EN birer cümle). Kullanıcıya kısa özet (kullanıcı kararı, 2026-10-28: ekran görüntüsü gerekmez). Gerçek sürelerle `docs/todo.md` faz saatleri güncellenir.
   - 2026-10-28: landing (TR), oluşturucuda yeni erkek karakter + Dalgalı undercut, "Bitti", konuşma ekranında TR "Nasılsın?" (konuşma ~2 sn'de başladı) ve EN "How are you?" (~2.5 sn) çalışıyor; konsolda yalnız `THREE.Clock` uyarısı. Kadın karakter /dev/stage'de (Ada, Jelena, Seo) kontrol edildi.
