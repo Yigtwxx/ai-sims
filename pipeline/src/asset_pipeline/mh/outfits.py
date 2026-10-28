@@ -110,9 +110,7 @@ F64 = NDArray[np.float64]
 I64 = NDArray[np.int64]
 Bool = NDArray[np.bool_]
 
-# v7: cloth between the legs hangs on both (`bridging`); v8: cuffs beside the torso keep
-# their skin margin (OPEN_COVER_REACH).
-OUTFITS_VERSION = "outfit-v8"
+OUTFITS_VERSION = "outfit-v7"  # v7: cloth between the legs hangs on both (`bridging`)
 TEXTURE_RECIPE = "outfit-v1"  # part of every map's content name; bump to re-encode all maps
 GENERATOR = "ai-sims mh-convert (outfits)"
 GENDERS = ("female", "male")
@@ -159,10 +157,6 @@ HIDE_RAY_RINGS = ((35.0, 6), (60.0, 6))  # (tilt from the skin normal, rays) bes
 OPEN_MARGIN = 0.025  # metres kept visible around an exposed garment opening...
 OPEN_GAP_FACTOR = 1.0  # ...plus this times the opening's distance from the skin
 OPEN_NEIGHBOURS = 8
-# Garment this close (m) outside an open edge covers it (a shirt hem over a waistband).
-# Farther out it lies across a gap: the torso panel 3-5 cm beside a tee's sleeve took
-# the cuff's margin away, and in a pose the backdrop showed under the sleeve.
-OPEN_COVER_REACH = 0.025
 LAYER_THICKNESS = 0.006  # metres: hem folds and ribs closer than this are one layer
 # Female tops that should fit the torso instead of hanging off the bust (`hug_torso`): the
 # share of the gap between cloth and skin taken away.
@@ -1223,7 +1217,7 @@ def opening_vertices(
     # Folded hems and ribs put the garment's own other layer a few millimetres outside the
     # edge, so only garment further out than LAYER_THICKNESS covers an opening from outside.
     inside = garment.blocked(points, -normal, np.maximum(gap - 0.0005, 0.0), min_t=0.0005)
-    outside = garment.blocked(points, normal, OPEN_COVER_REACH, min_t=LAYER_THICKNESS)
+    outside = garment.blocked(points, normal, HIDE_DISTANCE, min_t=LAYER_THICKNESS)
     exposed = ~inside & ~outside
     return points[exposed], gap[exposed]
 
