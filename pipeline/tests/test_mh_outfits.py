@@ -515,6 +515,35 @@ def test_body_hide_covers_the_middle_and_spares_the_openings() -> None:
     assert stats["opening_vertices"] > 0
 
 
+def test_body_hide_keeps_the_cuff_margin_beside_the_torso() -> None:
+    # A sleeve with the torso panel 4 cm beside its cuff: the panel lies across the
+    # armpit, not over the cuff, so the skin there keeps its margin. Counted as an outer
+    # layer it let the gap under a tee's sleeve show the backdrop in a pose.
+    limb, limb_triangles = _tube(0.05, 0.0, 1.0, rings=41, segments=32)
+    body = _body(limb, limb_triangles)
+    sleeve, sleeve_triangles = _tube(0.06, 0.3, 0.7, rings=17, segments=32)
+    panel = np.array([[0.10, 0.0, -0.3], [0.10, 1.0, -0.3], [0.10, 0.0, 0.3], [0.10, 1.0, 0.3]])
+    panel_triangles = np.array([[0, 1, 2], [1, 3, 2]])
+
+    def part(positions: np.ndarray, triangles: np.ndarray) -> FittedPart:
+        return FittedPart(
+            material="m",
+            positions=positions,
+            normals=vertex_normals(positions, triangles),
+            uvs=np.zeros((len(positions), 2)),
+            triangles=triangles,
+            joints=np.zeros((len(positions), 4), dtype=np.int64),
+            weights=np.tile([1.0, 0, 0, 0], (len(positions), 1)),
+            morphs={},
+        )
+
+    fit = Fit(parts=[part(sleeve, sleeve_triangles), part(panel, panel_triangles)], stats={})
+    hidden, _ = body_hide(fit, body)
+    y = limb[:, 1]
+    cuff_by_panel = (y > 0.3) & (y < 0.32) & (limb[:, 0] > 0.03)
+    assert not hidden[cuff_by_panel].any(), "the cuff facing the torso keeps its margin"
+
+
 def test_bitset_is_lsb_first_base64() -> None:
     mask = np.zeros(10, dtype=bool)
     mask[[0, 9]] = True
