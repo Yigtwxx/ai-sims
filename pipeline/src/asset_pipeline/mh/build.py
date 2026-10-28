@@ -76,6 +76,7 @@ from asset_pipeline.mh.outfits import (
 )
 from asset_pipeline.mh.rig import MetaHumanRig
 from asset_pipeline.mh.stamps import Stamps, fingerprint
+from asset_pipeline.mh.strand_paint import PAINTS, STRAND_PAINT_VERSION
 from asset_pipeline.mh.textures import TextureError, write_json
 from asset_pipeline.mh.visemes import VISEME_RECIPES
 
@@ -125,6 +126,11 @@ class Builder:
     @property
     def web(self) -> Path:
         return self.web_root or self.archive / "web"
+
+    @property
+    def extras(self) -> Path:
+        """Files that come beside the Fab packages (strand files, hand-made cards)."""
+        return self.archive / "fab_extras"
 
     @property
     def stamps(self) -> Stamps:
@@ -423,8 +429,15 @@ class Builder:
                 continue
             if self._is_pruned(key, f"groom.{groom.slot}.{groom.style}"):
                 continue
+            paint = PAINTS.get(groom.style)
+            strands = [STRAND_PAINT_VERSION, self.extras / paint.extras] if paint else []
             print_ = fingerprint(
-                "groom-v3", unit / "done.json", head_done, reference_done, self.mapping_path
+                "groom-v3",
+                unit / "done.json",
+                head_done,
+                reference_done,
+                self.mapping_path,
+                *strands,
             )
             self.run(key, print_, self._groom_builder(groom, reference, state))
 
@@ -435,7 +448,9 @@ class Builder:
             if "setup" not in state:
                 state["setup"] = self._groom_setup(reference)
             heads, head, mesh = state["setup"]
-            entry, outputs, stats = convert_groom(groom, heads, head, self.web, dna_head=mesh)
+            entry, outputs, stats = convert_groom(
+                groom, heads, head, self.web, dna_head=mesh, extras_root=self.extras
+            )
             if stats.get("painted"):
                 detail = f"painted on the skin ({', '.join(stats['textures'])})"
                 return outputs, {"groom": entry, "stats": stats}, detail

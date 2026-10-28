@@ -150,6 +150,27 @@ def test_validate_reports_contract_breaks() -> None:
         assert fragment in problems
 
 
+def _groom(**files: str) -> dict:
+    return {"id": "groom.hair.X", "slot": "hair", "label": "X", "textures": {}, **files}
+
+
+@pytest.mark.parametrize(
+    ("files", "valid"),
+    [
+        ({"glb": "grooms/hair/X/cards.glb"}, True),
+        ({"painted": "grooms/hair/X/baked.ktx2"}, True),
+        # Long cards over short hair painted from its strands (Nomad Wave Undercut).
+        ({"glb": "grooms/hair/X/cards.glb", "painted": "grooms/hair/X/painted.ktx2"}, True),
+        ({}, False),
+    ],
+)
+def test_validate_takes_groom_cards_a_painted_map_or_both(files: dict, valid: bool) -> None:
+    manifest = _sample()
+    manifest["grooms"] = [_groom(**files)]
+    problems = [p for p in validate(manifest) if "groom" in p]
+    assert (not problems) == valid, problems
+
+
 def test_write_manifest_refuses_missing_files(tmp_path: Path) -> None:
     with pytest.raises(ManifestError):
         write_manifest(_sample(), tmp_path / "manifest.json", tmp_path)

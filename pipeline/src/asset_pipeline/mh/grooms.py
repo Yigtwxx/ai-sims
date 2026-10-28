@@ -62,6 +62,16 @@ from asset_pipeline.mh.kinematics import (
     forward_kinematics,
 )
 from asset_pipeline.mh.ktx import Ktx2Settings, encode_ktx2
+from asset_pipeline.mh.strand_paint import (
+    ALIGN_TOLERANCE,
+    PAINTS,
+    Strands,
+    card_groups,
+    load_strands,
+    paint_strands,
+    split_groups,
+    under_cards,
+)
 
 SLOTS = {"Hair": "hair", "Eyebrows": "eyebrows", "Beards": "beard", "Mustaches": "mustache"}
 COMPAT = {"beard": "male", "mustache": "male"}
@@ -220,6 +230,8 @@ class GroomHead:
     edge_agreement: float  # share of DNA polygon edges present in the GLB triangles
     # (P, 2) head UV of every position (glTF top-left origin); one of a seam's UVs
     uvs: F64 | None = None
+    # (T, 3, 2) head UV of every triangle corner, so a triangle on a seam keeps its island
+    corner_uvs: F64 | None = None
 
     @classmethod
     def load(cls, path: Path, head: Mesh) -> "GroomHead":
@@ -244,7 +256,8 @@ class GroomHead:
         agreement = len(dna_edges & glb_edges) / max(len(dna_edges), 1)
         position_uvs = np.zeros((len(head.positions), 2))
         position_uvs[head.layout_positions] = _layout_uvs(head)
-        return cls(path.stem, ordered, triangles, agreement, position_uvs)
+        corner_uvs = uvs[indices.astype(np.int64)].astype(np.float64)
+        return cls(path.stem, ordered, triangles, agreement, position_uvs, corner_uvs)
 
 
 # ---------------------------------------------------------------------------- cards
@@ -302,6 +315,24 @@ class CardMesh:
             joined("U0"),
             joined("U1"),
             np.concatenate(indices),
+        )
+
+    def subset(self, keep: NDArray[np.bool_]) -> "CardMesh":
+        """The cards whose vertices `keep` marks (whole cards), renumbered."""
+        remap = np.full(len(self.positions), -1, dtype=np.int64)
+        remap[keep] = np.arange(int(keep.sum()))
+
+        def pick(values: F64 | None) -> F64 | None:
+            return None if values is None else values[keep]
+
+        triangles = self.indices[keep[self.indices].all(axis=1)]
+        return CardMesh(
+            self.positions[keep],
+            pick(self.normals),
+            pick(self.tangents),
+            pick(self.uv0),
+            pick(self.uv1),
+            remap[triangles],
         )
 
 
@@ -941,16 +972,28 @@ def convert_groom(
     reference: ReferenceHead,
     web_root: Path,
     dna_head: Mesh | None = None,
+    extras_root: Path | None = None,
 ) -> tuple[dict[str, Any], list[Path], dict[str, Any]]:
     """Write `grooms/<slot>/<style>/` and return (manifest entry, outputs, stats).
     `dna_head` (the reference DNA head mesh) lets the unit's own groom head join the
-    candidate heads (`GroomUnit.own_head`)."""
+    candidate heads (`GroomUnit.own_head`). `extras_root` (`<archive>/fab_extras`) holds
+    the strand files of the grooms whose short hair is painted (`strand_paint.PAINTS`)."""
     lods = groom.lod_files()
     if "LOD0" not in lods:
         return convert_painted(groom, web_root)
     light = next((name for name in LIGHT_LODS if name in lods), None)
     chosen = ["LOD0", *([light] if light else [])]
     meshes = {name: CardMesh.load(lods[name]) for name in chosen}
+    paint = PAINTS.get(groom.style)
+    painted: list[Strands] = []
+    carded: list[Strands] = []
+    dropped: dict[str, int] = {}
+    if paint is not None:
+        if extras_root is None:
+            raise GroomError(f"{groom.style}: its strands are painted, give the extras folder")
+        painted, carded = split_groups(load_strands(paint, extras_root), paint)
+        for name, mesh in meshes.items():
+            meshes[name], dropped[name] = _drop_painted_cards(groom.style, mesh, painted, carded)
     own = groom.own_head(dna_head) if dna_head is not None else None
     if own is not None and own.name not in heads:
         heads = {**heads, own.name: own}
@@ -958,12 +1001,26 @@ def convert_groom(
     bound = [(name, mesh, bind_cards(mesh, head)) for name, mesh in meshes.items()]
     folder = web_root / "grooms" / groom.slot / groom.style
     textures, thumbnail = convert_textures(groom, folder, web_root)
+    card_density = None
     if "density" not in textures and head.uvs is not None:
         # Cards without Unreal's root-UV atlas: without a density the skin between them
         # stays bare scalp.
         density = folder / "density.ktx2"
-        encode_ktx2(density_from_cards(meshes["LOD0"], head, card_coverage(groom)), density, LINEAR)
+        card_density = density_from_cards(meshes["LOD0"], head, card_coverage(groom))
+        encode_ktx2(card_density, density, LINEAR)
         textures["density"] = density.relative_to(web_root).as_posix()
+    painted_file = None
+    if paint is not None:
+        if head.corner_uvs is None:
+            raise GroomError(f"{head.name} has no UVs to paint {groom.style}'s strands on")
+        target = folder / "painted.ktx2"
+        pixels = paint_strands(head.positions, head.triangles, head.corner_uvs, painted, carded)
+        if card_density is not None:
+            # The web paints this slot instead of tinting it, so the cover under the cards
+            # comes along, or the scalp between the long cards stays bare.
+            pixels = under_cards(pixels, card_density)
+        encode_ktx2(pixels, target, LINEAR)
+        painted_file = target.relative_to(web_root).as_posix()
     roots = bound[0][2].root_distance
     extras = {
         "kind": "groom",
@@ -998,6 +1055,9 @@ def convert_groom(
     if thumbnail:
         entry["thumbnail"] = thumbnail
     outputs = [folder / "cards.glb", *(web_root / f for f in textures.values())]
+    if painted_file:
+        entry["painted"] = painted_file
+        outputs.append(web_root / painted_file)
     if thumbnail:
         outputs.append(web_root / thumbnail)
     stats.update(
@@ -1007,4 +1067,22 @@ def convert_groom(
             "root_distance_mm": extras["root_distance_mm"],
         }
     )
+    if dropped:
+        stats["painted_strands"] = sum(len(s.counts) for s in painted)
+        stats["dropped_cards"] = dropped
     return entry, outputs, stats
+
+
+def _drop_painted_cards(
+    style: str, cards: CardMesh, painted: Sequence[Strands], carded: Sequence[Strands]
+) -> tuple[CardMesh, int]:
+    """The cards made from carded strand groups, and how many cards were dropped."""
+    labels = components(len(cards.positions), cards.indices)
+    group, spread = card_groups(cards.positions, labels, [*painted, *carded])
+    if spread > ALIGN_TOLERANCE:
+        raise GroomError(
+            f"{style}: strands sit {spread * 1000:.1f} mm from the cards (median); "
+            "the strand file is not in the cards' space"
+        )
+    kept = group >= len(painted)
+    return cards.subset(kept[labels]), int((~kept).sum())
