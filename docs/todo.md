@@ -103,7 +103,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - UE 5.8 riski: Skotukeda ve Frey 5.8'i listelemiyor. `fab_import` "created no assets" derse sebep bu olabilir.
   - **Bitti sayılır:** 4 yüz manifest'te doğru cinsiyetle duruyor ve `/dev/stage`'de konuşurken dudak senkronu çalışıyor.
 
-- [ ] **A3. Saçları ekle** (A1'den sonra):
+- [x] **A3. Saçları ekle** (2026-10-28, `bff8ccd`, `caec056`: 5 saç sitede; Nomad'ın tıraşlı kısmı tellerden kafa derisine boyanıyor. Bilinen küçük kusurlar: Ponytail'de alnın üstüne biraz saç düşüyor, Nomad'ın tepe girdabında küçük bir açık nokta) (A1'den sonra):
   - `grooms` işi Fab paketlerini bugün görmüyor:
     - `style_folders()` yalnız `/MetaHumanCharacter/Optional/Grooms/GroomAssets/<slot>/<style>` klasörünü tarar (`pipeline/unreal/mh_export/grooms.py:148`). Paketler `/Game/Fab/<paket>/` altına iniyor.
     - `related_assets()` yalnız `/MetaHumanCharacter/` önekli bağımlılıkları alır (`PLUGIN_PREFIX`).

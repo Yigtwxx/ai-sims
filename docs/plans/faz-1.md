@@ -76,9 +76,10 @@
   - `uv run asset-pipeline ue grooms --args '{"only": [<5 stil>]}'`.
   - `uv run asset-pipeline mh-convert --grooms --groom <stil> ... --manifest`; GLB validate.
   - Tek cinsiyete özgü saç `pipeline/src/asset_pipeline/mh/gender_compat.json`'a; etiketler (TR/EN) saçların etiket dosyasına.
-- [ ] **1b.4 Sahnede kontrol ve yayın.** Tahmin 1.5 · Gerçek —
+- [x] **1b.4 Sahnede kontrol ve yayın.** Tahmin 1.5 · Gerçek ~2.5 (Nomad'ın boyalı fade'i dahil)
   - `/dev/stage`: 5 saç × en az 3 yüz (iki cinsiyet, kısa/uzun boyun) önden, yandan, arkadan; kafa derisi açıkta değil, kartlar kafaya girmiyor.
   - `/dev/thumbs`, `node scripts/r2-sync.mjs grooms`, manifest. Commit + push. A3 `[x]`.
+  - Bitti (2026-10-28, `caec056`): **Nomad yayında.** Fab paketinin `.abc` tel dosyası (`fab_extras/gr_nomadwaveundercut.zip`) okunuyor (`mh/alembic.py`, kütüphanesiz Ogawa okuyucu). İki grup var: LongHair 34280 tel (2-8 cm), ShavedHair 37578 tel (2.5-14 mm). Tıraşlı gruptan üretilmiş 1122 kart atılıyor (karta en yakın tel grubu, %98.5 saflık), o teller ve uzun tellerin kökleri kafa UV'sine tel tel çiziliyor; uzun kartların yumuşak örtüsü de altına konuyor (`mh/strand_paint.py`). Manifest girdisinde hem `glb` hem `painted` var; web kodu değişmedi. Harita Epic'in buzz cut `baked`'iyle aynı yerleşimde (örtü payı 0.24 / 0.23). Victor (önden, arkadan) ve Seo'da (yandan) temiz; tepe girdabında tek küçük açık nokta kaldı. R2'de, manifest 51 saç.
   - Durum (2026-10-27): Ponytail, Male 11 ve MessyWavy yayında (R2 manifest 53 saç; GLB'ler validate'te temiz, küçük resimler yeniden çizildi). **Nomad tutuldu:** tıraşlı arka ve yanlar yamalı tutam ve yatay çizgi gibi görünüyor, tepe girdabında açık deri lekesi var. Web çıktısı silindi (manifest atlıyor); düzeltme subagent'ta: uzun üst kart kalır, kısa fade deriye boyanır. Bilinen küçük kusurlar: Ponytail'de önden alnın üstüne biraz saç düşüyor; Male 11'in paketteki eski kart mesh'i dışa aktarımda duruyor, dönüştürücü yok sayıyor.
 - [x] **1b.5 Üç saçı kaldır (A3b).** Tahmin 1 · Gerçek ~0.3
   - `/[locale]/curate`'te gizle: `groom.hair.Hair_S_HairLoss`, `groom.hair.Hair_M_Layered`, `groom.hair.Hair_L_MessyClumps`.
