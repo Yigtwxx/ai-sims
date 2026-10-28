@@ -173,6 +173,17 @@ def test_lists_fab_packages_nothing_came_from(tmp_path: Path) -> None:
     assert plan_prune(archive, set(), unused=True).packages == ("fab/vampire.mhpkg",)
 
 
+def test_fab_faces_keep_the_package_they_came_from(tmp_path: Path) -> None:
+    archive = _archive(tmp_path)
+    _write(archive / "fab" / "bo_pack.mhpkg")
+    created = {"created": {"/Game/Fab/bo_pack/Bo.Bo": "MetaHumanCharacter"}}
+    _write(archive / "raw" / "fab_import" / "bo_pack" / "import.json", json.dumps(created))
+    plan = plan_prune(archive, set(), unused=True)
+    assert plan.unused == (), f"a kept face's package counted as unused: {plan.unused}"
+    gone = plan_prune(archive, {"face.Bo", "skin.Bo"})
+    assert gone.packages == ("fab/bo_pack.mhpkg", "raw/fab_import/bo_pack"), gone.packages
+
+
 def test_no_package_counts_as_unused_while_an_export_unit_is_missing(tmp_path: Path) -> None:
     archive = _archive(tmp_path)
     _write(archive / "fab" / "vampire.mhpkg")

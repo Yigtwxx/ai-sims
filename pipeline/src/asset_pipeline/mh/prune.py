@@ -152,6 +152,23 @@ def unit_packages(archive: Path) -> dict[str, set[str]]:
     return found
 
 
+def character_packages(archive: Path) -> dict[str, set[str]]:
+    """Fab packages each MetaHuman character came from, by character name, from the
+    `ue fab_import` records (`created`: asset path -> class)."""
+    found: dict[str, set[str]] = {}
+    root = archive / "raw" / "fab_import"
+    for record in sorted(root.glob("*/import.json")) if root.is_dir() else []:
+        try:
+            created = json.loads(record.read_text(encoding="utf-8")).get("created", {})
+        except (OSError, json.JSONDecodeError, AttributeError):
+            continue
+        for path, kind in created.items():
+            if kind == "MetaHumanCharacter":
+                name = str(path).rsplit(".", 1)[-1]
+                found.setdefault(name, set()).update(FAB_PACKAGE.findall(f"{path}"))
+    return found
+
+
 def catalogue(archive: Path) -> dict[str, Asset]:
     """Every asset the build stamps and the current manifest know of, by id. Stamps of
     kinds the curation never hides (bodies, lighting) still count, as kept references."""
@@ -162,6 +179,7 @@ def catalogue(archive: Path) -> dict[str, Asset]:
     def asset(identifier: str) -> Asset:
         return assets.setdefault(identifier, Asset(identifier))
 
+    characters = character_packages(archive)
     grooms = {unit.name: unit for unit in list_groom_units(archive)}
     outfits = {(unit.name, unit.gender): unit for unit in list_outfit_units(archive)}
     clips_root = archive / "raw" / "animations"
@@ -187,6 +205,8 @@ def catalogue(archive: Path) -> dict[str, Asset]:
             entry = asset(f"{prefix}.{rest}")
             entry.home = f"web/{kind}/{rest}"
             entry.sources.add(f"raw/characters/{rest}")
+            # A Fab character's face, skin and iris all come from its package.
+            entry.packages |= characters.get(rest, set())
         elif kind == "grooms" and isinstance(info.get("groom"), dict):
             groom = info["groom"]
             entry = asset(str(groom["id"]))
