@@ -17,12 +17,25 @@ MetaHuman heads with the DNA head topology but their own shape. The converter
 Runtime refit to any other head (positions of that head's DNA positions, metres, rest):
 `position = sum(_BIND_WEIGHTS[i] * head[_BIND_POSITIONS[i]]) + _BIND_OFFSET`; cards keep
 their shape and only translate, so normals and tangents stay valid.
+
+A card translated with its root sinks into a head that is fuller than the authoring head
+elsewhere along the card (bangs into a higher forehead, a ponytail's base into a longer
+back of the head). So every card vertex also keeps the depth it was designed at
+(`SurfaceDepth`, `_SURFACE_DEPTH`): the authoring-head vertex nearest to it (a DNA
+position) and its offset along that vertex's normal, in steps of `DEPTH_UNIT` (negative
+under the skin, as card roots are tucked in by design). After the root refit, `keep_depth`
+walks every card from its root to its tips (`_SURFACE_PARENT`) and pushes each vertex that
+now sits deeper than designed back out along the worn head's normal; the rest of the card
+follows the push, so cards bend off the skin instead of kinking, and the pieces of a card
+split at a seam meet again. The cards in the GLB are fitted to the reference head this way
+too.
 """
 
 import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -30,13 +43,13 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 from scipy.ndimage import gaussian_filter, grey_closing
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import min_weight_full_bipartite_matching
+from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse.csgraph import connected_components, dijkstra, min_weight_full_bipartite_matching
 from scipy.spatial import cKDTree
 
 from asset_pipeline.mh.bake import MorphTarget
 from asset_pipeline.mh.dna import DnaFile, Mesh
-from asset_pipeline.mh.geometry import closest_triangles, components
+from asset_pipeline.mh.geometry import closest_triangles, components, vertex_normals
 from asset_pipeline.mh.glb import (
     ARRAY_BUFFER,
     ELEMENT_ARRAY_BUFFER,
@@ -73,6 +86,8 @@ from asset_pipeline.mh.strand_paint import (
     under_cards,
 )
 
+# In the fingerprint of every groom; v4: cards keep their designed depth (`SurfaceDepth`).
+GROOMS_VERSION = "groom-v4"
 SLOTS = {"Hair": "hair", "Eyebrows": "eyebrows", "Beards": "beard", "Mustaches": "mustache"}
 COMPAT = {"beard": "male", "mustache": "male"}
 LIGHT_LODS = ("LOD2", "LOD3", "LOD1", "LOD4")  # first one present is the lighter LOD
@@ -132,6 +147,22 @@ GENERATED_SLOT = re.compile(r"_TS(\d)$", re.I)
 # `density` for grooms without Unreal's root-UV atlas: card surface this close to the skin
 # covers it (scalp, combed-over crowns, hairlines), weighted by the atlas coverage.
 COVER_DISTANCE = 0.006  # metres
+# Designed depth (`SurfaceDepth`). Card vertices up to DEPTH_REACH outside the authoring
+# head keep their depth; the push fades out from DEPTH_FULL to DEPTH_REACH, farther out the
+# card only follows the push of its part nearer the root. Sinking up to DEPTH_SLACK beyond
+# the design is left alone. The closest head point must face the vertex (`DEPTH_SQUARE`,
+# as the fit audit's `square`), or be within DEPTH_NEAR of it: past the open neck, eye and
+# mouth edges the head normal says nothing about inside or out.
+DEPTH_REACH = 0.05  # metres
+DEPTH_FULL = 0.03
+DEPTH_SLACK = 0.0005
+DEPTH_SQUARE = 0.8
+DEPTH_NEAR = 0.001
+DEPTH_UNIT = 1e-5  # metres per `_SURFACE_DEPTH` step (SHORT): +-0.33 m
+UNBOUND_DEPTH = -32768  # `_SURFACE_DEPTH` of a vertex that only follows its parent
+COPY_DEPTH = 32767  # `_SURFACE_DEPTH` of a copy of its parent (same position, seam split)
+SMOOTH_STEPS = 4  # rounds of push smoothing along the cards (`keep_depth`)
+WELD_DECIMALS = 6  # card vertices at one position (metres, rounded) are one strand point
 LINEAR = Ktx2Settings("linear", rdo=2.0)
 COLOR = Ktx2Settings("srgb", rdo=1.0)
 
@@ -367,6 +398,308 @@ def bind_cards(cards: CardMesh, head: GroomHead) -> Binding:
     anchor = np.einsum("vk,vkj->vj", weights, head.positions[triangles])
     attached = distance[root] <= ATTACH_DISTANCE
     return Binding(triangles, weights, cards.positions - anchor, distance[roots], attached)
+
+
+# ---------------------------------------------------------------------------- designed depth
+
+
+def head_normals(positions: F64, triangles: I64) -> F64:
+    """Unit area-weighted normals of a head's DNA positions, turned outward (away from the
+    mean position on the whole). `positions` may have NaN rows (positions a head primitive
+    lacks): triangles touching them are left out, and normals with no triangle are zero.
+    The runtime twin is `headSurface` (grooms.ts)."""
+    present = ~np.isnan(positions).any(axis=1)
+    whole = triangles[present[triangles].all(axis=1)]
+    filled = np.where(present[:, None], positions, 0.0)
+    normals = vertex_normals(filled, whole)
+    centre = filled[present].mean(axis=0)
+    if np.einsum("ij,ij->", normals[present], filled[present] - centre) < 0:
+        normals = -normals
+    return normals
+
+
+@dataclass(frozen=True)
+class HeadFrame:
+    """A head's DNA positions (NaN where it lacks one), `head_normals`, the neighbours of
+    every position along the triangle edges (ascending, padded with -1) and the positions
+    on an open edge (neck, eyes, mouth), where the normal says nothing about inside or
+    out. The runtime twin is `HeadSurface` (grooms.ts)."""
+
+    positions: F64  # (P, 3)
+    normals: F64  # (P, 3)
+    neighbours: I64  # (P, K)
+    boundary: NDArray[np.bool_]  # (P,)
+
+    @classmethod
+    def build(cls, positions: F64, triangles: I64) -> "HeadFrame":
+        count = len(positions)
+        edges = np.sort(triangles[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2), axis=1)
+        edges = edges[edges[:, 0] != edges[:, 1]]
+        pairs, uses = np.unique(edges, axis=0, return_counts=True)
+        boundary = np.zeros(count, dtype=bool)
+        boundary[pairs[uses == 1].ravel()] = True
+        both = np.concatenate([pairs, pairs[:, ::-1]])
+        both = both[np.lexsort((both[:, 1], both[:, 0]))]
+        degree = np.bincount(both[:, 0], minlength=count)
+        start = np.r_[0, np.cumsum(degree)[:-1]]
+        slot = np.arange(len(both)) - start[both[:, 0]]
+        neighbours = np.full((count, int(degree.max(initial=1))), -1, dtype=np.int64)
+        neighbours[both[:, 0], slot] = both[:, 1]
+        return cls(positions, head_normals(positions, triangles), neighbours, boundary)
+
+    def nearest(self, points: F64, start: I64, steps: int = 64) -> I64:
+        """The head position nearest to every point, walking greedily from `start` along
+        the edges to the neighbour closest to the point while that is closer (the first
+        such neighbour on ties, as `keepCardDepth` does)."""
+        current = start.copy()
+        best = np.sum((points - self.positions[current]) ** 2, axis=1)
+        best = np.nan_to_num(best, nan=np.inf)
+        moving = np.arange(len(points))
+        for _ in range(steps):
+            if not len(moving):
+                break
+            candidates = self.neighbours[current[moving]]
+            valid = candidates >= 0
+            reach = self.positions[np.where(valid, candidates, 0)]
+            distance = np.sum((points[moving, None, :] - reach) ** 2, axis=2)
+            distance = np.where(valid, np.nan_to_num(distance, nan=np.inf), np.inf)
+            pick = np.argmin(distance, axis=1)
+            closer = distance[np.arange(len(moving)), pick] < best[moving]
+            moving = moving[closer]
+            current[moving] = candidates[closer, pick[closer]]
+            best[moving] = distance[closer, pick[closer]]
+        return current
+
+
+@dataclass(frozen=True)
+class SurfaceDepth:
+    """How deep under (negative) or over the skin every card vertex was designed: the
+    authoring-head vertex nearest to it (`HeadFrame.nearest`) and its offset along that
+    vertex's normal, and the card vertex it follows from root to tip
+    (`parent`, -1 for roots). Vertices that are not `bound` (too far out or beyond an open
+    edge) keep no depth of their own and only follow their parent. A `copy` is at its
+    parent's position by design (cards are split at UV and normal seams into pieces that
+    translate with roots of their own): it rejoins its parent, and its piece follows."""
+
+    position: I64  # (V,) DNA position
+    depth: F64  # (V,) metres along the head normal
+    bound: NDArray[np.bool_]  # (V,)
+    copy: NDArray[np.bool_]  # (V,)
+    parent: I64  # (V,)
+
+    def encode(self) -> dict[str, NDArray[Any]]:
+        """GLB vertex attributes: `_SURFACE_DEPTH` (VEC2 SHORT: the DNA position, then the
+        depth in DEPTH_UNIT steps, UNBOUND_DEPTH when not bound, COPY_DEPTH for a copy) and
+        `_SURFACE_PARENT` (SCALAR, vertex minus parent index, 0 for roots; SHORT, or FLOAT
+        when a difference does not fit: glTF has no 32-bit integer vertex attributes)."""
+        if self.position.size and int(self.position.max()) > np.iinfo(np.int16).max:
+            raise GroomError("head has too many positions for 16-bit surface indices")
+        steps = np.clip(np.round(self.depth / DEPTH_UNIT), UNBOUND_DEPTH + 1, COPY_DEPTH - 1)
+        steps = np.where(self.copy, COPY_DEPTH, np.where(self.bound, steps, UNBOUND_DEPTH))
+        delta = np.where(self.parent >= 0, np.arange(len(self.parent)) - self.parent, 0)
+        short = np.iinfo(np.int16)
+        fits = not delta.size or (delta.min() >= short.min and delta.max() <= short.max)
+        return {
+            "_SURFACE_DEPTH": np.stack(
+                [np.where(self.bound, self.position, 0), steps], axis=1
+            ).astype(np.int16),
+            "_SURFACE_PARENT": delta.astype(np.int16 if fits else np.float32),
+        }
+
+    @classmethod
+    def decode(cls, surface: F64, parent: F64) -> "SurfaceDepth":
+        """From the attributes as `accessor_values` reads them; the inverse of `encode`, up
+        to its quantization."""
+        values = np.round(np.nan_to_num(surface.reshape(-1, 2), nan=UNBOUND_DEPTH))
+        steps = values[:, 1]
+        count = len(steps)
+        delta = np.round(np.nan_to_num(parent.reshape(-1))).astype(np.int64)
+        index = np.arange(count) - delta
+        linked = (delta != 0) & (index >= 0) & (index < count)
+        bound = (steps != UNBOUND_DEPTH) & (steps != COPY_DEPTH)
+        return cls(
+            position=values[:, 0].astype(np.int64),
+            depth=np.where(bound, steps * DEPTH_UNIT, 0.0),
+            bound=bound,
+            copy=(steps == COPY_DEPTH) & linked,
+            parent=np.where(linked, index, -1),
+        )
+
+    def quantized(self) -> "SurfaceDepth":
+        """As the runtime reads it back from the GLB."""
+        encoded = self.encode()
+        return SurfaceDepth.decode(
+            encoded["_SURFACE_DEPTH"].astype(np.float64),
+            encoded["_SURFACE_PARENT"].astype(np.float64),
+        )
+
+
+def card_forest(positions: F64, indices: I64, rank: F64) -> tuple[I64, NDArray[np.bool_]]:
+    """The vertex every card vertex follows on its way from its card's root to the tips
+    (-1 for roots), and which vertices follow a vertex at their own position (`copy`).
+
+    Vertices at one position (rounded to WELD_DECIMALS) are one strand point split at a
+    seam, so the graph joins them as well as the triangle edges: a card is a connected
+    piece of it, its root the vertex of lowest `rank` (the deepest under the skin, lowest
+    index on ties), and every vertex follows its predecessor on the shortest path from the
+    root along the card."""
+    count = len(positions)
+    _, node = np.unique(np.round(positions, WELD_DECIMALS), axis=0, return_inverse=True)
+    node = node.reshape(-1).astype(np.int64)
+    first = np.full(int(node.max(initial=-1)) + 1, count, dtype=np.int64)
+    np.minimum.at(first, node, np.arange(count))
+    edges = np.sort(indices[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2), axis=1)
+    edges = np.unique(edges[edges[:, 0] != edges[:, 1]], axis=0)
+    length = np.linalg.norm(positions[edges[:, 0]] - positions[edges[:, 1]], axis=1)
+    copies = np.flatnonzero(first[node] != np.arange(count))
+    pairs = np.concatenate([edges, np.stack([first[node[copies]], copies], axis=1)])
+    # Zero would read as no edge; seams cost next to nothing, card edges their length.
+    weight = np.concatenate([length + 1e-9, np.full(len(copies), 1e-12)])
+    order = np.lexsort((weight, pairs[:, 1], pairs[:, 0]))
+    keep = order[np.r_[True, np.any(np.diff(pairs[order], axis=0) != 0, axis=1)]]
+    graph = coo_matrix((weight[keep], (pairs[keep, 0], pairs[keep, 1])), shape=(count, count))
+    graph = graph.tocsr()
+    _, labels = connected_components(graph, directed=False)
+    by_rank = np.lexsort((np.arange(count), np.nan_to_num(rank, nan=np.inf), labels))
+    roots = by_rank[np.r_[True, labels[by_rank][1:] != labels[by_rank][:-1]]]
+    distance, predecessors, _ = dijkstra(
+        graph, directed=False, indices=roots, return_predecessors=True, min_only=True
+    )
+    parent = np.where(predecessors >= 0, predecessors, -1).astype(np.int64)
+    # The other vertices at a position all follow the one the walk reaches first.
+    by_reach = np.lexsort((np.arange(count), distance, node))
+    reached = by_reach[np.r_[True, node[by_reach][1:] != node[by_reach][:-1]]]
+    point = np.empty(len(first), dtype=np.int64)
+    point[node[reached]] = reached
+    copy = point[node] != np.arange(count)
+    return np.where(copy, point[node], parent), copy
+
+
+def bind_depth(cards: CardMesh, head: GroomHead) -> SurfaceDepth:
+    """The depth every card vertex was designed at on its authoring head."""
+    triangle, bary, distance = closest_triangles(cards.positions, head.positions, head.triangles)
+    corners = head.triangles[triangle]
+    frame = HeadFrame.build(head.positions, head.triangles)
+    start = corners[np.arange(len(corners)), np.argmax(bary, axis=1)]
+    position = frame.nearest(cards.positions, start)
+    offset = cards.positions - head.positions[position]
+    depth = np.einsum("vj,vj->v", offset, frame.normals[position])
+    # Whether the closest head point faces the vertex (`square`, as in the fit audit).
+    closest = np.einsum("vk,vkj->vj", bary, head.positions[corners])
+    a, b, c = (head.positions[corners[:, k]] for k in range(3))
+    face = np.cross(b - a, c - a)
+    face /= np.maximum(np.linalg.norm(face, axis=1, keepdims=True), 1e-12)
+    along = np.abs(np.einsum("vj,vj->v", cards.positions - closest, face))
+    square = along / np.maximum(distance, 1e-12)
+    facing = ((square >= DEPTH_SQUARE) | (distance <= DEPTH_NEAR)) & ~frame.boundary[position]
+    # Beyond an open edge the sign is meaningless: rank those by distance, as outside.
+    parent, copy = card_forest(cards.positions, cards.indices, np.where(facing, depth, distance))
+    bound = ~copy & facing & (depth <= DEPTH_REACH)
+    return SurfaceDepth(position, np.where(bound, depth, 0.0), bound, copy, parent)
+
+
+def forest_levels(parent: I64) -> I64:
+    """Steps from every vertex to its root (pointer jumping): parents come first in
+    increasing level."""
+    level = (parent >= 0).astype(np.int64)
+    up = parent.copy()
+    for _ in range(64):
+        linked = np.flatnonzero(up >= 0)
+        if not len(linked):
+            return level
+        above = up[linked]
+        level[linked] += level[above]
+        up[linked] = up[above]
+    raise GroomError("card parents form a cycle")
+
+
+def keep_depth(points: F64, surface: SurfaceDepth, triangles: I64, head: HeadFrame) -> F64:
+    """Cards refitted to a head (`points`, by root translation) pushed back out to the depth
+    they were designed at; `triangles` are the cards' own. Never pulls a vertex in. The
+    runtime twin is `keepCardDepth` (grooms.ts).
+
+    A vertex's depth now is taken at the head vertex nearest to where it is, walking there
+    from the one it was designed over (`HeadFrame.nearest`): a piece of card that the root
+    translation slid along the skin (its root on a jaw or neck of another shape) is judged
+    where it is, not pushed off the skin it left. Nearest to an open edge, a vertex keeps no
+    depth of its own.
+
+    1. Walking every card from its root to its tips, a vertex takes its parent's push and,
+       when it still sits deeper under (or nearer to) the skin than designed by over
+       DEPTH_SLACK, moves out along the head normal by the rest (fading out from DEPTH_FULL
+       to DEPTH_REACH), so the card beyond a push follows it instead of kinking. A copy
+       also moves onto its parent, and the rest of its piece with it: pieces of a card
+       translate with roots of their own and were torn apart by up to 26 mm on the
+       reference face (Hair_L_StraightBangs), by 76 mm with the runtime's neck seam.
+    2. SMOOTH_STEPS rounds of `push = (push + mean of the neighbours' push) / 2` along the
+       card edges spread the pushes across each card: the two edges of a card bound to
+       head points that moved apart shear less (heavily stretched card edges on the worst
+       face drop about sixfold).
+    3. A vertex the smoothing left deeper than designed takes back the rest itself."""
+    count = len(points)
+    under = np.where(
+        surface.bound & (surface.position >= 0) & (surface.position < len(head.positions)),
+        surface.position,
+        -1,
+    )
+    fade = np.clip((DEPTH_REACH - surface.depth) / (DEPTH_REACH - DEPTH_FULL), 0.0, 1.0)
+    fade = np.where(under >= 0, fade, 0.0)
+
+    def need(rows: I64, moved: F64) -> F64:
+        """How far the `rows` vertices, moved by `moved`, still are to go out, along which
+        normal; walks `under` on to the head vertices nearest to them."""
+        live = rows[fade[rows] > 0]
+        at = points[live] + moved[fade[rows] > 0]
+        nearest = head.nearest(at, under[live])
+        under[live] = nearest
+        normal = head.normals[nearest]
+        now = np.einsum("vj,vj->v", at - head.positions[nearest], normal)
+        ok = ~head.boundary[nearest] & np.isfinite(now) & (np.linalg.norm(normal, axis=1) > 0.5)
+        amount = np.maximum(surface.depth[live] - np.nan_to_num(now) - DEPTH_SLACK, 0.0)
+        out = np.zeros((len(rows), 3))
+        out[fade[rows] > 0] = np.where(ok, amount * fade[live], 0.0)[:, None] * normal
+        return out
+
+    parent = surface.parent
+    level = forest_levels(parent)
+    order = np.argsort(level, kind="stable")
+    bounds = np.searchsorted(level[order], np.arange(int(level.max(initial=0)) + 2))
+    join = np.zeros((count, 3))  # rigid per piece: where its seams meet the parents
+    push = np.zeros((count, 3))  # out of the skin
+    for start, stop in pairwise(bounds):
+        rows = order[start:stop]
+        up = np.maximum(parent[rows], 0)
+        linked = (parent[rows] >= 0)[:, None]
+        joined = np.where(linked, join[up], 0.0)
+        seam = surface.copy[rows][:, None]
+        join[rows] = np.where(seam, points[up] + join[up] - points[rows], joined)
+        carried = np.where(linked, push[up], 0.0)
+        push[rows] = carried + need(rows, join[rows] + carried)
+    # A copy is its parent's point: its edges are that point's edges.
+    point_of = np.arange(count)
+    for _ in range(64):
+        step = np.where(surface.copy[point_of], parent[point_of], point_of)
+        if np.array_equal(step, point_of):
+            break
+        point_of = step
+    edges = point_of[triangles[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2)]
+    edges = edges[edges[:, 0] != edges[:, 1]]
+    graph = coo_matrix(
+        (
+            np.ones(2 * len(edges)),
+            (np.r_[edges[:, 0], edges[:, 1]], np.r_[edges[:, 1], edges[:, 0]]),
+        ),
+        shape=(count, count),
+    ).tocsr()
+    degree = np.asarray(graph.sum(axis=1)).reshape(-1, 1)
+    smoothed = degree > 0
+    for _ in range(SMOOTH_STEPS):
+        mean = (graph @ push) / np.maximum(degree, 1)
+        push = np.where(smoothed, 0.5 * push + 0.5 * mean, push)
+    push += need(np.arange(count), join + push)
+    out = points + join + push
+    out[surface.copy] = out[point_of[surface.copy]]
+    return out
 
 
 # ---------------------------------------------------------------------------- reference head
@@ -787,17 +1120,22 @@ def convert_textures(
 
 def write_cards_glb(
     output: Path,
-    lods: Sequence[tuple[str, CardMesh, Binding]],
+    lods: Sequence[tuple[str, CardMesh, Binding, SurfaceDepth]],
     reference: ReferenceHead,
     extras: dict[str, Any],
+    head_triangles: I64,
 ) -> dict[str, Any]:
+    """`head_triangles`: DNA position triangles of the reference head's surface."""
     builder = GlbBuilder(GENERATOR, compress=True)
     builder.use_extension(QUANTIZATION)
     fitted = []
     used: set[int] = set()
     skins = []
-    for _, _cards, binding in lods:
-        positions = binding.fit(reference.positions)
+    frame = HeadFrame.build(reference.positions, head_triangles)
+    for _, cards, binding, surface in lods:
+        positions = keep_depth(
+            binding.fit(reference.positions), surface.quantized(), cards.indices, frame
+        )
         joints, weights = _blend_skin(reference, binding)
         fitted.append(positions)
         skins.append((joints, weights))
@@ -851,7 +1189,7 @@ def write_cards_glb(
     mesh_nodes = []
     lod_info = []
     names_union: list[str] = []
-    for (lod_name, cards, binding), positions, (joints, weights) in zip(
+    for (lod_name, cards, binding, surface), positions, (joints, weights) in zip(
         lods, fitted, skins, strict=True
     ):
         count = len(positions)
@@ -883,6 +1221,8 @@ def write_cards_glb(
                 binding.offsets.astype(np.float32), target=ARRAY_BUFFER
             ),
         }
+        for name, values in surface.encode().items():
+            attributes[name] = builder.add_accessor(values, target=ARRAY_BUFFER)
         if cards.normals is not None:
             attributes["NORMAL"] = builder.add_accessor(
                 quantize_snorm16(cards.normals), target=ARRAY_BUFFER, normalized=True
@@ -1012,13 +1352,17 @@ def convert_groom(
     if own is not None and own.name not in heads:
         heads = {**heads, own.name: own}
     head, score = choose_head(meshes["LOD0"], heads, groom.source_head)
-    bound = [(name, mesh, bind_cards(mesh, head)) for name, mesh in meshes.items()]
+    bound = [
+        (name, mesh, bind_cards(mesh, head), bind_depth(mesh, head))
+        for name, mesh in meshes.items()
+    ]
     folder = web_root / "grooms" / groom.slot / groom.style
     textures, thumbnail = convert_textures(groom, folder, web_root)
     card_density = None
-    if "density" not in textures and head.uvs is not None:
+    if "density" not in textures and "baked" not in textures and head.uvs is not None:
         # Cards without Unreal's root-UV atlas: without a density the skin between them
-        # stays bare scalp.
+        # stays bare scalp. Epic brows, beards and moustaches without that atlas have
+        # Unreal's strand-by-strand `baked` map, which the skin uses instead.
         density = folder / "density.ktx2"
         card_density = density_from_cards(meshes["LOD0"], head, card_coverage(groom))
         encode_ktx2(card_density, density, LINEAR)
@@ -1054,9 +1398,25 @@ def convert_groom(
             "the refitted cards with the head's skeleton and inverse bind matrices. Cards "
             "whose root is over 1 cm from the skin carry no expression morphs"
         ),
+        "depth": {
+            "about": (
+                "designed depth on the authoring head: _SURFACE_DEPTH (the nearest DNA "
+                "position, then the depth in steps of unit metres along its normal; "
+                "unbound: the vertex only follows its parent, copy: it sits on its parent "
+                "by design), _SURFACE_PARENT (vertex minus the index of the vertex it "
+                "follows from root to tip, 0 for roots). After the refit, a vertex deeper "
+                "than designed by over slack moves out along the head normal, faded from "
+                "full to reach; the rest of its card follows (grooms.py keep_depth)"
+            ),
+            "unit": DEPTH_UNIT,
+            "unbound": UNBOUND_DEPTH,
+            "slack": DEPTH_SLACK,
+            "full": DEPTH_FULL,
+            "reach": DEPTH_REACH,
+        },
         "textures": textures,
     }
-    stats = write_cards_glb(folder / "cards.glb", bound, reference, extras)
+    stats = write_cards_glb(folder / "cards.glb", bound, reference, extras, head.triangles)
     entry: dict[str, Any] = {
         "id": f"groom.{groom.slot}.{groom.style}",
         "slot": groom.slot,

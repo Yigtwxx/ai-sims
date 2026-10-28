@@ -50,8 +50,8 @@ from asset_pipeline.mh.convert import (
 )
 from asset_pipeline.mh.dna import Mesh, read_dna
 from asset_pipeline.mh.groom_labels import with_label
-from asset_pipeline.mh.grooms import HEADS as GROOM_HEADS
 from asset_pipeline.mh.grooms import (
+    GROOMS_VERSION,
     GroomError,
     GroomHead,
     GroomUnit,
@@ -59,6 +59,7 @@ from asset_pipeline.mh.grooms import (
     convert_groom,
     list_groom_units,
 )
+from asset_pipeline.mh.grooms import HEADS as GROOM_HEADS
 from asset_pipeline.mh.ktx import KtxEncodeError, KtxUnavailableError
 from asset_pipeline.mh.lighting import convert_level, has_lights, list_levels, manifest_entry
 from asset_pipeline.mh.manifest import assemble, write_manifest
@@ -432,7 +433,7 @@ class Builder:
             paint = PAINTS.get(groom.style)
             strands = [STRAND_PAINT_VERSION, self.extras / paint.extras] if paint else []
             print_ = fingerprint(
-                "groom-v3",
+                GROOMS_VERSION,
                 unit / "done.json",
                 head_done,
                 reference_done,

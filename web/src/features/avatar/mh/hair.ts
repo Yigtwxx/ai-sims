@@ -9,7 +9,15 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import { assetUrl, type MhGroom } from '@/lib/assets/manifest';
 
-import { bindToHead, fitCards, headPositionTable, strandProgress } from './grooms';
+import {
+  bindToHead,
+  cardForest,
+  fitCards,
+  headSurface,
+  strandProgress,
+  type CardForest,
+  type HeadSurface,
+} from './grooms';
 import {
   createHairMaterials,
   setHairLook,
@@ -37,6 +45,8 @@ interface CardsAsset {
   source: SkinnedMesh;
   joints: string[];
   progress: Float32Array;
+  /** Root-to-tip order of the card vertices; null for cards without a designed depth. */
+  forest: CardForest | null;
 }
 
 /**
@@ -80,6 +90,7 @@ function loadCards(renderer: WebGLRenderer, url: string, lod: 0 | 1): Promise<Ca
         source,
         joints: source.skeleton.bones.map((bone) => bone.name),
         progress: strandProgress(source.geometry),
+        forest: cardForest(source.geometry),
       };
     });
     pending.catch(() => assets.delete(key));
@@ -106,13 +117,13 @@ export function cardAtlas(groom: MhGroom): {
   throw new Error(`Groom ${groom.id} has no card atlas`);
 }
 
-const headTables = new WeakMap<BufferGeometry, Float32Array | null>();
+const headSurfaces = new WeakMap<BufferGeometry, HeadSurface | null>();
 
-function headTable(head: SkinnedMesh): Float32Array | null {
-  if (!headTables.has(head.geometry)) {
-    headTables.set(head.geometry, headPositionTable(head.geometry));
+function surfaceOf(head: SkinnedMesh): HeadSurface | null {
+  if (!headSurfaces.has(head.geometry)) {
+    headSurfaces.set(head.geometry, headSurface(head.geometry));
   }
-  return headTables.get(head.geometry)!;
+  return headSurfaces.get(head.geometry)!;
 }
 
 /**
@@ -134,7 +145,7 @@ export async function wearGroom(
     loadAssetTexture(renderer, atlas.coverage, 'data'),
     atlas.tangent ? loadAssetTexture(renderer, atlas.tangent, 'data') : Promise.resolve(null),
   ]);
-  const geometry = fitCards(cards.source.geometry, headTable(head), cards.progress);
+  const geometry = fitCards(cards.source.geometry, surfaceOf(head), cards.progress, cards.forest);
   const materials = createHairMaterials(groom.id, {
     attribute,
     tangent,

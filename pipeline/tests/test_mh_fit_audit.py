@@ -26,6 +26,7 @@ from asset_pipeline.mh.fit_audit import (
     stacked_layers,
     winding_sign,
 )
+from asset_pipeline.mh.grooms import HeadFrame, SurfaceDepth
 from asset_pipeline.mh.kinematics import axis_quaternions
 
 
@@ -287,6 +288,58 @@ def test_cards_refit_like_the_runtime() -> None:
     assert np.allclose(points[0], [0.25, 0.25, 0.01])
     assert np.allclose(points[1], [8.0, 8.0, 8.0])  # binds a position the head lacks
     assert missed == 1
+
+
+def _skin_patch(lift: float) -> tuple[np.ndarray, np.ndarray]:
+    """A 3 x 3 grid of skin `lift` metres up (positions 0-8, normal +z; position 4 is
+    inside, the rest on its open edge) and a root anchor below it (position 9)."""
+    xs, ys = np.meshgrid(np.arange(3.0), np.arange(3.0))
+    grid = np.stack([xs.ravel(), ys.ravel(), np.full(9, lift)], axis=1)
+    table = np.vstack([grid, [[5.0, 5.0, -1.0]]])
+    quads = [
+        (r * 3 + c, r * 3 + c + 1, r * 3 + c + 4, r * 3 + c + 3) for r in (0, 1) for c in (0, 1)
+    ]
+    skin = np.array([t for a, b, c, d in quads for t in ((a, b, c), (a, c, d))])
+    return table, skin
+
+
+def test_cards_refit_keeps_the_designed_depth_like_the_runtime() -> None:
+    surface = SurfaceDepth(
+        position=np.array([4, 4]),
+        depth=np.array([0.001, 0.003]),
+        bound=np.array([True, True]),
+        copy=np.array([False, False]),
+        parent=np.array([-1, 0]),
+    )
+    at = np.array([[1.0, 1.0, 0.001], [1.1, 0.9, 0.003]])
+    cards = Cards(
+        id="groom.hair.x",
+        slot="hair",
+        compat="unisex",
+        fitted_to="Ada",
+        positions=np.zeros((2, 3)),
+        triangles=np.array([[0, 1, 1]]),
+        bind_positions=np.full((2, 3), 9),
+        bind_weights=np.array([[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+        bind_offset=at - np.array([5.0, 5.0, -1.0]),
+        card=np.array([0, 0]),
+        roots=np.array([0]),
+        surface=surface,
+    )
+    table, skin = _skin_patch(0.0)
+    points, _ = refit_cards(cards, table, HeadFrame.build(table, skin))
+    np.testing.assert_allclose(points[:, 2], [0.001, 0.003], atol=1e-12)
+    raised, _ = _skin_patch(0.005)
+    points, _ = refit_cards(cards, raised, HeadFrame.build(raised, skin))
+    # The skin rose 5 mm under the card while its root stayed: both vertices come back
+    # out to their designed height over it (within the 0.5 mm slack).
+    np.testing.assert_allclose(points[:, 2], [0.0055, 0.0075], atol=1e-9)
+    unchanged, _ = refit_cards(cards, raised)  # without a head frame: the root refit alone
+    np.testing.assert_allclose(unchanged[:, 2], [0.001, 0.003], atol=1e-12)
+    # Over the open edge of the skin a vertex keeps no depth of its own.
+    edge = Cards(**{**cards.__dict__, "bind_offset": cards.bind_offset - [1.0, 1.0, 0.0]})
+    points, _ = refit_cards(edge, raised, HeadFrame.build(raised, skin))
+    np.testing.assert_allclose(points[:, 2], [0.001, 0.003], atol=1e-12)
 
 
 def test_loops_pair_across_a_shift_and_a_reversal() -> None:

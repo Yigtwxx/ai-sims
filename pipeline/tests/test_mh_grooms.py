@@ -11,12 +11,21 @@ from asset_pipeline.mh import grooms
 from asset_pipeline.mh.dna import read_dna
 from asset_pipeline.mh.geometry import closest_point_on_triangles, closest_triangles, components
 from asset_pipeline.mh.grooms import (
+    COPY_DEPTH,
+    DEPTH_SLACK,
+    UNBOUND_DEPTH,
     Binding,
     CardMesh,
     GroomError,
     GroomHead,
     GroomUnit,
+    HeadFrame,
+    SurfaceDepth,
     bind_cards,
+    bind_depth,
+    card_forest,
+    forest_levels,
+    keep_depth,
 )
 
 
@@ -96,6 +105,203 @@ def test_cards_bind_by_their_root_and_follow_the_surface() -> None:
     )
     assert len(np.unique(binding.triangles[:4], axis=0)) == 1, "a card moves with one root"
     assert binding.attached.all(), "both cards grow from the surface"
+
+
+# --- designed depth ------------------------------------------------------------------------
+
+RADIUS = 0.09
+
+
+def _sphere(rings: int = 48, segments: int = 96) -> tuple[np.ndarray, np.ndarray]:
+    """UV sphere head (y up) with outward winding."""
+    vertices = [[0.0, RADIUS, 0.0]]
+    for i in range(1, rings):
+        theta = np.pi * i / rings
+        for j in range(segments):
+            phi = 2 * np.pi * j / segments
+            vertices.append(
+                [
+                    RADIUS * np.sin(theta) * np.cos(phi),
+                    RADIUS * np.cos(theta),
+                    RADIUS * np.sin(theta) * np.sin(phi),
+                ]
+            )
+    vertices.append([0.0, -RADIUS, 0.0])
+    bottom = len(vertices) - 1
+    triangles = []
+    for j in range(segments):
+        k = (j + 1) % segments
+        triangles.append((0, 1 + k, 1 + j))
+        triangles.append((bottom, 1 + (rings - 2) * segments + j, 1 + (rings - 2) * segments + k))
+    for i in range(rings - 2):
+        for j in range(segments):
+            k = (j + 1) % segments
+            a, b = 1 + i * segments + j, 1 + i * segments + k
+            c, d = a + segments, b + segments
+            triangles += [(a, b, d), (a, d, c)]
+    return np.array(vertices), np.array(triangles, dtype=np.int64)
+
+
+def _strip(heights: np.ndarray, rows: int = 24) -> CardMesh:
+    """One card from near the crown down the +x side of the sphere: rows of two vertices
+    1 cm apart in z, `heights` (rows,) metres over the skin."""
+    theta = np.linspace(0.15, 1.3, rows)
+    radius = RADIUS + heights
+    positions = []
+    for t, r in zip(theta, radius, strict=True):
+        for z in (-0.005, 0.005):
+            positions.append([r * np.sin(t), r * np.cos(t), z])
+    quads = [(2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2) for i in range(rows - 1)]
+    indices = np.array([t for a, b, c, d in quads for t in ((a, b, c), (a, c, d))])
+    return CardMesh(np.array(positions), None, None, None, None, indices)
+
+
+def _designed_depth_now(cards: np.ndarray, surface: SurfaceDepth, head: np.ndarray) -> np.ndarray:
+    """Depth of every card vertex at the head vertex nearest to it now."""
+    frame = HeadFrame.build(head, _sphere()[1])
+    nearest = frame.nearest(cards, surface.position)
+    return np.einsum("vj,vj->v", cards - head[nearest], frame.normals[nearest])
+
+
+def test_card_depth_is_measured_along_the_outward_head_normal() -> None:
+    vertices, triangles = _sphere()
+    head = GroomHead("sphere", vertices, triangles, 1.0)
+    heights = np.r_[-0.002, np.full(23, 0.004)]  # root tucked 2 mm under the skin
+    surface = bind_depth(_strip(heights), head)
+    assert surface.bound.all()
+    np.testing.assert_allclose(surface.depth, np.repeat(heights, 2), atol=3e-4)
+    assert (surface.parent[:2] == -1).any(), "the root is in the tucked-in row"
+
+
+def test_keep_depth_leaves_cards_on_their_authoring_head_alone() -> None:
+    vertices, triangles = _sphere()
+    head = GroomHead("sphere", vertices, triangles, 1.0)
+    cards = _strip(np.r_[-0.002, np.full(23, 0.004)])
+    binding = bind_cards(cards, head)
+    surface = bind_depth(cards, head).quantized()
+    kept = keep_depth(
+        binding.fit(vertices), surface, cards.indices, HeadFrame.build(vertices, triangles)
+    )
+    np.testing.assert_allclose(kept, cards.positions, atol=1e-9)
+
+
+def test_keep_depth_pushes_a_sinking_card_back_to_its_designed_depth() -> None:
+    vertices, triangles = _sphere()
+    head = GroomHead("sphere", vertices, triangles, 1.0)
+    heights = np.r_[-0.002, np.full(23, 0.004)]
+    cards = _strip(heights)
+    binding = bind_cards(cards, head)
+    surface = bind_depth(cards, head).quantized()
+    # A head 15 % wider: the card's root near the crown barely moves, its lower end
+    # would sit ~8 mm inside the skin.
+    wide = vertices * np.array([1.15, 1.0, 1.0])
+    refit = binding.fit(wide)
+    before = _designed_depth_now(refit, surface, wide)
+    assert before.min() < -0.006, "the root translation alone sinks the card"
+    kept = keep_depth(refit, surface, cards.indices, HeadFrame.build(wide, triangles))
+    after = _designed_depth_now(kept, surface, wide)
+    assert np.all(after >= surface.depth - DEPTH_SLACK - 1e-6), "no vertex deeper than designed"
+    outside = (kept[:, 0] / 1.15) ** 2 + kept[:, 1] ** 2 + kept[:, 2] ** 2 > RADIUS**2
+    assert outside[2:].all(), "only the tucked root stays under the skin"
+    # The card stays a card: its edges keep their length within a few percent.
+    edges = cards.indices[:, [0, 1, 1, 2, 2, 0]].reshape(-1, 2)
+    rest = np.linalg.norm(cards.positions[edges[:, 0]] - cards.positions[edges[:, 1]], axis=1)
+    now = np.linalg.norm(kept[edges[:, 0]] - kept[edges[:, 1]], axis=1)
+    assert np.abs(now / rest - 1).max() < 0.15
+
+
+def test_keep_depth_never_pulls_a_card_in() -> None:
+    vertices, triangles = _sphere()
+    head = GroomHead("sphere", vertices, triangles, 1.0)
+    cards = _strip(np.r_[0.002, np.full(23, 0.004)])  # bound by its top row
+    binding = bind_cards(cards, head)
+    surface = bind_depth(cards, head).quantized()
+    narrow = vertices * np.array([0.9, 1.0, 1.0])
+    refit = binding.fit(narrow)
+    kept = keep_depth(refit, surface, cards.indices, HeadFrame.build(narrow, triangles))
+    np.testing.assert_allclose(kept, refit, atol=1e-12)
+
+
+def test_card_forest_runs_from_the_deepest_point_and_folds_seam_copies() -> None:
+    # A strip of three rows, split after the second row: vertices 4, 5 copy 2, 3.
+    positions = np.array(
+        [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 1, 0], [1, 1, 0], [0, 2, 0], [1, 2, 0]],
+        dtype=np.float64,
+    )
+    indices = np.array([[0, 1, 3], [0, 3, 2], [4, 5, 7], [4, 7, 6]], dtype=np.int64)
+    rank = np.array([0.5, 0.4, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0])  # vertex 1 is the deepest
+    parent, copy = card_forest(positions, indices, rank)
+    assert parent[1] == -1 and (parent >= 0).sum() == 7, "one card, rooted at its deepest"
+    assert copy[5] and parent[5] == 3, "the seam copy follows its twin"
+    linked = np.flatnonzero(copy)
+    np.testing.assert_array_equal(positions[parent[linked]], positions[linked])
+    assert not copy[:4].any() and not copy[6:].any()
+    level = forest_levels(parent)
+    assert np.all(level[parent >= 0] > level[parent[parent >= 0]])
+
+
+def test_keep_depth_joins_seam_copies_to_their_twin() -> None:
+    vertices, triangles = _sphere()
+    head = GroomHead("sphere", vertices, triangles, 1.0)
+    whole = _strip(np.full(24, 0.004))
+    # Split the card at row 12: the lower piece gets its own copies of that row, so it
+    # binds to a root of its own.
+    positions = np.concatenate([whole.positions, whole.positions[24:26]])
+    indices = whole.indices.copy()
+    lower = indices[24:]  # quads 12 onwards (two triangles each)
+    indices[24:] = np.where(lower == 24, 48, np.where(lower == 25, 49, lower))
+    cards = CardMesh(positions, None, None, None, None, indices)
+    assert len(np.unique(components(len(positions), indices))) == 2
+    binding = bind_cards(cards, head)
+    surface = bind_depth(cards, head).quantized()
+    assert surface.copy[48:].all()
+    wide = vertices * np.array([1.15, 1.0, 1.0])
+    refit = binding.fit(wide)
+    assert np.linalg.norm(refit[48] - refit[24]) > 1e-3, "the pieces tear apart by root"
+    kept = keep_depth(refit, surface, indices, HeadFrame.build(wide, triangles))
+    np.testing.assert_allclose(kept[48:], kept[24:26], atol=1e-12)
+    # The lower piece moved with its seam instead of stretching across it.
+    designed = np.linalg.norm(positions[48] - positions[30])
+    assert abs(np.linalg.norm(kept[48] - kept[30]) / designed - 1) < 0.05
+
+
+def test_surface_depth_survives_the_glb_encoding() -> None:
+    surface = SurfaceDepth(
+        position=np.array([24048, 5, 7]),
+        depth=np.array([-0.0123, 0.0, 0.031]),
+        bound=np.array([True, False, True]),
+        copy=np.array([False, True, False]),
+        parent=np.array([-1, 0, 0]),
+    )
+    encoded = surface.encode()
+    assert encoded["_SURFACE_DEPTH"].dtype == np.int16
+    assert encoded["_SURFACE_DEPTH"].tolist() == [[24048, -1230], [0, COPY_DEPTH], [7, 3100]]
+    assert encoded["_SURFACE_PARENT"].dtype == np.int16
+    assert encoded["_SURFACE_PARENT"].tolist() == [0, 1, 2]
+    back = surface.quantized()
+    assert back.parent.tolist() == [-1, 0, 0]
+    assert back.bound.tolist() == [True, False, True]
+    assert back.copy.tolist() == [False, True, False]
+    assert back.position[[0, 2]].tolist() == [24048, 7]
+    np.testing.assert_allclose(back.depth[[0, 2]], [-0.0123, 0.031], atol=1e-9)
+    unbound = SurfaceDepth(**{**surface.__dict__, "copy": np.zeros(3, dtype=bool)})
+    assert unbound.encode()["_SURFACE_DEPTH"][1, 1] == UNBOUND_DEPTH
+
+
+def test_surface_parent_falls_back_to_float_when_it_does_not_fit_a_short() -> None:
+    count = 40000
+    parent = np.full(count, -1)
+    parent[-1] = 0  # 39999 back
+    surface = SurfaceDepth(
+        position=np.zeros(count, dtype=np.int64),
+        depth=np.zeros(count),
+        bound=np.zeros(count, dtype=bool),
+        copy=np.zeros(count, dtype=bool),
+        parent=parent,
+    )
+    encoded = surface.encode()["_SURFACE_PARENT"]
+    assert encoded.dtype == np.float32 and encoded[-1] == count - 1
+    assert surface.quantized().parent[-1] == 0
 
 
 @pytest.fixture(scope="module")

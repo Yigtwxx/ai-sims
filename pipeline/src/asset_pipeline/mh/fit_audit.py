@@ -45,7 +45,9 @@ dominant skin joint of the offending vertices.
 Grooms. Every visible groom's LOD0 cards are refitted to a few faces of each compatible
 gender (the extremes of skull width and neck length) and to the face they were fitted to
 (`fitted_to`, the reference), with the runtime formula (`grooms.ts`, `refitPositions`):
-`position = sum(w * head[p]) + offset`, in the head's bind space. Measured per case:
+`position = sum(w * head[p]) + offset`, in the head's bind space, then pushed back out to
+the depth each vertex was designed at (`keepCardDepth`, `grooms.keep_depth`) when the GLB
+carries it. Measured per case:
 
 - `inside`: card vertices inside the head (signed distance below -1 mm against the
   closest head triangle's outward normal; only where that triangle faces the vertex, so
@@ -78,6 +80,7 @@ from scipy.spatial import cKDTree
 
 from asset_pipeline.mh.geometry import closest_triangles, components, vertex_normals
 from asset_pipeline.mh.glb import accessor_array, accessor_values, read_glb
+from asset_pipeline.mh.grooms import HeadFrame, SurfaceDepth, keep_depth
 from asset_pipeline.mh.kinematics import compose_transforms, forward_kinematics
 
 COMMAND = "mh-fit-audit"
@@ -131,7 +134,8 @@ CARD_REACH = 0.04  # card vertices farther than this from every head vertex are 
 # Mirrors of `web/src/features/avatar/mh/garments.ts` (fitGarmentOverHead).
 HEAD_REACH = 0.05
 HEAD_NEIGHBOURS = 4
-HEAD_CLEARANCE = 0.003
+HEAD_CLEARANCE = 0.006
+HEAD_BESIDE = 0.015  # fitGarmentOverHead's head pass: garment within this of the normal line
 HEAD_BAND = 0.015  # skinGarmentToHead's fade
 NEAR_CANDIDATES = 16  # closest-triangle candidates per point (by centroid)
 
@@ -609,13 +613,24 @@ def fit_over_head(garment: F64, head: F64, head_normals: F64) -> F64:
     out_along = np.einsum("ij,ij->i", garment[rows] - head[first], head_normals[first])
     want = np.zeros(len(head))
     np.maximum.at(want, first, HEAD_CLEARANCE - out_along)
+    # The head pass: head skin the garment lies behind asks for clearance too (skin
+    # poking out between garment vertices is no garment vertex's nearest point).
+    near_garment = cKDTree(garment[rows])
+    g_distance, g_index = near_garment.query(head, distance_upper_bound=HEAD_REACH)
+    hit = np.flatnonzero(np.isfinite(g_distance))
+    offset = garment[rows][g_index[hit]] - head[hit]
+    out_head = np.einsum("ij,ij->i", offset, head_normals[hit])
+    beside = np.sqrt(np.maximum(g_distance[hit] ** 2 - out_head**2, 0.0))
+    behind = (out_head < 0) & (beside < HEAD_BESIDE)
+    want[hit[behind]] = np.maximum(want[hit[behind]], HEAD_CLEARANCE - out_head[behind])
     w = np.where(valid, 1.0 / np.maximum(distance, 1e-5), 0.0)
     total = w.sum(axis=1)
     push = (w * want[index]).sum(axis=1) / total
+    most = np.where(valid, want[index], 0.0).max(axis=1)
     direction = np.einsum("rk,rkj->rj", w, head_normals[index])
     length = np.linalg.norm(direction, axis=1)
     t = np.clip((HEAD_REACH - distance[:, 0]) / (HEAD_REACH / 2), 0.0, 1.0)
-    shift = np.maximum(want[first], push) * t * t * (3 - 2 * t)
+    shift = np.maximum(most, push) * t * t * (3 - 2 * t)
     move = (shift > 0) & (length > 0)
     out[rows[move]] += direction[move] / length[move, None] * shift[move, None]
     return out
@@ -915,6 +930,23 @@ def place_head(rig: HeadRig, state: BodyState) -> tuple[F64, F64]:
             np.c_[snapped[moved], np.ones(len(moved))],
         )
         posed[moved] = np.einsum("vij,vj->vi", blend_matrices(j, w, posed_matrices), local)[:, :3]
+        # `blendRingSkin` (assembly.ts): the boundary moves on the body's skin and the
+        # rings on their head skin blended towards their two slots' body skin by their
+        # falloff. Linear blend skinning is linear in the weights, so the blend of the
+        # two posed positions is the blended skin's.
+        bmesh = rig.body.asset.mesh
+        point = snapped[moved]
+
+        def body_posed(slots: I64) -> F64:
+            vertices = rig.pairing[slots]
+            return linear_blend_skin(
+                point, rig.body.nodes[bmesh.joints[vertices]], bmesh.weights[vertices], state.skin
+            )
+
+        t = rings.blend[:, None]
+        on_body = (1 - t) * body_posed(rings.slot_a) + t * body_posed(rings.slot_b)
+        share = np.where(rings.on_boundary, 1.0, rings.weights)[:, None]
+        posed[moved] = (1 - share) * posed[moved] + share * on_body
     return snapped, posed
 
 
@@ -1556,11 +1588,26 @@ class Cards:
     bind_offset: F64
     card: I64  # card (connected component) per vertex
     roots: I64  # root vertex per card
+    surface: SurfaceDepth | None = None  # designed depth (cards converted since groom-v4)
+
+
+SURFACE_ATTRIBUTES = ("_SURFACE_DEPTH", "_SURFACE_PARENT")
+
+
+def read_surface(attributes: Mapping[str, F64], count: int) -> SurfaceDepth | None:
+    """The designed depth of a cards GLB, None when it has none (older conversions)."""
+    surface = attributes.get("_SURFACE_DEPTH")
+    parent = attributes.get("_SURFACE_PARENT")
+    if surface is None or parent is None or surface.shape != (count, 2):
+        return None
+    if np.isnan(surface).all() or np.isnan(parent).all():
+        return None
+    return SurfaceDepth.decode(surface, parent)
 
 
 def load_cards(archive_web: Path, entry: Mapping[str, Any]) -> Cards:
     path = archive_web / entry["glb"]
-    attributes = ("_BIND_POSITIONS", "_BIND_WEIGHTS", "_BIND_OFFSET")
+    attributes = ("_BIND_POSITIONS", "_BIND_WEIGHTS", "_BIND_OFFSET", *SURFACE_ATTRIBUTES)
     try:
         asset = read_asset(path, meshes={"cards_lod0"}, attributes=attributes, morphs=False)
     except FitAuditError:
@@ -1587,6 +1634,7 @@ def load_cards(archive_web: Path, entry: Mapping[str, Any]) -> Cards:
         bind_offset=offset,
         card=card,
         roots=roots[roots >= 0],
+        surface=read_surface(mesh.attributes, len(mesh.positions)),
     )
 
 
@@ -1600,9 +1648,16 @@ def head_table(head: Head) -> F64:
     return table
 
 
-def refit_cards(cards: Cards, table: F64) -> tuple[F64, int]:
-    """`refitPositions` (grooms.ts): sum(w * head[p]) + offset; vertices whose binding
-    points at positions the head lacks keep their loaded position."""
+def head_frame(head: Head, table: F64) -> HeadFrame:
+    """The head primitive's surface in DNA positions (`table`), like `headSurface`
+    (grooms.ts)."""
+    return HeadFrame.build(table, head.weld[head.asset.mesh.triangles])
+
+
+def refit_cards(cards: Cards, table: F64, frame: HeadFrame | None = None) -> tuple[F64, int]:
+    """`fitCards` (grooms.ts): `refitPositions`, sum(w * head[p]) + offset (vertices whose
+    binding points at positions the head lacks keep their loaded position), then with the
+    head's `frame` and the cards' designed depth, `keepCardDepth`."""
     index = cards.bind_positions
     valid = np.all((index >= 0) & (index < len(table)), axis=1)
     safe = np.where(valid[:, None], index, 0)
@@ -1611,7 +1666,10 @@ def refit_cards(cards: Cards, table: F64) -> tuple[F64, int]:
     valid &= ~np.isnan(cards.bind_weights).any(axis=1) & ~np.isnan(cards.bind_offset).any(axis=1)
     fitted = np.einsum("vk,vkj->vj", np.nan_to_num(cards.bind_weights), np.nan_to_num(corners))
     out = np.where(valid[:, None], fitted + np.nan_to_num(cards.bind_offset), cards.positions)
-    return out, int((~valid).sum())
+    missed = int((~valid).sum())
+    if frame is not None and cards.surface is not None and missed < len(out):
+        out = keep_depth(out, cards.surface, cards.triangles, frame)
+    return out, missed
 
 
 def head_direction_regions(points: F64, head: Head) -> list[str]:
@@ -1639,7 +1697,8 @@ class CardDepth:
 
 
 def card_depth(cards: Cards, head: Head) -> CardDepth:
-    points, missed = refit_cards(cards, head_table(head))
+    table = head_table(head)
+    points, missed = refit_cards(cards, table, head_frame(head, table))
     mesh = head.asset.mesh
     near, _ = cKDTree(mesh.positions).query(points, k=1, distance_upper_bound=CARD_REACH)
     rows = np.flatnonzero(np.isfinite(near))
