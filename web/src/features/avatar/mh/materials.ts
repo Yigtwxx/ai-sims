@@ -1,6 +1,8 @@
 import {
   Color,
+  MeshDepthMaterial,
   MeshPhysicalMaterial,
+  RGBADepthPacking,
   RepeatWrapping,
   ShaderChunk,
   TextureLoader,
@@ -290,6 +292,43 @@ const BODY_HIDE_FRAGMENT = /* glsl */ `
 #endif
 `;
 
+/**
+ * Shadow depth of a body skin that drops the faces under worn garments, as the
+ * skin itself does. Without it the hidden skin still cast its shadow: wherever
+ * cloth dips a few millimetres under the skin in a pose (between the legs of
+ * a pencil skirt) it lay in that shadow and showed as black specks.
+ */
+export function bodyHideDepthMaterial(): MeshDepthMaterial {
+  const material = new MeshDepthMaterial({ depthPacking: RGBADepthPacking });
+  material.defines = { ...material.defines, MH_BODY_HIDE: '' };
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+${BODY_HIDE_VERTEX_PARS}`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+${BODY_HIDE_VERTEX}`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+${BODY_HIDE_FRAGMENT_PARS}`,
+      )
+      .replace(
+        '#include <clipping_planes_fragment>',
+        `#include <clipping_planes_fragment>
+${BODY_HIDE_FRAGMENT}`,
+      );
+  };
+  material.customProgramCacheKey = () => 'mh-body-hide-depth-v1';
+  return material;
+}
+
 /** Wrinkle inputs of a head skin; textures arrive asynchronously. */
 export interface WrinkleUniforms {
   wrinkleNormal1: { value: Texture | null };
@@ -470,6 +509,7 @@ export function applySkinMaterials(root: Object3D, detail: SkinDetail): Material
     // Kept for A/B checks on the dev bench.
     mesh.userData.mhSourceMaterial = source;
     mesh.material = skin;
+    if (tuning.bodyHide) mesh.customDepthMaterial = bodyHideDepthMaterial();
     created.push(skin);
   });
   return created;
