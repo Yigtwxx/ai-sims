@@ -129,18 +129,28 @@
 
 > `superpowers:systematic-debugging`: önce kanıt, sonra düzeltme. Düzeltmeler dönüştürücüde kalır ki sonraki kıyafetlere de geçsin.
 
-- [ ] **1d.1 Kanıt matrisi.** Tahmin 2 · Gerçek —
-  - Dev sayfası (ör. `/dev/fit`): her kıyafet × iki cinsiyet × nötr ve her slider ucu (ayrıca birkaç slider birlikte) × idle ve talk karesi; her saç × birkaç yüz × üç açı. Ekran görüntüleri arşivin `build/fit/` altına.
-  - Sayısal ölçüm: kıyafet altında görünen cilt vertex'i (`body_hide` dışı ve kumaşın dışına çıkan deri), kafaya giren kart sayısı.
-  - En kötü vakalar `docs/handoff.md`'ye.
-- [ ] **1d.2 Kıyafet düzeltmesi.** Tahmin 2 · Gerçek —
-  - Kök neden `outfits.py` (`stack_push` :787, `clear_morphs` :956, `body_hide` :1117) ya da web (`garments.ts` `bindGarment` :30); önce başarısız test, sonra düzeltme. Etkilenen kıyafetler yeniden dönüştürülür, validate.
-- [ ] **1d.3 Saç düzeltmesi.** Tahmin 1 · Gerçek —
-  - `grooms.ts` (`refitPositions` :52, `fitCards` :154, `bindToHead` :194), `groomDensity.ts`; testle.
+- [x] **1d.1 Kanıt matrisi.** Tahmin 2 · Gerçek ~1.5 (subagent ~67 dk)
+  - `asset-pipeline mh-fit-audit` (`b6de10f`, `pipeline/src/asset_pipeline/mh/fit_audit.py`): görünür her kıyafet × iki gövde × nötr, her kaydırıcı ucu, presetler ve birkaç birleşik uç × dinlenme pozu + idle ve talk kareleri; ölçülenler: kumaştan taşan deri, görünen deriye batan kumaş, çaprazlanan katmanlar, gizli derinin açıkta kaldığı delikler, yakadan taşan kafa derisi. Saçta her saç × birkaç yüz: kafaya giren kart köşesi ve kafadan >5 mm uzak kök. Runtime'ın dikiş snap'i, yaka itmesi ve yeniden skinleme numpy'a taşındı. 1049 kıyafet + 304 saç vakası 6 dk 17 sn. Rapor `<arşiv>/build/fit/report.json`.
+  - Sınır: pozlu kareler yalnız nötr kaydırıcıda; üst+alt birlikte ölçülmüyor; uzun saçın omuza girmesi ölçülmüyor; dikiş snap'i yaklaşık (Mason'ın pozdaki taşmasını gerçekte olduğundan küçük ölçüyor, aşağıda).
+- [ ] **1d.2 Kıyafet düzeltmesi.** Tahmin 2 · Gerçek ~3 (kısmen bitti)
+  - Bitti:
+    - **Eteğin kara noktaları** (`edc5198`): AO değilmiş, AO'suz (battery) da vardı. Gövdenin gölge geçişi `bodyHidden` maskesini uygulamıyordu; kıyafet altındaki gizli deri gölge düşürüyor, pozda deri altına birkaç mm giren kumaş o gölgede kapkara görünüyordu. Gövde artık gölgesini de maskeyle çiziyor.
+    - **Yakadan taşan alt boyun** (`5f7eb94`): her preset kafa paylaşılan gövdenin boynunu 1-4 cm ıskalıyor, dikiş ofseti ~2 cm'lik 4 halkada sönüyordu. Ofset artık ilk 3 cm'de tam, 9 cm'de sıfır (yüz dikişten en az 11.6 cm uzakta); yaka kafa derisinden 3 yerine 5 cm'ye kadar itiliyor. Denetimde Mason + tişört dinlenmede 150 köşe/9 mm → 5 köşe/1.1 mm; kaydırıcı uçlarında 35 mm → 3.8 mm; kazak nötrde temiz.
+    - `mh-prune` 4 Fab yüzünün paketini (1.9 GB) "kullanılmıyor" sayıyordu (`c0afe0e`).
+  - Açık (karar bekliyor):
+    - **Mason pozda:** idle ve talk'ta alt boyun tişörtün önüne geçiyor (yakanın altında ten lekeleri). Kanıt: gövde ve kafa gizlenince tişört kesintisiz; lekeler kafa derisi. Neden: Mason'ın alt boynu kendi kafa ağırlıklarıyla, tişört gövde ağırlıklarıyla dönüyor. Çözüm önerisi: dikiş bandının deri ağırlıklarını sönümle birlikte gövdenin ağırlıklarına karıştırmak (`assembly.ts` `snapNeckSeam`). Kumaşın örttüğü kafa derisini gizlemek denendi: yakada kara delik açtı, geri alındı.
+    - **Erkek tişört, kazak, kapüşonlu, kilo +1:** koltuk altında 140-190 delik üçgeni (gizli deri açıkta); tişörtte kol yeni kola 13 mm batıyor.
+    - **Flipflops:** kilo +1 ve kas +1'de başparmak arası kayış katmanları 14.7 mm çaprazlanıyor.
+    - **KhaosMDF479 (kadın):** kilo +1'de kumaş görünen derinin 6.7 mm altına giriyor (pelvis).
+    - **Street_Wear_01:** talk karesinde 202 delik üçgeni (pelvis, üst kol).
+    - Kol ağzında 1-2 piksellik arka plan sızıntısı (pozda kol ağzı kalkıyor; payı büyütmek deriyi kumaştan taşırır).
+- [ ] **1d.3 Saç düzeltmesi.** Tahmin 1 · Gerçek ~1 (kısmen bitti)
+  - Bitti: kart kaynaklı yoğunlukta kartlar arası 8 mm'ye kadar boşluklar kapanıyor (`a676190`): Ponytail'in tepesi ve tokası, Nomad'ın girdabı artık pembe değil. Fab saçları boy filtresinde (`cbf0a83`). Ponytail'in alnına düşen saç sanatçının tasarımı (Fab görselinde perçem var).
+  - Açık: kartlar kökleriyle yalnız ötelendiği için farklı kafa şekillerinde uzun kartlar kafaya giriyor (referans yüze göre: StraightBangs Dominic ve Mason'da ~3000 köşe/37 mm, Ponytail Skotukeda'da 4585/20.7 mm, HighPonytail Skotukeda'da 17 mm, Male 11 Dominic'te 20 mm). Çözüm kartı kökten uca kafa yüzeyine göre deforme etmek (kafa derisinden dışarı itme).
 - [ ] **1d.4 Yayın ve rapor.** Tahmin 1 · Gerçek —
-  - Matris yeniden: hiçbir karede cilt görünmüyor, slider uçlarında kırılma yok, kartlar kafaya girmiyor ve havada değil.
-  - `node scripts/r2-sync.mjs outfits grooms`, commit + push, kullanıcıya 3-4 önce/sonra ekran görüntüsü. B5 `[x]`.
+  - Saçlar R2'de; web düzeltmeleri `main`'e push'landı. Önce/sonra görüntüleri kullanıcıya gönderildi (2026-10-28). Açık maddelerin ne zaman yapılacağı kullanıcı kararı.
 
 ## Faz sonu kontrolü
 
 - [ ] Landing, yeni kadın ve erkek karakter, yeni yüzler ve saçlar, kalem etek, konuşma ekranı (TR + EN birer cümle). Kullanıcıya telefondan ekran görüntüleriyle faz özeti. Gerçek sürelerle `docs/todo.md` faz saatleri güncellenir.
+  - 2026-10-28: landing (TR), oluşturucuda yeni erkek karakter + Dalgalı undercut, "Bitti", konuşma ekranında TR "Nasılsın?" (konuşma ~2 sn'de başladı) ve EN "How are you?" (~2.5 sn) çalışıyor; konsolda yalnız `THREE.Clock` uyarısı. Kadın karakter /dev/stage'de (Ada, Jelena, Seo) kontrol edildi.

@@ -231,7 +231,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - Bilinenler:
     - **Mason (2026-10-27, A2):** kafa mesh'inin boyun ve göğüs parçası diğer erkek yüzlerden ~3.5 cm önde (z 0.130, diğerleri ~0.095); paylaşılan gövdeye takılınca tişört ve kazak yakasından ten taşıyor. Kafa parçası boyun dikişinden aşağıda gövdeye uydurulmalı (dönüştürücü ya da montaj), ya da kıyafet altında kalan kafa köşeleri de gizlenmeli.
     - **Kalem etek (2026-10-27, A4.0):** kalça ±1'de bacak arasını köprüleyen kumaş iç uyluk morph'unu izliyordu; `3df9de4` (`bridging`, outfit-v7) düzeltti, bütün kıyafetler yeniden dönüştürüldü.
-    - **AO gürültüsü (2026-10-27):** `high` kalitede N8AO, kalem eteğin bacak arasındaki sığ oluğunda kesik koyu noktalar çiziyor; `battery`'de (AO kapalı) yok. Katmanlar ayrık (en az 1.5 mm), geometri sağlam. Başka kıyafetlerin kıvrımlarında da bakılmalı; AO yarıçapı ya da örnek sayısı denenir.
+    - **AO gürültüsü (2026-10-27):** ~~N8AO~~ Düzeldi (2026-10-28, `edc5198`): AO değilmiş, `battery`'de de vardı. Kıyafet altındaki gizli deri gölge düşürüyordu; gövde artık gölgesini de `bodyHidden` maskesiyle çiziyor.
     - Kıyafet morph'ları her kaydırıcı ucunda deri normali boyunca dışarı itiliyor (`pipeline/src/asset_pipeline/mh/outfits.py`: `stack_push` :787, `clear_morphs` :956).
     - Cildi gizleyen maske `body_hide` (:1117). Web'de bağlama `web/src/features/avatar/mh/garments.ts` (`bindGarment` :30).
     - Birden çok kaydırıcının birlikte morph toplamı ayrıca denenmeli (her biri tek başına temiz olsa da).
@@ -294,6 +294,6 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## Kullanıcıya sorular
 
-(Bekleyen soru yok.)
+- **B5 açık kalanları (2026-10-28):** Faz 1d'de ölçülen ve düzeltilemeyen vakalar (`docs/plans/faz-1.md` 1d.2-1d.3: Mason'ın pozda alt boynu, erkek üstlerde kilo +1 koltuk altı delikleri, flipflops, KhaosMDF479, Street_Wear_01, farklı kafalarda uzun saç kartları). Faz 1 bunlarla kapanıp ayrı bir göreve mi alınsın, yoksa Faz 1 içinde mi bitirilsin?
 
 - Cevaplanan (2026-10-27, A2): Mason'ın 8K yüz dokuları belleği tıkadı, Claude Code dışa aktarımı durdurdu. Kullanıcı kararı: web için 8K gerekmez, 4K ya da daha düşüğü olur ("sen karar ver"). Yeni Fab yüzleri `"face": "res4k"` ile dışa aktarılır: web yüzü zaten 4096 px (`textures.py` `FACE_SIZE`, en az 4096 ister), 1080 gözenek detayını kaybettirir. Gövde 4K kalır.

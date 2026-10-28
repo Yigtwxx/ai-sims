@@ -29,6 +29,8 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 
 - **2026-10-28 (PC, Faz 1b kapandı):** Nomad Wave Undercut yayında: tıraşlı yanlar ve ense kart değil, paketin `.abc` tellerinden kafa UV'sine çizilen boyalı harita (`mh/strand_paint.py`, `mh/alembic.py`); uzun üst kartlar kalıyor. Bir saç girdisi artık hem `glb` hem `painted` taşıyabiliyor. A3 kapandı.
 
+- **2026-10-28 (PC, Faz 1d, B5):** `asset-pipeline mh-fit-audit` oturma hatalarını sayıyor (rapor `build/fit/report.json`). Düzeltilenler: gizli derinin gölgesi (eteğin "AO gürültüsü" sanılan kara noktaları), alt boynun yakadan taşması (dikiş ofseti 3 cm tam, 9 cm'de sıfır; yaka 5 cm'ye kadar itiliyor), kart saçlarda kafa derisi boşlukları, `mh-prune`'un Fab yüz paketlerini silinecek sanması. Açık kalanlar ve önerilen çözümler `docs/plans/faz-1.md` 1d.2-1d.3'te: Mason'ın alt boynu pozda tişörtün önüne geçiyor (kafa ağırlıkları), erkek üstlerde kilo +1'de koltuk altı delikleri, flipflops kayışı, KhaosMDF479, Street_Wear_01, farklı kafa şekillerinde uzun saç kartlarının kafaya girmesi.
+
 ### Unreal dışa aktarımı (Windows, `pipeline/unreal/mh_export/`)
 
 - **Bitti.** Sayılar `MetaHumanArchive/raw/` altındaki `done.json` birimlerinden:
