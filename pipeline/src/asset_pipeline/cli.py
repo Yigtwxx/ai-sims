@@ -8,7 +8,7 @@ def main(argv: list[str] | None = None) -> None:
     from asset_pipeline import transfer
     from asset_pipeline.garments import cli as garment_cli
     from asset_pipeline.mh import cli as mh_cli
-    from asset_pipeline.mh import prune, similar
+    from asset_pipeline.mh import fit_audit, prune, similar
 
     parser = argparse.ArgumentParser(prog="asset-pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -20,6 +20,7 @@ def main(argv: list[str] | None = None) -> None:
     mh_cli.add_parser(sub)
     prune.add_parser(sub)
     similar.add_parser(sub)
+    fit_audit.add_parser(sub)
     transfer.add_parser(sub)
     garment_cli.add_parser(sub)
     ue.add_argument(
@@ -36,6 +37,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(prune.run(args))
     elif args.command == similar.COMMAND:
         raise SystemExit(similar.run(args))
+    elif args.command == fit_audit.COMMAND:
+        raise SystemExit(fit_audit.run(args))
     elif args.command == garment_cli.COMMAND:
         raise SystemExit(garment_cli.run(args))
     elif args.command == "serve-slim":
