@@ -302,6 +302,48 @@ const DNA_POSITION = '_dna_position';
  */
 const SEAM_SKIRT_OUT = 0.0003;
 const SEAM_SKIRT_IN = 0.00005;
+/**
+ * How far (m, rest) up the neck the seam's offset holds in full, and where it
+ * has faded out. The converter's rings span ~2 cm, and a head sculpted on
+ * another body keeps its own neck above them: Mason's lower neck sits ~3.5 cm
+ * in front of the shared body's, nearly the same over its first 6 cm, and came
+ * through crew-neck collars. The face is 15 cm or more from the boundary.
+ */
+const SEAM_HOLD = 0.03;
+const SEAM_FADE = 0.09;
+
+/**
+ * Head vertices the seam moves and their falloff: the converter's rings, and
+ * every vertex within SEAM_FADE of the boundary (rest positions), in full up
+ * to SEAM_HOLD and then fading out smoothly. A vertex in both takes the larger
+ * weight.
+ */
+export function seamFalloff(
+  position: {
+    count: number;
+    getX(i: number): number;
+    getY(i: number): number;
+    getZ(i: number): number;
+  },
+  boundary: readonly Vector3[],
+  rings: Pick<NeckSeamExtras, 'vertices' | 'weights'>,
+): { vertices: Int32Array; weights: Float32Array } {
+  const weight = new Map<number, number>();
+  rings.vertices.forEach((vertex, i) => weight.set(vertex, rings.weights[i] ?? 0));
+  const point = new Vector3();
+  for (let v = 0; v < position.count; v += 1) {
+    point.set(position.getX(v), position.getY(v), position.getZ(v));
+    let nearest = Infinity;
+    for (const b of boundary) nearest = Math.min(nearest, b.distanceToSquared(point));
+    const d = Math.sqrt(nearest);
+    if (d >= SEAM_FADE) continue;
+    const t = Math.max(0, (d - SEAM_HOLD) / (SEAM_FADE - SEAM_HOLD));
+    const fade = 1 - t * t * (3 - 2 * t);
+    weight.set(v, Math.max(weight.get(v) ?? 0, fade));
+  }
+  const vertices = Int32Array.from([...weight.keys()].sort((a, b) => a - b));
+  return { vertices, weights: Float32Array.from(vertices, (v) => weight.get(v)!) };
+}
 
 /** First primitive vertex of each DNA position (glTF splits positions at UV seams). */
 function vertexOfPosition(geometry: BufferGeometry): Map<number, number> {
@@ -474,12 +516,14 @@ export function bindNeckSeam(
   const slotOfPosition = new Map(headSeam.boundary.map((p, slot) => [p, slot]));
   const dna = head.geometry.getAttribute(DNA_POSITION) as Attribute;
   const position = head.geometry.attributes.position as Attribute;
-  const count = headSeam.vertices.length;
+  const restBoundary = headBoundary.map((v) => new Vector3().fromBufferAttribute(position, v!));
+  const { vertices, weights } = seamFalloff(position, restBoundary, headSeam);
+  const count = vertices.length;
   const binding: NeckSeamBinding = {
     head,
     body: body.mesh,
-    vertices: Int32Array.from(headSeam.vertices),
-    weights: Float32Array.from(headSeam.weights),
+    vertices,
+    weights,
     rest: new Float32Array(count * 3),
     slotA: new Int32Array(count),
     slotB: new Int32Array(count),
@@ -493,7 +537,6 @@ export function bindNeckSeam(
     bodySkinWeight: new Float32Array(count * 4),
     bodyEntries: addBodyEntries(head, headMeshes, body.mesh, bodyVertex),
   };
-  const restBoundary = headBoundary.map((v) => new Vector3().fromBufferAttribute(position, v!));
   const point = new Vector3();
   for (let i = 0; i < count; i += 1) {
     const vertex = binding.vertices[i]!;

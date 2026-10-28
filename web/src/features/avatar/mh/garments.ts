@@ -125,8 +125,13 @@ export function releaseBodyHide(body: SkinnedMesh): void {
   if (hideOwners.get(body.geometry) === body) applyBodyHide(body, []);
 }
 
-/** Garment vertices farther than this (m) from the head skin keep their weights. */
-const HEAD_REACH = 0.03;
+/**
+ * Garment vertices farther than this (m) from the head skin keep their weights
+ * and place. At 3 cm a crew neck on a slimmed body (weight or shoulders at -1)
+ * stayed under Mason's, Mateo's and Victor's lower necks by up to 20 mm; the
+ * head skin there sits 6-9 cm above the seam, where its offset has faded.
+ */
+const HEAD_REACH = 0.05;
 /** Head vertices whose skin is blended into one garment vertex. */
 const HEAD_NEIGHBOURS = 4;
 /**

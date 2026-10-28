@@ -15,6 +15,7 @@ import {
   bindNeckSeam,
   bodySliderKey,
   createBodyRig,
+  seamFalloff,
   type NeckSeamExtras,
 } from './assembly';
 
@@ -173,6 +174,33 @@ describe('bindNeckSeam', () => {
     const rig = createBodyRig(root, {});
     expect(bindNeckSeam([head], undefined, rig, seam('body'))).toBeUndefined();
     expect(bindNeckSeam([head], seam('head'), rig, undefined)).toBeUndefined();
+  });
+});
+
+describe('seamFalloff', () => {
+  // A neck column: the boundary ring at y = 0 and vertices straight up from it.
+  const heights = [0, 0.01, 0.03, 0.05, 0.06, 0.09, 0.15];
+  const points = heights.map((y) => new Vector3(0.05, y, 0));
+  const position = new BufferAttribute(new Float32Array(points.flatMap((p) => p.toArray())), 3);
+  const boundary = ring(0.05, 0);
+
+  it('holds the seam offset over the lower neck and fades it out before the face', () => {
+    const { vertices, weights } = seamFalloff(position, boundary, { vertices: [], weights: [] });
+    const weightOf = (v: number) => weights[Array.from(vertices).indexOf(v)] ?? 0;
+    expect(weightOf(0)).toBe(1);
+    expect(weightOf(2)).toBe(1);
+    expect(weightOf(4)).toBeGreaterThan(0);
+    expect(weightOf(4)).toBeLessThan(1);
+    expect(weightOf(4)).toBeGreaterThan(weightOf(5));
+    expect(Array.from(vertices)).not.toContain(6);
+  });
+
+  it('keeps a ring weight the distance would lower', () => {
+    const { vertices, weights } = seamFalloff(position, boundary, {
+      vertices: [6],
+      weights: [0.2],
+    });
+    expect(weights[Array.from(vertices).indexOf(6)]).toBeCloseTo(0.2);
   });
 });
 
