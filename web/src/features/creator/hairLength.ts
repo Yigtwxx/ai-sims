@@ -3,14 +3,22 @@ export type HairLength = (typeof HAIR_LENGTHS)[number];
 
 const CODES: Record<string, HairLength> = { S: 'short', M: 'medium', L: 'long' };
 
+/** Fab grooms keep their artists' names, so their lengths are listed. */
+const FAB_LENGTHS: Record<string, HairLength> = {
+  NomadWaveUndercut: 'short',
+  SC_Hairstyle_Male_11: 'medium',
+  Ponytail: 'long',
+  Hair_F_Ponytail_MessyWavy_01: 'long',
+};
+
 /**
  * A hairstyle's length from its MetaHuman groom name, the part after the last
  * '.' of the manifest id: `Hair_S_…` short, `Hair_M_…` medium, `Hair_L_…`
- * long. Grooms named any other way (the fixture's, a custom export) have no
- * known length.
+ * long, or a Fab groom's listed length. Grooms named any other way (the
+ * fixture's, a custom export) have no known length.
  */
 export function hairLength(id: string): HairLength | undefined {
   const name = id.slice(id.lastIndexOf('.') + 1);
   const code = /^Hair_([SML])_/.exec(name)?.[1];
-  return code ? CODES[code] : undefined;
+  return code ? CODES[code] : FAB_LENGTHS[name];
 }
