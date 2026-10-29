@@ -17,7 +17,6 @@ import {
   TOE_REINFORCED,
   LEG_HEIGHT,
   LEG_JOINTS,
-  SOCK_THICKNESS,
   SOCK_TOE_NORMAL,
   SOCK_TOE_OFFSET,
   TOE_WEIGHT,
@@ -245,12 +244,10 @@ describe('setSocks', () => {
     expect(uniforms.skinSockNylon.value).toBe(1);
     expect(uniforms.skinSockNude.value).toBe(1);
     expect(uniforms.skinSockToes.value).toBe(1);
-    expect(uniforms.skinSockThickness.value).toBe(SOCK_THICKNESS.nylon);
     setSocks([material], null);
     expect(uniforms.skinSockTop.value).toBe(-1);
     expect(uniforms.skinSockNylon.value).toBe(0);
     expect(uniforms.skinSockNude.value).toBe(0);
     expect(uniforms.skinSockToes.value).toBe(0);
-    expect(uniforms.skinSockThickness.value).toBe(0);
   });
 });

@@ -11,7 +11,16 @@ import {
   useRef,
   use,
 } from 'react';
-import type { Camera, Group, Material, Mesh, Object3D, Scene, WebGLRenderTarget } from 'three';
+import type {
+  Camera,
+  Group,
+  Material,
+  Mesh,
+  Object3D,
+  Scene,
+  SkinnedMesh,
+  WebGLRenderTarget,
+} from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
@@ -70,6 +79,7 @@ import {
   loadIrisTextures,
   loadSkinTextures,
 } from './skinTextures';
+import { takeOffCuff, wearCuff } from './sockCuff';
 import { applySockToes, ensureLegHeights, loadSockToes, setSocks, type SockWear } from './socks';
 import { texturesIn, uploadTextures, warmUp, watchSceneTarget } from './warmUp';
 import { compileWrinkleTable, computeWrinkleWeights, type AnimatedMaps } from './wrinkles';
@@ -517,6 +527,29 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   const wornOutfits = useRef<WornOutfit[]>([]);
   // Lifts the character onto its shoes' soles (the bare feet stand on the floor).
   const stand = useRef<Group>(null);
+  // The sock's edge as geometry (see ./sockCuff.ts): rebuilt when the socks change
+  // length and whenever the garments change which skin they hide.
+  const latestSocks = useRef(socks);
+  useLayoutEffect(() => {
+    latestSocks.current = socks;
+  }, [socks]);
+  const cuff = useRef<SkinnedMesh | null>(null);
+  const refitCuff = useCallback(
+    (release = false) => {
+      takeOffCuff(cuff.current);
+      cuff.current = null;
+      const wear = latestSocks.current;
+      const body = assembled.handle.body.mesh;
+      // A bottom covers the waistband of tights, and the garments' masks stop a few
+      // centimetres short of their waist: the band would show through tight cloth.
+      const worn = new Set(wornOutfits.current.map((outfit) => outfit.category));
+      const waistCovered = wear?.fabric === 'nylon' && (worn.has('bottom') || worn.has('full'));
+      if (wear && !release && !waistCovered) {
+        cuff.current = wearCuff(body, wear, body.parent ?? assembled.root);
+      }
+    },
+    [assembled],
+  );
   const swapOutfits = useCallback(
     (next: WornOutfit[], release = false) => {
       const body = assembled.handle.body;
@@ -551,8 +584,9 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         top: underwearTop && !full && !worn.has('top'),
         bottom: !full && !worn.has('bottom'),
       });
+      refitCuff(release);
     },
-    [assembled, underwearTop],
+    [assembled, underwearTop, refitCuff],
   );
   useEffect(() => () => swapOutfits([], true), [swapOutfits]);
   useEffect(() => {
@@ -561,6 +595,11 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   useEffect(() => {
     setSocks(assembled.skins, socks);
   }, [assembled, socks]);
+  const cuffKey = socks ? `${socks.top}@${socks.cuff}@${socks.fabric}` : '';
+  useEffect(() => {
+    refitCuff();
+  }, [refitCuff, cuffKey]);
+  useEffect(() => () => refitCuff(true), [refitCuff]);
   // Until the file is in, socks are drawn over the bare toes.
   const wearsSocks = socks !== null;
   useEffect(() => {

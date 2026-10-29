@@ -250,11 +250,7 @@ export function sockWear(socks: CharacterConfig['socks'], base: CharacterBase): 
 export const FINEST_OPACITY = 0.22;
 /** How much of the skin the reinforced toe of tights hides, however sheer the rest. */
 export const TOE_REINFORCED = 0.92;
-/**
- * How far (m) the fabric stands off the skin: knit is a layer of its own, so its
- * edge steps up from the leg; nylon is close to a film.
- */
-export const SOCK_THICKNESS = { cotton: 0.0015, nylon: 0.0004 } as const;
+
 /**
  * Sheerness eases in: halfway down the slider tights still read as tights
  * (about 70 % cover), the fine end is a veil.
@@ -301,8 +297,6 @@ export interface SockUniforms {
   skinSockNude: { value: number };
   /** How much of the toe envelope applies (0 without socks, see SOCK_TOE_OFFSET). */
   skinSockToes: { value: number };
-  /** The fabric's stand-off from the skin (m, see SOCK_THICKNESS). */
-  skinSockThickness: { value: number };
 }
 
 export function createSockUniforms(): SockUniforms {
@@ -314,7 +308,6 @@ export function createSockUniforms(): SockUniforms {
     skinSockNylon: { value: 0 },
     skinSockNude: { value: 0 },
     skinSockToes: { value: 0 },
-    skinSockThickness: { value: 0 },
   };
 }
 
@@ -330,7 +323,6 @@ export function setSocks(materials: readonly Material[], wear: SockWear | null):
     uniforms.skinSockNylon.value = wear?.fabric === 'nylon' ? 1 : 0;
     uniforms.skinSockNude.value = wear?.nude ? 1 : 0;
     uniforms.skinSockToes.value = wear ? 1 : 0;
-    uniforms.skinSockThickness.value = wear ? SOCK_THICKNESS[wear.fabric] : 0;
   }
 }
 
@@ -342,8 +334,6 @@ attribute vec3 ${SOCK_TOE_OFFSET};
 attribute vec3 ${SOCK_TOE_NORMAL};
 attribute float ${TOE_WEIGHT};
 uniform float skinSockToes;
-uniform float skinSockTop;
-uniform float skinSockThickness;
 varying float vLegHeight;
 varying float vToeWeight;
 #endif
@@ -354,10 +344,6 @@ export const SOCKS_VERTEX = /* glsl */ `
   vLegHeight = ${LEG_HEIGHT};
   vToeWeight = ${TOE_WEIGHT};
   transformed += ${SOCK_TOE_OFFSET} * skinSockToes;
-  // The fabric stands off the skin, so its edge is a step: every covered vertex moves
-  // out along its bind-pose normal (the row the edge crosses ramps up to it).
-  vec3 sockOut = normalize( normal + ${SOCK_TOE_NORMAL} * skinSockToes );
-  transformed += sockOut * skinSockThickness * step( ${LEG_HEIGHT}, skinSockTop );
 #endif
 `;
 export const SOCKS_NORMAL_VERTEX = /* glsl */ `
