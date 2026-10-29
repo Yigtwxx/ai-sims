@@ -62,6 +62,47 @@ test.describe('creator options (fixture manifest)', () => {
     }
   });
 
+  test('socks sit with the shoes, and only women get tights', async ({ page }) => {
+    test.setTimeout(120_000);
+    await openCreator(page);
+    const s = c.outfit.socks;
+    const lengths = (panel: Locator) =>
+      panel.getByRole('radiogroup', { name: s.lengthLabel, exact: true });
+
+    let panel = await openCategory(page, c.categories.outfit);
+    const slots = panel.getByRole('radiogroup', { name: c.outfit.slotsLabel, exact: true });
+    await slots.getByRole('radio', { name: c.outfit.slots.shoes, exact: true }).click();
+    expect(await radioNames(lengths(panel))).toEqual(
+      [s.lengths.none, s.lengths.ankle, s.lengths.knee, s.lengths.tights].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    );
+    await expect(lengths(panel).getByRole('radio', { checked: true })).toHaveAccessibleName(
+      s.lengths.none,
+    );
+    await expect(panel.getByRole('slider', { name: s.sheer })).toHaveCount(0);
+
+    await lengths(panel).getByRole('radio', { name: s.lengths.tights, exact: true }).click();
+    await expect(panel.getByRole('slider', { name: s.sheer })).toBeVisible();
+    await expect(
+      panel.getByRole('radiogroup', { name: s.tightsColor, exact: true }).getByRole('radio', {
+        checked: true,
+      }),
+    ).toHaveAccessibleName(c.colors.nude);
+
+    // A man's base has no tights: they come off with the switch.
+    await chooseBase(page, 'male');
+    panel = await openCategory(page, c.categories.outfit);
+    await panel
+      .getByRole('radiogroup', { name: c.outfit.slotsLabel, exact: true })
+      .getByRole('radio', { name: c.outfit.slots.shoes, exact: true })
+      .click();
+    await expect(lengths(panel).getByRole('radio', { name: s.lengths.tights })).toHaveCount(0);
+    await expect(lengths(panel).getByRole('radio', { checked: true })).toHaveAccessibleName(
+      s.lengths.none,
+    );
+  });
+
   test('skins follow the base gender and an off-gender pick is replaced', async ({ page }) => {
     test.setTimeout(120_000);
     await openCreator(page);

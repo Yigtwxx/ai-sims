@@ -299,7 +299,24 @@
       "comingSoon": "The wardrobe is on its way.",
       "comingSoonBody": "Clothes appear here once they are exported into the library. Until then the character wears the MetaHuman base outfit.",
       "colorsHint": "Paint this part of the garment any colour.",
-      "colorways": "{count, plural, one {# colourway} other {# colourways}}"
+      "colorways": "{count, plural, one {# colourway} other {# colourways}}",
+      "socks": {
+        "title": "Socks",
+        "lengthLabel": "Sock length",
+        "lengths": {
+          "none": "None",
+          "ankle": "Ankle",
+          "knee": "Knee-high",
+          "tights": "Tights"
+        },
+        "hint": "Shown on bare feet and above the shoes; trousers cover them.",
+        "color": "Sock colour",
+        "tightsColor": "Tights colour",
+        "nudeHint": "Nude tights take on the skin tone.",
+        "sheer": "Sheerness",
+        "opaque": "Opaque",
+        "fine": "Sheer"
+      }
     },
     "jewelry": {
       "count": "{count}/{max} pieces",

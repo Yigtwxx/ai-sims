@@ -299,7 +299,24 @@
       "comingSoon": "Gardırop hazırlanıyor.",
       "comingSoonBody": "Kıyafetler dışa aktarılıp kütüphaneye eklenince burada görünecek. Şimdilik karakter MetaHuman taban kıyafetiyle görünür.",
       "colorsHint": "Kıyafetin bu bölümünü istediğin renge boya.",
-      "colorways": "{count} renk"
+      "colorways": "{count} renk",
+      "socks": {
+        "title": "Çorap",
+        "lengthLabel": "Çorap boyu",
+        "lengths": {
+          "none": "Yok",
+          "ankle": "Bilek",
+          "knee": "Diz altı",
+          "tights": "Külotlu"
+        },
+        "hint": "Çıplak ayakta ve ayakkabının üstünde görünür; pantolonun altında kalır.",
+        "color": "Çorap rengi",
+        "tightsColor": "Külotlu rengi",
+        "nudeHint": "Ten rengi külotlu cildin tonunu alır.",
+        "sheer": "Şeffaflık",
+        "opaque": "Opak",
+        "fine": "İnce"
+      }
     },
     "jewelry": {
       "count": "{count}/{max} parça",

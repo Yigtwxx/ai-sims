@@ -13,6 +13,7 @@ import { OptionList } from '../ui/OptionList';
 import { ChipRadio, Hint, Section, SwatchPicker } from '../ui/controls';
 
 import { useConfig, useLabel, type PanelProps } from './shared';
+import { SocksSection } from './SocksSection';
 
 /** The first colour value of a tint preset, used as its swatch. */
 const tintColor = (values: Record<string, string | number>) => {
@@ -161,6 +162,8 @@ export function OutfitPanel({ manifest, slot, onSlotChange }: OutfitPanelProps) 
             </Section>
           ))
         : null}
+
+      {slot === 'shoes' ? <SocksSection /> : null}
     </>
   );
 }
