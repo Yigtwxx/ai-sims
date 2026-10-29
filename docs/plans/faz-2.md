@@ -4,6 +4,8 @@
 > Her adım tek başına biter: doğrulama, commit, push. Yarım adım push'lanmaz. Oturum kesilirse yenisi ilk açık kutudan devam eder.
 > Süreler saat. "Tahmin" plan anındaki kaba tahmin, "Gerçek" adım bitince yazılır.
 > Kullanıcı 2026-10-29'da yalnız 2a'yı istedi ("faz 2 a yı yap sadece"). 2b-2e sırası gelince adımlara bölünür.
+> Sıra değişti (kullanıcı kararı, 2026-10-29): 2a'dan sonra **2e** ("evet 2e yi yap sadece"), sonra 2b → 2c → 2d. 2e'nin teknik bir bağımlılığı yok: 2b ile aynı cilt shader'ına dokunur, şortlar (2d) gelince uzun çorap bir kez kontrol edilir.
+> Yeniden tahmin (2026-10-29, Faz 1 ve 2a'nın gerçek sürelerinden): 2b ~6, 2c ~1.5, 2d ~7, 2e ~2.5; kalan ~17 sa (aralık 12-25).
 
 **Hedef (2a):** Göz panelindeki ton ve Yüz panelindeki karıştırma sahnede çalışıyor; karışık yüz konuşurken dudak senkronu ve göz kırpma bozulmuyor.
 
@@ -67,6 +69,33 @@ Sırası gelince adımlara bölünür.
 
 Sırası gelince adımlara bölünür.
 
-## 2e — Çorap ve külotlu (A4.5), tahmin ~12
+## 2e — Çorap ve külotlu (A4.5), tahmin ~12 (yeniden ~2.5)
 
-Sırası gelince adımlara bölünür.
+**Hedef:** Ayakkabı bölümünde çorap boyu (yok, bilek, diz altı, külotlu), rengi ve külotluda şeffaflık seçiliyor. Çorap çıplak ayakta ve ayakkabının üstünde görünüyor, giysinin ve ayakkabının altında çizilmiyor, kaydırıcılarla bozulmuyor.
+
+**Mimari:** Yalnız web. Mesh yok, cilt shader'ında gövde katmanı (iç çamaşırının yanında, ondan sonra çizilir). `docs/todo.md` A4.5'teki "gövde UV'sinde script'le maske" yerine **kesim nötr gövdenin yüksekliğinden**: gövdenin `position` özniteliği kaydırıcısız gövdedir (kaydırıcılar morph), yani her vertex'in dinlenme yüksekliği anatomik bir koordinattır. Ölçüm (2026-10-29, `bodies/*/body.glb`): metre, Y yukarı, ayak tabanı y≈0; kadın ayak bileği eklemi 0.076, diz 0.459, `spine_01` 0.92; erkek 0.085, 0.486, 0.956. Bacaklar UV'de dikey (dv/dy ≈ 0.65 UV/m), çevre de ~0.65 UV/m. A-pozunda eller bel hizasında (kadın `hand_l` y 0.958): kesim düzlemi kolları da keserdi, bu yüzden ağırlığının yarısından fazlası kol zincirinde olan vertex'ler (`clavicle|upperarm|lowerarm|hand|thumb|index|middle|ring|pinky`, `*toe*` hariç) katmanın dışında kalır. Doku dosyası, pipeline ve R2 yükü yok; kesim kenarı üçgen içinde doğrusal ve `fwidth` ile kenar yumuşatılır.
+
+### Genel kısıtlar
+
+- Şema v2 → v3 (`CURRENT_SCHEMA_VERSION`), migration v2'ye `socks: { style: 'none', ... }` yazar; v1 → v3 de çalışır.
+- Külotlu çorap yalnız kadın gövdede; erkekte `reconcileConfig` onu `none` yapar. Gövde değişince çorap seçimi taşınır.
+- Renk ve şeffaflık değişimi yeniden derleme ve yeniden kurulum istemez (uniform). Çorap karakter anahtarına girmez.
+- UI metinleri `web/messages/{tr,en}.json`; renk adları `Creator.colors`.
+
+- [ ] **2e.1 Şema v3 ve migration.** Tahmin 0.5
+  - `schema.ts`: `SOCK_STYLES = ['none', 'ankle', 'knee', 'tights']`, `socks: { style, color: #RRGGBB, sheer: 0..1 }` (0 opak, 1 en ince). `defaults.ts`: `none`, siyah, 0.5.
+  - `legacy.ts`: `CharacterConfigV2Schema` (v3'ün `socks`'suz hali, `schemaVersion: 2`); `migrations.ts`: v2 → v3, v1 → v2 → v3.
+  - `reconcile.ts`: erkek + külotlu → `none`. `store.ts` `setBase`: `socks` taşınır.
+  - Testler: şema, migration (v2 ve v1 belgesi), reconcile; `repository.test.ts` artık 3 bekler.
+- [ ] **2e.2 Shader katmanı ve sahne.** Tahmin 1
+  - Yeni `web/src/features/avatar/mh/socks.ts`: `legHeights()` (dinlenme y'si, kolda büyük değer), `ensureLegHeights(body)` (paylaşılan geometriye bir kez), `sockWear()` (stil + cinsiyet → kesim, manşet, kumaş), GLSL parçaları, `createSockUniforms()`, `setSocks()`.
+  - `materials.ts`: `SkinTuning.socks` (yalnız gövde). Harita aşamasında iç çamaşırından sonra renk; pürüzlülük, speküler ve sheen kumaşa; SSS sarma ve saçılma kumaşın altında söner; normal: opak çorapta örgü (manşette dikey fitil), ince külotluda cildin normali kalır ama gözenekler kapanır; manşetin hemen üstündeki deride ince bir lastik gölgesi.
+  - Külotlu: opaklık `mix(1 - 0.75·sheer, 1, (1 - N·V)²)`, yani kenarda koyulaşır; bel bandı opak.
+  - `resolve.ts`: `socks: SockWear | null`; `MhCharacter` prop'u (uniform, irisTint gibi); `MhStage` geçirir. `/dev/stage`'e çorap seçici.
+  - Testler: kol maskesi ve yükseklikler (sentetik geometri), `sockWear`, CPU aynası (kenar, manşet, şeffaflık), shader enjeksiyonu.
+- [ ] **2e.3 Panel.** Tahmin 0.5
+  - `OutfitPanel`: Ayakkabı bölümünde "Çorap": boy seçici (`ChipRadio`; erkekte külotlu yok), renkler (çorap: siyah, beyaz, gri melanj, lacivert, bej, bordo; külotlu: ten rengi, siyah, lacivert, antrasit), külotluda şeffaflık kaydırıcısı (Opak ↔ İnce). Boy değişince renk o boyun paletinde değilse paletin ilkine geçer.
+  - `palettes.ts`: `SOCK_COLORS`, `TIGHTS_COLORS`; yeni renk adları (`greyMelange`, `beige`, `nude`).
+- [ ] **2e.4 Doğrulama ve yayın.** Tahmin 0.5
+  - `/dev/stage`: kadın ve erkek; çıplak ayak, ayakkabı, etek + külotlu (ince ve opak, ten ve siyah), pantolon (çorap görünmüyor), kaydırıcı uçları, idle ve konuşma. Oluşturucu: seçim, undo, autosave, kayıt, konuşma ekranı.
+  - `pnpm typecheck && pnpm lint && pnpm test`; `docs/todo.md` A4.5 `[x]`, handoff "Durum"; commit + push.

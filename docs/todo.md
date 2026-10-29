@@ -48,6 +48,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 8e | Son kontrol | D2 | ~5 |
   | **Toplam** | 37 alt faz | | | **~480** (1 subagent'la ~335) |
 
+  - **Sıra istisnası** (kullanıcı kararı, 2026-10-29): Faz 2'de 2a'dan sonra 2e yapılır, sonra 2b → 2c → 2d. Gerekçe ve yeni tahminler `docs/plans/faz-2.md`'nin başında.
   - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): fazlar yukarıdaki tablodaki alt fazlara bölünmüştür (1a, 1b, ...) ve alt fazlar tablodaki sırayla yapılır. Her fazın başında oturum her alt fazı adımlara böler ve `docs/plans/faz-<n>.md` dosyasına alt faz başlıklarıyla yazar (`superpowers:writing-plans`).
     - Bir alt adım en çok ~4-6 saatlik iştir ve kendi başına bitebilir: doğrulama, commit, push. Yarım alt adım push'lanmaz.
     - Plan dosyasında her adımın kutusu, tahmini süresi ve gerçek süresi tutulur. Gerçek süreler sonraki fazların tahminlerini düzeltir; bu dosyadaki faz saatleri de güncellenir.
