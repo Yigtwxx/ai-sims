@@ -9,6 +9,7 @@ import type { Rgb } from './hairColor';
 import type { HairLook } from './hairMaterial';
 import type { MocapLayer } from './motion';
 import type { OutfitWear } from './outfits';
+import { sockWear, type SockWear } from './socks';
 
 /** Standing heights (m) of the neutral MetaHuman bodies (pipeline bodies job). */
 export const BASE_HEIGHT = { female: 1.66, male: 1.78 } as const;
@@ -53,6 +54,8 @@ export interface ResolvedCharacter {
   outfits: OutfitWear[];
   /** The body wears an underwear top where no top covers it (the female body). */
   underwearTop: boolean;
+  /** Socks or tights on the body skin, or null. */
+  socks: SockWear | null;
   /** Face loops under the live face: the idle loop and a happy loop for the smile. */
   faceClips: { idle: string | null; smile: string | null };
   /** Approximate standing height (m), for camera framing. */
@@ -106,6 +109,7 @@ export function resolveCharacter(
     grooms: groomWears(config, manifest),
     outfits: outfitWears(config, manifest),
     underwearTop: gender === 'female',
+    socks: sockWear(config.socks, gender),
     faceClips: faceClipSet(manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };

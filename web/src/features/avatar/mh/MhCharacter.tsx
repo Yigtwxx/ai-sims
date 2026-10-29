@@ -70,6 +70,7 @@ import {
   loadIrisTextures,
   loadSkinTextures,
 } from './skinTextures';
+import { ensureLegHeights, setSocks, type SockWear } from './socks';
 import { texturesIn, uploadTextures, warmUp, watchSceneTarget } from './warmUp';
 import { compileWrinkleTable, computeWrinkleWeights, type AnimatedMaps } from './wrinkles';
 
@@ -137,6 +138,8 @@ export interface MhCharacterProps {
   prewarm?: boolean;
   /** The body wears an underwear top where no top covers it (women); briefs always. */
   underwearTop?: boolean;
+  /** Socks or tights drawn on the leg skin (see ./socks.ts); needs no reload. */
+  socks?: SockWear | null;
 }
 
 /**
@@ -166,6 +169,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     onUnsettled,
     prewarm = false,
     underwearTop = false,
+    socks = null,
   },
   ref,
 ) {
@@ -208,6 +212,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     const extras = mhExtras(bodyGltf.scene, bodyGltf.parser.json as { extras?: unknown });
     const headExtras = mhExtras(headGltf.scene, headGltf.parser.json as { extras?: unknown });
     const body = createBodyRig(bodyRoot, (extras.body_joint_deltas ?? {}) as JointDeltas);
+    ensureLegHeights(body.mesh);
     // Read before attachHead moves the face-only bones under the body's.
     const headBones = [...collectBones(headRoot).values()];
     const headMeshes = attachHead(headRoot, body);
@@ -550,6 +555,9 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   useEffect(() => {
     if (assembled) setSkinTone(assembled.skins, skinTone);
   }, [assembled, skinTone]);
+  useEffect(() => {
+    setSocks(assembled.skins, socks);
+  }, [assembled, socks]);
   const [tintR, tintG, tintB] = irisTint?.color ?? [];
   const tintReference = irisTint?.reference;
   useEffect(() => {

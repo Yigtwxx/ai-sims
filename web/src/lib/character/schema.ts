@@ -30,6 +30,12 @@ export const HAIR_PATTERNS = ['none', 'ombre', 'roots', 'highlights', 'underlaye
 /** Sock lengths: ankle, below the knee, or tights from the waist (women only). */
 export const SOCK_STYLES = ['none', 'ankle', 'knee', 'tights'] as const;
 
+/**
+ * Nude tights: in this colour tights take on the wearer's own skin tone, as
+ * nude tights are bought to match it. The swatch only stands for it.
+ */
+export const NUDE_TIGHTS_COLOR = '#c49a80';
+
 const Id = z.string().min(1).max(120);
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Expected a #RRGGBB hex color');
 const UnitIntervalSchema = z.number().min(0).max(1);

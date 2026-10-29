@@ -6,6 +6,8 @@
  * the messages (`Creator.colors.<key>`).
  */
 
+import { NUDE_TIGHTS_COLOR } from '@/lib/character/schema';
+
 export interface NamedColor {
   key: ColorKey;
   value: string;
@@ -37,6 +39,9 @@ export const COLOR_KEYS = [
   'cognac',
   'wine',
   'stone',
+  'greyMelange',
+  'beige',
+  'nude',
 ] as const;
 
 export type ColorKey = (typeof COLOR_KEYS)[number];
@@ -86,6 +91,24 @@ export const GARMENT_COLORS: readonly NamedColor[] = [
   named('cognac', '#7a4223'),
   named('wine', '#5b2430'),
   named('stone', '#c9b79a'),
+];
+
+/** Socks: the everyday knit colours. */
+export const SOCK_COLORS: readonly NamedColor[] = [
+  named('black', '#1b1b1d'),
+  named('white', '#ecebe6'),
+  named('greyMelange', '#9b9b98'),
+  named('navy', '#22304a'),
+  named('beige', '#cdb99a'),
+  named('burgundy', '#5e1f2b'),
+];
+
+/** Tights: nude (the wearer's own tone, see NUDE_TIGHTS_COLOR) and the dark office shades. */
+export const TIGHTS_COLORS: readonly NamedColor[] = [
+  named('nude', NUDE_TIGHTS_COLOR),
+  named('black', '#141416'),
+  named('navy', '#1d2638'),
+  named('charcoal', '#33353a'),
 ];
 
 /**

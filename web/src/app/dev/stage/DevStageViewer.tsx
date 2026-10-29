@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MhStage } from '@/features/avatar/mh/MhStage';
 import type { QualityPreference } from '@/features/avatar/quality';
 import { fetchSpeechClip, speechScript, type SpeechScript } from '@/features/chat/ttsClient';
-import { EYE_TINTS } from '@/features/creator/palettes';
+import { EYE_TINTS, SOCK_COLORS, TIGHTS_COLORS } from '@/features/creator/palettes';
 import { outfitsFor } from '@/features/creator/reconcile';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import {
@@ -94,6 +94,9 @@ export function DevStageViewer() {
   // One slider pushed to an end ('hips:1'), for checking how garments follow the body.
   const [body, setBody] = useState('');
   const [eyeTint, setEyeTint] = useState('');
+  // 'knee:#22304a', or '' for none.
+  const [socks, setSocks] = useState('');
+  const [sheer, setSheer] = useState(0.6);
   const [blendFace, setBlendFace] = useState('');
   const [blendWeight, setBlendWeight] = useState(0.5);
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
@@ -116,6 +119,10 @@ export function DevStageViewer() {
     value.mustache.style = styles.mustache || null;
     value.outfit = outfit;
     value.eyes.color = eyeTint || null;
+    if (socks) {
+      const [style, color] = socks.split(':') as [CharacterConfig['socks']['style'], string];
+      value.socks = { style, color, sheer };
+    }
     if (blendFace) value.face.blend = { [blendFace]: blendWeight };
     if (body) {
       const [slider, end] = body.split(':');
@@ -132,6 +139,8 @@ export function DevStageViewer() {
     outfit,
     body,
     eyeTint,
+    socks,
+    sheer,
     blendFace,
     blendWeight,
   ]);
@@ -286,6 +295,32 @@ export function DevStageViewer() {
               </option>
             ))}
           </select>
+          socks
+          <select data-testid="socks" value={socks} onChange={(e) => setSocks(e.target.value)}>
+            <option value="">none</option>
+            {(['ankle', 'knee'] as const).flatMap((style) =>
+              SOCK_COLORS.map((color) => (
+                <option key={`${style}:${color.key}`} value={`${style}:${color.value}`}>
+                  {style} {color.key}
+                </option>
+              )),
+            )}
+            {TIGHTS_COLORS.map((color) => (
+              <option key={`tights:${color.key}`} value={`tights:${color.value}`}>
+                tights {color.key}
+              </option>
+            ))}
+          </select>
+          <input
+            data-testid="sheer"
+            type="number"
+            min={0}
+            max={1}
+            step={0.1}
+            value={sheer}
+            onChange={(e) => setSheer(Number(e.target.value))}
+            className="w-14"
+          />
           body
           <select data-testid="body" value={body} onChange={(e) => setBody(e.target.value)}>
             <option value="">neutral</option>

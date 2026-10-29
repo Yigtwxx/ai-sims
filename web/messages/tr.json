@@ -482,7 +482,10 @@
       "olive": "Haki",
       "cognac": "Konyak",
       "wine": "Şarap",
-      "stone": "Taş"
+      "stone": "Taş",
+      "greyMelange": "Gri melanj",
+      "beige": "Bej",
+      "nude": "Ten rengi"
     },
     "loadingCharacter": "Karakter sahneye hazırlanıyor",
     "updatingCharacter": "Değişiklik sahneye geliyor",

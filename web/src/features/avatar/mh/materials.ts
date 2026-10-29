@@ -18,6 +18,18 @@ import { assetUrl } from '@/lib/assets/manifest';
 import { BODY_HIDDEN } from './garments';
 import { createGroomDensityUniforms } from './groomDensity';
 import { skinToneGain } from './skinTone';
+import {
+  SOCKS,
+  SOCKS_NORMAL,
+  SOCKS_PARS,
+  SOCKS_ROUGHNESS,
+  SOCKS_SHEEN,
+  SOCKS_SPECULAR,
+  SOCKS_VERTEX,
+  SOCKS_VERTEX_PARS,
+  createSockUniforms,
+  type SockUniforms,
+} from './socks';
 import { WRINKLE_MASK_LAYERS, WRINKLE_WEIGHT_COUNT } from './wrinkles';
 
 /**
@@ -30,7 +42,8 @@ import { WRINKLE_MASK_LAYERS, WRINKLE_WEIGHT_COUNT } from './wrinkles';
  *  - a tiled micro-normal for pore detail up close,
  *  - a faint sheen for peach fuzz at grazing angles,
  *  - on the head, wrinkle normals (wm1..wm3) blended in where RigLogic's
- *    region masks are active (see ./wrinkles.ts).
+ *    region masks are active (see ./wrinkles.ts),
+ *  - on the body, the underwear and socks drawn over the bare skin (./socks.ts).
  */
 
 export interface SkinDetail {
@@ -64,6 +77,8 @@ export interface SkinTuning {
    * one map (the head, which has one sampler unit left).
    */
   underwear: 'cloth' | 'straps' | null;
+  /** Draw socks or tights over the legs by their rest height (body only, see ./socks.ts). */
+  socks: boolean;
 }
 
 export const HEAD_SKIN: SkinTuning = {
@@ -76,6 +91,7 @@ export const HEAD_SKIN: SkinTuning = {
   groomDensity: true,
   bodyHide: false,
   underwear: 'straps',
+  socks: false,
 };
 
 export const BODY_SKIN: SkinTuning = {
@@ -85,6 +101,7 @@ export const BODY_SKIN: SkinTuning = {
   groomDensity: false,
   bodyHide: true,
   underwear: 'cloth',
+  socks: true,
 };
 
 const DIFFUSE_LINE =
@@ -96,6 +113,10 @@ const NORMAL_SCALE_LINE = 'mapN.xy *= normalScale;';
 const SCATTER = /* glsl */ `
   float skinWrapNL = saturate( ( dot( geometryNormal, directLight.direction ) + skinWrap ) / ( 1.0 + skinWrap ) );
   vec3 skinScatter = skinScatterColor * max( skinWrapNL - dotNL, 0.0 ) * directLight.color;
+  #ifdef MH_SOCKS
+  // Light does not scatter through cloth: Lambert where it hides the skin.
+  skinScatter *= 1.0 - sockCloth;
+  #endif
   reflectedLight.directDiffuse += ( irradiance + skinScatter ) * BRDF_Lambert( material.diffuseContribution ) * ( 1.0 - F );
 `;
 // SRMF red is Unreal's "Specular" (0.5 = the default F0 of 0.04), from the
@@ -405,6 +426,7 @@ export function createSkinMaterial(
         skinUnderwearShow: { value: new Vector2(0, 0) },
       }
     : null;
+  const socks: SockUniforms | null = tuning.socks ? createSockUniforms() : null;
   material.defines = {
     // Three's own (STANDARD, PHYSICAL): without PHYSICAL the shader has no
     // specular level at all, every texel at F0 0.04.
@@ -415,24 +437,35 @@ export function createSkinMaterial(
     ...(underwear ? { MH_UNDERWEAR: '' } : {}),
     ...(tuning.underwear === 'cloth' ? { MH_UNDERWEAR_CLOTH: '' } : {}),
     ...(tuning.underwear === 'straps' ? { MH_UNDERWEAR_STRAPS: '' } : {}),
+    ...(socks ? { MH_SOCKS: '' } : {}),
   };
   material.userData.skinUniforms = uniforms;
   material.userData.wrinkleUniforms = wrinkles;
   material.userData.groomDensityUniforms = density;
   material.userData.underwearUniforms = underwear;
+  material.userData.sockUniforms = socks;
   material.userData.skinTuning = tuning;
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms, wrinkles ?? {}, density ?? {}, underwear ?? {});
+    Object.assign(
+      shader.uniforms,
+      uniforms,
+      wrinkles ?? {},
+      density ?? {},
+      underwear ?? {},
+      socks ?? {},
+    );
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
         `#include <common>
-${BODY_HIDE_VERTEX_PARS}`,
+${BODY_HIDE_VERTEX_PARS}
+${SOCKS_VERTEX_PARS}`,
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
-${BODY_HIDE_VERTEX}`,
+${BODY_HIDE_VERTEX}
+${SOCKS_VERTEX}`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -451,13 +484,18 @@ ${BODY_HIDE_FRAGMENT}`,
           'uniform float skinMicroStrength;',
           GROOM_DENSITY_PARS,
           UNDERWEAR_PARS,
+          SOCKS_PARS,
           BODY_HIDE_FRAGMENT_PARS,
         ].join('\n'),
       )
-      .replace('#include <map_fragment>', `#include <map_fragment>\n${GROOM_DENSITY}\n${UNDERWEAR}`)
+      // Socks after the underwear: tights are worn over the briefs.
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>\n${GROOM_DENSITY}\n${UNDERWEAR}\n${SOCKS}`,
+      )
       .replace(
         '#include <roughnessmap_fragment>',
-        `#include <roughnessmap_fragment>\n${GROOM_ROUGHNESS}`,
+        `#include <roughnessmap_fragment>\n${GROOM_ROUGHNESS}\n${SOCKS_ROUGHNESS}`,
       )
       // After the normal map uniforms it reads (normalScale, vNormalMapUv).
       .replace(
@@ -470,21 +508,21 @@ ${BODY_HIDE_FRAGMENT}`,
       )
       .replace(
         '#include <lights_physical_fragment>',
-        ShaderChunk.lights_physical_fragment.replace(
+        `${ShaderChunk.lights_physical_fragment.replace(
           F90_LINE,
-          `${SPECULAR_FROM_RED}${GROOM_SPECULAR}${F90_CLAMPED}`,
-        ),
+          `${SPECULAR_FROM_RED}${GROOM_SPECULAR}${SOCKS_SPECULAR}${F90_CLAMPED}`,
+        )}\n${SOCKS_SHEEN}`,
       )
       .replace(
         '#include <normal_fragment_maps>',
         ShaderChunk.normal_fragment_maps.replace(
           NORMAL_SCALE_LINE,
-          `${MICRO_NORMAL}\n${UNDERWEAR_NORMAL}`,
+          `${MICRO_NORMAL}\n${UNDERWEAR_NORMAL}\n${SOCKS_NORMAL}`,
         ),
       );
   };
   material.customProgramCacheKey = () =>
-    `mh-skin-v8${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}${tuning.bodyHide ? '-hide' : ''}${tuning.underwear ? `-underwear-${tuning.underwear}` : ''}`;
+    `mh-skin-v9${wrinkles ? '-wrinkles' : ''}${density ? '-density' : ''}${tuning.bodyHide ? '-hide' : ''}${tuning.underwear ? `-underwear-${tuning.underwear}` : ''}${socks ? '-socks' : ''}`;
   return material;
 }
 

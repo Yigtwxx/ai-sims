@@ -482,7 +482,10 @@
       "olive": "Olive",
       "cognac": "Cognac",
       "wine": "Wine",
-      "stone": "Stone"
+      "stone": "Stone",
+      "greyMelange": "Grey marl",
+      "beige": "Beige",
+      "nude": "Nude"
     },
     "loadingCharacter": "Bringing your character on stage",
     "updatingCharacter": "Bringing your change on stage",

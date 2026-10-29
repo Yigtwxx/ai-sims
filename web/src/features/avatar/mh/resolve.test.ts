@@ -352,6 +352,18 @@ describe('iris tint', () => {
   });
 });
 
+describe('socks', () => {
+  it('wears none by default and the configured length for the body', () => {
+    const config = createDefaultConfig('female');
+    expect(resolveCharacter(config, manifest)?.socks).toBeNull();
+    config.socks = { style: 'tights', color: '#1b1b1d', sheer: 0.7 };
+    expect(resolveCharacter(config, manifest)?.socks).toMatchObject({
+      fabric: 'nylon',
+      sheer: 0.7,
+    });
+  });
+});
+
 describe('face blend', () => {
   const blendManifest = MhManifestSchema.parse({
     ...manifest,

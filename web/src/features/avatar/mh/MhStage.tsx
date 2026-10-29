@@ -389,6 +389,7 @@ export const MhStage = memo(function MhStage({
                   grooms={character.grooms}
                   outfits={character.outfits}
                   underwearTop={character.underwearTop}
+                  socks={character.socks}
                   onFrame={incoming ? onIncomingFrame : onFrame}
                   prewarm={incoming}
                   onSettled={(handle) => slotSettled(handle, key, incoming)}
