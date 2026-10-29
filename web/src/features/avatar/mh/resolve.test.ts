@@ -362,6 +362,19 @@ describe('socks', () => {
       sheer: 0.7,
     });
   });
+
+  it("points at the body's toe envelope when the manifest has one", () => {
+    const config = createDefaultConfig('female');
+    expect(resolveCharacter(config, manifest)?.sockToesUrl).toBeNull();
+    const withToes = MhManifestSchema.parse({
+      ...manifest,
+      bodies: manifest.bodies.map((body) => ({
+        ...body,
+        socks: `bodies/${body.gender}/socks.bin`,
+      })),
+    });
+    expect(resolveCharacter(config, withToes)?.sockToesUrl).toMatch(/bodies\/female\/socks\.bin$/);
+  });
 });
 
 describe('face blend', () => {

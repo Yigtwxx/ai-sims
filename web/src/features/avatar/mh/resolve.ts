@@ -56,6 +56,8 @@ export interface ResolvedCharacter {
   underwearTop: boolean;
   /** Socks or tights on the body skin, or null. */
   socks: SockWear | null;
+  /** Where the body's toes sit inside a sock (its `socks` file), if the manifest has it. */
+  sockToesUrl: string | null;
   /** Face loops under the live face: the idle loop and a happy loop for the smile. */
   faceClips: { idle: string | null; smile: string | null };
   /** Approximate standing height (m), for camera framing. */
@@ -110,6 +112,7 @@ export function resolveCharacter(
     outfits: outfitWears(config, manifest),
     underwearTop: gender === 'female',
     socks: sockWear(config.socks, gender),
+    sockToesUrl: body.socks ? assetUrl(body.socks) : null,
     faceClips: faceClipSet(manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };

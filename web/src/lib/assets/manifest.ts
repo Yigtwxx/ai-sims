@@ -108,6 +108,11 @@ export const BODY_PRESETS = ['slim', 'average', 'athletic', 'curvy'] as const;
 export const BodySchema = z.object({
   gender: Gender,
   glb: File,
+  /**
+   * Where the toes sit inside a sock (pipeline `sock_toes.py`): per moved vertex of the
+   * body GLB an offset and a normal delta. Optional: without it socks show every toe.
+   */
+  socks: File.optional(),
   sliders: z.array(SliderSchema).min(1),
   // Zod 4 records with enum keys are exhaustive; a body may define only some presets.
   presets: z.partialRecord(z.enum(BODY_PRESETS), z.record(z.string(), z.number())),

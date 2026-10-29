@@ -70,7 +70,7 @@ import {
   loadIrisTextures,
   loadSkinTextures,
 } from './skinTextures';
-import { ensureLegHeights, setSocks, type SockWear } from './socks';
+import { applySockToes, ensureLegHeights, loadSockToes, setSocks, type SockWear } from './socks';
 import { texturesIn, uploadTextures, warmUp, watchSceneTarget } from './warmUp';
 import { compileWrinkleTable, computeWrinkleWeights, type AnimatedMaps } from './wrinkles';
 
@@ -140,6 +140,8 @@ export interface MhCharacterProps {
   underwearTop?: boolean;
   /** Socks or tights drawn on the leg skin (see ./socks.ts); needs no reload. */
   socks?: SockWear | null;
+  /** The body's toe envelope for socks, loaded the first time socks go on. */
+  sockToesUrl?: string | null;
 }
 
 /**
@@ -170,6 +172,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     prewarm = false,
     underwearTop = false,
     socks = null,
+    sockToesUrl = null,
   },
   ref,
 ) {
@@ -558,6 +561,18 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   useEffect(() => {
     setSocks(assembled.skins, socks);
   }, [assembled, socks]);
+  // Until the file is in, socks are drawn over the bare toes.
+  const wearsSocks = socks !== null;
+  useEffect(() => {
+    if (!wearsSocks || !sockToesUrl) return;
+    let live = true;
+    void loadSockToes(sockToesUrl).then((toes) => {
+      if (live && toes) applySockToes(assembled.handle.body.mesh, toes);
+    });
+    return () => {
+      live = false;
+    };
+  }, [assembled, wearsSocks, sockToesUrl]);
   const [tintR, tintG, tintB] = irisTint?.color ?? [];
   const tintReference = irisTint?.reference;
   useEffect(() => {

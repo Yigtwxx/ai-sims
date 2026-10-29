@@ -21,6 +21,7 @@ import { skinToneGain } from './skinTone';
 import {
   SOCKS,
   SOCKS_NORMAL,
+  SOCKS_NORMAL_VERTEX,
   SOCKS_PARS,
   SOCKS_ROUGHNESS,
   SOCKS_SHEEN,
@@ -114,8 +115,11 @@ const SCATTER = /* glsl */ `
   float skinWrapNL = saturate( ( dot( geometryNormal, directLight.direction ) + skinWrap ) / ( 1.0 + skinWrap ) );
   vec3 skinScatter = skinScatterColor * max( skinWrapNL - dotNL, 0.0 ) * directLight.color;
   #ifdef MH_SOCKS
-  // Light does not scatter through cloth: Lambert where it hides the skin.
-  skinScatter *= 1.0 - sockCloth;
+  // Light does not scatter red through cloth; knit fibres only soften its
+  // terminator a little (a neutral wrap; nylon none).
+  float clothWrapNL = saturate( ( dot( geometryNormal, directLight.direction ) + 0.3 ) / 1.3 );
+  vec3 clothSoft = vec3( 0.6 * ( 1.0 - skinSockNylon ) ) * max( clothWrapNL - dotNL, 0.0 ) * directLight.color;
+  skinScatter = mix( skinScatter, clothSoft, sockCloth );
   #endif
   reflectedLight.directDiffuse += ( irradiance + skinScatter ) * BRDF_Lambert( material.diffuseContribution ) * ( 1.0 - F );
 `;
@@ -466,6 +470,11 @@ ${SOCKS_VERTEX_PARS}`,
         `#include <begin_vertex>
 ${BODY_HIDE_VERTEX}
 ${SOCKS_VERTEX}`,
+      )
+      .replace(
+        '#include <beginnormal_vertex>',
+        `#include <beginnormal_vertex>
+${SOCKS_NORMAL_VERTEX}`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
