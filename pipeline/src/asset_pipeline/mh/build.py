@@ -63,6 +63,8 @@ from asset_pipeline.mh.grooms import HEADS as GROOM_HEADS
 from asset_pipeline.mh.ktx import KtxEncodeError, KtxUnavailableError
 from asset_pipeline.mh.lighting import convert_level, has_lights, list_levels, manifest_entry
 from asset_pipeline.mh.manifest import assemble, write_manifest
+from asset_pipeline.mh.mobile import INDEX_FILE as MOBILE_INDEX
+from asset_pipeline.mh.mobile import write_mobile_textures
 from asset_pipeline.mh.outfits import (
     HUG_VERSION,
     OUTFITS_VERSION,
@@ -602,6 +604,8 @@ class Builder:
         write_manifest(manifest, path, self.web)
         counts = ", ".join(f"{k} {len(v)}" for k, v in manifest.items() if isinstance(v, list))
         self.log(f"wrote   {path}  ({counts})")
+        phones = write_mobile_textures(self.web)
+        self.log(f"wrote   {self.web / MOBILE_INDEX}  ({phones})")
         return path
 
 
