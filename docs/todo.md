@@ -13,7 +13,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 1b | Saçlar | A3 → A3b | ~8 (gerçek ~9) |
   |  | 1c | Kalem etek, Blender yolu ve paketleyici | A4.0 | ~10 (gerçek 5.4) |
   |  | 1d | Oturma hataları; düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer | B5 | ~6 (gerçek ~12) |
-  | **2 Panel ve temel kıyafet** (~60 sa) | 2a | Göz tonu, yüz karıştırma | B1 → B2 | ~14 |
+  | **2 Panel ve temel kıyafet** (~60 sa) | 2a | Göz tonu, yüz karıştırma | B1 → B2 | ~14 (gerçek ~1) |
   |  | 2b | Dövme, takı | B3 → B4 | ~16 |
   |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 |
   |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 |
@@ -212,8 +212,8 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 `web/src/features/avatar/mh/resolve.ts` bu ayarların hiçbirini okumuyor. Config yazılıyor, ama sahnede bir şey değişmiyor.
 
-- [ ] **B1. Göz rengi tonu** (`eyes.color`, `EyesPanel.tsx:47`). Iris shader'ında seçilen ton uygulanır; `null` doğal renk demektir.
-- [ ] **B2. Yüz karıştırma** (`face.blend`, `FacePanel.tsx`; `randomize.ts` de yazıyor). MetaHuman kafalarının topolojisi ortak: vertex konumları, morph delta'ları (ARKit + viseme) ve kafa eklemleri (göz, çene) ağırlıkla karıştırılır. Cilt seçili kalır. C7 bu altyapıyı kullanacak. **Bitti sayılır:** karışık yüz konuşurken dudak senkronu ve göz kırpma bozulmuyor.
+- [x] **B1. Göz rengi tonu** (2026-10-29, `543687b`) (`eyes.color`, `EyesPanel.tsx:47`). Iris shader'ında seçilen ton uygulanır; `null` doğal renk demektir.
+- [x] **B2. Yüz karıştırma** (2026-10-29, `d81f1df`; ayrıntı `docs/plans/faz-2.md` 2a) (`face.blend`, `FacePanel.tsx`; `randomize.ts` de yazıyor). MetaHuman kafalarının topolojisi ortak: vertex konumları, morph delta'ları (ARKit + viseme) ve kafa eklemleri (göz, çene) ağırlıkla karıştırılır. Cilt seçili kalır. C7 bu altyapıyı kullanacak. **Bitti sayılır:** karışık yüz konuşurken dudak senkronu ve göz kırpma bozulmuyor.
 - [ ] **B3. Dövme** (`tattoos`, `schema.ts:103`, `TattooPanel.tsx`, `web/src/features/creator/tattoos.ts`). Cilt shader'ında gövde ve kafa UV'sine bir katman eklenir. Tasarımlar küçük ve ölçülü kalır; yerleşim UV'leri gövde GLB'sinden ölçülür.
 - [ ] **B4. Takı** (`accessories`, `JewelryPanel.tsx`, `web/src/features/avatar/accessories/`). Bu kod anime döneminden kalma (VRoid kulak arama vb.); MetaHuman kafa ve gövde mesh'ine ve eklemlerine bağlanır. **Bitti sayılır:** küpe, kolye ve yüzük idle ve konuşma sırasında yerinde kalıyor ve mesh'e girmiyor.
 
@@ -294,7 +294,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## Kullanıcıya sorular
 
-(Bekleyen soru yok.)
+- **B2 kaydırıcı (2026-10-29, açık):** yüz karışımı bugün kaydırıcı bırakınca ~0.5 sn'de güncelleniyor (seçenek A, uygulandı). Seçenek B: sürüklerken canlı değişsin (~+3 sa; saç ve boyun bırakınca oturur). Cevap gelirse B ayrı adım olarak yapılır.
 
 - Cevaplanan (2026-10-28, B5): açık kalan vakalar Faz 1 içinde bitirildi (kullanıcı: "faz 1i tamamen bitir").
 
