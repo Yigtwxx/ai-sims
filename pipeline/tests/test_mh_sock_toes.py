@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from asset_pipeline.mh.sock_toes import (
+    FIELD_BLUR,
     SockToes,
     envelope,
     read_sock_toes,
@@ -65,7 +66,9 @@ def test_envelope_closes_the_gap_between_two_toes() -> None:
     left = box((0.040, 0.0, 0.10), (0.050, 0.010, 0.11))
     right = box((0.053, 0.0, 0.10), (0.063, 0.010, 0.11))
     positions, normals, indices = merge(left, right)
-    offsets, _ = envelope(positions, normals, indices, np.ones(len(positions)), radius=RADIUS)
+    offsets, _ = envelope(
+        positions, normals, indices, np.ones(len(positions)), radius=RADIUS, box_blur=FIELD_BLUR
+    )
     moved = positions + offsets
     # Clear of the pair's own square edges, which the blurred field rounds.
     inner = (np.abs(positions[:, 1] - 0.005) < 0.0025) & (np.abs(positions[:, 2] - 0.105) < 0.0035)
@@ -81,9 +84,25 @@ def test_envelope_closes_the_gap_between_two_toes() -> None:
 
 def test_envelope_keeps_a_convex_shape() -> None:
     positions, normals, indices = box((0.040, 0.0, 0.10), (0.052, 0.012, 0.112))
-    offsets, _ = envelope(positions, normals, indices, np.ones(len(positions)), radius=RADIUS)
+    offsets, _ = envelope(
+        positions, normals, indices, np.ones(len(positions)), radius=RADIUS, box_blur=FIELD_BLUR
+    )
     shift = np.linalg.norm(offsets, axis=1)
     assert shift.max() < 0.0003, f"max {shift.max() * 1e3:.2f} mm"
+
+
+def test_envelope_rounds_a_toe_box_but_keeps_its_size() -> None:
+    # A toe box of 40 x 20 x 40 mm under the default blur: its broad top stays where it
+    # is, its corners round off as knit pulled over them does.
+    positions, normals, indices = box((0.040, 0.0, 0.10), (0.080, 0.020, 0.14), n=20)
+    offsets, _ = envelope(positions, normals, indices, np.ones(len(positions)), radius=RADIUS)
+    shift = np.linalg.norm(offsets, axis=1)
+    top = (np.abs(positions[:, 1] - 0.020) < 1e-9) & (
+        np.linalg.norm(positions[:, [0, 2]] - [0.060, 0.120], axis=1) < 0.005
+    )
+    corner = np.linalg.norm(positions - [0.080, 0.020, 0.14], axis=1) < 1e-9
+    assert shift[top].max() < 0.001, f"the top moved {shift[top].max() * 1e3:.2f} mm"
+    assert shift[corner].min() > 0.002, f"a corner moved only {shift[corner].min() * 1e3:.2f} mm"
 
 
 def test_envelope_leaves_unweighted_vertices_alone() -> None:

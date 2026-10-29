@@ -9,11 +9,12 @@ converted body:
 2. The solid is closed morphologically with a ball of `CLOSING_RADIUS`: gaps and grooves
    narrower than about twice that fill, convex shapes stay as they were.
 3. The toe vertices (weighted to the toe and ball bones) move onto the closed surface.
-   A side facing the next toe across a filled gap meets it halfway, so the gap closes
-   all along, out to its open front between the toe tips. Every other vertex (the walls
-   of the grooves over and under the toes) snaps onto the closed surface along its
-   distance gradient. The field is blurred, so the result is smooth without evening the
-   vertices out (which would slide them and drag the UVs).
+   A side facing the next toe across a filled gap first meets it halfway, so the gap
+   closes all along, out to its open front between the toe tips. Then every vertex snaps
+   along the distance gradient onto a strongly blurred copy of the closed surface
+   (TOE_BOX_BLUR): the toe box, one rounded shape without the bumps of the separate toe
+   tips. The field is smooth, so the result is too, without evening the vertices out
+   (which would slide them and drag the UVs).
 4. Their normals become those of a softer copy of the closed surface (NORMAL_BLUR),
    blended in by the toe weight.
 
@@ -41,7 +42,7 @@ F64 = NDArray[np.float64]
 MAGIC = b"MHSK"
 FORMAT_VERSION = 1
 #: Bumped whenever the envelope changes (part of the build fingerprint).
-SOCK_TOES_VERSION = "sock-toes-v4"
+SOCK_TOES_VERSION = "sock-toes-v5"
 
 VOXEL = 0.001
 #: Grooves narrower than about twice this fill; the toe gaps are 2-8 mm, the notches
@@ -49,8 +50,11 @@ VOXEL = 0.001
 CLOSING_RADIUS = 0.018
 #: Blur of the closed surface's distance field (voxels), against the voxel staircase.
 FIELD_BLUR = 1.5
+#: Blur of the field the toes finally snap onto (voxels): a sock's toe box is one
+#: rounded shape, so each toe tip's own bump is smoothed away with the notches between.
+TOE_BOX_BLUR = 5.0
 #: Blur of the field the normals come from (voxels): knit shades softly, without the
-#: creases the snapped toes still leave between them.
+#: creases the snapped toes would still leave between them.
 NORMAL_BLUR = 6.0
 #: The foot is everything under this height; the leg above is left out of the voxels.
 FOOT_HEIGHT = 0.09
@@ -205,6 +209,7 @@ def envelope(
     radius: float = CLOSING_RADIUS,
     voxel: float = VOXEL,
     foot_height: float = FOOT_HEIGHT,
+    box_blur: float = TOE_BOX_BLUR,
 ) -> tuple[F64, F64]:
     """Offsets and new normals for every vertex (zero offset and the old normal where
     `weight` is 0). Each foot (x > 0 and x < 0) is closed on its own."""
@@ -225,19 +230,21 @@ def envelope(
         solid = voxelize(positions[closed_triangles], lo, shape, voxel)
         closed = closing(solid, radius, voxel)
         field = Field(distance_field(closed, voxel), lo, voxel)
-        shading = Field(distance_field(closed, voxel, NORMAL_BLUR), lo, voxel)
-        # The same snap onto the unclosed solid: what the voxels alone move a vertex by
-        # (up to half a voxel). Taking it off leaves only what the closing adds.
+        box = Field(distance_field(closed, voxel, box_blur), lo, voxel)
+        shading = Field(distance_field(closed, voxel, max(NORMAL_BLUR, box_blur)), lo, voxel)
+        # The voxels alone move a vertex by up to half a voxel: what a snap onto the
+        # unclosed solid moves it by. Taking that off leaves what the closing adds.
         baseline = Field(distance_field(solid, voxel), lo, voxel)
-
-        index = np.flatnonzero(moving)
-        snapped = snap(positions[index], field) - (
-            snap(positions[index], baseline) - positions[index]
-        )
         # Unblurred: a blur narrows a 2 mm gap and the next toe would seem nearer.
         walls = Field(distance_field(solid, voxel, blur=0.0), lo, voxel)
-        met, meets = meet_across(positions[index], normals[index], field, walls)
-        snapped[meets] = met[meets]
+
+        index = np.flatnonzero(moving)
+        start = positions[index]
+        met, meets = meet_across(start, normals[index], field, walls)
+        error = snap(start, baseline) - start
+        error[meets] = 0.0
+        start = np.where(meets[:, None], met, start)
+        snapped = snap(start, box) - error
         w = weight[index][:, None]
         offsets[index] = (snapped - positions[index]) * w
         blended = normals[index] * (1 - w) + shading.normal(snapped) * w
