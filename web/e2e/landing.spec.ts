@@ -20,7 +20,9 @@ test.describe('landing', () => {
       .toBeGreaterThan(0.9);
 
     await cta.click();
-    await expect(page).toHaveURL(/\/tr\/create/);
+    // Guest sign-in is a server action against MongoDB: beside the creator
+    // tests' software-rendered stages it can take well over the default 5 s.
+    await expect(page).toHaveURL(/\/tr\/create/, { timeout: 30_000 });
   });
 
   test('jumps between chapters from the step list', async ({ page }) => {
