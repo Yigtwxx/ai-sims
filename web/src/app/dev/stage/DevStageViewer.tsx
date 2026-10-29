@@ -1,7 +1,12 @@
 'use client';
 
+import { _roots } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Vector3 } from 'three';
 
+import type { Vec3 } from '@/app/dev/thumbs/framing';
+import { aimCamera } from '@/app/dev/thumbs/sceneProbe';
+import type { CameraFocus } from '@/features/avatar/cameraFocus';
 import { MhStage } from '@/features/avatar/mh/MhStage';
 import type { QualityPreference } from '@/features/avatar/quality';
 import { fetchSpeechClip, speechScript, type SpeechScript } from '@/features/chat/ttsClient';
@@ -73,6 +78,26 @@ function useManifest(): MhManifest | null {
 /** MhStage over the converted manifest, for checking life, lip-sync and grooms. Dev only. */
 export function DevStageViewer() {
   const loaded = useManifest();
+  // Console hook for close-ups the framings do not reach: devStage.look([x, y, z], [x, y, z])
+  // aims the camera, devStage.at('foot_l') is a node's world position.
+  useEffect(() => {
+    const look = (position: Vec3, target: Vec3) => {
+      const canvas = document.querySelector('canvas');
+      return canvas ? aimCamera(canvas, { position, target }) : false;
+    };
+    const state = () => {
+      const canvas = document.querySelector('canvas');
+      return canvas ? _roots.get(canvas)?.store.getState() : undefined;
+    };
+    const at = (name: string) => {
+      const node = state()?.scene.getObjectByName(name);
+      return node ? node.getWorldPosition(new Vector3()).toArray() : null;
+    };
+    Object.assign(window, { devStage: { look, at, state } });
+    return () => {
+      delete (window as { devStage?: unknown }).devStage;
+    };
+  }, []);
   const [idles, setIdles] = useState<IdleSet>('manifest');
   const manifest = useMemo(() => {
     const override = loaded && IDLE_SETS[idles];
@@ -100,6 +125,7 @@ export function DevStageViewer() {
   const [blendFace, setBlendFace] = useState('');
   const [blendWeight, setBlendWeight] = useState(0.5);
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
+  const [focus, setFocus] = useState<CameraFocus>('body');
   const [quality, setQuality] = useState<QualityPreference>('high');
   const [thinking, setThinking] = useState(false);
   const [zoom, setZoom] = useState(0);
@@ -216,6 +242,7 @@ export function DevStageViewer() {
         config={config}
         manifest={manifest}
         mode={mode}
+        focus={focus}
         zoom={zoom}
         onZoomChange={setZoom}
         speech={speech}
@@ -240,6 +267,16 @@ export function DevStageViewer() {
           <select value={mode} onChange={(e) => setMode(e.target.value as 'talk' | 'creator')}>
             <option>talk</option>
             <option>creator</option>
+          </select>
+          focus
+          <select
+            data-testid="focus"
+            value={focus}
+            onChange={(e) => setFocus(e.target.value as CameraFocus)}
+          >
+            {(['body', 'face', 'torso', 'legs', 'feet', 'shoes'] as const).map((f) => (
+              <option key={f}>{f}</option>
+            ))}
           </select>
           quality
           <select
