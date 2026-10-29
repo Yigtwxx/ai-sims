@@ -351,3 +351,63 @@ describe('iris tint', () => {
     expect(tint?.reference).toBeCloseTo(0.2159, 3);
   });
 });
+
+describe('face blend', () => {
+  const blendManifest = MhManifestSchema.parse({
+    ...manifest,
+    faces: [
+      ...manifest.faces,
+      {
+        id: 'Cara',
+        label: 'Cara',
+        gender: 'female',
+        head: 'faces/Cara/head.glb',
+        defaultSkin: 'Cara',
+      },
+      {
+        id: 'Dana',
+        label: 'Dana',
+        gender: 'female',
+        head: 'faces/Dana/head.glb',
+        defaultSkin: 'Dana',
+      },
+      {
+        id: 'Esra',
+        label: 'Esra',
+        gender: 'female',
+        head: 'faces/Esra/head.glb',
+        defaultSkin: 'Esra',
+      },
+    ],
+  });
+
+  it('is empty without blend weights', () => {
+    expect(resolveCharacter(createDefaultConfig('female'), blendManifest)?.blend).toEqual([]);
+  });
+
+  it('maps blend faces to their heads, heaviest first', () => {
+    const config = createDefaultConfig('female');
+    config.face.preset = 'Ada';
+    config.face.blend = { Aoi: 0.2, Cara: 0.5 };
+    expect(resolveCharacter(config, blendManifest)?.blend).toEqual([
+      { headUrl: '/assets/mh/faces/Cara/head.glb', weight: 0.5 },
+      { headUrl: '/assets/mh/faces/Aoi/head.glb', weight: 0.2 },
+    ]);
+  });
+
+  it('skips unknown faces, the other gender, the worn face and zero weights', () => {
+    const config = createDefaultConfig('female');
+    config.face.preset = 'Ada';
+    config.face.blend = { Gone: 0.5, Bruce: 0.5, Ada: 0.5, Aoi: 0 };
+    expect(resolveCharacter(config, blendManifest)?.blend).toEqual([]);
+  });
+
+  it('keeps at most three faces, the heaviest', () => {
+    const config = createDefaultConfig('female');
+    config.face.preset = 'Ada';
+    config.face.blend = { Aoi: 0.1, Cara: 0.4, Dana: 0.3, Esra: 0.2 };
+    expect(resolveCharacter(config, blendManifest)?.blend.map((b) => b.weight)).toEqual([
+      0.4, 0.3, 0.2,
+    ]);
+  });
+});

@@ -99,9 +99,16 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 /** One element for every render: a new one would re-render the whole studio set. */
 const STUDIO_LIGHTING = <MhLighting rig="studio" />;
 
-/** A character is rebuilt (new GLBs) only when its body or head changes. */
+/**
+ * A character is rebuilt only when its body or head changes, a face blend
+ * included: the blended head is assembled off screen like a new face.
+ */
 export const characterKey = (resolved: ResolvedCharacter) =>
-  `${resolved.bodyUrl}|${resolved.headUrl}`;
+  [
+    resolved.bodyUrl,
+    resolved.headUrl,
+    ...resolved.blend.map((b) => `${b.headUrl}@${b.weight}`),
+  ].join('|');
 
 /**
  * Memoised: the creator re-renders on every slider step and keystroke; the
@@ -372,6 +379,7 @@ export const MhStage = memo(function MhStage({
                   skinTone={character.skinTone}
                   iris={character.iris}
                   irisTint={character.irisTint}
+                  blend={character.blend}
                   // A still takes the same pose every time: the first clip, not a random one.
                   idleClips={frozen ? character.idleClips.slice(0, 1) : character.idleClips}
                   idleLayer={character.idleLayer}

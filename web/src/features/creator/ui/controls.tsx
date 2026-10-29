@@ -90,6 +90,8 @@ interface LabeledSliderProps {
   max: number;
   step?: number;
   onChange: (value: number) => void;
+  /** The value where a drag or key press ends, for changes too costly to apply on every step. */
+  onCommit?: (value: number) => void;
   /** Words at the two ends of the track ("Kısa" / "Uzun"). */
   ends?: [string, string];
   /** Human readout of the value, also used as aria-valuetext. */
@@ -118,6 +120,7 @@ export function LabeledSlider({
   max,
   step = 0.01,
   onChange,
+  onCommit,
   ends,
   valueText,
   centered,
@@ -144,7 +147,10 @@ export function LabeledSlider({
       onPointerDown={() => useCreatorStore.getState().beginGesture()}
       onPointerUp={endGesture}
       onLostPointerCapture={endGesture}
-      onValueCommit={endGesture}
+      onValueCommit={([next]) => {
+        if (next !== undefined) onCommit?.(next);
+        endGesture();
+      }}
     />
   );
   // Pulled up to the track: the ends belong to this slider, not the next row.

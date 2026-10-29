@@ -15,6 +15,15 @@ export const BASE_HEIGHT = { female: 1.66, male: 1.78 } as const;
 /** The height slider spans ±14 cm (pipeline bodies job, SLIDERS["height"]). */
 export const HEIGHT_RANGE = 0.14;
 
+/** Most faces a character blends towards at once (the creator offers three). */
+export const MAX_BLEND_FACES = 3;
+
+/** A head the face leans towards and how far, 0..1. */
+export interface FaceBlendWear {
+  headUrl: string;
+  weight: number;
+}
+
 export interface ResolvedCharacter {
   gender: CharacterConfig['base'];
   faceId: string;
@@ -30,6 +39,8 @@ export interface ResolvedCharacter {
   iris: MhIris | null;
   /** Colour laid over the iris, or null for its own. */
   irisTint: IrisTint | null;
+  /** Heads the face leans towards (see faceBlends); empty for a plain preset. */
+  blend: FaceBlendWear[];
   /** Body idle clips and how much of the body they drive (see idleSet). */
   idleClips: string[];
   idleLayer: MocapLayer;
@@ -89,6 +100,7 @@ export function resolveCharacter(
     skinTone: config.skin.tone,
     iris,
     irisTint: config.eyes.color ? irisTint(config.eyes.color, iris) : null,
+    blend: faceBlends(config, manifest, face),
     ...idleSet(manifest),
     ...gestureSet(manifest),
     grooms: groomWears(config, manifest),
@@ -97,6 +109,27 @@ export function resolveCharacter(
     faceClips: faceClipSet(manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };
+}
+
+/**
+ * Faces to blend towards: in the manifest, of the worn face's gender, not the
+ * worn face itself and with a positive weight; the MAX_BLEND_FACES heaviest,
+ * heaviest first (ties by id, so the order is stable).
+ */
+export function faceBlends(
+  config: CharacterConfig,
+  manifest: MhManifest,
+  worn: MhManifest['faces'][number],
+): FaceBlendWear[] {
+  return Object.entries(config.face.blend)
+    .flatMap(([id, weight]) => {
+      const face = manifest.faces.find((f) => f.id === id);
+      if (!face || face.id === worn.id || face.gender !== worn.gender || !(weight > 0)) return [];
+      return [{ id, headUrl: assetUrl(face.head), weight }];
+    })
+    .sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id))
+    .slice(0, MAX_BLEND_FACES)
+    .map(({ headUrl, weight }) => ({ headUrl, weight }));
 }
 
 /** The face idle loop and the first happy expression loop, by manifest tags. */

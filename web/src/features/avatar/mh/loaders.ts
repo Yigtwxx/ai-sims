@@ -72,6 +72,12 @@ export function useMhGltf(url: string): GLTF {
   return useLoader(GLTFLoader, url, (loader) => configureLoader(loader, gl));
 }
 
+/** Like useMhGltf for several GLBs at once (none: no suspension). */
+export function useMhGltfs(urls: readonly string[]): GLTF[] {
+  const gl = useThree((state) => state.gl);
+  return useLoader(GLTFLoader, urls as string[], (loader) => configureLoader(loader, gl));
+}
+
 /** Starts loading without suspending, e.g. for the options next to the current one. */
 export function preloadMhGltf(url: string, renderer: WebGLRenderer): void {
   useLoader.preload(GLTFLoader, url, (loader) => configureLoader(loader, renderer));

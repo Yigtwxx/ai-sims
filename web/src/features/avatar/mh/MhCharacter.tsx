@@ -9,9 +9,10 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  use,
 } from 'react';
 import type { Camera, Group, Material, Mesh, Object3D, Scene, WebGLRenderTarget } from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 import type { MhIris, MhSkin } from '@/lib/assets/manifest';
@@ -19,6 +20,7 @@ import type { MhIris, MhSkin } from '@/lib/assets/manifest';
 import {
   applyBodySliders,
   attachHead,
+  collectBones,
   bindNeckSeam,
   bodySliderKey,
   collectMorphMeshes,
@@ -34,6 +36,7 @@ import {
 import { useQuality } from '../quality';
 import { applyEyeMaterials, bindIrisTextures, setIrisTint, type IrisTint } from './eyeMaterials';
 import { applyBodyHide, releaseBodyHide } from './garments';
+import { applyFaceBlend, prepareFaceBlend, type PreparedBlend } from './faceBlend';
 import {
   densityFiles,
   packGroomDensity,
@@ -42,8 +45,9 @@ import {
   setGroomTint,
 } from './groomDensity';
 import { takeOffGroom, wearGroom, type GroomWear, type WornGroom } from './hair';
+import type { FaceBlendWear } from './resolve';
 import { setHairLook } from './hairMaterial';
-import { meshoptDecoder, useMhGltf } from './loaders';
+import { meshoptDecoder, useMhGltf, useMhGltfs } from './loaders';
 import { MotionPlayer, type MocapLayer, type MotionClip } from './motion';
 import {
   layerOutfits,
@@ -96,6 +100,11 @@ export interface MhCharacterProps {
   skinTone?: number;
   /** Eyeball maps; converted heads carry none, so the eyes are white without one. */
   iris?: MhIris | null;
+  /**
+   * Heads the face leans towards (same topology as the worn head): positions,
+   * morphs and eye joints are blended when the character assembles.
+   */
+  blend?: readonly FaceBlendWear[];
   /** Colour laid over the iris (null: its own); needs no reload. */
   irisTint?: IrisTint | null;
   /** Idle body clips (GLB animations targeting MetaHuman bone names). */
@@ -145,6 +154,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     skinTone = 0,
     iris = null,
     irisTint = null,
+    blend = NO_BLEND,
     idleClips = NO_CLIPS,
     idleLayer = 'full',
     talkClips = NO_CLIPS,
@@ -182,6 +192,15 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   }, [onSettled, onUnsettled, prewarm, camera, scene]);
   const bodyGltf = useMhGltf(bodyUrl);
   const headGltf = useMhGltf(headUrl);
+  // Keyed by value: a new array with the same heads and weights reuses the assembly.
+  const blendKey = blend.map((b) => `${b.headUrl}@${b.weight}`).join('|');
+  const blendUrls = useMemo(
+    () => (blendKey ? blendKey.split('|').map((part) => part.slice(0, part.lastIndexOf('@'))) : []),
+    [blendKey],
+  );
+  const blendGltfs = useMhGltfs(blendUrls);
+  // Worked out a slice at a time while the character suspends (see preparedBlend).
+  const prepared = use(preparedBlend(headUrl, headGltf, blendKey, blendGltfs));
 
   const assembled = useMemo(() => {
     const bodyRoot = cloneSkinned(bodyGltf.scene) as Object3D;
@@ -189,7 +208,13 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     const extras = mhExtras(bodyGltf.scene, bodyGltf.parser.json as { extras?: unknown });
     const headExtras = mhExtras(headGltf.scene, headGltf.parser.json as { extras?: unknown });
     const body = createBodyRig(bodyRoot, (extras.body_joint_deltas ?? {}) as JointDeltas);
+    // Read before attachHead moves the face-only bones under the body's.
+    const headBones = [...collectBones(headRoot).values()];
     const headMeshes = attachHead(headRoot, body);
+    if (prepared) {
+      const ownBones = new Set(headBones.filter((bone) => !body.bones.has(bone.name)));
+      applyFaceBlend(headMeshes, ownBones, prepared);
+    }
     // The skin primitive: grooms are fitted to its DNA positions and joints.
     const headSkin = headMeshes.find((mesh) => (mesh.material as Material).name === 'head');
     for (const mesh of headMeshes) bodyRoot.add(mesh);
@@ -227,8 +252,10 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       skins,
       eyes,
       wrinkles: wrinkleDriver(bodyRoot, skins, headExtras),
+      // A blended head owns its geometries (and their morph textures); a plain one shares the loader's.
+      ownGeometries: prepared ? headMeshes.map((mesh) => mesh.geometry) : [],
     };
-  }, [bodyGltf, headGltf]);
+  }, [bodyGltf, headGltf, prepared]);
 
   // Numbers settled states. A change that reloads a part and the unmount bump
   // it too, so a warm-up they overtook stops where it is and reports nothing.
@@ -335,6 +362,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     return () => {
       live = false;
       for (const material of [...assembled.skins, ...assembled.eyes]) material.dispose();
+      for (const geometry of assembled.ownGeometries) geometry.dispose();
     };
   }, [assembled]);
 
@@ -623,8 +651,45 @@ const LAYER_DELAY_MS = 150;
 const NO_CLIPS: readonly string[] = [];
 const NO_GROOMS: readonly GroomWear[] = [];
 const NO_OUTFITS: readonly OutfitWear[] = [];
+const NO_BLEND: readonly FaceBlendWear[] = [];
 
 const clipCache = new Map<string, Promise<MotionClip[]>>();
+
+/** Face blends worked out lately, by worn head and blend: the stage holds at most two characters. */
+const blendCache = new Map<string, Promise<PreparedBlend | null>>();
+const BLEND_CACHE_SIZE = 2;
+const NO_PREPARED_BLEND = Promise.resolve(null);
+
+/**
+ * The prepared blend of a worn head towards the blend GLBs (`blendKey` lists
+ * their URLs and weights in order), one promise per blend for `use`: the
+ * character suspends while it is worked out a few milliseconds at a time,
+ * instead of freezing the stage while it assembles.
+ */
+function preparedBlend(
+  headUrl: string,
+  head: GLTF,
+  blendKey: string,
+  sources: readonly GLTF[],
+): Promise<PreparedBlend | null> {
+  if (!blendKey) return NO_PREPARED_BLEND;
+  const key = `${headUrl}#${blendKey}`;
+  let promise = blendCache.get(key);
+  if (!promise) {
+    const weights = blendKey.split('|').map((part) => Number(part.split('@').pop()));
+    promise = prepareFaceBlend(
+      head.scene,
+      sources.map((gltf, k) => ({ root: gltf.scene, weight: weights[k] ?? 0 })),
+    ).catch((error: unknown) => {
+      // The preset face is still a face: show it rather than fail the stage.
+      console.warn('[mh] face blend failed', error);
+      return null;
+    });
+    blendCache.set(key, promise);
+    while (blendCache.size > BLEND_CACHE_SIZE) blendCache.delete(blendCache.keys().next().value!);
+  }
+  return promise;
+}
 
 /**
  * Animation clips of animation-only GLBs (with their skeleton's pelvis rest),

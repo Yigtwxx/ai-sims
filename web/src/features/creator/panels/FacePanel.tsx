@@ -18,6 +18,8 @@ export function FacePanel({ manifest }: PanelProps) {
   const label = useLabel();
   const { config, update } = useConfig();
   const [picking, setPicking] = useState(false);
+  // A blend reassembles the head: the stage gets the weight where a drag ends.
+  const [dragging, setDragging] = useState<{ id: string; value: number } | null>(null);
 
   const faces = facesFor(manifest, config.base);
   const skinIds = new Set(skinsFor(manifest, config.base).map((skin) => skin.id));
@@ -55,7 +57,8 @@ export function FacePanel({ manifest }: PanelProps) {
 
       <Section title={t('blend')} aside={`${blends.length}/${MAX_FACE_BLENDS}`}>
         <Hint>{t('blendHint')}</Hint>
-        {blends.map(([id, weight]) => {
+        {blends.map(([id, committed]) => {
+          const weight = dragging?.id === id ? dragging.value : committed;
           const face = byId.get(id);
           const name = face ? label(face.label) : id;
           const thumbnail = thumbnailSrc(face?.thumbnail);
@@ -79,7 +82,11 @@ export function FacePanel({ manifest }: PanelProps) {
                   min={0}
                   max={1}
                   valueText={`${Math.round(weight * 100)}%`}
-                  onChange={(value) => update((draft) => void (draft.face.blend[id] = value))}
+                  onChange={(value) => setDragging({ id, value })}
+                  onCommit={(value) => {
+                    setDragging(null);
+                    update((draft) => void (draft.face.blend[id] = value));
+                  }}
                 />
               </div>
               <Button

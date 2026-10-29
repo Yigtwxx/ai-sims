@@ -94,6 +94,8 @@ export function DevStageViewer() {
   // One slider pushed to an end ('hips:1'), for checking how garments follow the body.
   const [body, setBody] = useState('');
   const [eyeTint, setEyeTint] = useState('');
+  const [blendFace, setBlendFace] = useState('');
+  const [blendWeight, setBlendWeight] = useState(0.5);
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
   const [quality, setQuality] = useState<QualityPreference>('high');
   const [thinking, setThinking] = useState(false);
@@ -114,12 +116,25 @@ export function DevStageViewer() {
     value.mustache.style = styles.mustache || null;
     value.outfit = outfit;
     value.eyes.color = eyeTint || null;
+    if (blendFace) value.face.blend = { [blendFace]: blendWeight };
     if (body) {
       const [slider, end] = body.split(':');
       value.body.sliders = { [slider as BodySlider]: Number(end) };
     }
     return value;
-  }, [gender, face, styles, melanin, redness, pattern, outfit, body, eyeTint]);
+  }, [
+    gender,
+    face,
+    styles,
+    melanin,
+    redness,
+    pattern,
+    outfit,
+    body,
+    eyeTint,
+    blendFace,
+    blendWeight,
+  ]);
 
   const pickOutfit = useCallback((category: OutfitCategory, id: string) => {
     setOutfit((current) => {
@@ -233,6 +248,31 @@ export function DevStageViewer() {
               <option key={key}>{key}</option>
             ))}
           </select>
+          blend
+          <select
+            data-testid="blend-face"
+            value={blendFace}
+            onChange={(e) => setBlendFace(e.target.value)}
+          >
+            <option value="">none</option>
+            {manifest.faces
+              .filter((f) => f.gender === gender && f.id !== face)
+              .map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.id}
+                </option>
+              ))}
+          </select>
+          <input
+            data-testid="blend-weight"
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={blendWeight}
+            onChange={(e) => setBlendWeight(Number(e.target.value))}
+            className="w-14"
+          />
           eyes
           <select
             data-testid="eye-tint"

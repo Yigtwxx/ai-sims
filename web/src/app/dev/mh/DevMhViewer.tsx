@@ -93,12 +93,28 @@ const ALL_MORPHS = [...ARKIT, ...VISEMES.map((v) => `viseme_${v}`)];
  * sweep and the Turkish speech sample driving the visemes. Dev only.
  */
 export function DevMhViewer() {
+  const params = useSearchParams();
   // `?face=Etta` opens any converted preset, not only the ones in the picker.
-  const [face, setFace] = useState<string>(useSearchParams().get('face') ?? 'Ada');
-  const [gender, setGender] = useState<'female' | 'male'>('female');
-  const [focus, setFocus] = useState<CameraFocus>('face');
+  const [face, setFace] = useState<string>(params.get('face') ?? 'Ada');
+  const [gender, setGender] = useState<'female' | 'male'>(
+    params.get('gender') === 'male' ? 'male' : 'female',
+  );
+  const [focus, setFocus] = useState<CameraFocus>((params.get('focus') as CameraFocus) ?? 'face');
   const [sliders, setSliders] = useState<Partial<Record<BodySliderId, number>>>({});
-  const [morph, setMorph] = useState<string>('');
+  // `?morph=eyeBlinkLeft` holds one morph at 1, `?blend=Zuri:0.5,Etta:0.3` blends the head.
+  const [morph, setMorph] = useState<string>(params.get('morph') ?? '');
+  const blendParam = params.get('blend') ?? '';
+  const blend = useMemo(
+    () =>
+      blendParam
+        .split(',')
+        .filter(Boolean)
+        .map((part) => {
+          const [id = '', weight = '0'] = part.split(':');
+          return { headUrl: `/assets/mh/faces/${id}/head.glb`, weight: Number(weight) };
+        }),
+    [blendParam],
+  );
   const [sweep, setSweep] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [rig, setRig] = useState<'studio' | 'portrait' | 'legacy'>('studio');
@@ -170,6 +186,7 @@ export function DevMhViewer() {
             key={`${gender}-${face}`}
             bodyUrl={`/assets/mh/bodies/${gender}/body.glb`}
             headUrl={`/assets/mh/faces/${face}/head.glb`}
+            blend={blend}
             sliders={sliders}
             skin={skinSet}
             iris={iris}
