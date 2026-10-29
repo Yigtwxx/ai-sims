@@ -17,6 +17,8 @@ const CONTENT_TYPES = {
   '.png': 'image/png',
   '.webp': 'image/webp',
   '.txt': 'text/plain',
+  // Sock toe envelopes of the bodies (pipeline sock_toes.py).
+  '.bin': 'application/octet-stream',
 };
 // File names carry no content hash, so caches stay short; the manifest changes on every convert.
 const CACHE_CONTROL = 'public,max-age=3600';
