@@ -76,6 +76,7 @@ from asset_pipeline.mh.outfits import (
     manifest_entries,
 )
 from asset_pipeline.mh.rig import MetaHumanRig
+from asset_pipeline.mh.sock_toes import SOCK_TOES_VERSION, sock_toes_from_glb, write_sock_toes
 from asset_pipeline.mh.stamps import Stamps, fingerprint
 from asset_pipeline.mh.strand_paint import PAINTS, STRAND_PAINT_VERSION
 from asset_pipeline.mh.textures import TextureError, write_json
@@ -256,6 +257,23 @@ class Builder:
         return self.run(
             f"bodies/{gender}", body_fingerprint(self.archive, gender, self.compress), build
         )
+
+    def body_socks(self, gender: str) -> Outcome:
+        """`bodies/<gender>/socks.bin`: where the toes sit inside a sock (see sock_toes.py),
+        worked out from the converted body GLB, which it leaves untouched."""
+        key = f"bodies/{gender}/socks"
+        body_glb = self.web / "bodies" / gender / "body.glb"
+        if not body_glb.is_file():
+            return self._fail(key, ConversionError(f"needs {body_glb.name} first"))
+
+        def build() -> tuple[Iterable[Path], dict[str, Any], str]:
+            out = body_glb.parent / "socks.bin"
+            toes = sock_toes_from_glb(body_glb)
+            write_sock_toes(toes, out)
+            info = {"body_socks": {"gender": gender, "socks": out.relative_to(self.web).as_posix()}}
+            return [out], info, f"{len(toes.indices)} vertices, up to {toes.reach * 1e3:.1f} mm"
+
+        return self.run(key, fingerprint(SOCK_TOES_VERSION, body_glb), build)
 
     # ------------------------------------------------------------------------ animations
 
@@ -549,7 +567,7 @@ class Builder:
                 if "skin" in info
             ],
             irises=[info["iris"] for info in self.records("irises") if "iris" in info],
-            bodies=[info["body"] for info in self.records("bodies") if "body" in info],
+            bodies=with_socks(self.records("bodies")),
             animations=[
                 *(info["animation"] for info in self.records("animations") if "animation" in info),
                 *(a for a in fab_animations(self.web) if a["id"] not in self.pruned),
@@ -585,6 +603,21 @@ class Builder:
         counts = ", ".join(f"{k} {len(v)}" for k, v in manifest.items() if isinstance(v, list))
         self.log(f"wrote   {path}  ({counts})")
         return path
+
+
+def with_socks(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Body entries, each with its sock toes file when that is built (an optional field:
+    without it the web draws socks over the bare toes)."""
+    socks = {
+        info["body_socks"]["gender"]: info["body_socks"]["socks"]
+        for info in records
+        if "body_socks" in info
+    }
+    bodies = [dict(info["body"]) for info in records if "body" in info]
+    for body in bodies:
+        if body["gender"] in socks:
+            body["socks"] = socks[body["gender"]]
+    return bodies
 
 
 def with_compat(groom: dict[str, Any]) -> dict[str, Any]:

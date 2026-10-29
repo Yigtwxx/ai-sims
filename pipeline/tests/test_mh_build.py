@@ -9,6 +9,7 @@ from asset_pipeline.mh.build import (
     fab_animations,
     with_compat,
     with_gender,
+    with_socks,
     with_thumbnail,
 )
 from asset_pipeline.mh.convert import ConversionError
@@ -179,3 +180,18 @@ def test_skins_take_their_preset_gender(tmp_path: Path, monkeypatch) -> None:
     assert with_gender(skin, tmp_path) == {**skin, "gender": "male"}
     missing = {"id": "skin.Nobody", "tone": 0.1}
     assert with_gender(missing, tmp_path) == missing, "a skin without sources keeps its entry"
+
+
+def test_bodies_carry_their_sock_toes_file_when_built() -> None:
+    records = [
+        {"body": {"gender": "female", "glb": "bodies/female/body.glb"}},
+        {"body_socks": {"gender": "female", "socks": "bodies/female/socks.bin"}},
+        {"body": {"gender": "male", "glb": "bodies/male/body.glb"}},
+    ]
+    female, male = with_socks(records)
+    assert female == {
+        "gender": "female",
+        "glb": "bodies/female/body.glb",
+        "socks": "bodies/female/socks.bin",
+    }
+    assert "socks" not in male

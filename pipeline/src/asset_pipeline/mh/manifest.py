@@ -125,6 +125,7 @@ def validate(manifest: Mapping[str, Any], web_root: Path | None = None) -> list[
         where = f"body {body.get('gender')}"
         need(body.get("gender") in GENDERS, f"{where}: gender")
         file(body.get("glb"), where)
+        file(body.get("socks"), f"{where} socks", optional=True)
         sliders = body.get("sliders", [])
         need(isinstance(sliders, list) and len(sliders) >= 1, f"{where}: needs sliders")
         for slider in sliders:

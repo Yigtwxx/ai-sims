@@ -92,6 +92,7 @@ def run(args: argparse.Namespace) -> int:
     if args.bodies or everything:
         for gender in args.gender or GENDERS:
             builder.body(gender)
+            builder.body_socks(gender)
     if args.animations or everything:
         builder.animations(args.clip)
     if args.lighting or everything:
