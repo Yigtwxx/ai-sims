@@ -26,6 +26,15 @@
         "value": "#24180a",
         "createdAt": "2026-10-21T20:05:26.854Z",
         "reason": "User confirmed #24180a is intentional (gold jewellery preview gradient)"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ffffff",
+        "files": [
+          "web/src/features/avatar/mh/socks.test.ts"
+        ],
+        "createdAt": "2026-10-29T09:37:39.768Z",
+        "reason": "Test data: a white sock's colour in the character config, not a UI colour"
       }
     ]
   }
