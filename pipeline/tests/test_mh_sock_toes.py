@@ -6,8 +6,11 @@ import pytest
 from asset_pipeline.mh.sock_toes import (
     FIELD_BLUR,
     MEET_SHARE,
+    PIT_DEPTH,
+    Field,
     SockToes,
     envelope,
+    hold_under,
     read_sock_toes,
     toe_weights,
     unfold,
@@ -155,6 +158,27 @@ def test_unfold_turns_no_triangle_over() -> None:
     )
     assert np.all(faces[:, 2] > 0), "a triangle is still turned over"
     assert np.array_equal(fixed[1:], offsets[1:]), "the rim moved"
+
+
+def ball_field(radius: float, voxel: float = 0.0005) -> Field:
+    """The signed distance to a ball of `radius` at the origin, on a voxel grid."""
+    lo = np.full(3, -radius - 0.01)
+    n = int(np.ceil(2 * (radius + 0.01) / voxel))
+    axis = lo[0] + (np.arange(n) + 0.5) * voxel
+    x, y, z = np.meshgrid(axis, axis, axis, indexing="ij")
+    return Field(np.sqrt(x**2 + y**2 + z**2) - radius, lo, voxel)
+
+
+def test_hold_under_brings_a_pit_up_to_the_toe_box() -> None:
+    # Unfolding shrank a corner 6 mm into a 20 mm toe box: a pit seen from the side.
+    # Corners on the box and just under it stay where they are.
+    field = ball_field(0.02)
+    up = np.array([0.0, 1.0, 0.0])
+    points = np.stack([up * 0.014, up * 0.02, up * (0.02 - PIT_DEPTH / 2)])
+    held = hold_under(points, field)
+    assert field(held[:1])[0] == pytest.approx(-PIT_DEPTH, abs=1e-4)
+    assert np.allclose(held[0, [0, 2]], 0.0), "the pit came up sideways"
+    assert np.array_equal(held[1:], points[1:])
 
 
 @pytest.mark.parametrize(

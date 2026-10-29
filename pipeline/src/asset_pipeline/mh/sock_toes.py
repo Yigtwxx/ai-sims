@@ -18,7 +18,10 @@ converted body:
    without evening the vertices out (which would slide them and drag the UVs).
 4. Triangles the move turned over (a hole: their back is not drawn) or folded to face
    into the box (a dark slit) are unfolded, the offsets of their corners eased towards
-   their neighbours' until none is left.
+   their neighbours' until none is left. That tucks the sides which met across a gap
+   under the box, where a bent toe cannot push them out through it, but the last
+   corners it shrinks back towards the skin sank up to 6 mm: a pit that showed as a
+   dark slit once the foot turned. No corner is left deeper than PIT_DEPTH.
 5. Their normals become those of a softer copy of the closed surface (NORMAL_BLUR),
    blended in by the toe weight.
 
@@ -48,7 +51,7 @@ F64 = NDArray[np.float64]
 MAGIC = b"MHSK"
 FORMAT_VERSION = 1
 #: Bumped whenever the envelope changes (part of the build fingerprint).
-SOCK_TOES_VERSION = "sock-toes-v13"
+SOCK_TOES_VERSION = "sock-toes-v14"
 
 VOXEL = 0.001
 #: Grooves narrower than about twice this fill; the toe gaps are 2-8 mm, the notches
@@ -86,6 +89,9 @@ UNFOLD_PASSES = 200
 FOLD_LIMIT = -0.3
 #: Then passes of shrinking the corners still turned over back towards the skin.
 SHRINK_PASSES = 60
+#: How deep (m) under the toe box a corner may end up: the unfolded sides stay under
+#: it, nothing deeper shows as a pit.
+PIT_DEPTH = 0.001
 #: Offsets and normal changes below these are not written.
 MIN_OFFSET, MIN_NORMAL = 1e-5, 1e-4
 
@@ -321,6 +327,19 @@ def unfold(
     return result
 
 
+def hold_under(points: F64, box: Field, depth: float = PIT_DEPTH) -> F64:
+    """Points deeper than `depth` inside the toe box brought up to that depth along its
+    gradient; the rest as they are."""
+    q = points.copy()
+    for _ in range(SNAP_STEPS):
+        excess = box(q) + depth
+        deep = excess < 0
+        if not deep.any():
+            break
+        q[deep] -= excess[deep, None] * box.normal(q[deep])
+    return q
+
+
 def envelope(
     positions: F64,
     normals: F64,
@@ -337,6 +356,7 @@ def envelope(
     triangles = indices.reshape(-1, 3)
     offsets = np.zeros_like(positions)
     result = normals.copy()
+    held: list[tuple[NDArray[np.int64], Field]] = []
     for side in (1.0, -1.0):
         foot = (side * positions[:, 0] > 0) & (positions[:, 1] < foot_height)
         moving = foot & (weight > 0)
@@ -373,7 +393,12 @@ def envelope(
         offsets[index] = (snapped - positions[index]) * w
         blended = normals[index] * (1 - w) + shading.normal(snapped) * w
         result[index] = blended / np.maximum(np.linalg.norm(blended, axis=1, keepdims=True), 1e-12)
-    return unfold(positions, offsets, triangles, result), result
+        # Where the envelope holds in full: in the fade the skin is meant to sit inside.
+        held.append((index[weight[index] >= 1.0], box))
+    offsets = unfold(positions, offsets, triangles, result)
+    for index, box in held:
+        offsets[index] = hold_under(positions[index] + offsets[index], box) - positions[index]
+    return offsets, result
 
 
 def sock_toes_from_glb(body_glb: Path) -> SockToes:
