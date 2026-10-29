@@ -233,7 +233,7 @@
       "default": "The face's own eyes",
       "tint": "Tint",
       "noTint": "No tint",
-      "tintHint": "Lays a light colour over the iris."
+      "tintHint": "Recolours the iris and keeps its natural detail."
     },
     "hair": {
       "styles": "Hairstyle",

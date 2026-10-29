@@ -144,12 +144,77 @@ export function createEyeOcclusionMaterial(tuning = MH_EYE_OCCLUSION): MeshBasic
   return material;
 }
 
+type Rgb = [number, number, number];
+
+/**
+ * Iris ring in eyeball UV, as a distance from the centre (measured on the
+ * 2048 px DCC eye maps): the pupil ends by 0.04, the iris runs to 0.13 and a
+ * dark limbus ring to 0.15, where the sclera starts. Each pair is a fade.
+ */
+export const IRIS_UV = { pupil: [0.035, 0.05], limbus: [0.13, 0.15] } as const;
+/** Share of the tint in the iris; the rest keeps the iris's own hue. */
+export const IRIS_TINT_STRENGTH = 0.85;
+/**
+ * Chroma kept from the picked colour. At full chroma blue and green irises read
+ * as coloured contact lenses under the studio light; brown and grey barely move.
+ */
+export const IRIS_TINT_CHROMA = 0.75;
+const LUMA: Rgb = [0.2126, 0.7152, 0.0722];
+const luma = ([r, g, b]: Rgb) => r * LUMA[0] + g * LUMA[1] + b * LUMA[2];
+/** Caps a texel's brightness against the iris average, so a glint is not blown out. */
+const IRIS_DETAIL_MAX = 3;
+
+const smoothstep = (edge0: number, edge1: number, x: number) => {
+  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
+  return t * t * (3 - 2 * t);
+};
+
+/** CPU mirror of the shader's iris mask at a UV distance from the eyeball's centre. */
+export function irisMask(radius: number): number {
+  return (
+    smoothstep(IRIS_UV.pupil[0], IRIS_UV.pupil[1], radius) *
+    (1 - smoothstep(IRIS_UV.limbus[0], IRIS_UV.limbus[1], radius))
+  );
+}
+
+/**
+ * CPU mirror of the shader tint (linear light): the iris takes the tint at its
+ * own average brightness (`reference`) and keeps its fibres as brightness
+ * ratios, so a brown iris tinted blue reads as a blue iris, not a blue film.
+ */
+export function tintIris(texel: Rgb, tint: Rgb, reference: number, mask: number): Rgb {
+  const detail = Math.min(luma(texel) / reference, IRIS_DETAIL_MAX);
+  const muted = muteTint(tint);
+  const k = mask * IRIS_TINT_STRENGTH;
+  return [0, 1, 2].map((c) => texel[c]! + (muted[c]! * detail - texel[c]!) * k) as Rgb;
+}
+
+/** The picked colour at IRIS_TINT_CHROMA, same brightness. */
+export function muteTint(tint: Rgb): Rgb {
+  const grey = luma(tint);
+  return tint.map((c) => grey + (c - grey) * IRIS_TINT_CHROMA) as Rgb;
+}
+
+export interface IrisTint {
+  /** Linear colour. */
+  color: Rgb;
+  /** Linear luminance of the worn iris's ring (its manifest swatch). */
+  reference: number;
+}
+
+const IRIS_TINT_GLSL = /* glsl */ `
+uniform vec3 irisTint;
+uniform float irisTintAmount;
+uniform float irisReference;
+`;
+
 /**
  * Eyeball with a glossy cornea over a softer iris and sclera: the clearcoat
  * lobe carries the sharp catch-lights, the base lobe stays diffuse-looking.
+ * The iris can be recoloured (setIrisTint) without new maps.
  */
 export function createEyeballMaterial(source: MeshStandardMaterial): MeshPhysicalMaterial {
-  return new MeshPhysicalMaterial({
+  const material = new MeshPhysicalMaterial({
     name: `${source.name}_eyeball`,
     map: source.map,
     normalMap: source.normalMap,
@@ -160,6 +225,50 @@ export function createEyeballMaterial(source: MeshStandardMaterial): MeshPhysica
     clearcoatRoughness: 0.03,
     ior: 1.376,
   });
+  const uniforms = {
+    irisTint: { value: new Color(1, 1, 1) },
+    irisTintAmount: { value: 0 },
+    irisReference: { value: 1 },
+  };
+  material.userData.irisUniforms = uniforms;
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${IRIS_TINT_GLSL}`)
+      .replace(
+        '#include <map_fragment>',
+        /* glsl */ `#include <map_fragment>
+        #ifdef USE_MAP
+          float irisR = distance( vMapUv, vec2( 0.5 ) );
+          float irisMask = smoothstep( ${IRIS_UV.pupil[0]}, ${IRIS_UV.pupil[1]}, irisR )
+            * ( 1.0 - smoothstep( ${IRIS_UV.limbus[0]}, ${IRIS_UV.limbus[1]}, irisR ) );
+          float irisLuma = dot( diffuseColor.rgb, vec3( ${LUMA.join(', ')} ) );
+          vec3 irisTinted = irisTint * min( irisLuma / irisReference, ${IRIS_DETAIL_MAX.toFixed(1)} );
+          diffuseColor.rgb = mix( diffuseColor.rgb, irisTinted, irisMask * irisTintAmount );
+        #endif
+        `,
+      );
+  };
+  material.customProgramCacheKey = () => 'mh-eyeball-tint-v1';
+  return material;
+}
+
+/** Recolours the iris of the eyeball materials (null: its own colour); needs no reload. */
+export function setIrisTint(materials: readonly Material[], tint: IrisTint | null): void {
+  for (const material of materials) {
+    const uniforms = material.userData.irisUniforms as
+      | {
+          irisTint: { value: Color };
+          irisTintAmount: { value: number };
+          irisReference: { value: number };
+        }
+      | undefined;
+    if (!uniforms) continue;
+    uniforms.irisTintAmount.value = tint ? IRIS_TINT_STRENGTH : 0;
+    if (!tint) continue;
+    uniforms.irisTint.value.setRGB(...muteTint(tint.color));
+    uniforms.irisReference.value = Math.max(tint.reference, 1e-4);
+  }
 }
 
 /** Replaces the eye materials of an assembled character; returns them for disposal. */

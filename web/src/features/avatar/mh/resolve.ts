@@ -3,6 +3,7 @@ import { Color } from 'three';
 import { assetUrl, type MhIris, type MhManifest, type MhSkin } from '@/lib/assets/manifest';
 import type { BodySlider, CharacterConfig } from '@/lib/character/schema';
 
+import type { IrisTint } from './eyeMaterials';
 import type { GroomWear } from './hair';
 import type { Rgb } from './hairColor';
 import type { HairLook } from './hairMaterial';
@@ -27,6 +28,8 @@ export interface ResolvedCharacter {
   skinTone: number;
   /** Eyes: the configured iris, else the face's default, else the iris named like the face. */
   iris: MhIris | null;
+  /** Colour laid over the iris, or null for its own. */
+  irisTint: IrisTint | null;
   /** Body idle clips and how much of the body they drive (see idleSet). */
   idleClips: string[];
   idleLayer: MocapLayer;
@@ -66,6 +69,15 @@ export function resolveCharacter(
     manifest.skins.find((s) => s.id === config.skin.set) ??
     manifest.skins.find((s) => s.id === face.defaultSkin) ??
     null;
+  // Faces exported without eyes of their own borrow the iris of the preset
+  // their skin comes from, so they never render with white eyes.
+  const iris =
+    manifest.irises.find((i) => i.id === config.eyes.iris) ??
+    manifest.irises.find((i) => i.id === face.defaultIris) ??
+    manifest.irises.find((i) => presetOf(i.id) === presetOf(face.id)) ??
+    (skin && manifest.irises.find((i) => presetOf(i.id) === presetOf(skin.id))) ??
+    manifest.irises[0] ??
+    null;
   return {
     gender,
     faceId: face.id,
@@ -75,15 +87,8 @@ export function resolveCharacter(
     skin,
     makeup: config.skin.makeup,
     skinTone: config.skin.tone,
-    // Faces exported without eyes of their own borrow the iris of the preset
-    // their skin comes from, so they never render with white eyes.
-    iris:
-      manifest.irises.find((i) => i.id === config.eyes.iris) ??
-      manifest.irises.find((i) => i.id === face.defaultIris) ??
-      manifest.irises.find((i) => presetOf(i.id) === presetOf(face.id)) ??
-      (skin && manifest.irises.find((i) => presetOf(i.id) === presetOf(skin.id))) ??
-      manifest.irises[0] ??
-      null,
+    iris,
+    irisTint: config.eyes.color ? irisTint(config.eyes.color, iris) : null,
     ...idleSet(manifest),
     ...gestureSet(manifest),
     grooms: groomWears(config, manifest),
@@ -112,6 +117,15 @@ const presetOf = (id: string) => id.slice(id.indexOf('.') + 1);
 function linear(hex: string): Rgb {
   const color = new Color(hex);
   return [color.r, color.g, color.b];
+}
+
+/**
+ * The eye tint against the worn iris's brightness (its swatch is the median of
+ * the iris ring). Without an iris the tint has nothing to keep and is drawn as is.
+ */
+function irisTint(hex: string, iris: MhIris | null): IrisTint {
+  const [r, g, b] = iris ? linear(iris.swatch) : linear(hex);
+  return { color: linear(hex), reference: 0.2126 * r + 0.7152 * g + 0.0722 * b };
 }
 
 /**

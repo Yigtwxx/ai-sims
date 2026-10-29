@@ -233,7 +233,7 @@
       "default": "Yüzün kendi gözü",
       "tint": "Renk tonu",
       "noTint": "Ton yok",
-      "tintHint": "İrisin üstüne hafif bir renk katar."
+      "tintHint": "İrisi yeniden renklendirir, doğal dokusu korunur."
     },
     "hair": {
       "styles": "Saç modeli",

@@ -32,7 +32,7 @@ import {
   type NeckSeamExtras,
 } from './assembly';
 import { useQuality } from '../quality';
-import { applyEyeMaterials, bindIrisTextures } from './eyeMaterials';
+import { applyEyeMaterials, bindIrisTextures, setIrisTint, type IrisTint } from './eyeMaterials';
 import { applyBodyHide, releaseBodyHide } from './garments';
 import {
   densityFiles,
@@ -96,6 +96,8 @@ export interface MhCharacterProps {
   skinTone?: number;
   /** Eyeball maps; converted heads carry none, so the eyes are white without one. */
   iris?: MhIris | null;
+  /** Colour laid over the iris (null: its own); needs no reload. */
+  irisTint?: IrisTint | null;
   /** Idle body clips (GLB animations targeting MetaHuman bone names). */
   idleClips?: readonly string[];
   /** How much of the body the idle clips drive; the procedural layer does the rest. */
@@ -142,6 +144,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     makeup = false,
     skinTone = 0,
     iris = null,
+    irisTint = null,
     idleClips = NO_CLIPS,
     idleLayer = 'full',
     talkClips = NO_CLIPS,
@@ -519,6 +522,15 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   useEffect(() => {
     if (assembled) setSkinTone(assembled.skins, skinTone);
   }, [assembled, skinTone]);
+  const [tintR, tintG, tintB] = irisTint?.color ?? [];
+  const tintReference = irisTint?.reference;
+  useEffect(() => {
+    const tint =
+      tintR === undefined || tintG === undefined || tintB === undefined
+        ? null
+        : { color: [tintR, tintG, tintB] as IrisTint['color'], reference: tintReference ?? 1 };
+    setIrisTint(assembled.eyes, tint);
+  }, [assembled, tintR, tintG, tintB, tintReference]);
   useEffect(() => {
     unsettle('outfits');
     const wears = latestOutfits.current;

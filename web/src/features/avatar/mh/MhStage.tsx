@@ -371,6 +371,7 @@ export const MhStage = memo(function MhStage({
                   makeup={character.makeup}
                   skinTone={character.skinTone}
                   iris={character.iris}
+                  irisTint={character.irisTint}
                   // A still takes the same pose every time: the first clip, not a random one.
                   idleClips={frozen ? character.idleClips.slice(0, 1) : character.idleClips}
                   idleLayer={character.idleLayer}

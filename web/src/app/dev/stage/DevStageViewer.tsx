@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MhStage } from '@/features/avatar/mh/MhStage';
 import type { QualityPreference } from '@/features/avatar/quality';
 import { fetchSpeechClip, speechScript, type SpeechScript } from '@/features/chat/ttsClient';
+import { EYE_TINTS } from '@/features/creator/palettes';
 import { outfitsFor } from '@/features/creator/reconcile';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import {
@@ -92,6 +93,7 @@ export function DevStageViewer() {
   );
   // One slider pushed to an end ('hips:1'), for checking how garments follow the body.
   const [body, setBody] = useState('');
+  const [eyeTint, setEyeTint] = useState('');
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
   const [quality, setQuality] = useState<QualityPreference>('high');
   const [thinking, setThinking] = useState(false);
@@ -111,12 +113,13 @@ export function DevStageViewer() {
     value.beard.style = styles.beard || null;
     value.mustache.style = styles.mustache || null;
     value.outfit = outfit;
+    value.eyes.color = eyeTint || null;
     if (body) {
       const [slider, end] = body.split(':');
       value.body.sliders = { [slider as BodySlider]: Number(end) };
     }
     return value;
-  }, [gender, face, styles, melanin, redness, pattern, outfit, body]);
+  }, [gender, face, styles, melanin, redness, pattern, outfit, body, eyeTint]);
 
   const pickOutfit = useCallback((category: OutfitCategory, id: string) => {
     setOutfit((current) => {
@@ -228,6 +231,19 @@ export function DevStageViewer() {
           <select value={idles} onChange={(e) => setIdles(e.target.value as IdleSet)}>
             {Object.keys(IDLE_SETS).map((key) => (
               <option key={key}>{key}</option>
+            ))}
+          </select>
+          eyes
+          <select
+            data-testid="eye-tint"
+            value={eyeTint}
+            onChange={(e) => setEyeTint(e.target.value)}
+          >
+            <option value="">own</option>
+            {EYE_TINTS.map((tint) => (
+              <option key={tint.key} value={tint.value}>
+                {tint.key}
+              </option>
             ))}
           </select>
           body

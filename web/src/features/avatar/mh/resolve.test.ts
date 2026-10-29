@@ -328,3 +328,26 @@ describe('iris fallback', () => {
     expect(resolveCharacter(config, withBruce)?.iris?.id).toBe('iris.Aoi');
   });
 });
+
+describe('iris tint', () => {
+  const withIris = MhManifestSchema.parse({
+    ...manifest,
+    irises: [{ id: 'iris.Ada', label: 'Ada', color: 'ia.ktx2', swatch: '#808080' }],
+  });
+
+  it('is off without a configured colour', () => {
+    const config = createDefaultConfig('female');
+    config.eyes.color = null;
+    expect(resolveCharacter(config, withIris)?.irisTint).toBeNull();
+  });
+
+  it("is the linear colour against the worn iris's own brightness", () => {
+    const config = createDefaultConfig('female');
+    config.eyes.iris = 'iris.Ada';
+    config.eyes.color = '#ffffff';
+    const tint = resolveCharacter(config, withIris)?.irisTint;
+    expect(tint?.color).toEqual([1, 1, 1]);
+    // #808080 is 0.2159 in linear light.
+    expect(tint?.reference).toBeCloseTo(0.2159, 3);
+  });
+});
