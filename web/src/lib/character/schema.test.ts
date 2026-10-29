@@ -23,7 +23,7 @@ const V1_ANIME = {
   tattoos: [{ design: 'rose', placement: 'wrist' }],
 };
 
-describe('CharacterConfigSchema v2', () => {
+describe('CharacterConfigSchema', () => {
   it.each(['male', 'female'] as const)('accepts the default %s config', (base) => {
     const config = createDefaultConfig(base);
     expect(config.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
@@ -47,6 +47,16 @@ describe('CharacterConfigSchema v2', () => {
     const unknown = createDefaultConfig('female') as unknown as { body: { sliders: object } };
     unknown.body.sliders = { tail: 0.2 };
     expect(CharacterConfigSchema.safeParse(unknown).success).toBe(false);
+  });
+
+  it('starts without socks and rejects an unknown sock style or sheerness', () => {
+    const config = createDefaultConfig('female');
+    expect(config.socks).toEqual({ style: 'none', color: '#1b1b1d', sheer: 0.5 });
+    (config.socks as { style: string }).style = 'fishnet';
+    expect(CharacterConfigSchema.safeParse(config).success).toBe(false);
+    const sheer = createDefaultConfig('female');
+    sheer.socks.sheer = 1.2;
+    expect(CharacterConfigSchema.safeParse(sheer).success).toBe(false);
   });
 
   it('rejects an unknown hair pattern and malformed colours', () => {
@@ -77,9 +87,25 @@ describe('migrateConfig', () => {
     expect(migrated!.tattoos).toEqual([{ design: 'rose', placement: 'wrist' }]);
   });
 
+  it('gives a v2 config no socks and keeps everything else', () => {
+    // A default config has no socks on: stripped of them, it is a stored v2 document.
+    const current = createDefaultConfig('female');
+    current.hair.style = 'groom.hair.Hair_M_BobCurly';
+    const v2: Record<string, unknown> = { ...current, schemaVersion: 2 };
+    delete v2.socks;
+    expect(migrateConfig(v2)).toEqual(current);
+  });
+
+  it('brings a v1 config to the current version with no socks', () => {
+    const migrated = migrateConfig(V1_ANIME);
+    expect(migrated!.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated!.socks.style).toBe('none');
+  });
+
   it('returns null for values that are no config at all', () => {
     expect(migrateConfig(null)).toBeNull();
     expect(migrateConfig({ schemaVersion: 1, base: 'robot' })).toBeNull();
     expect(migrateConfig({ schemaVersion: 99 })).toBeNull();
+    expect(migrateConfig({ schemaVersion: 2, base: 'female' })).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Bump when the config shape changes and add a step to ./migrations.ts. */
-export const CURRENT_SCHEMA_VERSION = 2 as const;
+export const CURRENT_SCHEMA_VERSION = 3 as const;
 
 export const CHARACTER_BASES = ['male', 'female'] as const;
 
@@ -26,6 +26,9 @@ export const BODY_SLIDERS = [
 export const BODY_PRESETS = ['slim', 'average', 'athletic', 'curvy'] as const;
 
 export const HAIR_PATTERNS = ['none', 'ombre', 'roots', 'highlights', 'underlayer'] as const;
+
+/** Sock lengths: ankle, below the knee, or tights from the waist (women only). */
+export const SOCK_STYLES = ['none', 'ankle', 'knee', 'tights'] as const;
 
 const Id = z.string().min(1).max(120);
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Expected a #RRGGBB hex color');
@@ -97,6 +100,13 @@ export const CharacterConfigSchema = z.object({
     /** One-piece outfits (e.g. a costume) replace top and bottom. */
     full: OutfitItemSchema.nullable(),
   }),
+  /** Drawn on the skin under the shoes; hidden wherever a garment covers the leg. */
+  socks: z.object({
+    style: z.enum(SOCK_STYLES),
+    color: HexColorSchema,
+    /** How much skin shows through tights, 0 opaque .. 1 the finest. */
+    sheer: UnitIntervalSchema,
+  }),
   /** Jewellery and accessory ids, worn together. */
   accessories: z.array(Id).max(8),
   /** Small tattoo designs placed on body regions. */
@@ -111,3 +121,4 @@ export type OutfitItem = z.infer<typeof OutfitItemSchema>;
 export type BodySlider = (typeof BODY_SLIDERS)[number];
 export type BodyPreset = (typeof BODY_PRESETS)[number];
 export type HairPattern = (typeof HAIR_PATTERNS)[number];
+export type SockStyle = (typeof SOCK_STYLES)[number];

@@ -104,6 +104,22 @@ describe('creator store base switch', () => {
     });
   });
 
+  it('keeps the socks, dropping tights a man cannot wear', () => {
+    const manifest = maleWithoutCurvy();
+    const female = startingConfig('female', manifest);
+    female.socks = { style: 'knee', color: '#22304a', sheer: 0.5 };
+    useCreatorStore.setState({ config: female });
+
+    useCreatorStore.getState().setBase('male', manifest);
+    expect(useCreatorStore.getState().config.socks).toEqual(female.socks);
+
+    const tights = startingConfig('female', manifest);
+    tights.socks = { style: 'tights', color: '#1b1b1d', sheer: 0.4 };
+    useCreatorStore.setState({ config: tights });
+    useCreatorStore.getState().setBase('male', manifest);
+    expect(useCreatorStore.getState().config.socks.style).toBe('none');
+  });
+
   it('keeps picked garments, swapping one the new body cannot wear', () => {
     const manifest = maleWithoutCurvy();
     const unisex = outfitsFor(manifest, 'bottom', 'female').find((o) => o.compat === 'unisex')!;

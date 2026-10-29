@@ -117,6 +117,18 @@ describe('reconcileConfig', () => {
     ]);
   });
 
+  it('keeps socks of any style on a woman and drops tights on a man', () => {
+    const female = createDefaultConfig('female');
+    female.socks = { style: 'tights', color: '#c9a088', sheer: 0.7 };
+    expect(reconcileConfig(female, manifest).socks).toEqual(female.socks);
+
+    const male = createDefaultConfig('male');
+    male.socks = { style: 'tights', color: '#c9a088', sheer: 0.7 };
+    expect(reconcileConfig(male, manifest).socks.style).toBe('none');
+    male.socks.style = 'knee';
+    expect(reconcileConfig(male, manifest).socks.style).toBe('knee');
+  });
+
   it('turns makeup off when the skin has no makeup maps', () => {
     const config = createDefaultConfig('male');
     config.skin = { set: 'Bruce', tone: 0, makeup: true };

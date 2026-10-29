@@ -3,6 +3,7 @@ import net from 'node:net';
 import { Binary, ObjectId } from 'mongodb';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDefaultConfig } from '@/lib/character/defaults';
+import { CURRENT_SCHEMA_VERSION } from '@/lib/character/schema';
 
 const TEST_URI = 'mongodb://127.0.0.1:27018/ai-sims-test';
 
@@ -76,7 +77,7 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
     expect(created.name).toBe('Mika');
     expect(created.style).toBe('realistic');
     expect(created.base).toBe('male');
-    expect(created.schemaVersion).toBe(2);
+    expect(created.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(created.status).toBe('draft');
     expect(created.hasThumbnail).toBe(false);
   });
@@ -189,7 +190,7 @@ describe.skipIf(!reachable)('character repository (local MongoDB)', () => {
 
     const list = await repo.listCharacters('user-legacy');
     expect(list.map((c) => c.name)).toEqual(['old']);
-    expect(list[0]?.schemaVersion).toBe(2);
+    expect(list[0]?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(list[0]?.config.body.preset).toBe('athletic');
     expect((await repo.getCharacter('user-legacy', legacyId.toHexString()))?.style).toBe(
       'realistic',

@@ -85,6 +85,7 @@ export const useCreatorStore = create<CreatorState>()(
           fresh.eyes = state.config.eyes;
           // Picked garments carry over (reconciled to the new body); none stays underwear.
           fresh.outfit = state.config.outfit;
+          fresh.socks = state.config.socks;
           fresh.hair.color = state.config.hair.color;
           fresh.hair.pattern = state.config.hair.pattern;
           fresh.accessories = state.config.accessories;

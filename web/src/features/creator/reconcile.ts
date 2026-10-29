@@ -241,6 +241,9 @@ export function reconcileConfig(config: CharacterConfig, manifest: MhManifest): 
     next.outfit.bottom = null;
   }
 
+  // Tights are made for the female body only; socks fit both.
+  if (next.socks.style === 'tights' && base !== 'female') next.socks.style = 'none';
+
   next.accessories = reconcileAccessories(next.accessories);
 
   const placements = new Set<string>();

@@ -28,6 +28,7 @@ export function createDefaultConfig(base: CharacterBase): CharacterConfig {
     beard: { style: null },
     mustache: { style: null },
     outfit: { top: null, bottom: null, shoes: null, full: null },
+    socks: { style: 'none', color: '#1b1b1d', sheer: 0.5 },
     accessories: [],
     tattoos: [],
     voice: { gender: base },

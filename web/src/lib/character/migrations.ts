@@ -1,5 +1,10 @@
 import { createDefaultConfig } from './defaults';
-import { CharacterConfigV1Schema, type CharacterConfigV1 } from './legacy';
+import {
+  CharacterConfigV1Schema,
+  CharacterConfigV2Schema,
+  type CharacterConfigV1,
+  type CharacterConfigV2,
+} from './legacy';
 import {
   CharacterConfigSchema,
   CURRENT_SCHEMA_VERSION,
@@ -8,7 +13,7 @@ import {
 } from './schema';
 
 /**
- * v1 (anime/VRM) -> v2 (MetaHuman). The parts and faces of v1 do not exist in
+ * v1 (anime/VRM) -> v2 (MetaHuman), built on today's defaults. The parts and faces of v1 do not exist in
  * the MetaHuman library, so only what carries over is kept: base, body build and
  * height, accessories and tattoos. Everything else starts from the defaults and
  * the creator lets the user pick MetaHuman parts again.
@@ -25,6 +30,15 @@ function fromV1(v1: CharacterConfigV1): CharacterConfig {
   return config;
 }
 
+/** v2 -> v3: socks are new and start off. */
+function fromV2(v2: CharacterConfigV2): CharacterConfig {
+  return {
+    ...v2,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    socks: createDefaultConfig(v2.base).socks,
+  };
+}
+
 /**
  * Brings a stored config to the current schema version. Returns null when the
  * value is not a recognizable config of any version (the caller decides whether
@@ -38,6 +52,10 @@ export function migrateConfig(raw: unknown): CharacterConfig | null {
   if (version === 1) {
     const v1 = CharacterConfigV1Schema.safeParse(raw);
     if (v1.success) return fromV1(v1.data);
+  }
+  if (version === 2) {
+    const v2 = CharacterConfigV2Schema.safeParse(raw);
+    if (v2.success) return fromV2(v2.data);
   }
   return null;
 }

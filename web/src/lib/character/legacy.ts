@@ -1,8 +1,11 @@
 /**
- * Schema v1 (anime/VRM era). Kept only so stored v1 configs can be migrated to v2
- * (see ./migrations.ts) and for the frozen VRM creator until it is removed.
+ * Earlier schema versions, kept only so stored configs can be migrated (see
+ * ./migrations.ts): v1 (anime/VRM era, also the frozen VRM creator's until it
+ * is removed) and v2 (MetaHuman before socks).
  */
 import { z } from 'zod';
+
+import { CharacterConfigSchema } from './schema';
 
 /** Bump when the config shape changes and add a migration. */
 export const LEGACY_SCHEMA_VERSION = 1 as const;
@@ -73,3 +76,11 @@ export type CharacterBase = CharacterConfigV1['base'];
 export type CharacterStyle = CharacterConfigV1['style'];
 export type OutfitItem = z.infer<typeof OutfitItemSchema>;
 export type BodyBuild = CharacterConfigV1['body']['build'];
+
+/** Schema v2: the current MetaHuman config before v3 added `socks`. */
+export const CharacterConfigV2Schema = CharacterConfigSchema.omit({
+  schemaVersion: true,
+  socks: true,
+}).extend({ schemaVersion: z.literal(2) });
+
+export type CharacterConfigV2 = z.infer<typeof CharacterConfigV2Schema>;
