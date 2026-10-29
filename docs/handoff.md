@@ -37,6 +37,8 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
 
 - **2026-10-29 (PC, Faz 2c bitti, sıra kullanıcı kararıyla 2e → 2c → 2b → 2d):** 99 küçük resim (yüz, saç, kaş, sakal, bıyık, kıyafet) `/dev/thumbs` ile kâğıt tonlu fonda ve ayakta yeniden çizildi, R2'de. Çorap: manşetin alt sıraları kendi yüksekliklerindeki deriye oturuyor ve deriye dik giriyor (tırtıklı dikiş gitti, `SkinBand.hit`, UV adacığı korunuyor); parmak zarfında `unfold`'un açtığı 6 mm'lik çukurlar (döndürünce karanlık yarık) 1 mm'ye sınırlandı (`hold_under`, sock-toes-v14). Kalan bilinen: sağ ayakta büyük parmak kökünde pozda açılan küçük delik (tarak bükülmesi; itilen köşelere varış yerinin ağırlıkları gerekir).
 
+- **2026-10-29 (PC, telefon dokuları):** Telefonda ilk karakter ~110 sn'de açılıyordu (Fast 4G taklidi, 70 MB). Artık telefon 1024 px'ten büyük her dokunun üst mip seviyeleri kesilmiş `*.1k.ktx2` kopyasını çekiyor (ilk karakter 26 MB); masaüstü 4K'da kalıyor. Kopyalar ve `mobile-textures.json` manifest her yazıldığında üretilir (`mh/mobile.py`, 673 kopya, 378 MB, hepsi `ktx validate` temiz); web `textureVariants.ts` + KTX2 yükleyicisinin URL modifier'ı. Kullanıcı kararı: sınır 1K (yüz kadrajında yüz ~120 px, fark görünmüyor).
+
 ### Unreal dışa aktarımı (Windows, `pipeline/unreal/mh_export/`)
 
 - **Bitti.** Sayılar `MetaHumanArchive/raw/` altındaki `done.json` birimlerinden:

@@ -73,3 +73,10 @@ The manifest lives at `/assets/mh/manifest.json` and is validated by the zod sch
 - The curation screen (`/[locale]/curate`) writes `curation.json`, which looks like `{ hidden: string[] }`.
 - The creator never shows a hidden id.
 - `asset-pipeline mh-prune` (`pipeline/src/asset_pipeline/mh/prune.py`; updated 2026-10-21) deletes the hidden assets from the archive on the machine it runs on: their web outputs, the Unreal export units and Fab packages only they use, and their build stamps. The ids go into `raw/pruned.json`, so the converter skips them, and the manifest is rebuilt. The default is a dry run that prints the plan and a digest; `--apply --plan <digest>` deletes, and only if the plan is still the one shown.
+
+## Phone texture copies (2026-10-29)
+
+- Every KTX2 under `web/` whose base level is larger than 1024 px has a sibling `<name>.1k.ktx2`: the same file without the mip levels above 1024, cut byte for byte (`asset_pipeline/mh/mobile.py`, no re-encoding). `mobile-textures.json` at the export root lists the sources that have one: `{ version: 1, maxSize: 1024, suffix: ".1k.ktx2", files: string[] }`, paths relative to the root.
+- Both are rewritten whenever the manifest is (`Builder.manifest()`, so `mh-convert` and `mh-prune` too): a copy is redone when its source is newer or its levels changed, and copies whose source is gone are deleted.
+- On phones (touch screen, short side under 600 CSS px) the web app reads the index before the first texture (`web/src/lib/assets/textureVariants.ts`) and its KTX2 loader fetches the copies instead, glTF-referenced maps included. Without the index every texture loads at full size.
+- Why: a phone never draws those levels (the face spans about 120 px in the face close-up), yet they were most of the first character's download (70 MB, 26 MB with the copies).
