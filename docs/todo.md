@@ -17,7 +17,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 2b | Dövme, takı | B3 → B4 | ~16 |
   |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 |
   |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 |
-  |  | 2e | Çorap ve külotlu, file çorap hariç (şema v3) | A4.5 | ~12 |
+  |  | 2e | Çorap ve külotlu, file çorap hariç (şema v3) | A4.5 | ~12 (gerçek ~1) |
   | **3 İş seti ve karakter** (~55 sa) | 3a | Kumaş pantolon, gömlek; blazer 7b'de | A4.1 | ~13 |
   |  | 3b | Polo, chino, kravatlı gömlek, sıvanmış kol | A4.6 → A4.15 | ~12 |
   |  | 3c | Kişilik ve ses | C1 → C2 | ~22 |
@@ -153,7 +153,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Diz boyu elbise, kadın (kısa kol ya da kolsuz, belden oturan). Hem iş hem günlük.
     - Hafif ceket (overshirt / chore ceket), kadın ve erkek; tek başına `top`.
     - Desen varyantları ayrı katalog öğeleri olur, şema değişmez: çizgili tişört (A4.2), ekose gömlek (A4.1), keten pantolon. Paketleyici aynı mesh'ten ikinci bir birim yazar. `M_fabric_simpler`'ın iki renk maskesi (`diffuse_color_1/2`) desen maskesi olarak kullanılabiliyorsa desen iki renkli ve renk presetli olur; olmuyorsa dokusu bake'lenmiş düz PBR. Desen dokuları CC0 (ambientCG, Poly Haven) ya da script'le çizilir.
-  - [ ] **A4.5 Çorap: kısa ve uzun, renk seçilebilir** (kullanıcı isteği, 2026-10-27). Blender gerekmez; web işidir.
+  - [x] **A4.5 Çorap: kısa ve uzun, renk seçilebilir** (2026-10-29, `87738c0`, `1503838`, `2f00956`; ayrıntı `docs/plans/faz-2.md` 2e. Maske yerine nötr gövdenin yüksekliğinden kesim; ten rengi külotlu giyenin tenini alır) (kullanıcı isteği, 2026-10-27). Blender gerekmez; web işidir.
     - Mesh değil, cilt shader'ında bir katman olur, iç çamaşırıyla aynı yoldan: gövde UV'sinde maske, kumaş albedo ve normal, renk (`web/src/features/avatar/mh/materials.ts`, `skinTextures.ts`; iç çamaşırı maskesi `web/skins/underwear/`). Böylece ayakkabının içinden taşmaz ve slider'larla bozulmaz.
     - Boylar: kısa (bilek) ve uzun (diz altı). Maskeler gövde UV'sinde ayak bileği ve diz yükseklik çizgilerinden script'le üretilir; kenarda ince bir lastik bandı (normal haritada).
     - Görünürlük: alt giysi ya da ayakkabının örttüğü yerde zaten çizilmez (`body_hide`); çıplak ayakta ve terlikte çorap görünür.
