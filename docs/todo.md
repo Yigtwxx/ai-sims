@@ -15,7 +15,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 1d | Oturma hataları; düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer | B5 | ~6 (gerçek ~12) |
   | **2 Panel ve temel kıyafet** (~60 sa) | 2a | Göz tonu, yüz karıştırma | B1 → B2 | ~14 (gerçek ~1) |
   |  | 2b | Dövme, takı | B3 → B4 | ~16 |
-  |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 |
+  |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 (gerçek ~0.8) |
   |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 |
   |  | 2e | Çorap ve külotlu, file çorap hariç (şema v3) | A4.5 | ~12 (gerçek ~1) |
   | **3 İş seti ve karakter** (~55 sa) | 3a | Kumaş pantolon, gömlek; blazer 7b'de | A4.1 | ~13 |
@@ -48,7 +48,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 8e | Son kontrol | D2 | ~5 |
   | **Toplam** | 37 alt faz | | | **~480** (1 subagent'la ~335) |
 
-  - **Sıra istisnası** (kullanıcı kararı, 2026-10-29): Faz 2'de 2a'dan sonra 2e yapılır, sonra 2b → 2c → 2d. Gerekçe ve yeni tahminler `docs/plans/faz-2.md`'nin başında.
+  - **Sıra istisnası** (kullanıcı kararı, 2026-10-29): Faz 2'de 2a'dan sonra 2e, sonra 2c yapılır, sonra 2b → 2d. Gerekçe ve yeni tahminler `docs/plans/faz-2.md`'nin başında.
   - **Faz içi bölme** (kullanıcı kararı, 2026-10-27): fazlar yukarıdaki tablodaki alt fazlara bölünmüştür (1a, 1b, ...) ve alt fazlar tablodaki sırayla yapılır. Her fazın başında oturum her alt fazı adımlara böler ve `docs/plans/faz-<n>.md` dosyasına alt faz başlıklarıyla yazar (`superpowers:writing-plans`).
     - Bir alt adım en çok ~4-6 saatlik iştir ve kendi başına bitebilir: doğrulama, commit, push. Yarım alt adım push'lanmaz.
     - Plan dosyasında her adımın kutusu, tahmini süresi ve gerçek süresi tutulur. Gerçek süreler sonraki fazların tahminlerini düzeltir; bu dosyadaki faz saatleri de güncellenir.
@@ -290,7 +290,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## D. Kapanış
 
-- [ ] **D1. Küçük resimler.** Yüz, saç ve kıyafet küçük resimleri `/dev/thumbs` ile yeniden üretilir (A-pose hatası `motion.ts`'te düzeldi; eski görseller A-pozunda ve koyu fonda). Açık fon düşünülebilir. Sonra `cd web && node scripts/r2-sync.mjs`.
+- [x] **D1. Küçük resimler** (2026-10-29; 99 görsel kâğıt tonlu fonda ve ayakta, R2'de; ayrıntı `docs/plans/faz-2.md` 2c). Yüz, saç ve kıyafet küçük resimleri `/dev/thumbs` ile yeniden üretilir (A-pose hatası `motion.ts`'te düzeldi; eski görseller A-pozunda ve koyu fonda). Açık fon düşünülebilir. Sonra `cd web && node scripts/r2-sync.mjs`.
 - [ ] **D2. Son kontrol.** Landing, yeni kadın ve erkek karakter, yeni özellikler, Bitti, konuşma ekranında TR ve EN birer cümle (ses ve dudak). Konsolda `THREE.Clock` uyarısından başka hata olmamalı. Sonuç kullanıcıya ekran görüntüleriyle bildirilir.
 
 ## Kullanıcıya sorular
