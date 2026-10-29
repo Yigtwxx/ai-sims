@@ -29,6 +29,10 @@ describe('createSkinMaterial socks', () => {
     expect(shader.uniforms).toHaveProperty('skinSockTop');
     expect(shader.vertexShader).toContain(`attribute float ${LEG_HEIGHT};`);
     expect(shader.vertexShader).toContain(`vLegHeight = ${LEG_HEIGHT};`);
+    // The fabric stands off the skin, covered vertices only.
+    expect(shader.vertexShader).toContain(
+      `transformed += sockOut * skinSockThickness * step( ${LEG_HEIGHT}, skinSockTop );`,
+    );
     // The toe envelope moves the bind pose and its normal, before the skinning.
     expect(shader.vertexShader).toContain(`transformed += ${SOCK_TOE_OFFSET} * skinSockToes;`);
     expect(shader.vertexShader).toContain(
