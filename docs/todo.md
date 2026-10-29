@@ -294,7 +294,9 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## Kullanıcıya sorular
 
-- **B2 kaydırıcı (2026-10-29, açık):** yüz karışımı bugün kaydırıcı bırakınca ~0.5 sn'de güncelleniyor (seçenek A, uygulandı). Seçenek B: sürüklerken canlı değişsin (~+3 sa; saç ve boyun bırakınca oturur). Cevap gelirse B ayrı adım olarak yapılır.
+(Bekleyen soru yok.)
+
+- Cevaplanan (2026-10-29, B2): yüz karışımı kaydırıcı bırakınca güncellenir (seçenek A). Sürüklerken canlı önizleme (B) yapılmayacak.
 
 - Cevaplanan (2026-10-28, B5): açık kalan vakalar Faz 1 içinde bitirildi (kullanıcı: "faz 1i tamamen bitir").
 

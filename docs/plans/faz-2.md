@@ -53,7 +53,7 @@
   - `docs/todo.md` B1, B2 `[x]`; handoff "Durum"; commit + push.
   - Sonuç (2026-10-29): `/dev/mh?blend=` ile sabit karede Ada + Zuri %50 ve Victor + Mason %100'de `eyeBlinkLeft` kapağı tam kapatıyor, `viseme_PP`'de dudaklar kapalı, `jawOpen`'da diş ve dil yerinde; Victor → Mason %100 şekli Mason'la aynı. Konuşan karışık yüzde (Victor + Mason %50, TR örneği) m/b/p kapanıyor. Konuşma modunda göz teması sırasında göz küreleri yuvasında. Oluşturucuda karışım ekleme ve kaydırıcı çalışıyor, konsolda hata yok.
   - Ölçüm: hazırlama ~0.43 sn duvar saati (iki kaynak), dilimli; en uzun ana iş parçacığı görevi düz yüklemede 395 ms, karışımla 482 ms (shader ve morph dokusu). JS belleği tek kaynakla +75 MB, üç kaynakla +180 MB (kaynak GLB'ler önbellekte kalır).
-  - Yapılmadı: sürüklerken canlı önizleme (seçenek B, kullanıcıya soruldu, cevap bekleniyor).
+  - Kullanıcı kararı (2026-10-29): kaydırıcı bırakınca uygulanır (A); sürüklerken canlı önizleme (B) yapılmayacak.
 
 ## 2b — Dövme, takı (B3 → B4), tahmin ~16
 
