@@ -5,10 +5,12 @@ import pytest
 
 from asset_pipeline.mh.sock_toes import (
     FIELD_BLUR,
+    MEET_SHARE,
     SockToes,
     envelope,
     read_sock_toes,
     toe_weights,
+    unfold,
     write_sock_toes,
 )
 
@@ -62,7 +64,7 @@ def merge(*meshes):
 
 def test_envelope_closes_the_gap_between_two_toes() -> None:
     # Two 10 mm "toes" 3 mm apart: the sock spans the gap, so their facing sides meet
-    # halfway, all along it.
+    # in it all along, each a little past halfway (MEET_SHARE) so that they overlap.
     left = box((0.040, 0.0, 0.10), (0.050, 0.010, 0.11))
     right = box((0.053, 0.0, 0.10), (0.063, 0.010, 0.11))
     positions, normals, indices = merge(left, right)
@@ -72,14 +74,35 @@ def test_envelope_closes_the_gap_between_two_toes() -> None:
     moved = positions + offsets
     # Clear of the pair's own square edges, which the blurred field rounds.
     inner = (np.abs(positions[:, 1] - 0.005) < 0.0025) & (np.abs(positions[:, 2] - 0.105) < 0.0035)
-    for face in (0.050, 0.053):
+    for face, toward in ((0.050, 1.0), (0.053, -1.0)):
         facing = inner & (np.abs(positions[:, 0] - face) < 1e-9)
         assert facing.any()
-        miss = np.abs(moved[facing, 0] - 0.0515).max()
-        assert miss < 0.0004, f"the side at x={face} stops {miss * 1e3:.2f} mm from halfway"
+        expected = face + toward * 0.003 * MEET_SHARE
+        miss = np.abs(moved[facing, 0] - expected).max()
+        assert miss < 0.0006, f"the side at x={face} stops {miss * 1e3:.2f} mm short"
     outer = np.abs(positions[:, 0] - 0.040) < 1e-9
     shift = np.linalg.norm(offsets[outer], axis=1)
     assert shift.max() < VOXEL_TOLERANCE, f"an outer side moved {shift.max() * 1e3:.2f} mm"
+
+
+def test_envelope_fills_the_notch_between_two_toe_tips() -> None:
+    # The facing sides near the front of the gap come forwards onto the front of the
+    # pair, not over or under it: the front stays whole, no notch between the tips.
+    left = box((0.040, 0.0, 0.10), (0.050, 0.010, 0.11))
+    right = box((0.053, 0.0, 0.10), (0.063, 0.010, 0.11))
+    positions, normals, indices = merge(left, right)
+    offsets, _ = envelope(
+        positions, normals, indices, np.ones(len(positions)), radius=RADIUS, box_blur=FIELD_BLUR
+    )
+    moved = positions + offsets
+    near_front = (
+        ((np.abs(positions[:, 0] - 0.050) < 1e-9) | (np.abs(positions[:, 0] - 0.053) < 1e-9))
+        & (positions[:, 2] > 0.1075)
+        & (np.abs(positions[:, 1] - 0.005) < 0.0025)
+    )
+    assert near_front.any()
+    behind = 0.11 - moved[near_front, 2]
+    assert behind.max() < 0.0012, f"the front dips {behind.max() * 1e3:.2f} mm at the gap"
 
 
 def test_envelope_keeps_a_convex_shape() -> None:
@@ -114,6 +137,24 @@ def test_envelope_leaves_unweighted_vertices_alone() -> None:
     )
     assert not offsets.any()
     assert np.array_equal(new_normals, normals)
+
+
+def test_unfold_turns_no_triangle_over() -> None:
+    # A fan of four triangles around a centre that an offset pushed past its rim.
+    positions = np.array(
+        [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
+    )
+    triangles = np.array([[0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 1]])
+    offsets = np.zeros_like(positions)
+    offsets[0] = [1.6, 0.0, 0.0]
+    fixed = unfold(positions, offsets, triangles)
+    moved = positions + fixed
+    faces = np.cross(
+        moved[triangles[:, 1]] - moved[triangles[:, 0]],
+        moved[triangles[:, 2]] - moved[triangles[:, 0]],
+    )
+    assert np.all(faces[:, 2] > 0), "a triangle is still turned over"
+    assert np.array_equal(fixed[1:], offsets[1:]), "the rim moved"
 
 
 @pytest.mark.parametrize(

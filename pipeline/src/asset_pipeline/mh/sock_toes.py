@@ -8,14 +8,18 @@ converted body:
 1. Each foot below the ankle is voxelized (ray parity along x, 1 mm voxels).
 2. The solid is closed morphologically with a ball of `CLOSING_RADIUS`: gaps and grooves
    narrower than about twice that fill, convex shapes stay as they were.
-3. The toe vertices (weighted to the toe and ball bones) move onto the closed surface.
-   A side facing the next toe across a filled gap first meets it halfway, so the gap
-   closes all along, out to its open front between the toe tips. Then every vertex snaps
-   along the distance gradient onto a strongly blurred copy of the closed surface
-   (TOE_BOX_BLUR): the toe box, one rounded shape without the bumps of the separate toe
-   tips. The field is smooth, so the result is too, without evening the vertices out
-   (which would slide them and drag the UVs).
-4. Their normals become those of a softer copy of the closed surface (NORMAL_BLUR),
+3. The toe vertices (weighted to the toe and ball bones) move onto a strongly blurred
+   copy of the closed surface (TOE_BOX_BLUR): the toe box, one rounded shape. A side
+   facing the next toe across a filled gap first meets it halfway. A point the toe box
+   holds inside (a gap or a notch between two toe tips) is then pushed out from a spine
+   through the toes (`toe_spine`), so a notch's sides come forwards onto the box's front
+   instead of over or under it, and the front stays whole. Every other vertex snaps
+   onto the box along its distance gradient. The field is smooth, so the result is too,
+   without evening the vertices out (which would slide them and drag the UVs).
+4. Triangles the move turned over (a hole: their back is not drawn) or folded to face
+   into the box (a dark slit) are unfolded, the offsets of their corners eased towards
+   their neighbours' until none is left.
+5. Their normals become those of a softer copy of the closed surface (NORMAL_BLUR),
    blended in by the toe weight.
 
 The file holds, for the vertices that move, their index into the body GLB's vertex order
@@ -28,7 +32,9 @@ f32 offsets[count * 3], f32 normal deltas[count * 3].
 """
 
 import struct
+from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -42,7 +48,7 @@ F64 = NDArray[np.float64]
 MAGIC = b"MHSK"
 FORMAT_VERSION = 1
 #: Bumped whenever the envelope changes (part of the build fingerprint).
-SOCK_TOES_VERSION = "sock-toes-v5"
+SOCK_TOES_VERSION = "sock-toes-v13"
 
 VOXEL = 0.001
 #: Grooves narrower than about twice this fill; the toe gaps are 2-8 mm, the notches
@@ -59,13 +65,27 @@ NORMAL_BLUR = 6.0
 #: The foot is everything under this height; the leg above is left out of the voxels.
 FOOT_HEIGHT = 0.09
 #: Toe weight (toe + ball bones) where the envelope starts and where it holds in full.
-WEIGHT_START, WEIGHT_FULL = 0.02, 0.35
+WEIGHT_START, WEIGHT_FULL = 0.01, 0.12
 SNAP_STEPS = 10
 #: The widest gap a side crosses to meet the next toe, and the march step.
 MEET_REACH, MEET_STEP = 0.012, 0.00025
-#: A side meets across the gap when its normal and the way out of the filled volume
-#: (the distance gradient) are at least this far apart: |n . g| below it.
-MEET_ALIGNMENT = 0.5
+#: How far across the gap a side goes: a little past halfway, so the two sides overlap
+#: and no hairline crack is left between them where they come out onto the toe box.
+MEET_SHARE = 0.6
+#: The spine the toe box is pushed out from, this far behind its front (m).
+SPINE_DEPTH = 0.012
+#: How far a point travels at most to leave the toe box, and the march step.
+PUSH_REACH, PUSH_STEP = 0.02, 0.00025
+#: A point this far inside the box (m) is pushed out; nearer, it is on the surface give
+#: or take the voxels, and snaps.
+INSIDE = 0.0008
+#: Passes of easing the corners of turned-over triangles (see `unfold`).
+UNFOLD_PASSES = 200
+#: A triangle folded this far against the toe box's normal (cosine) counts as turned
+#: over: it would shade as a dark slit.
+FOLD_LIMIT = -0.3
+#: Then passes of shrinking the corners still turned over back towards the skin.
+SHRINK_PASSES = 60
 #: Offsets and normal changes below these are not written.
 MIN_OFFSET, MIN_NORMAL = 1e-5, 1e-4
 
@@ -179,7 +199,8 @@ def meet_across(
     points: F64, normals: F64, closed: Field, solid: Field
 ) -> tuple[F64, NDArray[np.bool_]]:
     """For vertices whose normal crosses a gap the closing filled and reaches the next
-    toe while still inside the closed volume, the point halfway across; and which do."""
+    toe while still inside the closed volume, the point a little past halfway across
+    (MEET_SHARE); and which do."""
     steps = np.arange(1, round(MEET_REACH / MEET_STEP) + 1) * MEET_STEP
     count = len(points)
     if count == 0:
@@ -193,11 +214,111 @@ def meet_across(
     first_reach = np.where(reached.any(axis=1), reached.argmax(axis=1), len(steps))
     escaped = ~inside_closed
     first_escape = np.where(escaped.any(axis=1), escaped.argmax(axis=1), len(steps))
+    # A groove wall meets its neighbour inside the groove too; push_out then lifts it out.
     meets = (first_reach < len(steps)) & (first_reach < first_escape)
-    across = np.abs((normals * closed.normal(points)).sum(axis=1)) < MEET_ALIGNMENT
-    meets &= across
-    halfway = steps[np.minimum(first_reach, len(steps) - 1)] / 2
-    return points + normals * halfway[:, None], meets
+    across = steps[np.minimum(first_reach, len(steps) - 1)] * MEET_SHARE
+    return points + normals * across[:, None], meets
+
+
+def toe_spine(points: F64, bin_width: float = 0.004) -> Callable[[F64], F64]:
+    """The spine of a foot's toes, as a function giving each point its spine point: across
+    the foot (x), at the toes' height, SPINE_DEPTH behind their front (+z)."""
+    x = points[:, 0]
+    edges = np.arange(x.min(), x.max() + bin_width, bin_width)
+    centres, fronts, heights = [], [], []
+    for a, b in pairwise(edges):
+        column = (x >= a) & (x < b)
+        if not column.any():
+            continue
+        front = points[column, 2].max()
+        near = column & (points[:, 2] > front - 0.015)
+        centres.append((a + b) / 2)
+        fronts.append(front)
+        heights.append(float(np.median(points[near, 1])))
+
+    def at(p: F64) -> F64:
+        y = np.interp(p[:, 0], centres, heights)
+        z = np.interp(p[:, 0], centres, fronts) - SPINE_DEPTH
+        return np.stack([p[:, 0], y, z], axis=1)
+
+    return at
+
+
+def push_out(points: F64, box: Field, spine: Callable[[F64], F64]) -> tuple[F64, NDArray[np.bool_]]:
+    """Points inside the toe box moved out of it away from the spine, in the plane across
+    the foot (x stays); behind the spine straight up or down. Also which made it out."""
+    count = len(points)
+    if count == 0:
+        return points.copy(), np.zeros(0, dtype=bool)
+    direction = points - spine(points)
+    direction[:, 0] = 0.0
+    direction[direction[:, 2] < 0, 2] = 0.0
+    length = np.linalg.norm(direction, axis=1, keepdims=True)
+    direction = np.where(length > 1e-9, direction / np.maximum(length, 1e-12), [0.0, 1.0, 0.0])
+    steps = np.arange(1, round(PUSH_REACH / PUSH_STEP) + 1) * PUSH_STEP
+    rays = (points[:, None, :] + direction[:, None, :] * steps[None, :, None]).reshape(-1, 3)
+    outside = box(rays).reshape(count, -1)
+    exits = (outside >= 0).any(axis=1)
+    first = np.where(exits, (outside >= 0).argmax(axis=1), 0)
+    # Between the last step inside and the first outside, where the field crosses zero.
+    before = np.where(first > 0, outside[np.arange(count), np.maximum(first - 1, 0)], box(points))
+    after = outside[np.arange(count), first]
+    t_before = np.where(first > 0, steps[np.maximum(first - 1, 0)], 0.0)
+    t_after = steps[first]
+    span = np.where(after != before, after - before, 1.0)
+    reach = t_before + (t_after - t_before) * np.clip(-before / span, 0.0, 1.0)
+    return points + direction * reach[:, None], exits
+
+
+def unfold(
+    positions: F64,
+    offsets: F64,
+    triangles: NDArray[np.int64],
+    normals: F64 | None = None,
+) -> F64:
+    """Offsets with no triangle turned over, nor (given the new vertex `normals`) folded
+    to face into the toe box: such a fold shades as a dark slit. Each pass moves the
+    moving corners of those triangles towards the mean offset of their neighbours. A few
+    settle among neighbours that moved as far; those corners then shrink back towards
+    the skin, which ends it (unmoved, no triangle is turned over or folded in)."""
+    before = np.cross(
+        positions[triangles[:, 1]] - positions[triangles[:, 0]],
+        positions[triangles[:, 2]] - positions[triangles[:, 0]],
+    )
+    moving = np.abs(offsets).max(axis=1) > 0
+    touched = moving[triangles].any(axis=1)
+    faces = triangles[touched]
+    reference = before[touched]
+    edges = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]])
+    edges = np.concatenate([edges, edges[:, ::-1]])
+    degree = np.bincount(edges[:, 0], minlength=len(positions)).astype(np.float64)
+    result = offsets.copy()
+    for step in range(UNFOLD_PASSES + SHRINK_PASSES):
+        moved = positions + result
+        after = np.cross(
+            moved[faces[:, 1]] - moved[faces[:, 0]], moved[faces[:, 2]] - moved[faces[:, 0]]
+        )
+        flipped = (after * reference).sum(axis=1) < 0
+        folded = np.zeros_like(flipped)
+        if normals is not None and step < UNFOLD_PASSES:
+            facing = normals[faces].mean(axis=1)
+            length = np.linalg.norm(after, axis=1) * np.linalg.norm(facing, axis=1)
+            folded = (after * facing).sum(axis=1) < FOLD_LIMIT * np.maximum(length, 1e-15)
+        if not (flipped | folded).any():
+            if step >= UNFOLD_PASSES or normals is None:
+                break
+            continue
+        corners = np.unique(faces[flipped | folded])
+        corners = corners[moving[corners]]
+        if step < UNFOLD_PASSES:
+            total = np.zeros_like(result)
+            np.add.at(total, edges[:, 0], result[edges[:, 1]])
+            mean = total[corners] / np.maximum(degree[corners], 1)[:, None]
+            result[corners] = 0.5 * result[corners] + 0.5 * mean
+        else:
+            # Only what is still turned over: a fold left to the skin would open the gap.
+            result[corners] *= 0.8
+    return result
 
 
 def envelope(
@@ -245,11 +366,14 @@ def envelope(
         error[meets] = 0.0
         start = np.where(meets[:, None], met, start)
         snapped = snap(start, box) - error
+        inside = np.flatnonzero(box(start) < -INSIDE)
+        pushed, out = push_out(start[inside], box, toe_spine(positions[index]))
+        snapped[inside[out]] = pushed[out]
         w = weight[index][:, None]
         offsets[index] = (snapped - positions[index]) * w
         blended = normals[index] * (1 - w) + shading.normal(snapped) * w
         result[index] = blended / np.maximum(np.linalg.norm(blended, axis=1, keepdims=True), 1e-12)
-    return offsets, result
+    return unfold(positions, offsets, triangles, result), result
 
 
 def sock_toes_from_glb(body_glb: Path) -> SockToes:
