@@ -1,14 +1,54 @@
-import { BufferAttribute, BufferGeometry, CylinderGeometry } from 'three';
+import { BufferAttribute, BufferGeometry, CylinderGeometry, LatheGeometry, Vector2 } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import { BODY_HIDDEN } from './garments';
 import { cuffGeometry, cuffProfile } from './sockCuff';
 import { LEG_HEIGHT } from './socks';
 
-/** A 10 cm leg of radius 5 cm standing on y = 0, with the attributes a body has. */
-function leg(hiddenBelow = -1): BufferGeometry {
+/** A body's UV density on the legs, along and around (UV units per metre). */
+const UV_PER_METRE = 0.65;
+
+/**
+ * A 10 cm leg of radius 5 cm standing on y = 0, with the attributes a body has;
+ * `twist` (radians per metre up) turns its UV seam into a slant.
+ */
+function leg(hiddenBelow = -1, twist = 0): BufferGeometry {
   const geometry = new CylinderGeometry(0.05, 0.05, 0.1, 24, 10, true);
   geometry.translate(0, 0.05, 0);
+  const turned = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  for (let v = 0; v < turned.count; v += 1) {
+    const angle = twist * turned.getY(v);
+    const [cos, sin] = [Math.cos(angle), Math.sin(angle)];
+    for (const attribute of [turned, normal]) {
+      const [x, z] = [attribute.getX(v), attribute.getZ(v)];
+      attribute.setX(v, x * cos - z * sin);
+      attribute.setZ(v, x * sin + z * cos);
+    }
+  }
+  // Around from 0 to 1 and up from 0 to 1: rescaled to the body's density.
+  const uv = geometry.getAttribute('uv');
+  for (let v = 0; v < uv.count; v += 1) {
+    uv.setXY(v, uv.getX(v) * 2 * Math.PI * 0.05 * UV_PER_METRE, uv.getY(v) * 0.1 * UV_PER_METRE);
+  }
+  return withBodyAttributes(geometry, hiddenBelow);
+}
+
+/** A leg whose radius at height y is `radiusAt(y)`, curving like a calf into the ankle. */
+function curvedLeg(radiusAt: (y: number) => number): BufferGeometry {
+  const points = Array.from(
+    { length: 41 },
+    (_, k) => new Vector2(radiusAt(k * 0.0025), k * 0.0025),
+  );
+  const geometry = new LatheGeometry(points, 96);
+  const uv = geometry.getAttribute('uv');
+  for (let v = 0; v < uv.count; v += 1) {
+    uv.setXY(v, uv.getX(v) * 2 * Math.PI * 0.045 * UV_PER_METRE, uv.getY(v) * 0.1 * UV_PER_METRE);
+  }
+  return withBodyAttributes(geometry, -1);
+}
+
+function withBodyAttributes(geometry: BufferGeometry, hiddenBelow: number): BufferGeometry {
   const position = geometry.getAttribute('position');
   const count = position.count;
   const heights = new Float32Array(count);
@@ -37,7 +77,7 @@ function leg(hiddenBelow = -1): BufferGeometry {
 const PROFILE = cuffProfile('cotton', 0.015);
 
 describe('cuffGeometry', () => {
-  it('rings the leg at the edge, standing off it and tapering down into the sock', () => {
+  it('rings the leg at the edge, standing off it and tucking down under the skin', () => {
     const cuff = cuffGeometry(leg(), 0.055, PROFILE)!;
     const position = cuff.getAttribute('position');
     let lowest = Infinity;
@@ -49,12 +89,43 @@ describe('cuffGeometry', () => {
       thickest = Math.max(thickest, Math.hypot(position.getX(v), position.getZ(v)) - 0.05);
     }
     expect(highest).toBeCloseTo(0.055, 3);
-    expect(lowest).toBeCloseTo(0.055 - 0.015, 3);
+    expect(lowest).toBeCloseTo(0.055 - 0.015 - 0.0012, 3);
     // The cylinder's flat sides sit a little inside the radius; the roll is ~2 mm thick.
     expect(thickest).toBeGreaterThan(0.0015);
     expect(thickest).toBeLessThan(0.0025);
-    // Around the whole leg: 24 sides crossed, two triangles each.
-    expect(position.count).toBe(48 * 2 * PROFILE.points.length);
+    // Around the whole leg: 24 sides crossed, two triangles each, five columns on each.
+    expect(position.count).toBe(48 * 5 * PROFILE.points.length);
+  });
+
+  it('sits its lower rows on the skin at their own height, however the leg curves', () => {
+    // Straight down from the edge the taper would end 2 mm inside the skin, and
+    // along the skin's slope at the edge 0.5 mm inside it.
+    const radiusAt = (y: number) => 0.04 + 4 * (0.07 - y) ** 2;
+    const cuff = cuffGeometry(curvedLeg(radiusAt), 0.0551, PROFILE)!;
+    const position = cuff.getAttribute('position');
+    const rows = PROFILE.points.length;
+    for (let v = 0; v < position.count; v += 1) {
+      const above = Math.hypot(position.getX(v), position.getZ(v)) - radiusAt(position.getY(v));
+      // The end of the taper: half a millimetre over the skin all round.
+      if (v % rows === rows - 2) {
+        expect(above).toBeGreaterThan(0.0004);
+        expect(above).toBeLessThan(0.0006);
+      }
+      // Its last row is under the skin, so no facet pokes through the seam.
+      if (v % rows === rows - 1) expect(above).toBeLessThan(0);
+    }
+  });
+
+  it('keeps each column on one UV island across a seam', () => {
+    // The cylinder's UVs jump from all the way round back to 0 where it closes;
+    // twisted, the seam slants under the edge, and lower rows reach across it.
+    const cuff = cuffGeometry(leg(-1, 10), 0.055, PROFILE)!;
+    const uv = cuff.getAttribute('uv');
+    const rows = PROFILE.points.length;
+    for (let v = 0; v < uv.count; v += 1) {
+      const top = v - (v % rows);
+      expect(Math.abs(uv.getX(v) - uv.getX(top))).toBeLessThan(0.01);
+    }
   });
 
   it('is drawn as sock and keeps the skin weights and morphs of the leg there', () => {
@@ -87,12 +158,14 @@ describe('cuffGeometry', () => {
 });
 
 describe('cuffProfile', () => {
-  it('rolls knit thicker than the waistband of tights, and ends on the skin', () => {
+  it('rolls knit thicker than the waistband of tights, and ends under the skin', () => {
     const knit = cuffProfile('cotton', 0.015).points;
     const nylon = cuffProfile('nylon', 0.025).points;
     const thickness = (points: typeof knit) => Math.max(...points.map(([out]) => out));
     expect(thickness(knit)).toBeGreaterThan(thickness(nylon));
-    expect(knit.at(-1)![1]).toBeCloseTo(-0.015);
-    expect(knit.at(-1)![0]).toBeLessThan(0.0005);
+    expect(knit.at(-2)![1]).toBeCloseTo(-0.015);
+    expect(knit.at(-2)![0]).toBeLessThan(0.001);
+    expect(knit.at(-1)![0]).toBeLessThan(0);
+    expect(knit.at(-1)![1]).toBeLessThan(-0.015);
   });
 });
