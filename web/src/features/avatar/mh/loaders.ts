@@ -1,10 +1,12 @@
 'use client';
 
 import { useLoader, useThree } from '@react-three/fiber';
-import type { WebGLRenderer } from 'three';
+import { LoadingManager, type WebGLRenderer } from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+
+import { textureUrl } from '@/lib/assets/textureVariants';
 
 /** Basis transcoder copied from three/examples/jsm/libs/basis into public/basis. */
 const BASIS_PATH = '/basis/';
@@ -12,6 +14,11 @@ const BASIS_PATH = '/basis/';
 // One KTX2Loader per renderer: it owns a transcoder worker pool and detects the
 // GPU's compressed formats (ASTC/BC7/ETC2) once.
 const ktx2ByRenderer = new Map<WebGLRenderer, KTX2Loader>();
+
+// Every KTX2 request, the maps glTF files reference included, resolves through
+// this manager: on phones it swaps in the phone-sized copies.
+const ktx2Manager = new LoadingManager();
+ktx2Manager.setURLModifier(textureUrl);
 
 /**
  * Terminates the transcoder workers of renderers whose canvas has left the
@@ -32,7 +39,7 @@ export function ktx2LoaderFor(renderer: WebGLRenderer): KTX2Loader {
   let loader = ktx2ByRenderer.get(renderer);
   if (!loader) {
     releaseDetachedLoaders();
-    loader = new KTX2Loader().setTranscoderPath(BASIS_PATH).detectSupport(renderer);
+    loader = new KTX2Loader(ktx2Manager).setTranscoderPath(BASIS_PATH).detectSupport(renderer);
     ktx2ByRenderer.set(renderer, loader);
   }
   return loader;

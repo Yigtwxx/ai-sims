@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { assetUrl, loadMhManifest, type MhManifest } from '@/lib/assets/manifest';
+import { loadTextureVariants } from '@/lib/assets/textureVariants';
 
 export type ManifestState =
   | { status: 'loading' }
@@ -41,7 +42,8 @@ export function useMhManifest({ curated = true }: { curated?: boolean } = {}): M
           if (active) setState({ status: 'ready', manifest: fixtureManifest(), fixture: true });
           return;
         }
-        const manifest = await loadMhManifest({ curated });
+        // Phones read the texture index first: no map may load before its copy is known.
+        const [manifest] = await Promise.all([loadMhManifest({ curated }), loadTextureVariants()]);
         if (active) setState({ status: 'ready', manifest, fixture: false });
       } catch (error) {
         if (!active) return;
