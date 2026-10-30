@@ -165,3 +165,48 @@ def test_ribs_darken_the_occlusion():
     plain = garment_maps(GarmentLines(), 1.0, size=64)
     ribbed = garment_maps(GarmentLines(ribs=[np.array([[0.5, 0.1], [0.5, 0.9]])]), 1.0, size=64)
     assert np.asarray(ribbed["AO"])[..., 0].min() < np.asarray(plain["AO"])[..., 0].min()
+
+
+def test_shorts_leg_outline_closes_counter_clockwise():
+    from asset_pipeline.garments.shorts import LegPattern
+
+    leg = LegPattern(0.19, 0.24, 0.24, 0.27, 0.045, 0.07, 0.07, 0.19, 0.375, 0.0)
+    segments = leg.segments()
+    assert [s.name for s in segments] == ["hem", "side", "top", "centre", "inseam"]
+    for a, b in zip(segments, segments[1:] + segments[:1], strict=True):
+        assert np.allclose(a.points[-1], b.points[0])
+    outline = np.concatenate([s.points[:-1] for s in segments])
+    x, y = outline[:, 0], outline[:, 1]
+    assert 0.5 * np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y) > 0
+    # The leg at the crotch is its own width: inner seam to side seam.
+    side = segments[1].points
+    at_crotch = np.interp(0.07, side[:, 1], side[:, 0])
+    assert at_crotch + leg.extension == pytest.approx(leg.leg_width, abs=1e-3)
+
+
+def test_crotch_height_is_where_the_legs_join():
+    from asset_pipeline.garments.shorts import crotch_height
+
+    y = np.linspace(0.0, 1.0, 201)
+    legs = [np.stack([np.full_like(y, sx), y, np.zeros_like(y)], 1) for sx in (-0.1, 0.1)]
+    top = y[y > 0.62]
+    middle = np.stack([np.zeros_like(top), top, np.zeros_like(top)], 1)
+    points = np.concatenate([*legs, middle])
+    assert crotch_height(points, 0.3, 0.9) == pytest.approx(0.625, abs=0.005)
+
+
+@pytest.mark.parametrize("front", [True, False])
+@pytest.mark.parametrize("left", [True, False])
+def test_leg_wrap_splits_the_ring_by_the_front_share(front, left):
+    from asset_pipeline.garments.shorts import _leg_along
+
+    a = np.linspace(0, 2 * np.pi, 128, endpoint=False)
+    ring = make_ring(np.stack([0.08 * np.cos(a), 0.08 * np.sin(a)], 1), 0.5)
+    t = np.linspace(0.0, 1.0, 50)
+    points = _leg_along(ring, t, np.full(50, 0.4), front, left)
+    length = np.linalg.norm(np.diff(points, axis=0), axis=1).sum()
+    share = 0.4 if front else 0.6
+    assert length == pytest.approx(share * ring.perimeter, rel=0.03)
+    # Starts on the side facing the other leg; the front path passes the front.
+    assert np.sign(points[0, 0]) == (-1 if left else 1)
+    assert (points[:, 1].max() > 0.07) == front

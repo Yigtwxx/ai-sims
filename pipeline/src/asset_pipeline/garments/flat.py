@@ -71,6 +71,7 @@ class FlatMesh:
     segments: dict[tuple[str, str], I64] = field(default_factory=dict)  # vertex run
     seams: tuple[Seam, ...] = ()
     uv_metres: float = 1.0  # pattern metres one UV unit spans
+    pin: F64 | None = None  # (V,) cloth pin weight, 0..1
 
     def sewn(self, piece: str, segment: str) -> bool:
         return any(
@@ -106,7 +107,9 @@ class FlatMesh:
             "positions": np.round(self.positions, 6).tolist(),
             "faces": self.faces.tolist(),
             "corner_uvs": np.round(self.corner_uvs(), 6).tolist(),
-            "pin": [0.0] * len(self.positions),
+            "pin": (
+                np.round(self.pin, 4).tolist() if self.pin is not None else [0.0] * len(self.flat)
+            ),
             "rest": np.round(flat3, 6).tolist(),
             "sew": self.pairs.tolist(),
             "welds": self.welds(),

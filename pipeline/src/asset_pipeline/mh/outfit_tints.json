@@ -879,6 +879,50 @@
           "diffuse_color_2": "#9cb6cf"
         }
       }
+    ],
+    "AS_MiniShorts": [
+      {
+        "id": "sand",
+        "values": {
+          "diffuse_color_1": "#bea886",
+          "diffuse_color_2": "#bea886"
+        }
+      },
+      {
+        "id": "white",
+        "values": {
+          "diffuse_color_1": "#e6e2da",
+          "diffuse_color_2": "#e6e2da"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#1d1d1f"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#1f2941"
+        }
+      },
+      {
+        "id": "olive",
+        "values": {
+          "diffuse_color_1": "#5a5c39",
+          "diffuse_color_2": "#5a5c39"
+        }
+      },
+      {
+        "id": "blush",
+        "values": {
+          "diffuse_color_1": "#d1a89c",
+          "diffuse_color_2": "#d1a89c"
+        }
+      }
     ]
   }
 }

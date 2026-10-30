@@ -184,10 +184,12 @@ def write_unit(
     lines: GarmentLines,
     uv_metres: float,
     switches: Mapping[str, bool] | None = None,
+    template_unit: str = TEMPLATE,
 ) -> Path:
-    """Write `raw/outfits/<gender>/WI_<name>/` atomically (via `.partial`)."""
+    """Write `raw/outfits/<gender>/WI_<name>/` atomically (via `.partial`), its material
+    taken from the Epic unit `template_unit`."""
     root = archive / "raw" / "outfits" / gender
-    template_dir = root / TEMPLATE
+    template_dir = root / template_unit
     if not (template_dir / "outfit.json").is_file():
         raise GarmentError(f"template unit {template_dir} is missing")
     template = json.loads((template_dir / "outfit.json").read_text(encoding="utf-8"))

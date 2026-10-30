@@ -186,5 +186,9 @@
   "AS_CrewTee": {
     "en": "Plain tee",
     "tr": "Düz tişört"
+  },
+  "AS_MiniShorts": {
+    "en": "Cotton mini shorts",
+    "tr": "Pamuklu mini şort"
   }
 }

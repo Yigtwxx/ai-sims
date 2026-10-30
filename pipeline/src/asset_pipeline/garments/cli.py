@@ -17,8 +17,9 @@ from asset_pipeline.garments.blender import run_sim, write_job
 from asset_pipeline.garments.body import BaseBody, load_base_body
 from asset_pipeline.garments.collider import Neck, closed_body, neck
 from asset_pipeline.garments.flat import FlatMesh
-from asset_pipeline.garments.pack import GarmentLines, write_unit
+from asset_pipeline.garments.pack import TEMPLATE, GarmentLines, write_unit
 from asset_pipeline.garments.pattern import GarmentMesh
+from asset_pipeline.garments.shorts import MINI_SHORTS, draft_shorts, shorts_lines
 from asset_pipeline.garments.skirt import draft_pencil_skirt, skirt_lines
 from asset_pipeline.garments.tee import TEE_FEMALE, TEE_MALE, draft_tee, tee_lines
 from asset_pipeline.mh.convert import archive_root
@@ -41,6 +42,7 @@ class Item:
     sim: dict[str, float]  # cloth settings over garment_sim.py's defaults
     neck: bool = False  # reaches the neck: drape against the body closed by a head
     thickness: float = 0.002
+    template: str = TEMPLATE  # the Epic unit whose material is the starting point
 
 
 def _pencil_skirt(
@@ -48,6 +50,11 @@ def _pencil_skirt(
 ) -> tuple[GarmentMesh, GarmentLines]:
     draft = draft_pencil_skirt(body)
     return draft.mesh, skirt_lines(draft)
+
+
+def _mini_shorts(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
+    draft = draft_shorts(body, MINI_SHORTS)
+    return draft.mesh, shorts_lines(draft, MINI_SHORTS)
 
 
 def _crew_tee(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
@@ -76,6 +83,21 @@ JERSEY = {
     "shear": 5.0,
 }
 
+# Cotton twill for shorts: stiffer than jersey; it rests closer to the skin than the tee
+# so the cloth between the thighs has room.
+TWILL = {
+    **JERSEY,
+    "frames": 70.0,
+    "bending": 1.0,
+    "tension": 30.0,
+    "compression": 30.0,
+    "shear": 10.0,
+    "collision_distance": 0.0025,
+    "min_gap": 0.002,
+    "self_distance": 0.0015,
+    "friction": 1.0,
+}
+
 ITEMS = {
     # Wool suiting: no pilling, and stiff enough not to fold into the gap between the legs.
     "AS_PencilSkirt": Item(("female",), _pencil_skirt, {"DoPill": False}, {"bending": 8.0}),
@@ -87,6 +109,14 @@ ITEMS = {
         JERSEY,
         neck=True,
         thickness=0.0015,
+    ),
+    "AS_MiniShorts": Item(
+        ("female",),
+        _mini_shorts,
+        {"DoPill": False, "DoFuzz": False},
+        TWILL,
+        thickness=0.0018,
+        template="WI_OA_Shorts",
     ),
 }
 
@@ -126,7 +156,9 @@ def build(archive: Path, name: str, gender: str, frames: int | None) -> dict[str
     gap = clearance(draped, body)
     if gap < MIN_CLEARANCE:
         raise GarmentError(f"{name} ({gender}) sinks into the body: {gap * 1000:.1f} mm")
-    unit = write_unit(archive, gender, name, draped, lines, mesh.uv_metres, item.switches)
+    unit = write_unit(
+        archive, gender, name, draped, lines, mesh.uv_metres, item.switches, item.template
+    )
     return {**report, "clearance_mm": round(gap * 1000, 2), "unit": str(unit)}
 
 

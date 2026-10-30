@@ -126,7 +126,12 @@
   - Erkekte kapsama "full" çıkıyordu: `CATEGORY_OVERRIDES` ile `top`. `fit_audit.CREW_NECKS`'e eklendi.
   - Kontrol: `gltf-transform validate` hatasız (uyarılar kalem etekle aynı). `mh-fit-audit`: yaka bütün yüzlerde ve kilo −1, omuz −1'de temiz; pozda deri taşması erkek konuşmada 2 köşe / 7.9 mm, boşta 2 / 4.7 mm (Epic Crewneckt: 5-11 köşe / 17-19 mm). `/dev/stage`'de Ada ve Victor; nötr, kilo ±1, göğüs +1, kas +1; önden ve arkadan.
   - Bilinen: kadında kol kapağının arkasında pozda küçük açık renkli benekler; sırtta kol ağzı yakınında yer yer kumaş kıvrımı.
-- [ ] **2d.3 Kumaş mini şort (K).** Tahmin 1.5. İki bacak ve ağ kalıbı, bel bandı, kıvrık paça.
+- [x] **2d.3 Kumaş mini şort (K).** Tahmin 1.5 · Gerçek ~2 (`AS_MiniShorts`, "Pamuklu mini şort" / "Cotton mini shorts")
+  - `garments/shorts.py`: dört parça (iki bacak × ön/arka), yan dikiş, iç bacak ve ağ (ön ve arka orta) dikişleri; genişlikler kalça (iki bacak tek zarfta), ağın hemen altında uyluk ve paça çevresinden, ön pay %47. Yan dikiş kalçadan aşağı içeri gelir, böylece bacak ağda kendi genişliğinde (önce kalçanın yarısı + ağ uzantıları kadardı, bacaklar balon gibi duruyordu).
+  - Başlangıç: ağın üstünde satır kalçayı ön ortadan yan dikişe sarar, ağ uzantısı gövdenin altına, ağ noktasına giden kirişe katlanır; ağın 7 cm altına kadar bacağın kendi halkasına yumuşakça geçer. Halkalar ön/arka kalıp payına göre bölünür (x uçlarından bölününce paça %7 gerili ve buruşuk başlıyordu). Bel bandının yalnız üst 12 mm'si iğneli.
+  - Dokuma ayarı (`TWILL`): bükülme 1, gerilme 30, çarpışma 2.5 mm (5 mm'de iki uyluk arasında kumaşa yer kalmıyor, iç paçalar fırfır gibi buruşuyordu), sürtünme 1. Malzeme `WI_OA_Shorts` şablonundan (`write_unit(template_unit=...)`), tüysüz.
+  - Kontrol: validate hatasız; `mh-fit-audit` Epic `OA_Shorts`'la aynı düzeyde (konuşmada deri taşması 0-1 köşe / ≤2.3 mm). `/dev/stage`'de Ada: nötr, kalça +1, kilo +1, önden ve arkadan; tişörtle birlikte.
+  - Bilinen: önde ağ hizasında, iki uyluk arasını köprüleyen hafif yatay kıvrım ve ağa doğru kıvrımlar.
 - [ ] **2d.4 Kot şortlar.** Tahmin 1.5. Mini kot şort (K, kesik paça) ve kot şort (E, diz üstü, kıvrık paça); kot görünümü ve yıkama presetleri.
 - [ ] **2d.5 Küçük resim, doğrulama, yayın.** Tahmin 0.5. `/dev/thumbs`, `r2-sync`, `docs/todo.md` A4.2/A4.3, handoff "Durum".
 
