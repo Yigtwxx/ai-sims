@@ -94,6 +94,7 @@ import {
   type TattooWear,
   type WornTattoo,
 } from './tattoos';
+import { wearJewellery, type WornJewellery } from './jewellery';
 import { texturesIn, uploadTextures, warmUp, watchSceneTarget } from './warmUp';
 import { compileWrinkleTable, computeWrinkleWeights, type AnimatedMaps } from './wrinkles';
 
@@ -174,6 +175,8 @@ export interface MhCharacterProps {
    * (and socks over an ankle) are left off until it is null again.
    */
   revealTattoo?: TattooPlacement | null;
+  /** Jewellery ids (see ./jewellery.ts); rebuilt when they or the body sliders change. */
+  accessories?: readonly string[];
 }
 
 /**
@@ -207,6 +210,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     sockToesUrl = null,
     tattoos = NO_TATTOOS,
     revealTattoo = null,
+    accessories = NO_ACCESSORIES,
   },
   ref,
 ) {
@@ -568,6 +572,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   const cuff = useRef<SkinnedMesh | null>(null);
   // Tattoos hide under the garments' mask too: re-read whenever it changes.
   const wornTattoos = useRef<WornTattoo[]>([]);
+  // Worn jewellery: garments hide what they cover.
+  const jewellery = useRef<WornJewellery | null>(null);
   const latestReveal = useRef(revealTattoo);
   useLayoutEffect(() => {
     latestReveal.current = revealTattoo;
@@ -612,6 +618,7 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
           shown.flatMap((worn) => (worn.hide ? [worn.hide] : [])),
         );
       syncTattooHide(wornTattoos.current, body.mesh);
+      jewellery.current?.syncHidden(body.mesh);
       // In the same frame as the garments, so a change never flashes bare skin.
       const worn = new Set(shown.map((outfit) => outfit.category));
       const full = worn.has('full');
@@ -762,8 +769,40 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     return () => window.clearTimeout(timer);
   }, [assembled, sliderKey]);
 
+  // Jewellery is measured on the resting body: rebuilt once the sliders rest.
+  const accessoryKey = accessories.join('|');
+  const latestAccessories = useRef(accessories);
+  useLayoutEffect(() => {
+    latestAccessories.current = accessories;
+  }, [accessories]);
+  const firstJewellery = useRef(true);
+  useEffect(() => {
+    const build = () => {
+      jewellery.current?.dispose();
+      const body = assembled.handle.body;
+      jewellery.current = wearJewellery(
+        { body, head: assembled.headSkin },
+        latestAccessories.current,
+      );
+      jewellery.current.syncHidden(body.mesh);
+    };
+    const delay = firstJewellery.current ? 0 : LAYER_DELAY_MS;
+    firstJewellery.current = false;
+    const timer = window.setTimeout(build, delay);
+    return () => window.clearTimeout(timer);
+  }, [assembled, accessoryKey, sliderKey]);
+  useEffect(
+    () => () => {
+      jewellery.current?.dispose();
+      jewellery.current = null;
+    },
+    [assembled],
+  );
+
   useFrame(({ camera }, delta) => {
     onFrame?.(assembled.handle, delta, camera);
+    // After the pose and the face of this frame: pins read the posed skin.
+    jewellery.current?.update(delta);
     // Wrinkles follow whatever the face morphs ended up as this frame.
     const wrinkles = assembled.wrinkles;
     if (wrinkles?.uniforms.wrinkleMasks.value) {
@@ -792,6 +831,7 @@ const NO_GROOMS: readonly GroomWear[] = [];
 const NO_OUTFITS: readonly OutfitWear[] = [];
 const NO_BLEND: readonly FaceBlendWear[] = [];
 const NO_TATTOOS: readonly TattooWear[] = [];
+const NO_ACCESSORIES: readonly string[] = [];
 
 const clipCache = new Map<string, Promise<MotionClip[]>>();
 

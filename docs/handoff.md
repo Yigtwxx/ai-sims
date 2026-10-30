@@ -183,7 +183,7 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - **P5** kadraj: kurulumda kamera ekrandaki karakteri izler (`1c129d1`); kıyafet küçük resimleri öğenin kendisine kadrajlanır (`9d8912d`).
   - **P6** Ada'nın askı kamaları (`258d56a`).
 
-- **2026-10-30 (PC, Faz 2b, B3 dövme):** Sekiz ince çizgi dövme yedi yerde: deriden kesilen çıkartma yaması (kafa malzemesinde boş doku birimi yok), kafa-gövde dikişini kesintisiz geçiyor; giysi, çorap ve deriye çizilen iç çamaşırı mürekkebi örtüyor. Dövme sekmesinde kamera seçilen yere gidiyor, gerekirse karakter dönüyor, o yeri örten giysi önizlemede çıkıyor. Takı (B4) sırada.
+- **2026-10-30 (PC, Faz 2b, B3 dövme):** Sekiz ince çizgi dövme yedi yerde: deriden kesilen çıkartma yaması (kafa malzemesinde boş doku birimi yok), kafa-gövde dikişini kesintisiz geçiyor; giysi, çorap ve deriye çizilen iç çamaşırı mürekkebi örtüyor. Dövme sekmesinde kamera seçilen yere gidiyor, gerekirse karakter dönüyor, o yeri örten giysi önizlemede çıkıyor. Takı (B4) da bitti: 28 parça (küpe, kolye, bilezik, yüzük, ölçülü piercing); küpe ve piercing'ler yüz iskeletinin noktalarına iğneli ve dudak senkronunu izliyor, sarkanlar sallanıyor; kolye boyun dibinden göğse oturuyor, bilezik ve yüzük deri ağırlıklarıyla bağlı. Gözlük C8'e kaldı, anime dönemi aksesuar kodu silindi. Faz 2'de kalan: 2d (tişört, şortlar).
 
 ## Site kontrolü (2026-10-22 sabah, PC)
 

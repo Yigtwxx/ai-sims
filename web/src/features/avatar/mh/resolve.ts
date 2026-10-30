@@ -1,5 +1,6 @@
 import { Color } from 'three';
 
+import { findAccessory } from '@/features/avatar/accessories/catalog';
 import { isTattooDesign, isTattooPlacement } from '@/features/creator/tattoos';
 import { assetUrl, type MhIris, type MhManifest, type MhSkin } from '@/lib/assets/manifest';
 import type { BodySlider, CharacterConfig } from '@/lib/character/schema';
@@ -62,6 +63,8 @@ export interface ResolvedCharacter {
   sockToesUrl: string | null;
   /** Small tattoos, one per placement, with designs the renderer knows. */
   tattoos: TattooWear[];
+  /** Jewellery the catalogue knows, one per slot (see ../accessories/catalog.ts). */
+  accessories: string[];
   /** Face loops under the live face: the idle loop and a happy loop for the smile. */
   faceClips: { idle: string | null; smile: string | null };
   /** Approximate standing height (m), for camera framing. */
@@ -118,6 +121,7 @@ export function resolveCharacter(
     socks: sockWear(config.socks, gender),
     sockToesUrl: body.socks ? assetUrl(body.socks) : null,
     tattoos: tattooWears(config),
+    accessories: accessoryWears(config),
     faceClips: faceClipSet(manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };
@@ -142,6 +146,17 @@ export function faceBlends(
     .sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id))
     .slice(0, MAX_BLEND_FACES)
     .map(({ headUrl, weight }) => ({ headUrl, weight }));
+}
+
+/** Known jewellery ids, the first for each slot. */
+export function accessoryWears(config: CharacterConfig): string[] {
+  const slots = new Set<string>();
+  return config.accessories.filter((id) => {
+    const def = findAccessory(id);
+    if (!def || slots.has(def.slot)) return false;
+    slots.add(def.slot);
+    return true;
+  });
 }
 
 /** Tattoos with a known design and placement, the first for each placement. */

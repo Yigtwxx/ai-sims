@@ -114,6 +114,9 @@ export function DevMhViewer() {
   // `?tattoo=all` wears one design per placement, `?tattoo=nape&design=bird` one.
   const tattooParam = params.get('tattoo') ?? '';
   const designParam = params.get('design') ?? 'star';
+  // `?jewelry=ear-hoop-small,neck-pearls` wears jewellery ids.
+  const jewelryParam = params.get('jewelry') ?? '';
+  const accessories = useMemo(() => jewelryParam.split(',').filter(Boolean), [jewelryParam]);
   const tattoos = useMemo(() => {
     if (tattooParam === 'all') {
       return TATTOO_PLACEMENTS.map((placement, i) => ({
@@ -224,6 +227,7 @@ export function DevMhViewer() {
             iris={iris}
             underwearTop={gender === 'female'}
             tattoos={tattoos}
+            accessories={accessories}
             onFrame={onFrame}
           />
         </Suspense>

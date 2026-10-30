@@ -106,7 +106,7 @@ const CATEGORY_FOCUS: Record<Exclude<Category, 'outfit'>, CameraFocus> = {
   eyes: 'head',
   hair: 'head',
   facialHair: 'head',
-  jewelry: 'head',
+  jewelry: 'torso',
   tattoos: 'upper',
 };
 

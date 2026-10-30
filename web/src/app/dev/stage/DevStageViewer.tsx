@@ -154,6 +154,12 @@ export function DevStageViewer() {
       value.socks = { style, color, sheer };
     }
     if (blendFace) value.face.blend = { [blendFace]: blendWeight };
+    // `?jewelry=ear-hoop-small,neck-pearls` wears jewellery ids.
+    const jewelry =
+      typeof window === 'undefined'
+        ? null
+        : new URLSearchParams(window.location.search).get('jewelry');
+    if (jewelry) value.accessories = jewelry.split(',').filter(Boolean);
     // Straight into the config: 'all' wears more tattoos than the creator allows.
     if (tattoo === 'all') {
       value.tattoos = TATTOO_PLACEMENTS.map((placement, i) => ({

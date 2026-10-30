@@ -14,7 +14,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 1c | Kalem etek, Blender yolu ve paketleyici | A4.0 | ~10 (gerçek 5.4) |
   |  | 1d | Oturma hataları; düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer | B5 | ~6 (gerçek ~12) |
   | **2 Panel ve temel kıyafet** (~60 sa) | 2a | Göz tonu, yüz karıştırma | B1 → B2 | ~14 (gerçek ~1) |
-  |  | 2b | Dövme, takı | B3 → B4 | ~16 |
+  |  | 2b | Dövme, takı | B3 → B4 | ~16 (gerçek ~5) |
   |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 (gerçek ~0.8) |
   |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 |
   |  | 2e | Çorap ve külotlu, file çorap hariç (şema v3) | A4.5 | ~12 (gerçek ~1) |
@@ -216,7 +216,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 - [x] **B1. Göz rengi tonu** (2026-10-29, `543687b`) (`eyes.color`, `EyesPanel.tsx:47`). Iris shader'ında seçilen ton uygulanır; `null` doğal renk demektir.
 - [x] **B2. Yüz karıştırma** (2026-10-29, `d81f1df`; ayrıntı `docs/plans/faz-2.md` 2a) (`face.blend`, `FacePanel.tsx`; `randomize.ts` de yazıyor). MetaHuman kafalarının topolojisi ortak: vertex konumları, morph delta'ları (ARKit + viseme) ve kafa eklemleri (göz, çene) ağırlıkla karıştırılır. Cilt seçili kalır. C7 bu altyapıyı kullanacak. **Bitti sayılır:** karışık yüz konuşurken dudak senkronu ve göz kırpma bozulmuyor.
 - [x] **B3. Dövme** (2026-10-30; ayrıntı `docs/plans/faz-2.md` 2b.1-2b.2; cilt shader'ı yerine deriden kesilen çıkartma yaması) (`tattoos`, `schema.ts:103`, `TattooPanel.tsx`, `web/src/features/creator/tattoos.ts`). Cilt shader'ında gövde ve kafa UV'sine bir katman eklenir. Tasarımlar küçük ve ölçülü kalır; yerleşim UV'leri gövde GLB'sinden ölçülür.
-- [ ] **B4. Takı** (`accessories`, `JewelryPanel.tsx`, `web/src/features/avatar/accessories/`). Bu kod anime döneminden kalma (VRoid kulak arama vb.); MetaHuman kafa ve gövde mesh'ine ve eklemlerine bağlanır. **Bitti sayılır:** küpe, kolye ve yüzük idle ve konuşma sırasında yerinde kalıyor ve mesh'e girmiyor.
+- [x] **B4. Takı** (2026-10-30; ayrıntı `docs/plans/faz-2.md` 2b.3-2b.6; anime kodu silindi, katalog yeniden) (`accessories`, `JewelryPanel.tsx`, `web/src/features/avatar/accessories/`). Bu kod anime döneminden kalma (VRoid kulak arama vb.); MetaHuman kafa ve gövde mesh'ine ve eklemlerine bağlanır. **Bitti sayılır:** küpe, kolye ve yüzük idle ve konuşma sırasında yerinde kalıyor ve mesh'e girmiyor.
 
 - [x] **B5. Oturma hataları: kıyafet ve saç** (2026-10-28, `edc5198`, `c0afe0e`, `a676190`, `cbf0a83`, `373806d`, `e497f3a`, `7a6f2a2`; ölçüm aracı `mh-fit-audit` `b6de10f`; ayrıntı `docs/plans/faz-1.md` 1d. Bilinen küçük kusur: tişört kol ağzının koltuk altı kenarında pozda 1-2 piksellik iz.) (kullanıcı şikâyeti, 2026-10-27; sırası A4.0'dan hemen sonra, bkz. "Sıra").
   - Belirtiler:

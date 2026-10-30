@@ -408,6 +408,7 @@ export const MhStage = memo(function MhStage({
                   socks={character.socks}
                   sockToesUrl={character.sockToesUrl}
                   tattoos={character.tattoos}
+                  accessories={character.accessories}
                   revealTattoo={revealTattoo}
                   onFrame={incoming ? onIncomingFrame : onFrame}
                   prewarm={incoming}

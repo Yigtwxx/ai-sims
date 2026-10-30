@@ -58,7 +58,7 @@ const DEG = Math.PI / 180;
  * The character's own axes from its shoulders: left, up (the turntable only
  * turns about up) and forward.
  */
-function bodyFrame(joint: JointLookup) {
+export function bodyFrame(joint: JointLookup) {
   const left = joint('upperarm_l');
   const right = joint('upperarm_r');
   if (!left || !right) return null;

@@ -12,6 +12,7 @@ import {
   outfitWears,
   resolveCharacter,
   tattooWears,
+  accessoryWears,
 } from './resolve';
 
 const manifest = MhManifestSchema.parse({
@@ -452,5 +453,13 @@ describe('tattooWears', () => {
       { design: 'star', placement: 'nape' },
       { design: 'bird', placement: 'ankle' },
     ]);
+  });
+});
+
+describe('accessoryWears', () => {
+  it('keeps catalogue ids, the first per slot', () => {
+    const config = createDefaultConfig('female');
+    config.accessories = ['ear-hoop-small', 'face-glasses-round', 'ear-stud-pearl', 'neck-pearls'];
+    expect(accessoryWears(config)).toEqual(['ear-hoop-small', 'neck-pearls']);
   });
 });
