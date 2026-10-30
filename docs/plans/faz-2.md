@@ -137,7 +137,14 @@
   - Erkekte başlangıç tırtıklıydı: bacak dilimlerinde 12 mm'de ~35 köşe var, zarflar dilimden dilime zıplıyor, satırlar %290'a kadar gerili başlıyordu. Halkalar artık üçgenlerin düzlemle tam kesitinden (`shorts.Sections`); pamuklu mini şort da yeniden üretildi (gerilen kenar 237 → 137, gövdeye giren başlangıç noktası 0).
   - Kontrol: validate hatasız, manifest zod temiz; `mh-fit-audit` konuşmada deri taşması ≤3 köşe / ≤12 mm (Epic şortu düzeyinde). `/dev/stage`'de Ada ve Victor tişörtle.
   - Bilinen: erkekte arkada ağ dikişi boyunca konuşurken küçük bir yarık izi.
-- [ ] **2d.5 Küçük resim, doğrulama, yayın.** Tahmin 0.5. `/dev/thumbs`, `r2-sync`, `docs/todo.md` A4.2/A4.3, handoff "Durum".
+- [x] **2d.5 Küçük resim, doğrulama, yayın.** Tahmin 0.5 · Gerçek 0.4
+  - `/dev/thumbs` "eksikleri çiz": dört yeni küçük resim (beyaz tişört, bej pamuklu şort, açık yıkama mini kot, orta yıkama erkek kot). Manifest küçük resimlerden önce yazılmıştı, panel baş harf gösteriyordu: `mh-convert --manifest` sonra; R2'de manifest, dört kıyafet klasörü ve `mobile-textures.json`.
+  - `pnpm typecheck`, `pnpm lint` temiz, `pnpm test` 1018 geçti (15 atlandı); pipeline `ruff` temiz, `pytest` 436 geçti.
+  - Kıyafet klasörlerinde önceki dönüşümlerden kalan, manifestin göstermediği eski `ktx2`'ler var (`AS_CrewTee`): `mh-prune` siler.
+
+## Faz sonu kontrolü
+
+- [x] 2026-10-30: landing (TR), oluşturucuda yeni kadın karakter, Alt'ta iki yeni kadın şortu ve beş yıkama preseti, tişört + kesik paça kot şort sahnede; "Bitti", kayıt, konuşma ekranında TR "Nasılsın?" (~4 sn) ve EN "How are you?" yanıtlandı; konsolda hata yok. Gerçek süreler: 2a ~1, 2b ~5, 2c ~0.8, 2d ~8, 2e ~1 (toplam ~16; tahmin ~60).
 
 ## 2e — Çorap ve külotlu (A4.5), tahmin ~12 (yeniden ~2.5) · gerçek ~1 (bitti 2026-10-29)
 

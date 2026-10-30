@@ -13,10 +13,10 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 1b | Saçlar | A3 → A3b | ~8 (gerçek ~9) |
   |  | 1c | Kalem etek, Blender yolu ve paketleyici | A4.0 | ~10 (gerçek 5.4) |
   |  | 1d | Oturma hataları; düzeltmeler dönüştürücüde kalır, sonraki kıyafetlerin hepsine geçer | B5 | ~6 (gerçek ~12) |
-  | **2 Panel ve temel kıyafet** (~60 sa) | 2a | Göz tonu, yüz karıştırma | B1 → B2 | ~14 (gerçek ~1) |
+  | **2 Panel ve temel kıyafet** (~60 sa; gerçek ~16, bitti 2026-10-30) | 2a | Göz tonu, yüz karıştırma | B1 → B2 | ~14 (gerçek ~1) |
   |  | 2b | Dövme, takı | B3 → B4 | ~16 (gerçek ~5) |
   |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 (gerçek ~0.8) |
-  |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 |
+  |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 (gerçek ~8) |
   |  | 2e | Çorap ve külotlu, file çorap hariç (şema v3) | A4.5 | ~12 (gerçek ~1) |
   | **3 İş seti ve karakter** (~55 sa) | 3a | Kumaş pantolon, gömlek; blazer 7b'de | A4.1 | ~13 |
   |  | 3b | Polo, chino, kravatlı gömlek, sıvanmış kol | A4.6 → A4.15 | ~12 |
@@ -143,8 +143,8 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
     - Uzun kollu düz gömlek, kadın ve erkek (yaka, düğme patı, manşet; düğmeler dokuda). Budanan `OA_Shirt_04`'ün yerini alır.
     - Blazer + gömlek, kadın ve erkek, tek `top` öğe: C9'daki `outer` slotu gelene kadar gömlek blazer'ın içinde modellenir. Tek düğme, çentik yaka. En zor parça olduğu için sona kalır.
     - Renkler: lacivert, antrasit, siyah, deve tüyü, bej; gömlekte beyaz, açık mavi, pudra.
-  - [ ] **A4.2 Düz tişört,** kadın ve erkek (eski A4). Desen varyantlarının tabanıdır.
-  - [ ] **A4.3 Şortlar** (kullanıcı isteği, 2026-10-27):
+  - [x] **A4.2 Düz tişört,** kadın ve erkek (eski A4). Desen varyantlarının tabanıdır. (2026-10-30, `bd9863d`; `AS_CrewTee`, düz kalıp + Blender dikiş yayları, tüysüz pamuk; ayrıntı `docs/plans/faz-2.md` 2d.1-2d.2)
+  - [x] **A4.3 Şortlar** (kullanıcı isteği, 2026-10-27; 2026-10-30, `d05d03c`, `070333e`: `AS_MiniShorts` pamuklu mini şort, `AS_DenimMiniShorts` kesik paça mini kot şort, `AS_DenimShorts` kıvrık paça kot şort; ayrıntı `docs/plans/faz-2.md` 2d.3-2d.4):
     - Mini kot şort, kadın (denim, kesik ya da kıvrık paça).
     - Mini şort, kadın (kumaş, denim olmayan).
     - Kot şort, erkek (diz üstü, kıvrık paça).
