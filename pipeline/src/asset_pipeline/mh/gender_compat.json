@@ -35,6 +35,8 @@
     "SleevelessTurtleneck": "female",
     "Casual_M_Outfit": "male",
     "AS_PencilSkirt": "female",
-    "AS_MiniShorts": "female"
+    "AS_MiniShorts": "female",
+    "AS_DenimMiniShorts": "female",
+    "AS_DenimShorts": "male"
   }
 }

@@ -190,5 +190,13 @@
   "AS_MiniShorts": {
     "en": "Cotton mini shorts",
     "tr": "Pamuklu mini şort"
+  },
+  "AS_DenimMiniShorts": {
+    "en": "Cut-off denim mini shorts",
+    "tr": "Kesik paça mini kot şort"
+  },
+  "AS_DenimShorts": {
+    "en": "Rolled denim shorts",
+    "tr": "Kıvrık paça kot şort"
   }
 }

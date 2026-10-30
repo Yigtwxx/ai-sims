@@ -84,6 +84,26 @@
     "mustard": {
       "en": "Mustard",
       "tr": "Hardal"
+    },
+    "lightWash": {
+      "en": "Light wash",
+      "tr": "Açık yıkama"
+    },
+    "midWash": {
+      "en": "Mid wash",
+      "tr": "Orta yıkama"
+    },
+    "darkWash": {
+      "en": "Dark wash",
+      "tr": "Koyu yıkama"
+    },
+    "blackDenim": {
+      "en": "Black denim",
+      "tr": "Siyah kot"
+    },
+    "whiteDenim": {
+      "en": "White denim",
+      "tr": "Beyaz kot"
     }
   },
   "outfits": {
@@ -921,6 +941,73 @@
         "values": {
           "diffuse_color_1": "#d1a89c",
           "diffuse_color_2": "#d1a89c"
+        }
+      }
+    ],
+    "AS_DenimMiniShorts": [
+      {
+        "id": "lightWash",
+        "values": {
+          "diffuse_color_1": "#7d97b8",
+          "diffuse_color_2": "#b8893f"
+        }
+      },
+      {
+        "id": "midWash",
+        "values": {
+          "diffuse_color_1": "#4a6488",
+          "diffuse_color_2": "#b8893f"
+        }
+      },
+      {
+        "id": "darkWash",
+        "values": {
+          "diffuse_color_1": "#253650",
+          "diffuse_color_2": "#b8893f"
+        }
+      },
+      {
+        "id": "blackDenim",
+        "values": {
+          "diffuse_color_1": "#2a2a2e",
+          "diffuse_color_2": "#5a5a5e"
+        }
+      },
+      {
+        "id": "whiteDenim",
+        "values": {
+          "diffuse_color_1": "#e3e0d8",
+          "diffuse_color_2": "#d8d2c4"
+        }
+      }
+    ],
+    "AS_DenimShorts": [
+      {
+        "id": "midWash",
+        "values": {
+          "diffuse_color_1": "#4a6488",
+          "diffuse_color_2": "#b8893f"
+        }
+      },
+      {
+        "id": "darkWash",
+        "values": {
+          "diffuse_color_1": "#253650",
+          "diffuse_color_2": "#b8893f"
+        }
+      },
+      {
+        "id": "lightWash",
+        "values": {
+          "diffuse_color_1": "#7d97b8",
+          "diffuse_color_2": "#b8893f"
+        }
+      },
+      {
+        "id": "blackDenim",
+        "values": {
+          "diffuse_color_1": "#2a2a2e",
+          "diffuse_color_2": "#5a5a5e"
         }
       }
     ]

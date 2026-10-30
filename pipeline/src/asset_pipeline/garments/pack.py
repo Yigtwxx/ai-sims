@@ -44,6 +44,17 @@ class GarmentLines:
     edges: list[F64] = field(default_factory=list)  # finished edges: wear and a slight roll
     stitches: list[F64] = field(default_factory=list)  # topstitching
     ribs: list[F64] = field(default_factory=list)  # knit rib wales (a neckband's grooves)
+    fades: list[F64] = field(default_factory=list)  # worn, washed-out bands (denim seams)
+    frays: list[F64] = field(default_factory=list)  # loose threads of a cut-off hem
+
+
+@dataclass(frozen=True)
+class Look:
+    """Changes to the template's material: tiling maps taken from other units' files and
+    scalars set outright (tiling already in our UV density)."""
+
+    textures: Mapping[str, Path] = field(default_factory=dict)  # slot -> source file
+    scalars: Mapping[str, float] = field(default_factory=dict)
 
 
 def metres_per_uv(glb: Path) -> float:
@@ -93,12 +104,14 @@ def garment_maps(
     edge = _mask(lines.edges, size, 2.0 * px, 4.0 * px)
     stitch = _mask(lines.stitches, size, 0.6 * px, 0.25 * px)
     rib = _mask(lines.ribs, size, 0.8 * px, 0.35 * px) if lines.ribs else 0.0 * groove
+    fade = _mask(lines.fades, size, 5.0 * px, 6.0 * px) if lines.fades else 0.0 * groove
+    fray = _mask(lines.frays, size, 0.5 * px, 0.2 * px) if lines.frays else 0.0 * groove
 
-    height = -groove + 0.5 * edge - 0.4 * stitch - 0.5 * rib
+    height = -groove + 0.5 * edge - 0.4 * stitch - 0.5 * rib + 0.3 * fray
     normal = _normal_from_height(height, strength=2.0)
     ones = np.ones((size, size))
     occlusion = np.clip(1.0 - 0.35 * shadow - 0.15 * stitch - 0.12 * rib, 0.0, 1.0)
-    wear = np.clip(0.55 + 0.3 * edge, 0.0, 1.0)
+    wear = np.clip(0.55 + 0.3 * edge + 0.3 * fade + 0.45 * fray, 0.0, 1.0)
 
     def rgba(*channels: F64) -> Image.Image:
         return Image.fromarray(np.round(np.stack(channels, -1) * 255).astype(np.uint8), "RGBA")
@@ -130,9 +143,10 @@ def outfit_info(
     garment_files: Mapping[str, str],
     tiling_scale: float,
     switches: Mapping[str, bool],
+    look: Look | None = None,
 ) -> dict[str, Any]:
     """`outfit.json` for our unit: the template's single material renamed, its garment maps
-    replaced by ours and its tiling scaled."""
+    replaced by ours, its tiling scaled and the `look` applied."""
     materials = template.get("materials", {})
     if len(materials) != 1:
         raise GarmentError(f"{TEMPLATE}: expected one material, found {len(materials)}")
@@ -142,10 +156,20 @@ def outfit_info(
     for key in list(scalars):
         if key.removeprefix("B_") in TILING_SCALARS:
             scalars[key] = float(scalars[key]) * tiling_scale
+    look = look or Look()
+    scalars.update(look.scalars)
     sampled = fabric_slots(material)
     folder = f"{CUSTOM_ROOT}/{name}"
     textures = {}
+    for slot, source in look.textures.items():
+        reference = f"{folder}/Textures/T_{name}_{slot}.T_{name}_{slot}"
+        material.setdefault("textures", {})[slot] = reference
+        with Image.open(source) as image:
+            size = list(image.size)
+        textures[reference] = {"file": source.name, "size": size, "srgb": False}
     for slot, reference in list(material.get("textures", {}).items()):
+        if slot in look.textures:
+            continue
         if slot in garment_files:
             asset = f"{folder}/Textures/T_{name}_{slot}"
             material["textures"][slot] = f"{asset}.T_{name}_{slot}"
@@ -185,6 +209,7 @@ def write_unit(
     uv_metres: float,
     switches: Mapping[str, bool] | None = None,
     template_unit: str = TEMPLATE,
+    look: Look | None = None,
 ) -> Path:
     """Write `raw/outfits/<gender>/WI_<name>/` atomically (via `.partial`), its material
     taken from the Epic unit `template_unit`."""
@@ -208,7 +233,9 @@ def write_unit(
         file = f"T_{name}_{slot}.png"
         image.save(partial / "textures" / file, optimize=False, compress_level=6)
         garment_files[slot] = file
-    info = outfit_info(template, name, gender, garment_files, tiling_scale, switches or {})
+    info = outfit_info(template, name, gender, garment_files, tiling_scale, switches or {}, look)
+    for source in (look or Look()).textures.values():
+        shutil.copyfile(source, partial / "textures" / source.name)
     for reference, entry in info["textures"].items():
         source = template_dir / "textures" / str(entry["file"])
         target = partial / "textures" / str(entry["file"])

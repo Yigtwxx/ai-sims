@@ -17,9 +17,16 @@ from asset_pipeline.garments.blender import run_sim, write_job
 from asset_pipeline.garments.body import BaseBody, load_base_body
 from asset_pipeline.garments.collider import Neck, closed_body, neck
 from asset_pipeline.garments.flat import FlatMesh
-from asset_pipeline.garments.pack import TEMPLATE, GarmentLines, write_unit
+from asset_pipeline.garments.pack import TEMPLATE, GarmentLines, Look, metres_per_uv, write_unit
 from asset_pipeline.garments.pattern import GarmentMesh
-from asset_pipeline.garments.shorts import MINI_SHORTS, draft_shorts, shorts_lines
+from asset_pipeline.garments.shorts import (
+    DENIM_MINI_SHORTS,
+    DENIM_SHORTS,
+    MINI_SHORTS,
+    ShortsSpec,
+    draft_shorts,
+    shorts_lines,
+)
 from asset_pipeline.garments.skirt import draft_pencil_skirt, skirt_lines
 from asset_pipeline.garments.tee import TEE_FEMALE, TEE_MALE, draft_tee, tee_lines
 from asset_pipeline.mh.convert import archive_root
@@ -43,6 +50,7 @@ class Item:
     neck: bool = False  # reaches the neck: drape against the body closed by a head
     thickness: float = 0.002
     template: str = TEMPLATE  # the Epic unit whose material is the starting point
+    denim: bool = False  # `denim_look` on the template's material
 
 
 def _pencil_skirt(
@@ -52,9 +60,31 @@ def _pencil_skirt(
     return draft.mesh, skirt_lines(draft)
 
 
-def _mini_shorts(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
-    draft = draft_shorts(body, MINI_SHORTS)
-    return draft.mesh, shorts_lines(draft, MINI_SHORTS)
+def _shorts(spec: ShortsSpec) -> Draft:
+    def draft(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
+        shorts = draft_shorts(body, spec)
+        return shorts.mesh, shorts_lines(shorts, spec)
+
+    return draft
+
+
+def denim_look(archive: Path, gender: str, uv_metres: float) -> Look:
+    """Jeans twill and its washed streaks (Epic's jeans' tiling maps) on the fabric
+    shader, so wash presets work; tiles as big as on the jeans."""
+    jeans = archive / "raw" / "outfits" / gender / "WI_OA_Jeans"
+    metres = metres_per_uv(jeans / f"OutfitBase_{gender}_Outfits.glb")
+    return Look(
+        textures={
+            "detailTex_normal": jeans / "textures" / "micro_jeans_tile_N.png",
+            "MacroTex_Variation": jeans / "textures" / "btm_jeans_nrm_tile_overlay_D.png",
+        },
+        scalars={
+            "DetailTex_UVTtiling": uv_metres / (metres / 500.0),
+            "DetailTex_NormalStrength": 1.0,
+            "MacroTex_UvTiling": uv_metres / (metres / 7.0),
+            "MacroTexStrength": 0.6,
+        },
+    )
 
 
 def _crew_tee(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
@@ -98,6 +128,16 @@ TWILL = {
     "friction": 1.0,
 }
 
+DENIM = {**TWILL, "bending": 1.5, "tension": 40.0, "compression": 40.0}
+DENIM_SWITCHES = {
+    "DoPill": False,
+    "DoFuzz": False,
+    "DoDetailVariation": False,
+    "DoMacroVariation": True,
+    "DoDetailNormal": True,
+    "DoPaintedWear": True,
+}
+
 ITEMS = {
     # Wool suiting: no pilling, and stiff enough not to fold into the gap between the legs.
     "AS_PencilSkirt": Item(("female",), _pencil_skirt, {"DoPill": False}, {"bending": 8.0}),
@@ -112,11 +152,29 @@ ITEMS = {
     ),
     "AS_MiniShorts": Item(
         ("female",),
-        _mini_shorts,
+        _shorts(MINI_SHORTS),
         {"DoPill": False, "DoFuzz": False},
         TWILL,
         thickness=0.0018,
         template="WI_OA_Shorts",
+    ),
+    # Denim on the fabric shader (the jeans master takes no colours): twill, washed
+    # streaks, faded seams and gold topstitching.
+    "AS_DenimMiniShorts": Item(
+        ("female",),
+        _shorts(DENIM_MINI_SHORTS),
+        DENIM_SWITCHES,
+        DENIM,
+        thickness=0.0022,
+        denim=True,
+    ),
+    "AS_DenimShorts": Item(
+        ("male",),
+        _shorts(DENIM_SHORTS),
+        DENIM_SWITCHES,
+        DENIM,
+        thickness=0.0022,
+        denim=True,
     ),
 }
 
@@ -156,8 +214,9 @@ def build(archive: Path, name: str, gender: str, frames: int | None) -> dict[str
     gap = clearance(draped, body)
     if gap < MIN_CLEARANCE:
         raise GarmentError(f"{name} ({gender}) sinks into the body: {gap * 1000:.1f} mm")
+    look = denim_look(archive, gender, mesh.uv_metres) if item.denim else None
     unit = write_unit(
-        archive, gender, name, draped, lines, mesh.uv_metres, item.switches, item.template
+        archive, gender, name, draped, lines, mesh.uv_metres, item.switches, item.template, look
     )
     return {**report, "clearance_mm": round(gap * 1000, 2), "unit": str(unit)}
 

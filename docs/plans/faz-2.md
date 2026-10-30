@@ -132,7 +132,11 @@
   - Dokuma ayarı (`TWILL`): bükülme 1, gerilme 30, çarpışma 2.5 mm (5 mm'de iki uyluk arasında kumaşa yer kalmıyor, iç paçalar fırfır gibi buruşuyordu), sürtünme 1. Malzeme `WI_OA_Shorts` şablonundan (`write_unit(template_unit=...)`), tüysüz.
   - Kontrol: validate hatasız; `mh-fit-audit` Epic `OA_Shorts`'la aynı düzeyde (konuşmada deri taşması 0-1 köşe / ≤2.3 mm). `/dev/stage`'de Ada: nötr, kalça +1, kilo +1, önden ve arkadan; tişörtle birlikte.
   - Bilinen: önde ağ hizasında, iki uyluk arasını köprüleyen hafif yatay kıvrım ve ağa doğru kıvrımlar.
-- [ ] **2d.4 Kot şortlar.** Tahmin 1.5. Mini kot şort (K, kesik paça) ve kot şort (E, diz üstü, kıvrık paça); kot görünümü ve yıkama presetleri.
+- [x] **2d.4 Kot şortlar.** Tahmin 1.5 · Gerçek ~1.5 (`AS_DenimMiniShorts` "Kesik paça mini kot şort", K; `AS_DenimShorts` "Kıvrık paça kot şort", E, diz üstü)
+  - Epic kotunun ustası (`M_jeans_nrm_custom_master`) web'de düz PBR ve renk parametresi yok; kot kumaş shader'ında: Epic kotunun dimi normal'i (`micro_jeans_tile_N`, ~2.5 mm döşeme) ve yıkama dalgalanması (`tile_overlay_D`, ~18 cm, makro varyasyon) başka birimden alınıyor (`pack.Look`). Dikişlerde ve paçada solma (`fades`), çift sıra dikiş, önde cep ağzı ve fermuar J'si, arkada roba ve cep (`to_uv`: kalıp noktası → UV), kesik paçada saçak iplikleri (`frays`), kıvrık paçada kat çizgisi. Presetler: açık, orta, koyu yıkama, siyah ve beyaz kot; dikiş rengi `diffuse_color_2` (altın).
+  - Erkekte başlangıç tırtıklıydı: bacak dilimlerinde 12 mm'de ~35 köşe var, zarflar dilimden dilime zıplıyor, satırlar %290'a kadar gerili başlıyordu. Halkalar artık üçgenlerin düzlemle tam kesitinden (`shorts.Sections`); pamuklu mini şort da yeniden üretildi (gerilen kenar 237 → 137, gövdeye giren başlangıç noktası 0).
+  - Kontrol: validate hatasız, manifest zod temiz; `mh-fit-audit` konuşmada deri taşması ≤3 köşe / ≤12 mm (Epic şortu düzeyinde). `/dev/stage`'de Ada ve Victor tişörtle.
+  - Bilinen: erkekte arkada ağ dikişi boyunca konuşurken küçük bir yarık izi.
 - [ ] **2d.5 Küçük resim, doğrulama, yayın.** Tahmin 0.5. `/dev/thumbs`, `r2-sync`, `docs/todo.md` A4.2/A4.3, handoff "Durum".
 
 ## 2e — Çorap ve külotlu (A4.5), tahmin ~12 (yeniden ~2.5) · gerçek ~1 (bitti 2026-10-29)

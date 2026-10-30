@@ -34,6 +34,7 @@ from asset_pipeline.garments.tee import Ring, make_ring
 
 PIECES = ("front_l", "front_r", "back_l", "back_r")  # the wearer's left leg is +x
 SECTION = 0.006  # half-height of a body slab (m)
+LEG_SIDE = 0.005  # x past which skin below the crotch is the left leg's
 FLAP_DROP = 0.01  # crotch extensions start this far under the crotch (m)
 CROTCH_BAND = 0.07  # metres under the crotch where the hips' wrap turns into the leg's
 PIN_BAND = 0.012  # metres of the waistband's top edge held where it starts
@@ -59,8 +60,36 @@ class ShortsSpec:
     hem_band: float = 0.02  # turned-up hem (or a rolled cuff's height)
     spacing: float = 0.011
     gap: float = 0.004  # start of the simulation: rings outside the body
+    denim: bool = False  # jeans details in the garment maps
+    cut_off: bool = False  # raw, frayed hem instead of a turned-up one
 
 
+DENIM_MINI_SHORTS = ShortsSpec(
+    "AS_DenimMiniShorts",
+    top_below_waist=0.08,
+    inseam=0.045,
+    top_ease=-0.01,
+    hip_ease=0.0,
+    hem_ease=0.05,
+    denim=True,
+    cut_off=True,
+)
+DENIM_SHORTS = ShortsSpec(
+    "AS_DenimShorts",
+    top_below_waist=0.05,
+    above_knee=0.07,
+    top_ease=0.03,
+    hip_ease=0.02,
+    hem_ease=0.06,
+    leg_ease=0.04,
+    front_extension=0.05,
+    back_extension=0.1,
+    front_crotch_depth=0.08,
+    back_crotch_depth=0.11,
+    waistband=0.04,
+    hem_band=0.03,
+    denim=True,
+)
 MINI_SHORTS = ShortsSpec(
     "AS_MiniShorts", top_below_waist=0.07, inseam=0.07, top_ease=-0.01, hip_ease=0.0, hem_ease=0.04
 )
@@ -79,6 +108,37 @@ class ShortsMeasures:
 
 def _slab(points: F64, height: float, band: float = SECTION) -> F64:
     return points[np.abs(points[:, 1] - height) < band]
+
+
+class Sections:
+    """Exact horizontal cross-sections of the body's skin (torso and legs, no arms): the
+    points where triangle edges cross the height. Slabs of vertices are too sparse round
+    the thighs, where their hulls jump from one height to the next."""
+
+    def __init__(self, body: BaseBody) -> None:
+        limb = body.limb if body.limb is not None else body.arm
+        keep = ~limb & (np.abs(body.positions[:, 0]) < 0.3)
+        triangles = body.triangles[keep[body.triangles].all(1)]
+        corners = body.positions[triangles]  # (T, 3, 3): each edge from a to b
+        self.a = corners.reshape(-1, 3)
+        self.b = np.roll(corners, -1, axis=1).reshape(-1, 3)
+
+    def at(self, height: float, side: float = 0.0) -> F64:
+        """(x, z) points of the section; `side` > 0 keeps x > side, < 0 x < side."""
+        ya, yb = self.a[:, 1], self.b[:, 1]
+        cross = (ya - height) * (yb - height) <= 0.0
+        cross &= ya != yb
+        a, b = self.a[cross], self.b[cross]
+        t = ((height - a[:, 1]) / (b[:, 1] - a[:, 1]))[:, None]
+        points = (a + t * (b - a))[:, [0, 2]]
+        if side > 0:
+            points = points[points[:, 0] > side]
+        if len(points) < 3:
+            raise GarmentError(f"no body section at {height:.3f} m")
+        return points
+
+    def girth(self, height: float, side: float = 0.0) -> float:
+        return _perimeter(convex_hull(self.at(height, side)))
 
 
 def _perimeter(hull: F64) -> float:
@@ -106,20 +166,16 @@ def measure_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsMeasures:
         hem = float(body.joints["calf_l"][1]) + spec.above_knee
     else:
         raise GarmentError(f"{spec.name}: no hem height")
-    leg = trunk[trunk[:, 0] > 0.005]
-    hips = [_perimeter(convex_hull(_slab(trunk, float(h))[:, [0, 2]])) for h in (top, marks.hip)]
-    hip = max(
-        _perimeter(convex_hull(_slab(trunk, float(h))[:, [0, 2]]))
-        for h in np.arange(crotch + 0.02, top, 0.01)
-    )
+    sections = Sections(body)
+    hip = max(sections.girth(float(h)) for h in np.arange(crotch + 0.02, top, 0.01))
     return ShortsMeasures(
         top=top,
         crotch=crotch,
         hem=hem,
-        girth_top=hips[0],
+        girth_top=sections.girth(top),
         girth_hip=hip,
-        girth_thigh=_perimeter(convex_hull(_slab(leg, hem)[:, [0, 2]])),
-        girth_leg=_perimeter(convex_hull(_slab(leg, crotch - 0.015)[:, [0, 2]])),
+        girth_thigh=sections.girth(hem, LEG_SIDE),
+        girth_leg=sections.girth(crotch - 0.015, LEG_SIDE),
     )
 
 
@@ -309,6 +365,22 @@ class ShortsDraft:
     measures: ShortsMeasures
     front: LegPattern
     back: LegPattern
+    pieces: tuple[Piece, ...] = ()
+
+    def to_uv(self, name: str, points: F64) -> F64:
+        """Pattern points of a piece (as drafted, before any mirroring) in the UV atlas."""
+        index = self.mesh.names.index(name)
+        piece = self.pieces[index]
+        mirrored = name in ("front_r", "back_l")
+        pattern = points * np.array([-1.0, 1.0]) if mirrored else points
+        outline_min = np.concatenate([s.points for s in piece.segments]).min(0)
+        on = self.mesh.piece == index
+        flat = self.mesh.flat[on]
+        # flat = pattern - outline min + the piece's offset; flat -> uv is affine.
+        local = pattern - outline_min + flat.min(0)
+        design = np.c_[flat, np.ones(len(flat))]
+        affine, *_ = np.linalg.lstsq(design, self.mesh.uvs[on], rcond=None)
+        return np.c_[local, np.ones(len(local))] @ affine
 
 
 def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
@@ -354,18 +426,18 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
 
     top = m.top + spec.back_raise + 0.01
     hips, legs = [], []
-    leg_points = trunk[trunk[:, 0] > 0.005]
+    sections = Sections(body)
     for height in np.arange(m.hem - 0.01, top, 0.005):
         v = float(height - m.hem)
         if height >= m.crotch - CROTCH_BAND - 0.005:
             # Round the hips from the centre lines (the extensions fold under).
             width = float(front_edges[1](v) + back_edges[1](v))
-            hull = convex_hull(_slab(trunk, float(height))[:, [0, 2]])
+            hull = convex_hull(sections.at(float(height)))
             grow = max(spec.gap, (2 * width - _perimeter(hull)) / (2 * np.pi))
             hips.append(make_ring(offset_hull(hull, grow, 48), float(height)))
         if height < m.crotch + 0.005:
             width = row(front_edges, v) + row(back_edges, v)
-            hull = convex_hull(_slab(leg_points, float(height))[:, [0, 2]])
+            hull = convex_hull(sections.at(float(height), LEG_SIDE))
             grow = max(spec.gap, (width - _perimeter(hull)) / (2 * np.pi))
             legs.append(make_ring(offset_hull(hull, grow, 48), float(height)))
 
@@ -429,25 +501,135 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
     v = mesh.positions[:, 1] - m.hem
     band = np.clip((v - (m.top - m.hem - PIN_BAND)) / (0.5 * PIN_BAND), 0.0, 1.0)
     pinned = replace(mesh, pin=band)
-    return ShortsDraft(pinned, m, front, back)
+    return ShortsDraft(pinned, m, front, back, tuple(pieces))
 
 
 def shorts_lines(draft: ShortsDraft, spec: ShortsSpec) -> GarmentLines:
-    """Seams, finished edges, the waistband and hem stitching, in UV space."""
+    """Seams, finished edges, the waistband and hem stitching, in UV space; denim adds
+    double topstitching, faded seams, front pockets, a fly, a back yoke and patch pockets,
+    and a cut-off (frayed) or turned-up hem."""
     mesh = draft.mesh
     uv = mesh.uvs
     mm = 0.001 / mesh.uv_metres
-    seams, edges, stitches = [], [], []
+    seams, edges, stitches, fades, frays = [], [], [], [], []
     for key, vertices in mesh.segments.items():
-        (seams if mesh.sewn(*key) else edges).append(uv[vertices])
+        line = uv[vertices]
+        if mesh.sewn(*key):
+            seams.append(line)
+            if spec.denim:
+                stitches.append(_inset(line, 1.8 * mm))
+                fades.append(line)
+        else:
+            edges.append(line)
     for name in PIECES:
         top = uv[mesh.segments[(name, "top")]]
         seams.append(_inset(top, spec.waistband * 1000 * mm))
         stitches.append(_inset(top, 2.5 * mm))
         stitches.append(_inset(top, (spec.waistband * 1000 - 2.5) * mm))
         hem = uv[mesh.segments[(name, "hem")]]
-        stitches.append(_inset(hem, spec.hem_band * 1000 * mm))
-    return GarmentLines(seams=seams, edges=edges, stitches=stitches)
+        if spec.cut_off:
+            fades.append(hem)
+            frays.extend(_fringe(hem, mm))
+        else:
+            stitches.append(_inset(hem, spec.hem_band * 1000 * mm))
+            if spec.denim:
+                fades.append(hem)
+                seams.append(_inset(hem, 2 * spec.hem_band * 1000 * mm))  # the cuff's fold
+    if spec.denim:
+        for name, front in (
+            ("front_l", True),
+            ("front_r", True),
+            ("back_l", False),
+            ("back_r", False),
+        ):
+            pattern = draft.front if front else draft.back
+            for line, kind in _denim_details(pattern, spec, front, name == "front_l"):
+                at = draft.to_uv(name, line)
+                if kind == "edge":
+                    edges.append(at)
+                else:
+                    seams.append(at)
+                    fades.append(at)
+                stitches.append(_inset(at, 2.0 * mm))
+                stitches.append(_inset(at, 7.0 * mm))
+    return GarmentLines(seams=seams, edges=edges, stitches=stitches, fades=fades, frays=frays)
+
+
+def _denim_details(
+    pattern: LegPattern, spec: ShortsSpec, front: bool, fly: bool
+) -> list[tuple[F64, str]]:
+    """Pattern-space lines of a jeans cut: front pocket openings and the fly's J, a back
+    yoke and patch pockets."""
+    top = pattern.top_v
+    band = spec.waistband
+    out: list[tuple[F64, str]] = []
+    if front:
+        depth = min(0.08, 0.35 * (top - pattern.crotch_v))
+        start = np.array([pattern.top_width - 0.095, top])
+        end = np.array([pattern.top_width + 0.002, top - depth])
+        out.append(
+            (
+                bezier(
+                    start, start + np.array([0.005, -0.6 * depth]), end - np.array([0.04, 0.0]), end
+                ),
+                "seam",
+            )
+        )
+        if fly:
+            low = max(pattern.crotch_v + pattern.crotch_depth, top - 0.16)
+            out.append(
+                (
+                    np.concatenate(
+                        [
+                            polyline((0.035, top - band), (0.035, low + 0.03))[:-1],
+                            bezier(
+                                np.array([0.035, low + 0.03]),
+                                np.array([0.035, low + 0.005]),
+                                np.array([0.02, low]),
+                                np.array([0.0, low - 0.005]),
+                            ),
+                        ]
+                    ),
+                    "stitch",
+                )
+            )
+        return out
+    yoke_low, yoke_high = top - 0.085, top - 0.045
+    out.append((polyline((0.0, yoke_low), (pattern.top_width, yoke_high)), "seam"))
+    width = min(0.14, 0.55 * pattern.top_width)
+    middle = 0.5 * pattern.top_width + 0.01
+    pocket_top = yoke_low - 0.01 + 0.5 * (yoke_high - yoke_low)
+    left, right = middle - width / 2, middle + width / 2
+    bottom = pocket_top - min(0.15, 0.6 * (top - pattern.crotch_v - 0.05))
+    out.append(
+        (
+            polyline(
+                (left, pocket_top),
+                (left + 0.004, bottom + 0.025),
+                (middle, bottom),
+                (right - 0.004, bottom + 0.025),
+                (right, pocket_top),
+            ),
+            "edge",
+        )
+    )
+    return out
+
+
+def _fringe(hem: F64, mm: float) -> list[F64]:
+    """Loose weft threads along a cut-off hem: short strokes into the cloth from the edge,
+    one every ~1.3 mm, 2-9 mm long (a fixed pattern, so the maps reproduce)."""
+    length = float(np.linalg.norm(np.diff(hem, axis=0), axis=1).sum())
+    count = max(2, round(length / (1.3 * mm)))
+    base = resample(hem, count)
+    inward = offset_line(base, 1.0) - base
+    rng = np.random.default_rng(7)
+    reach = rng.uniform(2.0, 9.0, count) * mm
+    tilt = rng.uniform(-0.25, 0.25, count)
+    along = np.gradient(base, axis=0)
+    along /= np.maximum(np.linalg.norm(along, axis=1, keepdims=True), 1e-12)
+    tips = base + (inward + tilt[:, None] * along) * reach[:, None]
+    return [np.stack([a, b]) for a, b in zip(base, tips, strict=True)]
 
 
 def _inset(line: F64, distance: float) -> F64:
