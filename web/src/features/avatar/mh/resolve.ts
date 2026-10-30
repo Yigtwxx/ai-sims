@@ -1,5 +1,6 @@
 import { Color } from 'three';
 
+import { isTattooDesign, isTattooPlacement } from '@/features/creator/tattoos';
 import { assetUrl, type MhIris, type MhManifest, type MhSkin } from '@/lib/assets/manifest';
 import type { BodySlider, CharacterConfig } from '@/lib/character/schema';
 
@@ -10,6 +11,7 @@ import type { HairLook } from './hairMaterial';
 import type { MocapLayer } from './motion';
 import type { OutfitWear } from './outfits';
 import { sockWear, type SockWear } from './socks';
+import type { TattooWear } from './tattoos';
 
 /** Standing heights (m) of the neutral MetaHuman bodies (pipeline bodies job). */
 export const BASE_HEIGHT = { female: 1.66, male: 1.78 } as const;
@@ -58,6 +60,8 @@ export interface ResolvedCharacter {
   socks: SockWear | null;
   /** Where the body's toes sit inside a sock (its `socks` file), if the manifest has it. */
   sockToesUrl: string | null;
+  /** Small tattoos, one per placement, with designs the renderer knows. */
+  tattoos: TattooWear[];
   /** Face loops under the live face: the idle loop and a happy loop for the smile. */
   faceClips: { idle: string | null; smile: string | null };
   /** Approximate standing height (m), for camera framing. */
@@ -113,6 +117,7 @@ export function resolveCharacter(
     underwearTop: gender === 'female',
     socks: sockWear(config.socks, gender),
     sockToesUrl: body.socks ? assetUrl(body.socks) : null,
+    tattoos: tattooWears(config),
     faceClips: faceClipSet(manifest),
     height: BASE_HEIGHT[gender] + (sliders.height ?? 0) * HEIGHT_RANGE,
   };
@@ -137,6 +142,17 @@ export function faceBlends(
     .sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id))
     .slice(0, MAX_BLEND_FACES)
     .map(({ headUrl, weight }) => ({ headUrl, weight }));
+}
+
+/** Tattoos with a known design and placement, the first for each placement. */
+export function tattooWears(config: CharacterConfig): TattooWear[] {
+  const placed = new Set<string>();
+  return config.tattoos.flatMap(({ design, placement }) => {
+    if (!isTattooDesign(design) || !isTattooPlacement(placement) || placed.has(placement))
+      return [];
+    placed.add(placement);
+    return [{ design, placement }];
+  });
 }
 
 /** The face idle loop and the first happy expression loop, by manifest tags. */

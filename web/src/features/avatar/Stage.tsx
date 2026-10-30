@@ -13,7 +13,7 @@ import {
 
 import { Backlight } from './Backlight';
 import { CameraRig } from './CameraRig';
-import { getCameraPose, zoomPose, type CameraFocus } from './cameraFocus';
+import { focusHeading, getCameraPose, zoomPose, type CameraFocus } from './cameraFocus';
 import { Cyclorama } from './Cyclorama';
 import { Platform, PLATFORM_HEIGHT } from './Platform';
 import { PostEffects, type RenderLook } from './PostEffects';
@@ -64,6 +64,8 @@ interface StageProps {
   follow?: RefObject<Vector3 | null>;
   /** The subject's eye centre (world); the brows and mouth framings aim at it. */
   anchor?: RefObject<Vector3 | null>;
+  /** A tattoo spot for the tattoo framings to follow (see CameraRig). */
+  spot?: RefObject<{ point: Vector3; normal: Vector3 } | null>;
   /** Render tier; `auto` starts high and steps down while frames drop. */
   quality?: QualityPreference;
   /**
@@ -104,6 +106,7 @@ export function Stage({
   onCreated,
   follow,
   anchor,
+  spot,
   quality = 'auto',
   lively = false,
   turnHome,
@@ -157,7 +160,9 @@ export function Stage({
             subjectHeight={subjectHeight}
             platform={platform}
           />
-          <Turntable home={turnHome}>{children}</Turntable>
+          <Turntable home={turnHome} heading={focusHeading(focus)}>
+            {children}
+          </Turntable>
           {post && <PostEffects look={look} ao={settings.ao} />}
         </Suspense>
       </QualityContext.Provider>
@@ -168,6 +173,7 @@ export function Stage({
         interactive={interactive}
         follow={follow}
         anchor={anchor}
+        spot={spot}
       />
       <ViewInset left={insetLeft} right={insetRight} />
     </Canvas>

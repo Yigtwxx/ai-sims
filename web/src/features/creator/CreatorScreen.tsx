@@ -57,6 +57,7 @@ import { saveThumbnailAction } from '@/lib/characters/saveActions';
 import { cn } from '@/lib/utils';
 
 import { CAMERA_PRESETS, resolveFocus, type CameraPreset } from './framing';
+import { TATTOO_FOCUS, type TattooPlacement } from './tattoos';
 import { PremiereOverlay } from './PremiereOverlay';
 import { BodyPanel } from './panels/BodyPanel';
 import { EyesPanel } from './panels/EyesPanel';
@@ -194,6 +195,8 @@ function CreatorEditor({ initial, visit }: { initial?: CreatorInitial; visit: st
   const [ready, setReady] = useState(false);
   const [category, setCategory] = useState<Category>('identity');
   const [outfitSlot, setOutfitSlot] = useState<OutfitCategory>('top');
+  // The placement picked on the tattoo panel: framed, and shown through clothes.
+  const [tattooPlacement, setTattooPlacement] = useState<TattooPlacement>('innerWrist');
   // A framing picked over the stage; the next category (or garment slot) frames itself again.
   const [preset, setPreset] = useState<CameraPreset | null>(null);
   const [quality, setQuality] = useQualityPreference();
@@ -326,7 +329,12 @@ function CreatorEditor({ initial, visit }: { initial?: CreatorInitial; visit: st
   // not autosaved, and a reload would otherwise lose it).
   useLocalDraft(!initial && !characterId && ready && phase === 'editing');
 
-  const categoryFocus = category === 'outfit' ? OUTFIT_FOCUS[outfitSlot] : CATEGORY_FOCUS[category];
+  const categoryFocus =
+    category === 'outfit'
+      ? OUTFIT_FOCUS[outfitSlot]
+      : category === 'tattoos'
+        ? TATTOO_FOCUS[tattooPlacement]
+        : CATEGORY_FOCUS[category];
   const focus: CameraFocus =
     phase === 'premiere' ? 'premiere' : resolveFocus(focusOverride ?? null, preset, categoryFocus);
   // The framing button that reads as pressed: the user's pick, or the
@@ -339,6 +347,10 @@ function CreatorEditor({ initial, visit }: { initial?: CreatorInitial; visit: st
   }, []);
   const chooseOutfitSlot = useCallback((slot: OutfitCategory) => {
     setOutfitSlot(slot);
+    setPreset(null);
+  }, []);
+  const chooseTattooPlacement = useCallback((placement: TattooPlacement) => {
+    setTattooPlacement(placement);
     setPreset(null);
   }, []);
 
@@ -475,6 +487,7 @@ function CreatorEditor({ initial, visit }: { initial?: CreatorInitial; visit: st
             <CreatorStage
               manifest={manifest}
               focus={focus}
+              revealTattoo={category === 'tattoos' ? tattooPlacement : null}
               insetLeft={stageInset}
               quality={quality}
               onSettled={markStageShown}
@@ -662,6 +675,8 @@ function CreatorEditor({ initial, visit }: { initial?: CreatorInitial; visit: st
                     manifest={manifest}
                     outfitSlot={outfitSlot}
                     onOutfitSlot={chooseOutfitSlot}
+                    tattooPlacement={tattooPlacement}
+                    onTattooPlacement={chooseTattooPlacement}
                   />
                 </motion.div>
               </AnimatePresence>
@@ -724,11 +739,15 @@ function CategoryPanel({
   manifest,
   outfitSlot,
   onOutfitSlot,
+  tattooPlacement,
+  onTattooPlacement,
 }: {
   category: Category;
   manifest: MhManifest;
   outfitSlot: OutfitCategory;
   onOutfitSlot: (slot: OutfitCategory) => void;
+  tattooPlacement: TattooPlacement;
+  onTattooPlacement: (placement: TattooPlacement) => void;
 }) {
   switch (category) {
     case 'identity':
@@ -750,7 +769,7 @@ function CategoryPanel({
     case 'jewelry':
       return <JewelryPanel />;
     case 'tattoos':
-      return <TattooPanel />;
+      return <TattooPanel placement={tattooPlacement} onPlacementChange={onTattooPlacement} />;
   }
 }
 
@@ -762,6 +781,7 @@ function CategoryPanel({
 function CreatorStage({
   manifest,
   focus,
+  revealTattoo,
   insetLeft,
   quality,
   onSettled,
@@ -769,6 +789,7 @@ function CreatorStage({
 }: {
   manifest: MhManifest;
   focus: CameraFocus;
+  revealTattoo: TattooPlacement | null;
   insetLeft: number;
   quality: QualityPreference;
   onSettled: () => void;
@@ -781,6 +802,7 @@ function CreatorStage({
       manifest={manifest}
       mode="creator"
       focus={focus}
+      revealTattoo={revealTattoo}
       insetLeft={insetLeft}
       quality={quality}
       onSettled={onSettled}

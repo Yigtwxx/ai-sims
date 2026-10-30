@@ -1,6 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import { aimCamera } from '@/app/dev/thumbs/sceneProbe';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Stage } from '@/features/avatar/Stage';
@@ -8,6 +9,12 @@ import type { CameraFocus } from '@/features/avatar/cameraFocus';
 import { stepBlink, type BlinkState } from '@/features/avatar/life';
 import { BODY_SLIDER_IDS, type BodySliderId } from '@/features/avatar/mh/assembly';
 import { MhCharacter, type MhCharacterHandle } from '@/features/avatar/mh/MhCharacter';
+import {
+  TATTOO_DESIGNS,
+  TATTOO_PLACEMENTS,
+  isTattooDesign,
+  isTattooPlacement,
+} from '@/features/creator/tattoos';
 import { MhLighting } from '@/features/avatar/mh/MhLighting';
 import { applyMouthToMorphs, createMouthState, stepMouth } from '@/features/lipsync/mouthDriver';
 import { SpeechPlayer } from '@/features/lipsync/speechPlayer';
@@ -104,6 +111,20 @@ export function DevMhViewer() {
   // `?morph=eyeBlinkLeft` holds one morph at 1, `?blend=Zuri:0.5,Etta:0.3` blends the head.
   const [morph, setMorph] = useState<string>(params.get('morph') ?? '');
   const blendParam = params.get('blend') ?? '';
+  // `?tattoo=all` wears one design per placement, `?tattoo=nape&design=bird` one.
+  const tattooParam = params.get('tattoo') ?? '';
+  const designParam = params.get('design') ?? 'star';
+  const tattoos = useMemo(() => {
+    if (tattooParam === 'all') {
+      return TATTOO_PLACEMENTS.map((placement, i) => ({
+        design: TATTOO_DESIGNS[i % TATTOO_DESIGNS.length]!,
+        placement,
+      }));
+    }
+    return isTattooPlacement(tattooParam) && isTattooDesign(designParam)
+      ? [{ design: designParam, placement: tattooParam }]
+      : [];
+  }, [tattooParam, designParam]);
   const blend = useMemo(
     () =>
       blendParam
@@ -144,6 +165,17 @@ export function DevMhViewer() {
     },
     [],
   );
+  // Console hook for close-ups: devMh.look([x, y, z], [x, y, z]) aims the camera.
+  useEffect(() => {
+    const look = (position: [number, number, number], target: [number, number, number]) => {
+      const canvas = document.querySelector('canvas');
+      return canvas ? aimCamera(canvas, { position, target }) : false;
+    };
+    Object.assign(window, { devMh: { look } });
+    return () => {
+      delete (window as { devMh?: unknown }).devMh;
+    };
+  }, []);
 
   const onFrame = useMemo(
     () => (handle: MhCharacterHandle, delta: number) => {
@@ -191,6 +223,7 @@ export function DevMhViewer() {
             skin={skinSet}
             iris={iris}
             underwearTop={gender === 'female'}
+            tattoos={tattoos}
             onFrame={onFrame}
           />
         </Suspense>

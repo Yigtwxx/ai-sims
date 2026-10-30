@@ -18,9 +18,18 @@ import {
  * stays fixed relative to the viewer like a real photo turntable.
  * Cursor and touch-action styling live on the Stage container (CSS).
  * Whenever `home` changes (a new framing), a character the viewer turned
- * away glides back to face them; a drag takes over at once.
+ * away glides back to face them (or to `heading`); a drag takes over at once.
  */
-export function Turntable({ children, home }: { children: ReactNode; home?: unknown }) {
+export function Turntable({
+  children,
+  home,
+  heading = 0,
+}: {
+  children: ReactNode;
+  home?: unknown;
+  /** Where homing turns the subject, radians from facing the viewer (its back: π). */
+  heading?: number;
+}) {
   const group = useRef<Group>(null);
   const state = useRef(createTurntableState());
   const homing = useRef<number | null>(null);
@@ -30,8 +39,8 @@ export function Turntable({ children, home }: { children: ReactNode; home?: unkn
   useEffect(() => {
     if (Object.is(home, lastHome.current)) return;
     lastHome.current = home;
-    homing.current = nearestFront(state.current.angle);
-  }, [home]);
+    homing.current = nearestFront(state.current.angle, heading);
+  }, [home, heading]);
 
   useEffect(() => {
     let lastX = 0;

@@ -11,6 +11,7 @@ import {
   MIN_CALM_IDLES,
   outfitWears,
   resolveCharacter,
+  tattooWears,
 } from './resolve';
 
 const manifest = MhManifestSchema.parse({
@@ -433,6 +434,23 @@ describe('face blend', () => {
     config.face.blend = { Aoi: 0.1, Cara: 0.4, Dana: 0.3, Esra: 0.2 };
     expect(resolveCharacter(config, blendManifest)?.blend.map((b) => b.weight)).toEqual([
       0.4, 0.3, 0.2,
+    ]);
+  });
+});
+
+describe('tattooWears', () => {
+  it('keeps known designs, the first tattoo per placement', () => {
+    const config = createDefaultConfig('female');
+    config.tattoos = [
+      { design: 'star', placement: 'nape' },
+      { design: 'moon', placement: 'nape' },
+      { design: 'dragon', placement: 'ankle' },
+      { design: 'leaf', placement: 'elbow' },
+      { design: 'bird', placement: 'ankle' },
+    ];
+    expect(tattooWears(config)).toEqual([
+      { design: 'star', placement: 'nape' },
+      { design: 'bird', placement: 'ankle' },
     ]);
   });
 });

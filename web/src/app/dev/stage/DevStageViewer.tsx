@@ -22,6 +22,7 @@ import {
   type MhManifest,
   type OutfitCategory,
 } from '@/lib/assets/manifest';
+import { TATTOO_DESIGNS, TATTOO_PLACEMENTS, type TattooDesign } from '@/features/creator/tattoos';
 import { createDefaultConfig } from '@/lib/character/defaults';
 import {
   BODY_SLIDERS,
@@ -122,6 +123,9 @@ export function DevStageViewer() {
   // 'knee:#22304a', or '' for none.
   const [socks, setSocks] = useState('');
   const [sheer, setSheer] = useState(0.6);
+  // A placement, 'all' (every placement, designs in turn) or '' for none.
+  const [tattoo, setTattoo] = useState('');
+  const [tattooDesign, setTattooDesign] = useState<TattooDesign>('star');
   const [blendFace, setBlendFace] = useState('');
   const [blendWeight, setBlendWeight] = useState(0.5);
   const [mode, setMode] = useState<'talk' | 'creator'>('talk');
@@ -150,6 +154,15 @@ export function DevStageViewer() {
       value.socks = { style, color, sheer };
     }
     if (blendFace) value.face.blend = { [blendFace]: blendWeight };
+    // Straight into the config: 'all' wears more tattoos than the creator allows.
+    if (tattoo === 'all') {
+      value.tattoos = TATTOO_PLACEMENTS.map((placement, i) => ({
+        design: TATTOO_DESIGNS[i % TATTOO_DESIGNS.length]!,
+        placement,
+      }));
+    } else if (tattoo) {
+      value.tattoos = [{ design: tattooDesign, placement: tattoo }];
+    }
     if (body) {
       const [slider, end] = body.split(':');
       value.body.sliders = { [slider as BodySlider]: Number(end) };
@@ -167,6 +180,8 @@ export function DevStageViewer() {
     eyeTint,
     socks,
     sheer,
+    tattoo,
+    tattooDesign,
     blendFace,
     blendWeight,
   ]);
@@ -329,6 +344,27 @@ export function DevStageViewer() {
             {EYE_TINTS.map((tint) => (
               <option key={tint.key} value={tint.value}>
                 {tint.key}
+              </option>
+            ))}
+          </select>
+          tattoo
+          <select data-testid="tattoo" value={tattoo} onChange={(e) => setTattoo(e.target.value)}>
+            <option value="">none</option>
+            <option value="all">all</option>
+            {TATTOO_PLACEMENTS.map((placement) => (
+              <option key={placement} value={placement}>
+                {placement}
+              </option>
+            ))}
+          </select>
+          <select
+            data-testid="tattoo-design"
+            value={tattooDesign}
+            onChange={(e) => setTattooDesign(e.target.value as TattooDesign)}
+          >
+            {TATTOO_DESIGNS.map((design) => (
+              <option key={design} value={design}>
+                {design}
               </option>
             ))}
           </select>

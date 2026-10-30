@@ -183,6 +183,8 @@ Yeni bir Claude Code oturumu bu dosyayı okuyarak kaldığı yerden devam eder. 
   - **P5** kadraj: kurulumda kamera ekrandaki karakteri izler (`1c129d1`); kıyafet küçük resimleri öğenin kendisine kadrajlanır (`9d8912d`).
   - **P6** Ada'nın askı kamaları (`258d56a`).
 
+- **2026-10-30 (PC, Faz 2b, B3 dövme):** Sekiz ince çizgi dövme yedi yerde: deriden kesilen çıkartma yaması (kafa malzemesinde boş doku birimi yok), kafa-gövde dikişini kesintisiz geçiyor; giysi, çorap ve deriye çizilen iç çamaşırı mürekkebi örtüyor. Dövme sekmesinde kamera seçilen yere gidiyor, gerekirse karakter dönüyor, o yeri örten giysi önizlemede çıkıyor. Takı (B4) sırada.
+
 ## Site kontrolü (2026-10-22 sabah, PC)
 
 - Landing, Karakterlerim, oluşturucu ve konuşma masaüstünde (1440×900) ve telefonda (390×844) gezildi. Yatay kaydırma yok, konsolda yalnız three'nin `THREE.Clock` uyarısı var.

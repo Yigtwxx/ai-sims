@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { REFERENCE_HEIGHT, closeUpPose, getCameraPose, isCloseUp } from './cameraFocus';
+import {
+  REFERENCE_HEIGHT,
+  closeUpPose,
+  focusHeading,
+  getCameraPose,
+  isCloseUp,
+  isTattooFocus,
+  spotPose,
+} from './cameraFocus';
 
 describe('getCameraPose', () => {
   it('returns the authored pose at the reference height', () => {
@@ -82,5 +90,31 @@ describe('creator framings', () => {
   it('show the bottoms from the feet to the waist', () => {
     expect(span('legs').bottom).toBeLessThan(0);
     expect(span('legs').top).toBeGreaterThan(1.15);
+  });
+});
+
+describe('tattoo framings', () => {
+  it('looks at the spot from its outside, at the framing distance', () => {
+    const pose = spotPose('tattooBack', [0.1, 1.4, 0.1], [0, 0, 1]);
+    expect(pose.target).toEqual([0.1, 1.4, 0.1]);
+    const [x, y, z] = pose.position.map((v, i) => v - pose.target[i]!);
+    expect(Math.hypot(x!, y!, z!)).toBeCloseTo(0.8, 6);
+    expect(z).toBeGreaterThan(0.7);
+    expect(y).toBeGreaterThan(0);
+  });
+
+  it('stays in front of the stage for a spot facing sideways', () => {
+    const pose = spotPose('tattooEar', [0, 1.6, 0], [-1, 0, 0]);
+    expect(pose.position[2]).toBeGreaterThan(0.3);
+    expect(pose.position[0]).toBeLessThan(-0.3);
+  });
+
+  it('turns the character only for spots on its back and sides', () => {
+    expect(focusHeading('tattooBack')).toBeCloseTo(Math.PI);
+    expect(focusHeading('tattooNape')).toBeCloseTo(Math.PI);
+    expect(focusHeading('tattooCollarbone')).toBe(0);
+    expect(focusHeading('upper')).toBe(0);
+    expect(isTattooFocus('tattooAnkle')).toBe(true);
+    expect(isTattooFocus('upper')).toBe(false);
   });
 });

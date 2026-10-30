@@ -58,9 +58,34 @@
   - Ölçüm: hazırlama ~0.43 sn duvar saati (iki kaynak), dilimli; en uzun ana iş parçacığı görevi düz yüklemede 395 ms, karışımla 482 ms (shader ve morph dokusu). JS belleği tek kaynakla +75 MB, üç kaynakla +180 MB (kaynak GLB'ler önbellekte kalır).
   - Kullanıcı kararı (2026-10-29): kaydırıcı bırakınca uygulanır (A); sürüklerken canlı önizleme (B) yapılmayacak.
 
-## 2b — Dövme, takı (B3 → B4), tahmin ~16
+## 2b — Dövme, takı (B3 → B4), tahmin ~16 (yeniden ~6)
 
-Sırası gelince adımlara bölünür.
+**Hedef:** Panelde seçilen küçük dövmeler deride, seçilen yerde ve doğru boyda; giysinin ve çorabın altında kalıyor. Küpe, kolye, bilezik, yüzük ve piercing'ler idle ve konuşma sırasında yerinde kalıyor, mesh'e girmiyor (todo B4'ün "bitti" tanımı).
+
+**Mimari:** Yalnız web; Unreal, Blender ve pipeline gerekmez.
+- Dövme: tasarımlar vektör (SVG yolu, ince çizgi), panel ve sahne aynı tanımı kullanır. Sahnede bir kez canvas'a çizilen 4×2'lik atlas. Cilt shader'ına katman eklenmez: kafa malzemesi 16 doku biriminin hepsini kullanıyor (`materials.ts:78`). Onun yerine **çıkartma yaması**: dövmenin altındaki deri üçgenleri kopyalanır (konum, normal, iskelet ağırlıkları, morph'lar; etkiler deriyle paylaşılır, `sockCuff.ts` deseni), deriyle aynı yerde çizilir (polygon offset), mürekkep çarpımlı karışımla deriyi koyulaştırır. Dövme koordinatı UV'den değil yamanın kendi izdüşümünden gelir (teğet düzlem, kiriş boyuyla), UV dikişi sorun olmaz. Yerleşim çalışma anında, dinlenme pozunda eklemlerden anatomik hedef ve en yakın deri noktasıyla bulunur. Gövde yaması `bodyHidden`'ı da kopyalar (giysi altında görünmez); çorap bileği örterse bilek dövmesi çizilmez.
+- Takı: anime döneminden kalan `accessories/` (VRoid kulak arama, MToon'a göre malzeme seti, `rig.ts`'siz katalog) silinir, yeniden yazılır; prosedürel geometri yardımcıları (`geometry.ts`, `math.ts`) kalır. İki bağlama:
+  - Halka parçalar (kolye, gerdanlık, bilezik, saat, yüzük): dinlenme pozunda boyun, bilek ya da parmak kesitine oturan merkez çizgisi, yüzeyden açıklıkla; her vertex en yakın deri noktasının iskelet ağırlıklarını alır (kafa ağırlıkları gövde iskeletine çevrilir), gövde iskeletine bağlı `SkinnedMesh`. Kaydırıcılar durunca yeniden kurulur (kıyafet katmanlama gibi). Giysi altında kalan kısım gövdenin `bodyHidden` maskesiyle gizlenir.
+  - İğneli parçalar (küpe, piercing): kafa ya da gövde üçgenine barisentrik iğne (`SkinPin`), her karede morph ve iskeletle CPU'da; dudak senkronu ve ifadeleri izler. Sarkan küpeler yerçekimine asılı, kısa bir sarkaç gecikmesiyle.
+- Katalog (kullanıcı, 2026-10-30: "anime dönemine ait bir şeyle karşılaşırsan silebilirsin"; handoff: "dövme ve piercing ölçülü"): gözlük C8'e gider (orada Fab'den gelecek), saç aksesuarları (fiyonk, çiçek, yıldız toka, çapraz toka) anime döneminin, silinir. Dudak halkası, Monroe, kaş halkası ve industrial ölçülü değil, silinir. Yeni `finger` yuvası: yüzük (düz alyans, tek taş, mühür). Kalan: kulak 6, boyun 6, bilek 4, parmak 3, burun 3, kaş 1, dudak 1 (labret), kıkırdak 3, göbek 1.
+
+### Genel kısıtlar
+
+- `CharacterConfig` değişmez (`tattoos` ve `accessories` şemada); bilinmeyen takı kimlikleri `reconcileAccessories` ile zaten düşer, migration yok.
+- Seçim değişimi cilt malzemesini yeniden derletmez: dövme ve takı yalnız kendi mesh'lerini kurar.
+- UI metinleri `web/messages/{tr,en}.json`.
+
+- [x] **2b.1 Dövme tasarımları.** Tahmin 0.7 · Gerçek 0.3. `creator/tattoos.ts` `TATTOO_ART`: 8 ince çizgi tasarım (100×100 viewBox, stroke yolları); panel Phosphor ikonları yerine bu çizimleri gösteriyor; `avatar/mh/tattooAtlas.ts` atlası (4×2, hücre 512 px, kırmızı kanal kapsama, çizgi çevresinde hafif mürekkep yayılması) tarayıcıda bir kez çiziyor.
+- [x] **2b.2 Dövme yaması ve yerleşim.** Tahmin 1.5 · Gerçek 2.5
+  - `avatar/mh/restPose.ts`: `atRest` (iskelet kaydırıcılı dinlenme pozunda ölçer, pozu geri koyar), `sampleRest` (yüz morph'ları kapalı), `restJoint`/`faceJoint`.
+  - `avatar/mh/tattoos.ts`: `placementRay` (eklemlerden ışın: iç bilek başparmağa 75° dönük, ön kol dış yüz, köprücüğün iç ucu, kulak kökünün arkası, dış ayak bileği, kürek kemiğinin üst dış köşesi, ense), `castToSkin`, `patchGeometry` (merkezi tasarımın 0.8 katı içinde, yüzü ±%20'den fazla dönmemiş ve teğet düzlemin 4 mm'den fazla üstüne çıkmayan üçgenler; konum, normal, iskelet, `bodyHidden`, `legHeight`, cilt UV'si ve morph'lar kopyalanır; tasarım koordinatı kiriş boyuyla izdüşüm), malzeme (çarpımlı mürekkep, polygon offset; giysi maskesi, çorap boyu ve deriye çizilen iç çamaşırı mürekkebi örter: iç çamaşırı uniform'ları deri malzemesiyle paylaşılır).
+  - `MhCharacter`: `tattoos` prop'u; giysi değişince `syncTattooHide`; giysi gösterimi ayrı `dress` adımı. Oluşturucu: yerleşim seçimi `CreatorScreen`'de; dövme sekmesinde kamera noktayı her karede izliyor (`CameraRig` `spot`, `spotPose`: deri normali boyunca, sahnenin önüne doğru), sırt, ense, kulak ve ayak bileği için karakter dönüyor (`focusHeading`, `Turntable` `heading`), o dövmeyi örten giysiler (`hidesTattoo`, giysinin maskesi yamaya değiyorsa) ve bilekteki çorap önizlemede çıkıyor (kullanıcı isteği, 2026-10-30: "dövmeyi gösterecek şekilde ekran da zoom yapsın veya kıyafetin altını göstersin").
+  - Bulgular: kafa mesh'i boynu ve omuz üstünü de kapsıyor, dikiş gövdeye takılı halde ~1.28-1.35 m'de; köprücük ve ense dövmeleri iki mesh'e bölünüyor ve kesintisiz. Yüz iskeletinin kendi kemikleri (`FACIAL_*`) gövdenin kafa kemiği altında santimlerce kayık duruyor (deri onlara bağlı değil); kulak gibi yüz noktaları kafa mesh'inin ters bind matrislerinden hesaplanıyor (`faceJoint`). Kafa dosyası tek başına yüklenince kulak 1.60 m'de, takılı karakterde 1.53 m'de: ölçümler tarayıcıda, takılı karakterde yapılmalı. Göğüsteki koyu dörtgen gölgeler dövmelerden bağımsız, önceden var (saç kartı gölgesi olabilir).
+  - Kontrol: `/dev/mh?tattoo=all` (sabit poz) ve oluşturucu: yedi yerleşim yerinde ve dik; ay köprücükte kafa-gövde dikişini kesintisiz geçiyor; kazak giyiliyken kürek kemiği seçilince kazak çıkıyor, sekme değişince geri geliyor.
+- [ ] **2b.3 Takı altyapısı ve katalog.** Tahmin 1. Eski dosyalar silinir; yeni katalog ve panel yuvaları; dinlenme örnekleyici ortak; halka kurucu (merkez çizgisi, ağırlık kopyası, `bodyHidden`), iğne (`SkinPin` yeniden), malzemeler (metal, inci, taş, kadife). `resolve.ts` `accessories`, `MhCharacter` montajı.
+- [ ] **2b.4 Küpe, kolye, bilezik, yüzük.** Tahmin 1.5. Kulak memesi iğnesi (ortak topoloji: vertex kimlikleri ölçülür ve sabitlenir), sarkaç; kolye boynun dibine dökülen zincir, kolye ucu; gerdanlık; bilek ve parmak halkaları. Kontrol: idle, konuşma, kaydırıcı uçları, iki cinsiyet, kıyafet altı.
+- [ ] **2b.5 Piercing'ler.** Tahmin 0.7. Burun (taş, halka, septum), kaş çubuğu, labret, kıkırdak (halka, taşlar, tragus), göbek halkası. Konuşurken dudak ve burunla birlikte; ifade uçlarında deriden çıkmıyor.
+- [ ] **2b.6 Doğrulama ve yayın.** Tahmin 0.5. `/dev/stage` ve oluşturucu; `pnpm typecheck && pnpm lint && pnpm test`; `docs/todo.md` B3, B4 `[x]`, handoff "Durum"; commit + push.
 
 ## 2c — Küçük resimler (D1), tahmin ~5 (yeniden ~1.5) · gerçek ~0.8 (bitti 2026-10-29)
 

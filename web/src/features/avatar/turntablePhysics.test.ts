@@ -52,6 +52,12 @@ describe('turning back to the viewer', () => {
     expect(nearestFront(-Math.PI * 2 - 1)).toBeCloseTo(-Math.PI * 2);
   });
 
+  it('turns to a heading the nearest way round', () => {
+    expect(nearestFront(0, Math.PI)).toBeCloseTo(Math.PI);
+    expect(nearestFront(Math.PI * 2 + 0.2, Math.PI)).toBeCloseTo(Math.PI * 3);
+    expect(nearestFront(-0.5, -1)).toBeCloseTo(-1);
+  });
+
   it('glides there and settles exactly, without coasting', () => {
     let state = { ...createTurntableState(1.2), velocity: 0.05 };
     state = stepHome(state, 0, 1 / 60);

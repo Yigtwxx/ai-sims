@@ -1,18 +1,6 @@
 'use client';
 
-import {
-  BirdIcon,
-  CompassIcon,
-  FeatherIcon,
-  HeartIcon,
-  LeafIcon,
-  MoonIcon,
-  PlusIcon,
-  StarIcon,
-  WavesIcon,
-  XIcon,
-  type Icon,
-} from '@phosphor-icons/react';
+import { PlusIcon, XIcon } from '@phosphor-icons/react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
@@ -21,6 +9,7 @@ import { cn } from '@/lib/utils';
 
 import {
   MAX_TATTOOS,
+  TATTOO_ART,
   TATTOO_DESIGNS,
   TATTOO_PLACEMENTS,
   isTattooDesign,
@@ -32,23 +21,40 @@ import { ChipRadio, Hint, Section } from '../ui/controls';
 
 import { useConfig } from './shared';
 
-/** Line glyphs stand in for the fine-line designs until their decals are baked. */
-const DESIGN_GLYPHS: Record<TattooDesign, Icon> = {
-  wave: WavesIcon,
-  star: StarIcon,
-  moon: MoonIcon,
-  leaf: LeafIcon,
-  bird: BirdIcon,
-  heart: HeartIcon,
-  feather: FeatherIcon,
-  compass: CompassIcon,
-};
+/** A design drawn with the lines the stage paints as ink. */
+function TattooGlyph({ design, className }: { design: TattooDesign; className?: string }) {
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden="true" className={className}>
+      {TATTOO_ART[design].map((d) => (
+        <path
+          key={d}
+          d={d}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.25}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
+  );
+}
 
-export function TattooPanel() {
+/**
+ * The picked placement lives with the editor: the stage frames it and shows
+ * it through the clothes while this panel is open.
+ */
+export function TattooPanel({
+  placement,
+  onPlacementChange,
+}: {
+  placement: TattooPlacement;
+  onPlacementChange: (placement: TattooPlacement) => void;
+}) {
   const t = useTranslations('Creator.tattoos');
   const { config, update } = useConfig();
   const [design, setDesign] = useState<TattooDesign>('star');
-  const [placement, setPlacement] = useState<TattooPlacement>('innerWrist');
 
   const taken = new Set(config.tattoos.map((tattoo) => tattoo.placement));
   const full = config.tattoos.length >= MAX_TATTOOS;
@@ -59,7 +65,6 @@ export function TattooPanel() {
       <Section title={t('design')}>
         <div role="radiogroup" aria-label={t('design')} className="grid grid-cols-4 gap-2.5">
           {TATTOO_DESIGNS.map((id) => {
-            const Glyph = DESIGN_GLYPHS[id];
             const active = id === design;
             return (
               <button
@@ -75,7 +80,7 @@ export function TattooPanel() {
                     : 'text-ink-muted hover:text-ink shadow-[inset_0_0_0_1px_rgb(23_26_33/0.12)] hover:shadow-[inset_0_0_0_1px_rgb(23_26_33/0.35)]',
                 )}
               >
-                <Glyph weight="thin" className="size-8" aria-hidden="true" />
+                <TattooGlyph design={id} className="size-8" />
                 <span className={cn('text-label', active && 'font-semibold')}>
                   {t(`designs.${id}`)}
                 </span>
@@ -90,7 +95,7 @@ export function TattooPanel() {
           label={t('placement')}
           value={placement}
           options={TATTOO_PLACEMENTS.map((id) => ({ value: id, label: t(`placements.${id}`) }))}
-          onChange={setPlacement}
+          onChange={onPlacementChange}
         />
         {blocked ? <Hint>{t('taken')}</Hint> : null}
         <Button
@@ -116,17 +121,27 @@ export function TattooPanel() {
               if (!isTattooDesign(tattoo.design) || !isTattooPlacement(tattoo.placement)) {
                 return null;
               }
-              const Glyph = DESIGN_GLYPHS[tattoo.design];
               const designName = t(`designs.${tattoo.design}`);
               return (
                 <li key={tattoo.placement} className="flex items-center gap-3 px-3 py-2">
-                  <Glyph weight="thin" className="text-ink-muted size-6" aria-hidden="true" />
-                  <span className="text-ui text-ink flex-1">
+                  <TattooGlyph design={tattoo.design} className="text-ink-muted size-6" />
+                  {/* Picking an added tattoo frames it on the stage. */}
+                  <button
+                    type="button"
+                    aria-pressed={tattoo.placement === placement}
+                    onClick={() => onPlacementChange(tattoo.placement as TattooPlacement)}
+                    className={cn(
+                      'text-ui flex-1 text-left transition-colors duration-200',
+                      tattoo.placement === placement
+                        ? 'text-ink font-semibold'
+                        : 'text-ink-muted hover:text-ink',
+                    )}
+                  >
                     {t('entry', {
                       design: designName,
                       placement: t(`placements.${tattoo.placement}`),
                     })}
-                  </span>
+                  </button>
                   <Button
                     type="button"
                     variant="ghost"

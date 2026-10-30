@@ -5,7 +5,15 @@ import { useFrame } from '@react-three/fiber';
 import { useEffect, useRef, type RefObject } from 'react';
 import { Vector3 } from 'three';
 
-import { closeUpPose, getCameraPose, isCloseUp, zoomPose, type CameraFocus } from './cameraFocus';
+import {
+  closeUpPose,
+  getCameraPose,
+  isCloseUp,
+  isTattooFocus,
+  spotPose,
+  zoomPose,
+  type CameraFocus,
+} from './cameraFocus';
 
 const { ACTION } = CameraControlsImpl;
 
@@ -14,6 +22,8 @@ const FOLLOW_FROM = 0.35;
 const FOLLOW_TO = 0.9;
 /** Re-aim only when the followed offset moved more than this (m). */
 const FOLLOW_STEP = 0.0005;
+/** A tattoo framing re-aims once its spot has moved this far (m). */
+const SPOT_STEP = 0.004;
 
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -37,6 +47,7 @@ export function CameraRig({
   interactive = true,
   follow,
   anchor,
+  spot,
 }: {
   focus: CameraFocus;
   height?: number;
@@ -44,6 +55,8 @@ export function CameraRig({
   interactive?: boolean;
   follow?: RefObject<Vector3 | null>;
   anchor?: RefObject<Vector3 | null>;
+  /** A tattoo spot (world point and outward normal) the tattoo framings follow. */
+  spot?: RefObject<{ point: Vector3; normal: Vector3 } | null>;
 }) {
   const controls = useRef<CameraControlsImpl>(null);
   const aimed = useRef(new Vector3());
@@ -65,6 +78,17 @@ export function CameraRig({
     const pose = closeUpPose(focus, [eyes.x, eyes.y, eyes.z], height);
     // Rigidly on the eyes: a close-up a few millimetres off reads as a miss.
     if (pose) void controls.current.setLookAt(...pose.position, ...pose.target, false);
+  });
+
+  // Tattoo framings glide after the spot as the idle moves it.
+  useFrame(() => {
+    const current = spot?.current;
+    if (zoom !== undefined || !current || !controls.current || !isTattooFocus(focus)) return;
+    if (anchored.current && anchored.current.distanceTo(current.point) < SPOT_STEP) return;
+    anchored.current = (anchored.current ?? new Vector3()).copy(current.point);
+    const { point, normal } = current;
+    const pose = spotPose(focus, [point.x, point.y, point.z], [normal.x, normal.y, normal.z]);
+    void controls.current.setLookAt(...pose.position, ...pose.target, true);
   });
 
   useFrame(() => {

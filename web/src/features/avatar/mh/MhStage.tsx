@@ -13,11 +13,12 @@ import {
 } from 'react';
 import { Vector3, type Camera, type Object3D } from 'three';
 
+import { placementOfFocus, type TattooPlacement } from '@/features/creator/tattoos';
 import type { SpeechPlayer } from '@/features/lipsync/speechPlayer';
 import type { MhManifest } from '@/lib/assets/manifest';
 import type { CharacterConfig } from '@/lib/character/schema';
 
-import { isCloseUp, type CameraFocus } from '../cameraFocus';
+import { isCloseUp, isTattooFocus, type CameraFocus } from '../cameraFocus';
 import type { QualityPreference } from '../quality';
 import { Stage } from '../Stage';
 import { CharacterLife, type FaceLayers, type LifeInput } from './characterLife';
@@ -25,6 +26,7 @@ import { loadFaceClip } from './faceClips';
 import { keepFacing } from './facing';
 import type { LifeMode } from './idle';
 import { MhCharacter, type MhCharacterHandle } from './MhCharacter';
+import { posedSpot } from './tattoos';
 import { MhLighting } from './MhLighting';
 import { resolveCharacter, type ResolvedCharacter } from './resolve';
 import { StageSwap } from './swap';
@@ -46,6 +48,8 @@ export interface MhStageProps {
   mode: 'creator' | 'talk' | 'hero' | 'thumbnail';
   /** Camera framing; creator categories map to body/face/torso/legs/feet. */
   focus?: CameraFocus;
+  /** Creator: the tattoo being placed shows through the garments over it. */
+  revealTattoo?: TattooPlacement | null;
   /**
    * Talk mode: zoom from full body (0) to face close-up (1). Leave undefined to
    * let the stage own it (wheel and pinch); pass it with `onZoomChange` to
@@ -119,6 +123,7 @@ export const MhStage = memo(function MhStage({
   manifest,
   mode,
   focus = 'body',
+  revealTattoo = null,
   zoom,
   onZoomChange,
   speech = null,
@@ -233,6 +238,9 @@ export const MhStage = memo(function MhStage({
   // The eye centre, for the close-up framings (brows, mouth) to aim at.
   const closeUp = isCloseUp(focus);
   const anchor = useRef<Vector3 | null>(null);
+  // The tattoo spot the tattoo framings follow (the placement of `focus`).
+  const spotPlacement = isTattooFocus(focus) ? placementOfFocus(focus) : null;
+  const spot = useRef<{ point: Vector3; normal: Vector3 } | null>(null);
   const eyes = useRef<{ handle: MhCharacterHandle; bones: Object3D[] } | null>(null);
   const onIncomingFrame = useCallback(
     (handle: MhCharacterHandle, delta: number, camera: Camera) => {
@@ -266,6 +274,13 @@ export const MhStage = memo(function MhStage({
           centre.divideScalar(bones.length);
         }
       }
+      if (spotPlacement) {
+        const found = handle.tattooSpot(spotPlacement);
+        if (found) {
+          spot.current ??= { point: new Vector3(), normal: new Vector3() };
+          posedSpot(found, spot.current.point, spot.current.normal);
+        }
+      }
       const head = handle.body.bones.get('head');
       if (!head) return;
       head.getWorldPosition(headWorld);
@@ -276,7 +291,7 @@ export const MhStage = memo(function MhStage({
         .copy(headWorld)
         .sub(followRest.current.head);
     },
-    [lifeOf, frozen, facing, closeUp],
+    [lifeOf, frozen, facing, closeUp, spotPlacement],
   );
   const latestOnSettled = useRef(onSettled);
   const latestOnCharacter = useRef(onCharacter);
@@ -356,6 +371,7 @@ export const MhStage = memo(function MhStage({
         interactive={mode === 'creator' || talk}
         follow={talk ? follow : undefined}
         anchor={closeUp ? anchor : undefined}
+        spot={spotPlacement ? spot : undefined}
         // Every new creator framing starts with the character facing the viewer.
         turnHome={mode === 'creator' ? focus : undefined}
         quality={quality}
@@ -391,6 +407,8 @@ export const MhStage = memo(function MhStage({
                   underwearTop={character.underwearTop}
                   socks={character.socks}
                   sockToesUrl={character.sockToesUrl}
+                  tattoos={character.tattoos}
+                  revealTattoo={revealTattoo}
                   onFrame={incoming ? onIncomingFrame : onFrame}
                   prewarm={incoming}
                   onSettled={(handle) => slotSettled(handle, key, incoming)}

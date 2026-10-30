@@ -16,7 +16,18 @@ export type CameraFocus =
   | 'brows'
   | 'mouth'
   | 'top'
-  | 'shoes';
+  | 'shoes'
+  | TattooFocus;
+
+/** Close framings of each tattoo placement (see TATTOO_FOCUS). */
+export type TattooFocus =
+  | 'tattooWrist'
+  | 'tattooForearm'
+  | 'tattooCollarbone'
+  | 'tattooEar'
+  | 'tattooAnkle'
+  | 'tattooBack'
+  | 'tattooNape';
 
 type Vec3 = readonly [number, number, number];
 
@@ -74,7 +85,76 @@ const REFERENCE_POSES: Record<CameraFocus, CameraPose> = {
   premiere: { position: [0, 0.78, 7.6], target: [0, 0.5, 0] },
   brows: around(REFERENCE_EYES, CLOSE_UP_OFFSETS.brows, 1),
   mouth: around(REFERENCE_EYES, CLOSE_UP_OFFSETS.mouth, 1),
+  // Tattoo placements, with the character turned by FOCUS_HEADING first (the
+  // targets are where the spot is once turned): close enough for a 2-5 cm
+  // design to read, wide enough that an idle sway keeps it in frame.
+  tattooWrist: { position: [0.15, 1.2, 1.5], target: [0.18, 0.98, 0] },
+  tattooForearm: { position: [-0.35, 1.08, 0.85], target: [-0.22, 1.02, 0.12] },
+  tattooCollarbone: { position: [0.05, 1.5, 0.75], target: [0.05, 1.46, 0.08] },
+  tattooEar: { position: [0.04, 1.72, 0.6], target: [0.04, 1.7, 0.06] },
+  tattooAnkle: { position: [0.18, 0.3, 0.75], target: [0.09, 0.15, 0.08] },
+  tattooBack: { position: [0.1, 1.48, 0.9], target: [0.095, 1.44, 0.1] },
+  tattooNape: { position: [0, 1.6, 0.7], target: [0, 1.56, 0.08] },
 };
+
+/**
+ * How far the turntable turns the character for a framing (radians from
+ * facing the viewer, counter-clockwise from above), so the spot faces the
+ * studio lights: the right ear's back from behind its shoulder, the left
+ * ankle's outside, the back and the nape all the way round.
+ */
+const FOCUS_HEADING: Partial<Record<CameraFocus, number>> = {
+  tattooEar: 2.6,
+  tattooAnkle: -1,
+  tattooBack: Math.PI,
+  tattooNape: Math.PI,
+};
+
+export function focusHeading(focus: CameraFocus): number {
+  return FOCUS_HEADING[focus] ?? 0;
+}
+
+/**
+ * How a tattoo spot is framed: the camera's distance (m; the camera rig's own
+ * minimum is 0.6), how much it follows the skin's normal and how far it rises
+ * above the spot.
+ */
+const TATTOO_VIEW: Record<TattooFocus, { distance: number; normal: number; lift: number }> = {
+  tattooWrist: { distance: 0.66, normal: 0.7, lift: 0.3 },
+  tattooForearm: { distance: 0.7, normal: 0.8, lift: 0.15 },
+  tattooCollarbone: { distance: 0.66, normal: 1, lift: 0.15 },
+  tattooEar: { distance: 0.62, normal: 1, lift: 0.1 },
+  tattooAnkle: { distance: 0.7, normal: 1, lift: 0.3 },
+  tattooBack: { distance: 0.8, normal: 1, lift: 0.15 },
+  tattooNape: { distance: 0.66, normal: 1, lift: 0.15 },
+};
+
+export function isTattooFocus(focus: CameraFocus): focus is TattooFocus {
+  return Object.hasOwn(TATTOO_VIEW, focus);
+}
+
+/**
+ * A tattoo framed where it actually is (world, m): looked at along the skin's
+ * outward normal, leaned towards the viewer's side of the stage (+z, where
+ * the turntable turned the spot) and a little from above.
+ */
+export function spotPose(focus: TattooFocus, point: Vec3, normal: Vec3): CameraPose {
+  const view = TATTOO_VIEW[focus];
+  const direction: Vec3 = [
+    normal[0] * view.normal,
+    normal[1] * view.normal + view.lift,
+    normal[2] * view.normal + 0.8,
+  ];
+  const length = Math.hypot(...direction) || 1;
+  return {
+    position: [
+      point[0] + (direction[0] / length) * view.distance,
+      point[1] + (direction[1] / length) * view.distance,
+      point[2] + (direction[2] / length) * view.distance,
+    ],
+    target: point,
+  };
+}
 
 export function getCameraPose(focus: CameraFocus, height = REFERENCE_HEIGHT): CameraPose {
   const s = height / REFERENCE_HEIGHT;

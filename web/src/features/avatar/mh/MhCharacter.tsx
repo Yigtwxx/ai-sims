@@ -81,6 +81,19 @@ import {
 } from './skinTextures';
 import { takeOffCuff, wearCuff } from './sockCuff';
 import { applySockToes, ensureLegHeights, loadSockToes, setSocks, type SockWear } from './socks';
+import type { TattooPlacement } from '@/features/creator/tattoos';
+
+import {
+  findSpot,
+  hidesTattoo,
+  setTattooSocks,
+  syncTattooHide,
+  takeOffTattoos,
+  wearTattoos,
+  type TattooSpot,
+  type TattooWear,
+  type WornTattoo,
+} from './tattoos';
 import { texturesIn, uploadTextures, warmUp, watchSceneTarget } from './warmUp';
 import { compileWrinkleTable, computeWrinkleWeights, type AnimatedMaps } from './wrinkles';
 
@@ -93,6 +106,8 @@ export interface MhCharacterHandle {
   setFaceMorph: (name: string, weight: number) => void;
   /** Mocap body clips, once loaded (null: procedural idle only). */
   motion: MotionPlayer | null;
+  /** The skin vertex in the middle of a tattoo placement (measured once per placement). */
+  tattooSpot: (placement: TattooPlacement) => TattooSpot | null;
 }
 
 export interface MhCharacterProps {
@@ -152,6 +167,13 @@ export interface MhCharacterProps {
   socks?: SockWear | null;
   /** The body's toe envelope for socks, loaded the first time socks go on. */
   sockToesUrl?: string | null;
+  /** Small tattoos, drawn as decals cut from the skin (see ./tattoos.ts). */
+  tattoos?: readonly TattooWear[];
+  /**
+   * Shows the tattoo at this placement while it is picked: garments over it
+   * (and socks over an ankle) are left off until it is null again.
+   */
+  revealTattoo?: TattooPlacement | null;
 }
 
 /**
@@ -183,6 +205,8 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     underwearTop = false,
     socks = null,
     sockToesUrl = null,
+    tattoos = NO_TATTOOS,
+    revealTattoo = null,
   },
   ref,
 ) {
@@ -257,11 +281,17 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
     const skins = applySkinMaterials(bodyRoot, { microNormal: null });
     const eyes = applyEyeMaterials(bodyRoot);
     const faceMeshes = collectMorphMeshes(bodyRoot).filter((mesh) => mesh !== body.mesh);
+    const spots = new Map<TattooPlacement, TattooSpot | null>();
     const handle: MhCharacterHandle = {
       body,
       faceMeshes,
       setFaceMorph: (name, weight) => setMorph(faceMeshes, name, weight),
       motion: null,
+      tattooSpot: (placement) => {
+        if (!spots.has(placement))
+          spots.set(placement, findSpot({ body, head: headSkin }, placement));
+        return spots.get(placement) ?? null;
+      },
     };
     return {
       root: bodyRoot,
@@ -529,11 +559,21 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
   const stand = useRef<Group>(null);
   // The sock's edge as geometry (see ./sockCuff.ts): rebuilt when the socks change
   // length and whenever the garments change which skin they hide.
-  const latestSocks = useRef(socks);
+  // Socks come off while an ankle tattoo is shown (see revealTattoo).
+  const shownSocks = revealTattoo === 'ankle' ? null : socks;
+  const latestSocks = useRef(shownSocks);
   useLayoutEffect(() => {
-    latestSocks.current = socks;
-  }, [socks]);
+    latestSocks.current = shownSocks;
+  }, [shownSocks]);
   const cuff = useRef<SkinnedMesh | null>(null);
+  // Tattoos hide under the garments' mask too: re-read whenever it changes.
+  const wornTattoos = useRef<WornTattoo[]>([]);
+  const latestReveal = useRef(revealTattoo);
+  useLayoutEffect(() => {
+    latestReveal.current = revealTattoo;
+  }, [revealTattoo]);
+  // The worn outfits on show: all of them unless one covers a revealed tattoo.
+  const shownOutfits = useRef<WornOutfit[]>([]);
   const refitCuff = useCallback(
     (release = false) => {
       takeOffCuff(cuff.current);
@@ -542,13 +582,46 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
       const body = assembled.handle.body.mesh;
       // A bottom covers the waistband of tights, and the garments' masks stop a few
       // centimetres short of their waist: the band would show through tight cloth.
-      const worn = new Set(wornOutfits.current.map((outfit) => outfit.category));
+      const worn = new Set(shownOutfits.current.map((outfit) => outfit.category));
       const waistCovered = wear?.fabric === 'nylon' && (worn.has('bottom') || worn.has('full'));
       if (wear && !release && !waistCovered) {
         cuff.current = wearCuff(body, wear, body.parent ?? assembled.root);
       }
     },
     [assembled],
+  );
+  // Which garments show, the skin they hide, the underwear and the sock cuff.
+  const dress = useCallback(
+    (release = false) => {
+      const body = assembled.handle.body;
+      const all = wornOutfits.current;
+      const reveal = latestReveal.current;
+      const tattoo = reveal
+        ? wornTattoos.current.find((worn) => worn.wear.placement === reveal)
+        : undefined;
+      const shown = tattoo ? all.filter((worn) => !hidesTattoo(worn.hide, tattoo, body.mesh)) : all;
+      shownOutfits.current = shown;
+      for (const worn of all) for (const mesh of worn.meshes) mesh.visible = shown.includes(worn);
+      // In the same frame as the shoes, so they never show sunk into the floor.
+      if (stand.current) stand.current.position.y = Math.max(0, ...shown.map((worn) => worn.sole));
+      // Teardown (release) leaves the shared mask to the character that set it last.
+      if (release) releaseBodyHide(body.mesh);
+      else
+        applyBodyHide(
+          body.mesh,
+          shown.flatMap((worn) => (worn.hide ? [worn.hide] : [])),
+        );
+      syncTattooHide(wornTattoos.current, body.mesh);
+      // In the same frame as the garments, so a change never flashes bare skin.
+      const worn = new Set(shown.map((outfit) => outfit.category));
+      const full = worn.has('full');
+      setUnderwear(assembled.skins, {
+        top: underwearTop && !full && !worn.has('top'),
+        bottom: !full && !worn.has('bottom'),
+      });
+      refitCuff(release);
+    },
+    [assembled, underwearTop, refitCuff],
   );
   const swapOutfits = useCallback(
     (next: WornOutfit[], release = false) => {
@@ -566,36 +639,40 @@ export const MhCharacter = forwardRef<MhCharacterHandle, MhCharacterProps>(funct
         body.garments.push(...worn.meshes);
       }
       wornOutfits.current = next;
-      // In the same frame as the shoes, so they never show sunk into the floor.
-      if (stand.current) stand.current.position.y = Math.max(0, ...next.map((worn) => worn.sole));
       layerOutfits(next, body);
       presetSkinnedBounds(assembled.root);
-      // Teardown (release) leaves the shared mask to the character that set it last.
-      if (release) releaseBodyHide(body.mesh);
-      else
-        applyBodyHide(
-          body.mesh,
-          next.flatMap((worn) => (worn.hide ? [worn.hide] : [])),
-        );
-      // In the same frame as the garments, so a change never flashes bare skin.
-      const worn = new Set(next.map((outfit) => outfit.category));
-      const full = worn.has('full');
-      setUnderwear(assembled.skins, {
-        top: underwearTop && !full && !worn.has('top'),
-        bottom: !full && !worn.has('bottom'),
-      });
-      refitCuff(release);
+      dress(release);
     },
-    [assembled, underwearTop, refitCuff],
+    [assembled, dress],
   );
   useEffect(() => () => swapOutfits([], true), [swapOutfits]);
   useEffect(() => {
     if (assembled) setSkinTone(assembled.skins, skinTone);
   }, [assembled, skinTone]);
   useEffect(() => {
-    setSocks(assembled.skins, socks);
-  }, [assembled, socks]);
-  const cuffKey = socks ? `${socks.top}@${socks.cuff}@${socks.fabric}` : '';
+    setSocks(assembled.skins, shownSocks);
+    setTattooSocks(wornTattoos.current, shownSocks);
+  }, [assembled, shownSocks]);
+  const tattooKey = tattoos.map((wear) => `${wear.design}@${wear.placement}`).join('|');
+  const latestTattoos = useRef(tattoos);
+  useLayoutEffect(() => {
+    latestTattoos.current = tattoos;
+  }, [tattoos]);
+  useEffect(() => {
+    const body = assembled.handle.body;
+    const worn = wearTattoos({ body, head: assembled.headSkin }, latestTattoos.current);
+    wornTattoos.current = worn;
+    setTattooSocks(worn, latestSocks.current);
+    dress();
+    return () => {
+      takeOffTattoos(worn);
+      if (wornTattoos.current === worn) wornTattoos.current = [];
+    };
+  }, [assembled, tattooKey, dress]);
+  useEffect(() => {
+    dress();
+  }, [dress, revealTattoo]);
+  const cuffKey = shownSocks ? `${shownSocks.top}@${shownSocks.cuff}@${shownSocks.fabric}` : '';
   useEffect(() => {
     refitCuff();
   }, [refitCuff, cuffKey]);
@@ -714,6 +791,7 @@ const NO_CLIPS: readonly string[] = [];
 const NO_GROOMS: readonly GroomWear[] = [];
 const NO_OUTFITS: readonly OutfitWear[] = [];
 const NO_BLEND: readonly FaceBlendWear[] = [];
+const NO_TATTOOS: readonly TattooWear[] = [];
 
 const clipCache = new Map<string, Promise<MotionClip[]>>();
 

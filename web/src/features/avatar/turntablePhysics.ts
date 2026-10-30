@@ -59,10 +59,13 @@ export function stepTurntable(
 
 const TURN = Math.PI * 2;
 
-/** The facing-the-viewer angle nearest to `angle`: a whole number of turns. */
-export function nearestFront(angle: number): number {
-  const turns = Math.round(angle / TURN);
-  return turns === 0 ? 0 : turns * TURN;
+/**
+ * The angle nearest to `angle` that turns the subject `heading` radians from
+ * facing the viewer (0: facing them, a whole number of turns).
+ */
+export function nearestFront(angle: number, heading = 0): number {
+  const turns = Math.round((angle - heading) / TURN);
+  return heading + (turns === 0 ? 0 : turns * TURN);
 }
 
 /**
