@@ -43,6 +43,7 @@ class GarmentLines:
     seams: list[F64] = field(default_factory=list)  # sewn seams: a groove and a shadow
     edges: list[F64] = field(default_factory=list)  # finished edges: wear and a slight roll
     stitches: list[F64] = field(default_factory=list)  # topstitching
+    ribs: list[F64] = field(default_factory=list)  # knit rib wales (a neckband's grooves)
 
 
 def metres_per_uv(glb: Path) -> float:
@@ -91,11 +92,12 @@ def garment_maps(
     shadow = _mask(lines.seams, size, 3.0 * px, 3.0 * px)
     edge = _mask(lines.edges, size, 2.0 * px, 4.0 * px)
     stitch = _mask(lines.stitches, size, 0.6 * px, 0.25 * px)
+    rib = _mask(lines.ribs, size, 0.8 * px, 0.35 * px) if lines.ribs else 0.0 * groove
 
-    height = -groove + 0.5 * edge - 0.4 * stitch
+    height = -groove + 0.5 * edge - 0.4 * stitch - 0.5 * rib
     normal = _normal_from_height(height, strength=2.0)
     ones = np.ones((size, size))
-    occlusion = np.clip(1.0 - 0.35 * shadow - 0.15 * stitch, 0.0, 1.0)
+    occlusion = np.clip(1.0 - 0.35 * shadow - 0.15 * stitch - 0.12 * rib, 0.0, 1.0)
     wear = np.clip(0.55 + 0.3 * edge, 0.0, 1.0)
 
     def rgba(*channels: F64) -> Image.Image:

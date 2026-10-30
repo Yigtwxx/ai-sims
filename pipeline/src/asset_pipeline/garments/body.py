@@ -5,7 +5,7 @@ Arm vertices are left out of the cross-sections (in the A-pose the hands hang be
 hips); they are told apart by the joint that weighs most on them.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +30,7 @@ ARM_PARTS = (
     "ring",
     "pinky",
 )
+LIMB_PARTS = tuple(part for part in ARM_PARTS if part != "clavicle")
 SECTION_BAND = 0.008  # half-height of the slab of vertices one cross-section takes (m)
 
 
@@ -39,11 +40,19 @@ def is_arm_joint(name: str) -> bool:
     return "toe" not in lower and any(part in lower for part in ARM_PARTS)
 
 
+def is_limb_joint(name: str) -> bool:
+    """Arm joints from the shoulder down: the clavicle's skin is the top of the torso."""
+    lower = name.lower()
+    return "toe" not in lower and any(part in lower for part in LIMB_PARTS)
+
+
 @dataclass(frozen=True, eq=False)
 class BaseBody:
     positions: F64  # (V, 3)
     triangles: NDArray[np.int64]  # (T, 3)
     arm: NDArray[np.bool_]  # (V,) vertices an arm joint weighs most on
+    limb: NDArray[np.bool_] | None = None  # (V,) the same without the clavicles
+    joints: dict[str, F64] = field(default_factory=dict)  # bind position per joint name
 
     @property
     def trunk(self) -> F64:
@@ -72,10 +81,21 @@ def load_base_body(path: Path) -> BaseBody:
         ],
         1,
     )
-    names = [document["nodes"][j].get("name", "") for j in document["skins"][0]["joints"]]
+    skin = document["skins"][0]
+    names = [document["nodes"][j].get("name", "") for j in skin["joints"]]
     arm_joint = np.array([is_arm_joint(n) for n in names])
+    limb_joint = np.array([is_limb_joint(n) for n in names])
     heaviest = joints[np.arange(len(joints)), weights.argmax(1)]
-    return BaseBody(positions, triangles.astype(np.int64), arm_joint[heaviest])
+    # glTF stores the inverse binds column-major; the bind world is their inverse.
+    inverse = accessor_values(document, binary, skin["inverseBindMatrices"]).reshape(-1, 4, 4)
+    world = np.linalg.inv(np.transpose(inverse, (0, 2, 1)))
+    return BaseBody(
+        positions,
+        triangles.astype(np.int64),
+        arm_joint[heaviest],
+        limb_joint[heaviest],
+        {name: world[i, :3, 3].copy() for i, name in enumerate(names)},
+    )
 
 
 @dataclass(frozen=True, eq=False)

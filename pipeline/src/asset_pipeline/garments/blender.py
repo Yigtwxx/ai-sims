@@ -7,10 +7,12 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from asset_pipeline.config import PIPELINE_ROOT
 from asset_pipeline.garments import GarmentError
 from asset_pipeline.garments.body import BaseBody
+from asset_pipeline.garments.flat import FlatMesh
 from asset_pipeline.garments.pattern import GarmentMesh
 
 SIM_SCRIPT = PIPELINE_ROOT / "blender" / "garment_sim.py"
@@ -34,18 +36,22 @@ def find_blender() -> Path:
 
 def write_job(
     work: Path,
-    garment: GarmentMesh,
+    garment: GarmentMesh | FlatMesh,
     body: BaseBody,
     material: str,
     sim: dict[str, Any],
     thickness: float,
+    collider: tuple[NDArray[np.float64], NDArray[np.int64]] | None = None,
 ) -> Path:
+    """`collider` replaces the body as the cloth's collision mesh (the body closed at
+    the neck, `garments.collider`)."""
     work.mkdir(parents=True, exist_ok=True)
+    positions, triangles = collider or (body.positions, body.triangles)
     job = {
         "garment": garment.to_json(),
         "body": {
-            "positions": np.round(body.positions, 6).tolist(),
-            "triangles": body.triangles.tolist(),
+            "positions": np.round(positions, 6).tolist(),
+            "triangles": triangles.tolist(),
         },
         "material": material,
         "sim": sim,

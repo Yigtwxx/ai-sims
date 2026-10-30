@@ -105,9 +105,30 @@
 - [x] **2c.3 Yayın.** Tahmin 0.5 · Gerçek 0.2. Yalnız küçük resimler `r2-sync` ile; manifest eksik `thumbnail` alanı varsa `mh-convert --manifest`. Oluşturucu panellerinde yeni görseller; `docs/todo.md` D1 `[x]`, handoff "Durum"; commit + push.
   - Sonuç: 99 dosya R2'de (örneklerin md5'i yereldekiyle aynı); manifest değişmedi, yollar zaten içindeydi. R2 önbelleği bir saat (`max-age=3600`): açık sekmeler eski görseli bir süre gösterebilir.
 
-## 2d — Tişört, şortlar (A4.2 → A4.3), tahmin ~13
+## 2d — Tişört, şortlar (A4.2 → A4.3), tahmin ~13 (yeniden ~8)
 
-Sırası gelince adımlara bölünür.
+**Hedef:** Kendi düz tişörtümüz (kadın ve erkek) ve üç şort (mini kot şort K, kumaş mini şort K, diz üstü kot şort E) sitede; A4'ün "bitti" tanımı: kumaş deriye girmiyor, altından cilt görünmüyor, kaydırıcı uçlarında kırılmıyor, idle ve talk'ta yırtılmıyor, renk presetleri çalışıyor.
+
+**Mimari:** Kalem eteğin yolu (`asset-pipeline garment`: ölç, kalıp, Blender, paket, `mh-convert`). Ölçüm (2026-10-30): taban gövdede kollar yataydan 52.6° aşağıda (A-pozu); omuz eklemi kadında (0.151, 1.377), erkekte (0.203, 1.55); `is_arm_joint` köprücüğü de kol sayıyor, gövdenin yarısı (16.090 köşe, omuz üstü dahil) "kol". Etekteki ızgara yolu tüp parçalar içindir; kol ağzı ve omuz dikişi olan tişört ızgaraya sığmaz.
+- Tişört: gerçek düz kalıp (ön, arka, iki kol; 2D çokgen, üçgenlenmiş). Parçalar gövdeye ve kola sarılı başlar, Blender'ın dikiş yayları (`use_sewing_springs`) yan, omuz, kol altı ve kol ağzı dikişlerini kapatır; sonra dikiş çiftleri kaynaklanır ve kumaş yerçekimiyle oturur. UV kalıbın düz koordinatı, dikiş çizgileri kalıp kenarlarından gelir.
+- Şortlar: önce ızgara yolu (etek gibi, iki bacak + ağ); olmazsa tişörtün dikiş yolu.
+- Kot: Epic kotunun ustası (`M_jeans_nrm_custom_master`) renk parametresi taşımıyor (OA_Jeans'te preset yok); kot şortlar `M_fabric_simpler` ile, kot döşeme haritalarıyla ve yıkama presetleriyle denenir.
+
+- [x] **2d.1 Dikişli kalıp yolu.** Tahmin 2.5 · Gerçek ~2
+  - `garments/flat.py`: düz parça (adlı kenar parçalarından saat yönü tersine çokgen), üçgen kafes + Delaunay (düz kenardaki eş doğrusal şeritler atılıyor; yoksa kaynakta üç yüzlü kenar çıkıyordu), dikişin iki yanı aynı sayıda örneklenir, yön başlangıç yerleşiminden seçilir, köşeler birleşim kümeleri (`welds`). Kalıbın düzü kumaşın dinlenme şekli (Blender `rest_shape_key`), UV atlası.
+  - `garments/collider.py`: taban gövdenin boynu yok (kafa mesh'i boynu ve omuz üstünü taşıyor, gövdenin üst kenarı önde 1.35 m). Ada ve Victor'un kafası web gövdesine çalışma anındaki gibi takılıp (`fit_audit.place_head`) en yakın gövde derisinin farkıyla taban gövdeye taşınıyor; dikiş 0 mm oturuyor. Çenesiz, yalnız boyun.
+  - `garment_sim.py`: dikiş yayları (gevşek kenarlar), yerçekimi dikişler kapanınca 10 karede açılıyor, sonra kaynak (küme ortalaması, `weld_verts`, bozuk üçgenler), deriye 4 mm'den yakın köşeleri dışarı itme (`push_out`), Solidify'da çift ofset kapalı ve sıkıştırma açık (köşelerden diken çıkıyordu).
+  - `BaseBody.limb` (köprücüksüz kol) ve `joints` (bağlama konumları).
+- [x] **2d.2 Düz tişört K/E.** Tahmin 2 · Gerçek ~2.5 (`AS_CrewTee`, "Düz tişört" / "Plain tee")
+  - `garments/tee.py`: genişlikler gövde çevresi + bolluk (kadında belden hafif içeri, erkekte düz), boylar gövde ve boynun sagital kesitinin dışbükey zarfından (göğsü ve boyun çukurunu kumaş gibi köprüler), omuz noktası omuz ekleminin 4.5 cm dışı, kol çevresi kol derisinin kesit kutusundan (erkek taban gövdenin kolu ~44 cm). Kol kapağı yüksekliği kol oyuğu uzunluğuna eşitlenir.
+  - Başlangıç: gövde parçaları her yükseklikte gövde kesitine (kesitin dörtte biri kalıbın yarı genişliği olacak kadar büyütülmüş) sarılı; kol oyuğu üstünde yalnız dış yarı daraltılıyor (tümü daraltılınca sırtta yatay kırışık ve %50 dikey gerilme kalıyordu); kollar kol ekseni etrafında. Jarse ayarı: bükülme 0.5 (0.05 buruşuk, 2.0 A kesim gibi açılıyor), çarpışma 5 mm.
+  - Malzeme Crewneckt kalıbı ama tüy, boncuklanma ve melanj benek kapalı (kullanıcı, 2026-10-30: "bütün tişörtler tüylü gözükmek zorunda değil"). UV çeyrek dönük: örgü çizgileri dikey. Yakada 1x1 ribana izi, etek ve kol ucunda çift iğne çizgisi.
+  - Erkekte kapsama "full" çıkıyordu: `CATEGORY_OVERRIDES` ile `top`. `fit_audit.CREW_NECKS`'e eklendi.
+  - Kontrol: `gltf-transform validate` hatasız (uyarılar kalem etekle aynı). `mh-fit-audit`: yaka bütün yüzlerde ve kilo −1, omuz −1'de temiz; pozda deri taşması erkek konuşmada 2 köşe / 7.9 mm, boşta 2 / 4.7 mm (Epic Crewneckt: 5-11 köşe / 17-19 mm). `/dev/stage`'de Ada ve Victor; nötr, kilo ±1, göğüs +1, kas +1; önden ve arkadan.
+  - Bilinen: kadında kol kapağının arkasında pozda küçük açık renkli benekler; sırtta kol ağzı yakınında yer yer kumaş kıvrımı.
+- [ ] **2d.3 Kumaş mini şort (K).** Tahmin 1.5. İki bacak ve ağ kalıbı, bel bandı, kıvrık paça.
+- [ ] **2d.4 Kot şortlar.** Tahmin 1.5. Mini kot şort (K, kesik paça) ve kot şort (E, diz üstü, kıvrık paça); kot görünümü ve yıkama presetleri.
+- [ ] **2d.5 Küçük resim, doğrulama, yayın.** Tahmin 0.5. `/dev/thumbs`, `r2-sync`, `docs/todo.md` A4.2/A4.3, handoff "Durum".
 
 ## 2e — Çorap ve külotlu (A4.5), tahmin ~12 (yeniden ~2.5) · gerçek ~1 (bitti 2026-10-29)
 

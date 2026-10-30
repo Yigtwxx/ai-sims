@@ -1,0 +1,167 @@
+import numpy as np
+import pytest
+
+from asset_pipeline.garments import GarmentError
+from asset_pipeline.garments.flat import (
+    Piece,
+    Seam,
+    Segment,
+    layout,
+    offset_line,
+    polyline,
+    resample,
+    triangulate,
+)
+from asset_pipeline.garments.pack import garment_maps
+from asset_pipeline.garments.tee import (
+    Ring,
+    TorsoPattern,
+    _cap_height,
+    _outline,
+    _sleeve,
+    make_ring,
+    surface_length,
+)
+
+
+def area(points, triangles):
+    p = points[triangles]
+    e1, e2 = p[:, 1] - p[:, 0], p[:, 2] - p[:, 0]
+    return 0.5 * (e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0])
+
+
+def square(side, origin=(0.0, 0.0), name="sq"):
+    x0, y0 = origin
+    return [
+        Segment("bottom", polyline((x0, y0), (x0 + side, y0))),
+        Segment("right", polyline((x0 + side, y0), (x0 + side, y0 + side))),
+        Segment("top", polyline((x0 + side, y0 + side), (x0, y0 + side))),
+        Segment("left", polyline((x0, y0 + side), (x0, y0))),
+    ]
+
+
+def test_triangulate_covers_the_outline_counter_clockwise():
+    outline = resample(
+        np.array([[0, 0], [0.3, 0], [0.3, 0.2], [0.15, 0.1], [0, 0.2], [0, 0]], float), 60
+    )[:-1]
+    points, triangles = triangulate(outline, 0.02)
+    # The outline comes first, in order; every triangle is counter-clockwise and the
+    # triangles tile the notched shape (0.06 - 0.015 m^2).
+    assert np.allclose(points[: len(outline)], outline)
+    assert (area(points, triangles) > 0).all()
+    assert area(points, triangles).sum() == pytest.approx(0.06 - 0.015, rel=0.02)
+
+
+def test_triangulate_drops_slivers_along_straight_edges():
+    outline = resample(np.array([[0, 0], [0.4, 0], [0.4, 0.1], [0, 0.1], [0, 0]], float), 101)[:-1]
+    _, triangles = triangulate(outline, 0.012)
+    edges = np.sort(
+        np.concatenate([triangles[:, [0, 1]], triangles[:, [1, 2]], triangles[:, [2, 0]]]), 1
+    )
+    _, counts = np.unique(edges, axis=0, return_counts=True)
+    assert counts.max() <= 2  # no edge shared by more than two triangles
+
+
+def place_flat(flat):
+    return np.c_[flat[:, 0], flat[:, 1], np.zeros(len(flat))]
+
+
+def test_layout_pairs_seams_by_where_the_pieces_start():
+    a = Piece("a", tuple(square(0.1)), place_flat)
+    # `b` starts right of `a`, its left edge on `a`'s right edge but running down.
+    b = Piece("b", tuple(square(0.1, (0.1, 0.0))), place_flat)
+    mesh = layout([a, b], [Seam("a", "right", "b", "left")], 0.02)
+    gaps = np.linalg.norm(mesh.positions[mesh.pairs[:, 0]] - mesh.positions[mesh.pairs[:, 1]], 1)
+    assert len(mesh.pairs) == 6  # 0.1 m at 0.02 m: six points a side
+    assert gaps.max() == pytest.approx(0.0, abs=1e-9)
+    assert mesh.sewn("a", "right") and mesh.sewn("b", "left")
+    assert not mesh.sewn("a", "left")
+    # Corners join: the seam's ends are groups of two.
+    assert sorted(len(g) for g in mesh.welds()) == [2] * 6
+
+
+def test_layout_gives_both_sides_of_a_seam_the_same_count():
+    short = Piece("s", tuple(square(0.05)), place_flat)
+    long = Piece("l", tuple(square(0.2, (0.3, 0.0))), place_flat)
+    mesh = layout([short, long], [Seam("s", "top", "l", "bottom")], 0.01)
+    assert len(mesh.segments[("s", "top")]) == len(mesh.segments[("l", "bottom")]) == 21
+
+
+def test_layout_rest_shape_keeps_the_pattern():
+    piece = Piece("p", tuple(square(0.1)), lambda flat: place_flat(flat) * 2.0)
+    mesh = layout([piece], [], 0.02)
+    rest = mesh.to_json()["rest"]
+    # The rest shape is the flat piece (x, 0, y), wherever it was placed.
+    assert np.ptp(np.array(rest)[:, 0]) == pytest.approx(0.1)
+    assert np.ptp(mesh.positions[:, 0]) == pytest.approx(0.2)
+
+
+def test_layout_rejects_repeated_names():
+    piece = Piece("p", tuple(square(0.1)), place_flat)
+    with pytest.raises(GarmentError):
+        layout([piece, piece], [], 0.02)
+
+
+def test_offset_line_moves_into_a_counter_clockwise_outline():
+    bottom = np.array([[0.0, 0.0], [1.0, 0.0]])
+    assert np.allclose(offset_line(bottom, 0.1)[:, 1], 0.1)
+
+
+def test_tee_outline_closes_and_mirrors():
+    pattern = TorsoPattern(0.27, 0.21, 0.25, 0.22, 0.35, 0.2, 0.56, 0.08, 0.65, 0.09)
+    segments = _outline(pattern, ("l", "r"))
+    names = [s.name for s in segments]
+    assert names == [
+        "hem",
+        "side_l",
+        "arm_l",
+        "shoulder_l",
+        "neck",
+        "shoulder_r",
+        "arm_r",
+        "side_r",
+    ]
+    for a, b in zip(segments, segments[1:] + segments[:1], strict=True):
+        assert np.allclose(a.points[-1], b.points[0])
+    left = {s.name: s.length for s in segments}
+    assert left["arm_l"] == pytest.approx(left["arm_r"])
+    outline = np.concatenate([s.points[:-1] for s in segments])
+    x, y = outline[:, 0], outline[:, 1]
+    assert 0.5 * np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y) > 0  # counter-clockwise
+
+
+def test_sleeve_cap_height_matches_the_armhole():
+    height = _cap_height(0.36, 0.08, 0.22)
+    cap = _sleeve("s", 0.36, 0.34, 0.08, height)[2]
+    assert cap.length == pytest.approx(0.22, abs=1e-4)
+
+
+def test_ring_runs_from_the_centre_front_toward_plus_x():
+    a = np.linspace(0, 2 * np.pi, 64, endpoint=False)
+    circle = np.stack([0.2 * np.cos(a), 0.1 * np.sin(a)], 1)
+    ring = make_ring(circle, 1.0)
+    assert isinstance(ring, Ring)
+    assert np.allclose(ring.points[0], [0.0, 0.1], atol=1e-3)
+    assert ring.points[5, 0] > 0
+    assert ring.side(True) == pytest.approx(ring.perimeter / 4, rel=0.02)
+    assert ring.back == pytest.approx(ring.perimeter / 2, rel=0.02)
+
+
+def test_surface_length_goes_over_the_top():
+    # A box 0.2 deep from y = 0 to 1 at x = 0 under a pitched roof peaking 5 cm higher at
+    # z = 0: the front path is 1 up plus one roof slope.
+    y = np.linspace(0, 1, 50)
+    sides = [np.stack([np.zeros_like(y), y, np.full_like(y, zz)], 1) for zz in (-0.1, 0.1)]
+    z = np.linspace(-0.1, 0.1, 21)
+    roof = np.stack([np.zeros_like(z), 1.05 - 0.5 * np.abs(z), z], 1)
+    points = np.concatenate([*sides, roof])
+    expected = 1.0 + np.hypot(0.1, 0.05)
+    assert surface_length(points, 0.0, 0.0, True) == pytest.approx(expected, abs=1e-6)
+
+
+def test_ribs_darken_the_occlusion():
+    from asset_pipeline.garments.pack import GarmentLines
+
+    plain = garment_maps(GarmentLines(), 1.0, size=64)
+    ribbed = garment_maps(GarmentLines(ribs=[np.array([[0.5, 0.1], [0.5, 0.9]])]), 1.0, size=64)
+    assert np.asarray(ribbed["AO"])[..., 0].min() < np.asarray(plain["AO"])[..., 0].min()

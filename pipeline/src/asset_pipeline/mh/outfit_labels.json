@@ -182,5 +182,9 @@
   "AS_PencilSkirt": {
     "en": "Pencil skirt",
     "tr": "Kalem etek"
+  },
+  "AS_CrewTee": {
+    "en": "Plain tee",
+    "tr": "Düz tişört"
   }
 }

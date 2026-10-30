@@ -15,9 +15,12 @@ import numpy as np
 from asset_pipeline.garments import GarmentError
 from asset_pipeline.garments.blender import run_sim, write_job
 from asset_pipeline.garments.body import BaseBody, load_base_body
+from asset_pipeline.garments.collider import Neck, closed_body, neck
+from asset_pipeline.garments.flat import FlatMesh
 from asset_pipeline.garments.pack import GarmentLines, write_unit
 from asset_pipeline.garments.pattern import GarmentMesh
 from asset_pipeline.garments.skirt import draft_pencil_skirt, skirt_lines
+from asset_pipeline.garments.tee import TEE_FEMALE, TEE_MALE, draft_tee, tee_lines
 from asset_pipeline.mh.convert import archive_root
 from asset_pipeline.mh.geometry import closest_triangles
 from asset_pipeline.mh.glb import accessor_values, read_glb
@@ -27,22 +30,64 @@ COMMAND = "garment"
 MIN_CLEARANCE = 0.001  # metres between the draped cloth and the skin
 
 
+Draft = Callable[[BaseBody, Neck | None, str], tuple[GarmentMesh | FlatMesh, GarmentLines]]
+
+
 @dataclass(frozen=True)
 class Item:
     genders: tuple[str, ...]
-    draft: Callable[[BaseBody], tuple[GarmentMesh, GarmentLines]]
+    draft: Draft
     switches: dict[str, bool]
     sim: dict[str, float]  # cloth settings over garment_sim.py's defaults
+    neck: bool = False  # reaches the neck: drape against the body closed by a head
+    thickness: float = 0.002
 
 
-def _pencil_skirt(body: BaseBody) -> tuple[GarmentMesh, GarmentLines]:
+def _pencil_skirt(
+    body: BaseBody, neck: Neck | None, gender: str
+) -> tuple[GarmentMesh, GarmentLines]:
     draft = draft_pencil_skirt(body)
     return draft.mesh, skirt_lines(draft)
 
 
+def _crew_tee(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
+    if neck is None:
+        raise GarmentError("the tee is draped against the neck")
+    spec = TEE_FEMALE if gender == "female" else TEE_MALE
+    draft = draft_tee(body, neck, spec)
+    return draft.mesh, tee_lines(draft, spec)
+
+
+# Cotton jersey: soft and stretchy, sewn from flat pieces; gravity comes after the seams.
+JERSEY = {
+    "frames": 50.0,
+    "sew_frames": 60.0,
+    "gravity_ramp": 10.0,
+    "self_collision": 1.0,
+    "quality": 8.0,
+    # Rests a little off the skin: by the neck and the armholes the skin stays drawn and
+    # poses and thin bodies would push it through cloth lying right on it.
+    "collision_distance": 0.005,
+    "min_gap": 0.004,
+    "friction": 2.0,
+    "bending": 0.5,
+    "tension": 15.0,
+    "compression": 15.0,
+    "shear": 5.0,
+}
+
 ITEMS = {
     # Wool suiting: no pilling, and stiff enough not to fold into the gap between the legs.
     "AS_PencilSkirt": Item(("female",), _pencil_skirt, {"DoPill": False}, {"bending": 8.0}),
+    # Smooth combed cotton: no fuzz, pills or heathered fleck (the template is a worn tee).
+    "AS_CrewTee": Item(
+        ("female", "male"),
+        _crew_tee,
+        {"DoPill": False, "DoFuzz": False, "DoDetailVariation": False},
+        JERSEY,
+        neck=True,
+        thickness=0.0015,
+    ),
 }
 
 
@@ -52,7 +97,7 @@ def add_parser(
     parser = subparsers.add_parser(COMMAND, help="Draft, drape (Blender) and pack our garments")
     parser.add_argument("--item", choices=sorted(ITEMS), required=True)
     parser.add_argument("--gender", choices=("female", "male"), action="append")
-    parser.add_argument("--frames", type=int, default=40, help="cloth simulation frames")
+    parser.add_argument("--frames", type=int, help="cloth simulation frames (after sewing)")
     parser.add_argument("--archive", type=Path, help="MetaHumanArchive root (default: $MH_ARCHIVE)")
     return parser
 
@@ -67,12 +112,15 @@ def clearance(glb: Path, body: BaseBody) -> float:
     return float(np.min(distance))
 
 
-def build(archive: Path, name: str, gender: str, frames: int) -> dict[str, object]:
+def build(archive: Path, name: str, gender: str, frames: int | None) -> dict[str, object]:
     item = ITEMS[name]
     body = load_base_body(base_body_path(archive, gender))
-    mesh, lines = item.draft(body)
+    neck_part = neck(archive, gender) if item.neck else None
+    mesh, lines = item.draft(body, neck_part, gender)
     work = archive / "build" / "garments" / name / gender
-    job = write_job(work, mesh, body, f"MI_{name}", {**item.sim, "frames": frames}, thickness=0.002)
+    sim = {**item.sim, **({"frames": frames} if frames else {})}
+    collider = closed_body(body, neck_part) if neck_part is not None else None
+    job = write_job(work, mesh, body, f"MI_{name}", sim, item.thickness, collider)
     report = run_sim(job)
     draped = Path(str(report["out"]))
     gap = clearance(draped, body)

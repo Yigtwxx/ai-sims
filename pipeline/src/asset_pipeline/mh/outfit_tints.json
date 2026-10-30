@@ -828,6 +828,57 @@
           "diffuse_color_2": "#c9bba2"
         }
       }
+    ],
+    "AS_CrewTee": [
+      {
+        "id": "white",
+        "values": {
+          "diffuse_color_1": "#e6e2da",
+          "diffuse_color_2": "#e6e2da"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f",
+          "diffuse_color_2": "#1d1d1f"
+        }
+      },
+      {
+        "id": "heather",
+        "values": {
+          "diffuse_color_1": "#8a8987",
+          "diffuse_color_2": "#8a8987"
+        }
+      },
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941",
+          "diffuse_color_2": "#1f2941"
+        }
+      },
+      {
+        "id": "olive",
+        "values": {
+          "diffuse_color_1": "#5a5c39",
+          "diffuse_color_2": "#5a5c39"
+        }
+      },
+      {
+        "id": "burgundy",
+        "values": {
+          "diffuse_color_1": "#5b1f2a",
+          "diffuse_color_2": "#5b1f2a"
+        }
+      },
+      {
+        "id": "sky",
+        "values": {
+          "diffuse_color_1": "#9cb6cf",
+          "diffuse_color_2": "#9cb6cf"
+        }
+      }
     ]
   }
 }
