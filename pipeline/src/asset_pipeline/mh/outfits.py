@@ -137,6 +137,11 @@ KERNEL_NEIGHBOURS = 32
 KERNEL_SIGMA_MIN = 0.006  # metres
 KERNEL_SIGMA_SCALE = 0.5  # sigma grows by this times the distance to the skin
 EXACT_RADIUS = 0.02  # closest-point weights fade out over this distance
+# Optional garment vertex attribute (our sewn garments): how far a vertex follows an arm,
+# its sign the side (+ left, - right). Without it the skin weights come from wherever the
+# skin is closest, and a sleeve hanging by the torso in the A-pose stays with the torso.
+ARM_ATTRIBUTE = "_ARM"
+ARM_JOINT = re.compile(r"upperarm|lowerarm|hand|thumb|index|middle|ring|pinky|wrist|elbow")
 # Bridging kernel (`bridging`): cloth hanging across the gap between the legs.
 BRIDGE_SIGMA_SCALE = 1.0  # its sigma is this times the distance to the skin
 BRIDGE_CUT = 0.01  # it reaches out to where its weight falls to this share of its peak
@@ -286,9 +291,13 @@ def _primitive(
         .reshape(-1, 3)
         .astype(np.int64),
     }
-    for key, name in (("NORMAL", "normals"), ("TEXCOORD_0", "uvs")):
+    for key, name in (("NORMAL", "normals"), ("TEXCOORD_0", "uvs"), (ARM_ATTRIBUTE, "arm")):
         if key in attributes:
-            out[name] = accessor_values(document, binary, attributes[key])
+            out[name] = accessor_values(document, binary, attributes[key]).reshape(
+                len(out["positions"]), -1
+            )
+    if "arm" in out:
+        out["arm"] = out["arm"][:, 0]
     joints = [k for k in sorted(attributes) if k.startswith("JOINTS_")]
     if joints:
         out["joints"] = np.concatenate(
@@ -475,6 +484,7 @@ class GarmentPart:
     normals: F64
     uvs: F64
     triangles: I64
+    arm: F64 | None = None  # (V,) see ARM_ATTRIBUTE
 
 
 @dataclass
@@ -660,6 +670,11 @@ def load_garment(path: Path, body: "BodyFit | None" = None) -> Garment:
         )
         normals = np.concatenate([p.get("normals", np.zeros_like(p["positions"])) for p in pieces])
         uvs = np.concatenate([p.get("uvs", np.zeros((len(p["positions"]), 2))) for p in pieces])
+        arm = (
+            np.concatenate([p.get("arm", np.zeros(len(p["positions"]))) for p in pieces])
+            if any("arm" in p for p in pieces)
+            else None
+        )
         drop, fans = find_caps(positions, triangles, body)
         garment.caps += fans
         garment.cap_triangles += int(drop.sum())
@@ -675,6 +690,7 @@ def load_garment(path: Path, body: "BodyFit | None" = None) -> Garment:
                 normals=_repair_normals(normals[used], kept_positions, kept_triangles),
                 uvs=uvs[used],
                 triangles=kept_triangles,
+                arm=None if arm is None else arm[used],
             )
         )
     if not garment.parts:
@@ -702,6 +718,8 @@ def pack_udim_parts(
         remapped = remap_uvs(part.uvs, part.triangles, layout)
         part.positions = part.positions[remapped.source]
         part.normals = part.normals[remapped.source]
+        if part.arm is not None:
+            part.arm = part.arm[remapped.source]
         part.uvs = remapped.uvs
         part.triangles = remapped.triangles
         layouts[part.material] = layout
@@ -742,6 +760,75 @@ def _signed_distance(
     normal = _unit(np.einsum("nk,nkj->nj", bary, normals[corners]))
     signed = np.einsum("ij,ij->i", points - closest, normal)
     return distance, signed, triangle, bary, normal
+
+
+def arm_masks(body: BodyFit) -> tuple[Bool, Bool]:
+    """Body vertices of the left and right arm (shoulder down, by their strongest joint)."""
+    names = body.skeleton.names
+    strongest = body.joints[np.arange(len(body.joints)), np.argmax(body.weights, axis=1)]
+    left = np.zeros(len(names), dtype=bool)
+    right = np.zeros(len(names), dtype=bool)
+    for j, name in enumerate(names):
+        lower = name.lower()
+        if "toe" in lower or not ARM_JOINT.search(lower):
+            continue
+        if lower.endswith("_l"):
+            left[j] = True
+        elif lower.endswith("_r"):
+            right[j] = True
+    return left[strongest], right[strongest]
+
+
+def restricted_transfer(points: F64, body: BodyFit, allowed: Bool) -> Transfer:
+    """`build_transfer` with the skin limited to the `allowed` body vertices (no
+    bridging): cloth that must follow one part of the body only."""
+    triangles = body.triangles[allowed[body.triangles].all(axis=1)]
+    distance, signed, triangle, bary, _ = _signed_distance(
+        points, body.base_positions, body.base_normals, triangles
+    )
+    count = len(points)
+    index = np.flatnonzero(allowed)
+    k = min(KERNEL_NEIGHBOURS, len(index))
+    radii, local = cKDTree(body.base_positions[index]).query(points, k=k)
+    radii = radii.reshape(count, k)
+    neighbours = index[local.reshape(count, k)]
+    sigma = np.maximum(KERNEL_SIGMA_MIN, KERNEL_SIGMA_SCALE * distance)[:, None]
+    kernel = np.exp(-(radii**2 - radii[:, :1] ** 2) / (2.0 * sigma**2))
+    kernel /= kernel.sum(axis=1, keepdims=True)
+    exact = smoothstep(1.0 - distance / EXACT_RADIUS)
+    near = (1.0 - exact)[:, None] * kernel
+    rows = np.concatenate([np.repeat(np.arange(count), 3), np.repeat(np.arange(count), k)])
+    cols = np.concatenate([triangles[triangle].ravel(), neighbours.ravel()])
+    values = np.concatenate([(exact[:, None] * bary).ravel(), near.ravel()])
+    matrix = coo_matrix((values, (rows, cols)), shape=(count, len(body.base_positions))).tocsr()
+    matrix.sum_duplicates()
+    return Transfer(matrix=matrix, distance=distance, signed=signed, bridge=np.zeros(count))
+
+
+def arm_transfer(points: F64, arm: F64, body: BodyFit) -> Transfer:
+    """Transfer for garments that say which cloth follows an arm (`ARM_ATTRIBUTE`): rows
+    blend the torso-only transfer and the arm's by each vertex's share, so a sleeve moves
+    with its arm and the body of the shirt with the torso, and the armhole seam between."""
+    left, right = arm_masks(body)
+    torso = restricted_transfer(points, body, ~(left | right))
+    share = np.clip(np.abs(arm), 0.0, 1.0)
+    matrix = diags(1.0 - share) @ torso.matrix
+    distance, signed = torso.distance.copy(), torso.signed.copy()
+    for side, mask in ((1.0, left), (-1.0, right)):
+        rows = np.flatnonzero(np.sign(arm) == side)
+        if not len(rows):
+            continue
+        limb = restricted_transfer(points[rows], body, mask)
+        pick = coo_matrix(
+            (np.ones(len(rows)), (rows, np.arange(len(rows)))), shape=(len(points), len(rows))
+        ).tocsr()
+        matrix = matrix + diags(share) @ (pick @ limb.matrix)
+        nearer = limb.distance < distance[rows]
+        distance[rows[nearer]] = limb.distance[nearer]
+        signed[rows[nearer]] = limb.signed[nearer]
+    matrix = matrix.tocsr()
+    matrix.sum_duplicates()
+    return Transfer(matrix=matrix, distance=distance, signed=signed, bridge=np.zeros(len(points)))
 
 
 def build_transfer(points: F64, body: BodyFit) -> Transfer:
@@ -1008,7 +1095,17 @@ def fit_garment(garment: Garment, body: BodyFit, *, hug: float = 0.0) -> Fit:
     torso (`hug_torso`)."""
     points = np.concatenate([p.positions for p in garment.parts])
     points, pulled = hug_torso(points, body, hug)
-    transfer = build_transfer(points, body)
+    arms = [p.arm for p in garment.parts]
+    if any(a is not None for a in arms):
+        arm = np.concatenate(
+            [
+                a if a is not None else np.zeros(len(p.positions))
+                for a, p in zip(arms, garment.parts, strict=True)
+            ]
+        )
+        transfer = arm_transfer(points, arm, body)
+    else:
+        transfer = build_transfer(points, body)
     moved = points + transfer.matrix @ body.displacement
     _, signed, triangle, bary, normal = _signed_distance(
         moved, body.positions, body.normals, body.triangles

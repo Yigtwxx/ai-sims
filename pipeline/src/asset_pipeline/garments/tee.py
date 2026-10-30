@@ -3,12 +3,12 @@
 Pieces: front, back and two set-in short sleeves. Widths come from the body's girths plus
 ease, lengths from its surface (the convex hull of a sagittal slab of the body and neck,
 so the cloth bridges the bust and the hollows by the neck as fabric does). The front and
-back start wrapped on an elliptic cylinder around the torso, the sleeves on a cylinder
+back start wrapped on rings round the torso (`torso_rings`), the sleeves on a cylinder
 around each upper arm; the sewing springs close the side, shoulder, underarm and armhole
 seams, then gravity settles the shirt on the shoulders.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 from scipy.interpolate import PchipInterpolator
@@ -42,6 +42,9 @@ SQUEEZE = 0.85  # how far toward a ring's side the pieces start above the armhol
 SQUEEZE_RISE = 0.06  # metres over which that narrowing comes in
 SQUEEZE_KEEP = 0.5  # share of the half-width, from the centre, left as cut
 RIB_PITCH = 2.5  # millimetres between a neckband's rib wales
+ARM_BAND = 0.07  # metres of torso cloth from the armhole that partly follow the arm
+UNDERARM_FADE = 0.03  # metres above the armhole bottom over which that comes in
+ARM_SEAM_SHARE = 2.0 / 3.0  # smoothstep of this (~0.74): the torso's share on the armhole
 
 
 @dataclass(frozen=True)
@@ -50,9 +53,10 @@ class TeeSpec:
     hem_above_hip: float = 0.035  # metres above the widest hip
     underarm_drop: float = 0.035  # armhole bottom below the armpit
     chest_ease: float = 0.08  # girth ease (metres of circumference)
-    waist_ease: float = 0.22
+    waist_ease: float = 0.30
     hem_ease: float = 0.07
     straight: bool = False  # side seams straight down from the chest (men's cut)
+    bust: bool = True  # a dartless front over a bust: cut no longer than the back
     shoulder_out: float = 0.045  # shoulder point beyond the shoulder joint, in x
     neck_ease: float = 0.03  # neck side point beyond the neck, in x
     front_neck_drop: float = 0.095
@@ -66,6 +70,9 @@ class TeeSpec:
     spacing: float = 0.012  # cloth edge length
     torso_gap: float = 0.012  # start of the simulation: rings outside the torso
     sleeve_gap: float = 0.03
+    sleeve_lift: float = 8.0  # degrees the sleeves start raised, to clear the torso
+    arm_band: float = 0.07  # metres of torso cloth from the armhole that partly follow the arm
+    arm_weights: bool = True  # sleeves follow the arm only (`ARM_ATTRIBUTE`)
 
 
 TEE_FEMALE = TeeSpec(hem_above_hip=0.05)
@@ -76,11 +83,13 @@ TEE_MALE = TeeSpec(
     waist_ease=0.20,
     hem_ease=0.10,
     straight=True,
+    bust=False,
     front_neck_drop=0.10,
     back_neck_drop=0.022,
     sleeve_length=0.13,
-    bicep_ease=0.07,
+    bicep_ease=0.06,
     rib=0.02,
+    arm_band=0.09,
 )
 
 
@@ -491,6 +500,11 @@ def draft_tee(body: BaseBody, neck: Neck, spec: TeeSpec) -> TeeDraft:
         )
 
     front, back = torso(True), torso(False)
+    if spec.bust:
+        # The front's shoulder seam slopes like the back's. Measured over the bust the
+        # front would be cut longer in the middle; the jersey stretches there instead, and
+        # a piece cut that long gathers in rolls under the bust.
+        front = replace(front, neck_v=front.shoulder_v + (back.neck_v - back.shoulder_v))
     front_outline = _outline(front, ("l", "r"))  # front u > 0 is the wearer's left
     back_outline = _outline(back, ("r", "l"))
     armhole = (
@@ -518,13 +532,20 @@ def draft_tee(body: BaseBody, neck: Neck, spec: TeeSpec) -> TeeDraft:
         Piece(
             SLEEVE_L,
             tuple(_sleeve(SLEEVE_L, width, width - spec.sleeve_hem_taper, spec.sleeve_length, cap)),
-            sleeve_place(m.shoulder, m.elbow, radius, sleeve_top, -0.02, np.radians(8)),
+            sleeve_place(
+                m.shoulder, m.elbow, radius, sleeve_top, -0.02, np.radians(spec.sleeve_lift)
+            ),
         ),
         Piece(
             SLEEVE_R,
             tuple(_sleeve(SLEEVE_R, width, width - spec.sleeve_hem_taper, spec.sleeve_length, cap)),
             sleeve_place(
-                m.shoulder * mirror, m.elbow * mirror, radius, sleeve_top, -0.02, np.radians(8)
+                m.shoulder * mirror,
+                m.elbow * mirror,
+                radius,
+                sleeve_top,
+                -0.02,
+                np.radians(spec.sleeve_lift),
             ),
         ),
     ]
@@ -544,7 +565,50 @@ def draft_tee(body: BaseBody, neck: Neck, spec: TeeSpec) -> TeeDraft:
         seams.append(Seam(FRONT, f"arm_{side}", sleeve.name, front_half))
         seams.append(Seam(BACK, f"arm_{side}", sleeve.name, back_half))
     mesh = layout(pieces, seams, spec.spacing, turn_uv=True)
+    hems = [(FRONT, "hem"), (BACK, "hem"), (SLEEVE_L, "hem"), (SLEEVE_R, "hem")]
+    stiff = np.maximum(
+        mesh.band(hems, spec.hem_band), mesh.band([(FRONT, "neck"), (BACK, "neck")], spec.rib)
+    )
+    # The armpits: between the arm and the torso, where the hanging cloth tears in poses.
+    trunk_at = trunk[np.abs(trunk[:, 1] - m.underarm) < SECTION]
+    side = float(np.abs(trunk_at[:, 0]).max())
+    depth = float(np.median(trunk_at[np.abs(trunk_at[:, 0]) > side - 0.03, 2]))
+    # Down the side too: the arm coming down from the A-pose presses its inner skin
+    # against the torso there, through cloth standing off the skin.
+    pits = tuple(
+        (sign * side, m.underarm + rise, depth) for sign in (1.0, -1.0) for rise in (0.02, -0.05)
+    )
+    mesh = replace(
+        mesh, stiff=stiff, hug=pits, arm=arm_share(mesh, spec.arm_band, front.underarm_v)
+    )
     return TeeDraft(mesh, m, front, back, sleeve_top, spec.sleeve_length)
+
+
+def arm_share(mesh: FlatMesh, band: float = ARM_BAND, underarm_v: float | None = None) -> F64:
+    """How far each vertex follows its arm: the sleeves in full (the armhole seam too:
+    under the arm, cloth that half follows the torso ends up inside the arm when it comes
+    down), the torso by the armhole about three quarters (ARM_SEAM_SHARE), less and less
+    out to `band` from it. With `underarm_v` (the armhole bottom's flat height) the torso
+    below the armhole stays with the torso."""
+    share = np.zeros(len(mesh.flat))
+    torso = np.isin(mesh.piece, [mesh.names.index(FRONT), mesh.names.index(BACK)])
+    for sleeve, sign, armholes in (
+        (SLEEVE_L, 1.0, [(FRONT, "arm_l"), (BACK, "arm_l")]),
+        (SLEEVE_R, -1.0, [(FRONT, "arm_r"), (BACK, "arm_r")]),
+    ):
+        share[mesh.piece == mesh.names.index(sleeve)] = sign
+        t = np.clip(1.0 - mesh.distance(armholes) / band, 0.0, ARM_SEAM_SHARE)
+        on = torso & (t > 0)
+        share[on] = sign * t[on] * t[on] * (3.0 - 2.0 * t[on])
+    if underarm_v is not None:
+        # Not below the armhole: the side seams stay with the torso, or the arm coming down
+        # drags them into it.
+        for piece in (FRONT, BACK):
+            on = mesh.piece == mesh.names.index(piece)
+            v = mesh.flat[on, 1] - mesh.flat[on, 1].min()
+            t = np.clip((v - underarm_v) / UNDERARM_FADE, 0.0, 1.0)
+            share[on] *= t * t * (3.0 - 2.0 * t)
+    return share
 
 
 def tee_lines(draft: TeeDraft, spec: TeeSpec) -> GarmentLines:
@@ -576,7 +640,14 @@ def tee_lines(draft: TeeDraft, spec: TeeSpec) -> GarmentLines:
         hem = run(piece, "hem")
         stitches.append(_inset(hem, spec.hem_band * 1000 * mm))
         stitches.append(_inset(hem, (spec.hem_band * 1000 - 6.0) * mm))
-    return GarmentLines(seams=seams, edges=edges, stitches=stitches, ribs=ribs)
+    return GarmentLines(
+        seams=seams,
+        edges=edges,
+        stitches=stitches,
+        ribs=ribs,
+        stitch_strength=0.5,
+        seam_shadow=0.15,
+    )
 
 
 def _inset(line: F64, distance: float) -> F64:

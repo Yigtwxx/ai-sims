@@ -7,15 +7,16 @@ it as an archive unit that `mh-convert --outfits --outfit <name>` then converts.
 import argparse
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+from numpy.typing import NDArray
 
 from asset_pipeline.garments import GarmentError
 from asset_pipeline.garments.blender import run_sim, write_job
-from asset_pipeline.garments.body import BaseBody, load_base_body
-from asset_pipeline.garments.collider import Neck, closed_body, neck
+from asset_pipeline.garments.body import BaseBody, landmarks, load_base_body
+from asset_pipeline.garments.collider import Neck, closed_body, fill_front_and_back, neck
 from asset_pipeline.garments.flat import FlatMesh
 from asset_pipeline.garments.pack import TEMPLATE, GarmentLines, Look, metres_per_uv, write_unit
 from asset_pipeline.garments.pattern import GarmentMesh
@@ -23,7 +24,9 @@ from asset_pipeline.garments.shorts import (
     DENIM_MINI_SHORTS,
     DENIM_SHORTS,
     MINI_SHORTS,
+    Sections,
     ShortsSpec,
+    crotch_height,
     draft_shorts,
     shorts_lines,
 )
@@ -50,7 +53,10 @@ class Item:
     neck: bool = False  # reaches the neck: drape against the body closed by a head
     thickness: float = 0.002
     template: str = TEMPLATE  # the Epic unit whose material is the starting point
-    denim: bool = False  # `denim_look` on the template's material
+    look: Callable[[Path, str, float], Look] | None = None  # changes to the material
+    sim_by_gender: dict[str, dict[str, float]] = field(default_factory=dict)
+    crotch: bool = False  # goes between the legs: drape against a body with the crotch's
+    # small hollows filled
 
 
 def _pencil_skirt(
@@ -68,6 +74,37 @@ def _shorts(spec: ShortsSpec) -> Draft:
     return draft
 
 
+def crotch_filled(body: BaseBody) -> NDArray[np.float64]:
+    """The body with the groin and seat filled out to each section's hull above the crotch
+    (a hand's width each way of the middle), so shorts bridge the creases there; the legs
+    below the crotch stay apart."""
+    limb = body.limb if body.limb is not None else body.arm
+    trunk = body.positions[~limb & (np.abs(body.positions[:, 0]) < 0.3)]
+    crotch = crotch_height(trunk, landmarks(body).knee, landmarks(body).hip)
+    p = body.positions
+    region = ~limb & (np.abs(p[:, 0]) < CROTCH_FILL_HALF_WIDTH)
+    region &= (p[:, 1] > crotch + 0.003) & (p[:, 1] < crotch + CROTCH_FILL_HEIGHT)
+    sections = Sections(body)
+    return fill_front_and_back(p, sections.at, region)
+
+
+def knit_look(archive: Path, gender: str, uv_metres: float) -> Look:
+    """Single jersey: the knit face and its own shading from Epic's hoodie, at a finer
+    gauge, softly (the crew-neck template's poplin read as a grid)."""
+    hoodie = archive / "raw" / "outfits" / gender / "WI_OA_Hoodie" / "textures"
+    return Look(
+        textures={
+            "detailTex_normal": hoodie / "micro_knit_front_N.png",
+            "DetailTex_Variation": hoodie / "micro_knit_front_AOHCA_M.png",
+        },
+        scalars={
+            "DetailTex_UVTtiling": uv_metres / KNIT_TILE,
+            "DetailTex_NormalStrength": 0.2,
+            "DetailTex_VariationStrength": 0.08,
+        },
+    )
+
+
 def denim_look(archive: Path, gender: str, uv_metres: float) -> Look:
     """Jeans twill and its washed streaks (Epic's jeans' tiling maps) on the fabric
     shader, so wash presets work; tiles as big as on the jeans."""
@@ -82,7 +119,11 @@ def denim_look(archive: Path, gender: str, uv_metres: float) -> Look:
             "DetailTex_UVTtiling": uv_metres / (metres / 500.0),
             "DetailTex_NormalStrength": 1.0,
             "MacroTex_UvTiling": uv_metres / (metres / 7.0),
-            "MacroTexStrength": 0.6,
+            "MacroTexStrength": 0.3,
+            # No exponent on the variation: the wash map is mostly dark and the template's
+            # curve darkened the denim to near black.
+            "VariationExpLow": 1.0,
+            "VariationExpHigh": 1.0,
         },
     )
 
@@ -95,6 +136,10 @@ def _crew_tee(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh,
     return draft.mesh, tee_lines(draft, spec)
 
 
+CROTCH_FILL_HALF_WIDTH = 0.12  # metres
+CROTCH_FILL_HEIGHT = 0.14  # metres above the crotch
+KNIT_TILE = 0.003  # metres of jersey one knit tile spans
+
 # Cotton jersey: soft and stretchy, sewn from flat pieces; gravity comes after the seams.
 JERSEY = {
     "frames": 50.0,
@@ -102,12 +147,17 @@ JERSEY = {
     "gravity_ramp": 10.0,
     "self_collision": 1.0,
     "quality": 8.0,
-    # Rests a little off the skin: by the neck and the armholes the skin stays drawn and
-    # poses and thin bodies would push it through cloth lying right on it.
-    "collision_distance": 0.005,
-    "min_gap": 0.004,
+    # Off the skin enough for the necks of every face; round the armpits drawn onto it
+    # (`hug`).
+    "collision_distance": 0.004,
+    "min_gap": 0.003,
+    "hug_radius": 0.05,
+    "hug_gap": 0.0035,
     "friction": 2.0,
     "bending": 0.5,
+    "band_bending": 4.0,
+    "smooth": 4.0,
+    "rim_only": 1.0,
     "tension": 15.0,
     "compression": 15.0,
     "shear": 5.0,
@@ -117,18 +167,23 @@ JERSEY = {
 # so the cloth between the thighs has room.
 TWILL = {
     **JERSEY,
+    "band_bending": 8.0,
     "frames": 70.0,
     "bending": 1.0,
     "tension": 30.0,
     "compression": 30.0,
     "shear": 10.0,
-    "collision_distance": 0.0025,
-    "min_gap": 0.002,
-    "self_distance": 0.0015,
+    "collision_distance": 0.004,
+    "min_gap": 0.003,
+    "hug_radius": 0.05,
+    "hug_gap": 0.0035,
     "friction": 1.0,
 }
 
 DENIM = {**TWILL, "bending": 1.5, "tension": 40.0, "compression": 40.0}
+# Stretch cotton and stretch denim for the clinging minis: they give over the body.
+STRETCH = {**TWILL, "bending": 0.8, "tension": 15.0, "compression": 15.0, "shear": 5.0}
+STRETCH_DENIM = {**STRETCH, "bending": 1.2, "tension": 25.0, "compression": 25.0}
 DENIM_SWITCHES = {
     "DoPill": False,
     "DoFuzz": False,
@@ -136,6 +191,7 @@ DENIM_SWITCHES = {
     "DoMacroVariation": True,
     "DoDetailNormal": True,
     "DoPaintedWear": True,
+    "DoWrinkles": False,
 }
 
 ITEMS = {
@@ -145,18 +201,27 @@ ITEMS = {
     "AS_CrewTee": Item(
         ("female", "male"),
         _crew_tee,
-        {"DoPill": False, "DoFuzz": False, "DoDetailVariation": False},
+        {
+            "DoPill": False,
+            "DoFuzz": False,
+            "DoWrinkles": False,
+            "DoDetailVariation": True,
+            "DoMacroVariation": False,
+        },
         JERSEY,
         neck=True,
         thickness=0.0015,
+        look=knit_look,
+        sim_by_gender={"male": {"hug_radius": 0.07, "hug_gap": 0.0025}},
     ),
     "AS_MiniShorts": Item(
         ("female",),
         _shorts(MINI_SHORTS),
-        {"DoPill": False, "DoFuzz": False},
-        TWILL,
+        {"DoPill": False, "DoFuzz": False, "DoWrinkles": False},
+        STRETCH,
         thickness=0.0018,
         template="WI_OA_Shorts",
+        crotch=True,
     ),
     # Denim on the fabric shader (the jeans master takes no colours): twill, washed
     # streaks, faded seams and gold topstitching.
@@ -164,17 +229,19 @@ ITEMS = {
         ("female",),
         _shorts(DENIM_MINI_SHORTS),
         DENIM_SWITCHES,
-        DENIM,
+        STRETCH_DENIM,
         thickness=0.0022,
-        denim=True,
+        look=denim_look,
+        crotch=True,
     ),
     "AS_DenimShorts": Item(
         ("male",),
         _shorts(DENIM_SHORTS),
         DENIM_SWITCHES,
-        DENIM,
+        {**DENIM, "bending": 2.0, "band_bending": 12.0},
         thickness=0.0022,
-        denim=True,
+        look=denim_look,
+        crotch=True,
     ),
 }
 
@@ -206,15 +273,21 @@ def build(archive: Path, name: str, gender: str, frames: int | None) -> dict[str
     neck_part = neck(archive, gender) if item.neck else None
     mesh, lines = item.draft(body, neck_part, gender)
     work = archive / "build" / "garments" / name / gender
-    sim = {**item.sim, **({"frames": frames} if frames else {})}
+    sim = {
+        **item.sim,
+        **item.sim_by_gender.get(gender, {}),
+        **({"frames": frames} if frames else {}),
+    }
     collider = closed_body(body, neck_part) if neck_part is not None else None
+    if item.crotch:
+        collider = (crotch_filled(body), body.triangles)
     job = write_job(work, mesh, body, f"MI_{name}", sim, item.thickness, collider)
     report = run_sim(job)
     draped = Path(str(report["out"]))
     gap = clearance(draped, body)
     if gap < MIN_CLEARANCE:
         raise GarmentError(f"{name} ({gender}) sinks into the body: {gap * 1000:.1f} mm")
-    look = denim_look(archive, gender, mesh.uv_metres) if item.denim else None
+    look = item.look(archive, gender, mesh.uv_metres) if item.look else None
     unit = write_unit(
         archive, gender, name, draped, lines, mesh.uv_metres, item.switches, item.template, look
     )

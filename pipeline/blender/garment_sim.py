@@ -18,6 +18,7 @@ from typing import Any
 
 import bmesh
 import bpy
+from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 
@@ -67,6 +68,16 @@ def build_garment(job: dict[str, Any]) -> bpy.types.Object:
     for index, weight in enumerate(garment["pin"]):
         if weight > 0:
             pin.add([index], weight, "REPLACE")
+    if "arm" in garment:
+        # Which arm the cloth follows: written into the GLB for the converter.
+        attribute = obj.data.attributes.new("_ARM", "FLOAT", "POINT")
+        attribute.data.foreach_set("value", [float(a) for a in garment["arm"]])
+    if "stiff" in garment:
+        # Hems, bands and cuffs: folded double and stitched, they bend less.
+        stiff = obj.vertex_groups.new(name="stiff")
+        for index, weight in enumerate(garment["stiff"]):
+            if weight > 0:
+                stiff.add([index], weight, "REPLACE")
     for polygon in obj.data.polygons:
         polygon.use_smooth = True
     if "rest" in garment:
@@ -96,6 +107,9 @@ def simulate(garment: bpy.types.Object, body: bpy.types.Object, sim: dict[str, A
     settings.bending_stiffness = sim.get("bending", 1.0)
     settings.air_damping = sim.get("air_damping", 2.0)
     settings.vertex_group_mass = "pin"
+    if garment.vertex_groups.get("stiff") is not None:
+        settings.vertex_group_bending = "stiff"
+        settings.bending_stiffness_max = sim.get("band_bending", 10.0 * settings.bending_stiffness)
     settings.pin_stiffness = 1.0
     cloth.collision_settings.distance_min = sim.get("collision_distance", 0.002)
     cloth.collision_settings.use_self_collision = bool(sim.get("self_collision", False))
@@ -184,7 +198,90 @@ def push_out(garment: bpy.types.Object, body: bpy.types.Object, gap: float) -> i
     return moved
 
 
-def solidify(garment: bpy.types.Object, thickness: float) -> None:
+def smooth(garment: bpy.types.Object, passes: int) -> None:
+    """Taubin smoothing (shrink-free): takes out the simulation's small dents and ripples,
+    keeps its folds. Open edges are smoothed along themselves only, so hems stay put."""
+    if passes <= 0:
+        return
+    bm = bmesh.new()
+    bm.from_mesh(garment.data)
+    bm.verts.ensure_lookup_table()
+    neighbours = []
+    for v in bm.verts:
+        if v.is_boundary:
+            ring = [e.other_vert(v) for e in v.link_edges if e.is_boundary]
+        else:
+            ring = [e.other_vert(v) for e in v.link_edges]
+        neighbours.append([u.index for u in ring])
+    points = [v.co.copy() for v in bm.verts]
+    for _ in range(passes):
+        for factor in (0.5, -0.53):
+            moved = []
+            for i, ring in enumerate(neighbours):
+                if not ring:
+                    moved.append(points[i])
+                    continue
+                mean = sum((points[j] for j in ring), points[i] * 0.0) / len(ring)
+                moved.append(points[i] + factor * (mean - points[i]))
+            points = moved
+    for v, co in zip(bm.verts, points, strict=True):
+        v.co = co
+    bm.to_mesh(garment.data)
+    bm.free()
+    garment.data.update()
+
+
+def hug(
+    garment: bpy.types.Object,
+    body: bpy.types.Object,
+    centres: list[list[float]],
+    radius: float,
+    gap: float,
+) -> int:
+    """Draw the cloth round each centre (glTF axes; the armpits) onto the skin, `gap` off
+    it, fully at the centre and not at all `radius` away. Cloth left hanging between arm
+    and torso takes its skin weights from both and tears when the arm moves."""
+    if not centres:
+        return 0
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    tree = BVHTree.FromObject(body, depsgraph)
+    points = [Vector(c) for c in to_blender(centres)]
+    moved = 0
+    for vertex in garment.data.vertices:
+        reach = min((vertex.co - c).length for c in points)
+        if reach >= radius:
+            continue
+        hit, normal, _, _ = tree.find_nearest(vertex.co)
+        if hit is None:
+            continue
+        t = 1.0 - reach / radius
+        share = t * t * (3.0 - 2.0 * t)
+        target = hit + normal * gap
+        if (vertex.co - hit).dot(normal) > gap:
+            vertex.co = vertex.co.lerp(target, share)
+            moved += 1
+    garment.data.update()
+    return moved
+
+
+def wrap(garment: bpy.types.Object, arm: bpy.types.Object, shares: list[float], gap: float) -> int:
+    """Lay the cloth onto the arm's skin, `gap` off it, by each vertex's share."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    tree = BVHTree.FromObject(arm, depsgraph)
+    moved = 0
+    for vertex, share in zip(garment.data.vertices, shares, strict=False):
+        if share <= 0.0:
+            continue
+        hit, normal, _, _ = tree.find_nearest(vertex.co)
+        if hit is None:
+            continue
+        vertex.co = vertex.co.lerp(hit + normal * gap, share)
+        moved += 1
+    garment.data.update()
+    return moved
+
+
+def solidify(garment: bpy.types.Object, thickness: float, rim_only: bool = False) -> None:
     modifier = garment.modifiers.new("Solidify", "SOLIDIFY")
     modifier.thickness = thickness
     modifier.offset = 1.0  # outward: faces wind outward
@@ -194,6 +291,9 @@ def solidify(garment: bpy.types.Object, thickness: float) -> None:
     modifier.use_quality_normals = True
     modifier.thickness_clamp = 1.0
     modifier.use_rim = True
+    # A single layer with only its open edges thickened: a full inner shell pokes through
+    # the outer one where seams crease and shows as dark specks.
+    modifier.use_rim_only = rim_only
     bake(garment)
 
 
@@ -217,6 +317,7 @@ def export(garment: bpy.types.Object, material_name: str, out: Path) -> None:
         export_materials="EXPORT",
         export_skins=False,
         export_animations=False,
+        export_attributes=True,
     )
 
 
@@ -231,9 +332,28 @@ def main() -> None:
         # The simulated cloth in the job's vertex order, before welding (glTF axes).
         points = [(v.co.x, v.co.z, -v.co.y) for v in garment.data.vertices]
         Path(job["debug"]).write_text(json.dumps(points), encoding="utf-8")
+    # Before the weld the vertices are still in the job's order.
+    wrapped = 0
+    if "wrap" in job["garment"] and job.get("arm_triangles"):
+        arm = mesh_object("arm", job["body"]["positions"], job["arm_triangles"])
+        wrapped = wrap(
+            garment, arm, job["garment"]["wrap"], job.get("sim", {}).get("wrap_gap", 0.003)
+        )
     seams = weld(garment, job["garment"].get("welds", []))
-    pushed = push_out(garment, body, job.get("sim", {}).get("min_gap", 0.0015))
-    solidify(garment, job.get("thickness", 0.002))
+    sim = job.get("sim", {})
+    hugged = hug(
+        garment,
+        body,
+        job["garment"].get("hug", []),
+        sim.get("hug_radius", 0.08),
+        sim.get("hug_gap", 0.003),
+    )
+    smooth(garment, int(sim.get("smooth", 0)))
+    # A few rounds: in a crease (the armpit) a push off one skin can bring it near the other.
+    pushed = sum(push_out(garment, body, sim.get("min_gap", 0.0015)) for _ in range(3))
+    solidify(garment, job.get("thickness", 0.002), bool(sim.get("rim_only", False)))
+    # Where the faces wind inward (a few, by the seams) the thickness went inward too.
+    pushed += push_out(garment, body, 0.6 * sim.get("min_gap", 0.0015))
     out = Path(job["out"])
     export(garment, job["material"], out)
     report = {
@@ -241,6 +361,8 @@ def main() -> None:
         "sim_seconds": round(seconds, 2),
         **{k: round(v, 5) for k, v in seams.items()},
         "pushed_out": pushed,
+        "hugged": hugged,
+        "wrapped": wrapped,
         "vertices": len(garment.data.vertices),
         "faces": len(garment.data.polygons),
         "blender": bpy.app.version_string,

@@ -56,6 +56,8 @@ class ShortsSpec:
     front_crotch_depth: float = 0.07  # rise of the crotch curves above the crotch point
     back_crotch_depth: float = 0.10
     back_raise: float = 0.02  # the back's top higher at the centre back
+    crotch_drop: float = 0.02  # the seams' crotch point under the body's (room, no groove)
+    crotch_stiff: float = 0.035  # metres either side of the crotch seam that bend little
     waistband: float = 0.035
     hem_band: float = 0.02  # turned-up hem (or a rolled cuff's height)
     spacing: float = 0.011
@@ -64,13 +66,20 @@ class ShortsSpec:
     cut_off: bool = False  # raw, frayed hem instead of a turned-up one
 
 
+# Women's minis: short, and cut smaller than the body (stretch cloth clings); small
+# front extensions so the front runs down flat into the crotch.
 DENIM_MINI_SHORTS = ShortsSpec(
     "AS_DenimMiniShorts",
     top_below_waist=0.08,
-    inseam=0.045,
-    top_ease=-0.01,
-    hip_ease=0.0,
-    hem_ease=0.05,
+    inseam=0.03,
+    top_ease=-0.02,
+    hip_ease=-0.04,
+    leg_ease=-0.01,
+    hem_ease=0.0,
+    front_extension=0.015,
+    front_crotch_depth=0.03,
+    back_extension=0.085,
+    crotch_drop=0.015,
     denim=True,
     cut_off=True,
 )
@@ -82,16 +91,28 @@ DENIM_SHORTS = ShortsSpec(
     hip_ease=0.02,
     hem_ease=0.06,
     leg_ease=0.04,
-    front_extension=0.05,
-    back_extension=0.1,
-    front_crotch_depth=0.08,
+    front_extension=0.025,
+    back_extension=0.11,
+    front_crotch_depth=0.04,
     back_crotch_depth=0.11,
     waistband=0.04,
     hem_band=0.03,
+    crotch_drop=0.0,
+    crotch_stiff=0.08,  # the fly front lies flat over the groin
     denim=True,
 )
 MINI_SHORTS = ShortsSpec(
-    "AS_MiniShorts", top_below_waist=0.07, inseam=0.07, top_ease=-0.01, hip_ease=0.0, hem_ease=0.04
+    "AS_MiniShorts",
+    top_below_waist=0.07,
+    inseam=0.035,
+    top_ease=-0.03,
+    hip_ease=-0.06,
+    leg_ease=-0.02,
+    hem_ease=-0.01,
+    front_extension=0.015,
+    front_crotch_depth=0.03,
+    back_extension=0.085,
+    crotch_drop=0.015,
 )
 
 
@@ -405,7 +426,7 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
             leg_width=leg_w,
             extension=extension,
             crotch_depth=depth,
-            crotch_v=m.crotch - m.hem,
+            crotch_v=m.crotch - spec.crotch_drop - m.hem,
             hip_v=0.5 * (m.crotch + m.top) - m.hem,
             top_v=m.top - m.hem,
             raise_=raise_,
@@ -500,7 +521,17 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
     # The waistband holds the shorts up: pinned where it starts.
     v = mesh.positions[:, 1] - m.hem
     band = np.clip((v - (m.top - m.hem - PIN_BAND)) / (0.5 * PIN_BAND), 0.0, 1.0)
-    pinned = replace(mesh, pin=band)
+    # The crotch seam and its facing bend little: the cloth bridges the groin instead of
+    # following the body into it.
+    stiff = np.maximum.reduce(
+        [
+            mesh.band([(n, "top") for n in PIECES], spec.waistband),
+            mesh.band([(n, "hem") for n in PIECES], spec.hem_band),
+            mesh.band([(n, "centre") for n in PIECES], spec.crotch_stiff),
+            mesh.band([(n, "inseam") for n in PIECES], spec.crotch_stiff),
+        ]
+    )
+    pinned = replace(mesh, pin=band, stiff=stiff)
     return ShortsDraft(pinned, m, front, back, tuple(pieces))
 
 

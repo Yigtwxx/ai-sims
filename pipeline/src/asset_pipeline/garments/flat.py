@@ -72,6 +72,26 @@ class FlatMesh:
     seams: tuple[Seam, ...] = ()
     uv_metres: float = 1.0  # pattern metres one UV unit spans
     pin: F64 | None = None  # (V,) cloth pin weight, 0..1
+    stiff: F64 | None = None  # (V,) 0..1, bands and hems that bend less
+    hug: tuple[tuple[float, float, float], ...] = ()  # where the cloth is drawn to the skin
+    arm: F64 | None = None  # (V,) share following an arm, + left, - right (`ARM_ATTRIBUTE`)
+    wrap: F64 | None = None  # (V,) 0..1, how far the drape is laid onto the arm's skin
+
+    def distance(self, edges: Sequence[tuple[str, str]]) -> F64:
+        """Flat distance of every vertex from the nearest named segment on its own piece
+        (inf on pieces without one)."""
+        out = np.full(len(self.flat), np.inf)
+        for piece, segment in edges:
+            on = np.flatnonzero(self.piece == self.names.index(piece))
+            line = self.flat[self.segments[(piece, segment)]]
+            near = cKDTree(resample(line, max(2, len(line) * 8))).query(self.flat[on])[0]
+            out[on] = np.minimum(out[on], near)
+        return out
+
+    def band(self, edges: Sequence[tuple[str, str]], width: float) -> F64:
+        """0..1 by flat distance from the named segments: 1 inside `width`, fading out
+        over half of it."""
+        return np.clip(1.5 - self.distance(edges) / width, 0.0, 1.0)
 
     def sewn(self, piece: str, segment: str) -> bool:
         return any(
@@ -112,6 +132,10 @@ class FlatMesh:
             ),
             "rest": np.round(flat3, 6).tolist(),
             "sew": self.pairs.tolist(),
+            **({"stiff": np.round(self.stiff, 3).tolist()} if self.stiff is not None else {}),
+            "hug": [list(c) for c in self.hug],
+            **({"arm": np.round(self.arm, 3).tolist()} if self.arm is not None else {}),
+            **({"wrap": np.round(self.wrap, 3).tolist()} if self.wrap is not None else {}),
             "welds": self.welds(),
         }
 

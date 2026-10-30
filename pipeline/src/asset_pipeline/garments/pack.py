@@ -46,6 +46,8 @@ class GarmentLines:
     ribs: list[F64] = field(default_factory=list)  # knit rib wales (a neckband's grooves)
     fades: list[F64] = field(default_factory=list)  # worn, washed-out bands (denim seams)
     frays: list[F64] = field(default_factory=list)  # loose threads of a cut-off hem
+    stitch_strength: float = 1.0  # how far the stitch colour covers the cloth's
+    seam_shadow: float = 0.35  # occlusion in a seam's hollow
 
 
 @dataclass(frozen=True)
@@ -110,7 +112,7 @@ def garment_maps(
     height = -groove + 0.5 * edge - 0.4 * stitch - 0.5 * rib + 0.3 * fray
     normal = _normal_from_height(height, strength=2.0)
     ones = np.ones((size, size))
-    occlusion = np.clip(1.0 - 0.35 * shadow - 0.15 * stitch - 0.12 * rib, 0.0, 1.0)
+    occlusion = np.clip(1.0 - lines.seam_shadow * shadow - 0.15 * stitch - 0.12 * rib, 0.0, 1.0)
     wear = np.clip(0.55 + 0.3 * edge + 0.3 * fade + 0.45 * fray, 0.0, 1.0)
 
     def rgba(*channels: F64) -> Image.Image:
@@ -123,7 +125,7 @@ def garment_maps(
         "AO": rgba(occlusion, ones, 0 * ones, ones),
         "Masks": rgba(wear, 0 * ones, 0 * ones, ones),
         "CustomStitch": Image.fromarray(
-            np.round(np.clip(stitch, 0, 1) * 255).astype(np.uint8), "L"
+            np.round(np.clip(stitch * lines.stitch_strength, 0, 1) * 255).astype(np.uint8), "L"
         ),
     }
 

@@ -142,6 +142,15 @@
   - `pnpm typecheck`, `pnpm lint` temiz, `pnpm test` 1018 geçti (15 atlandı); pipeline `ruff` temiz, `pytest` 436 geçti.
   - Kıyafet klasörlerinde önceki dönüşümlerden kalan, manifestin göstermediği eski `ktx2`'ler var (`AS_CrewTee`): `mh-prune` siler.
 
+- [x] **2d.6 Düzeltme turu (kullanıcı, 2026-10-30: "tişört ve şortlar çok iğrenç gözüküyor", "şortların bacak araları belli olmuyor, kalem etek gibi", "mini şortu biraz daha kısa yap, vücuda yapışabilir").** Gerçek ~4
+  - Tişört dokusu: şablonun popline normal'i ızgara gibi görünüyordu; yerine Epic kapüşonlusunun örgü normal'i ve kendi gölgesi, 3 mm döşeme, hafif (`knit_look`); kırışık haritası kapalı, dikiş rengi yarım güçte, dikiş gölgesi azaltıldı.
+  - Tişört dökümü: etek, yaka ribanası ve kol uçları sert bant (`stiff`, Blender `vertex_group_bending`); kadın ön parçası arka parçanın omuz eğimiyle (göğüs ölçüsüyle uzun kesilince göğüs altında rulo kıvrım yapıyordu); dikiş sonrası Taubin yumuşatma; tek katman + açık kenarlarda kalınlık (`use_rim_only`, çift katmanda iç kabuk dikişlerde dışa taşıp kara benek yapıyordu).
+  - Kol altında pozda deri görünmesi: kollar A-pozunda yataydan 52° aşağıda; kol inince kol ağzı çevresindeki kumaş ya kola gömülüyordu ya kolun derisi kumaştan taşıyordu. Kumaş artık kendi deri ağırlığını söylüyor: GLB'de `_ARM` özniteliği (kol parçası 1 / -1, gövdede kol oyuğunun yanında ~0.74'ten 7-9 cm'de 0'a, kol oyuğu altında 0), dönüştürücü bu köşeleri yalnız kolun ya da yalnız gövdenin derisinden ağırlıklandırıyor (`outfits.arm_transfer`, `restricted_transfer`). Koltuk altı ve gövde yanı kumaşı deriye 2.5-3.5 mm'ye çekiliyor (`hug`).
+  - Şortlar: bacak arası kalem etek gibi köprülüyordu. Ağ dikişi ve iç bacak çevresi sert bant (`crotch_stiff`), ağ noktası gövdenin ağından 1.5 cm aşağıda (`crotch_drop`, kadın), ön ağ uzantısı küçük (önden düz iner). Kasık ve kalça çukurları çarpışma gövdesinde her yükseklikte kesitin dışbükey zarfına (en çok 2.5 cm, 2 cm'de yumuşatılmış) dolduruluyor (`fill_front_and_back`): kumaş kasık kıvrımına girmiyor, iki bacak arası belli.
+  - Mini şortlar kısa (iç bacak 3-3.5 cm) ve vücuttan dar kesim, esnek kumaş ayarı (`STRETCH`, `STRETCH_DENIM`). Kot rengi: yıkama haritası koyu ağırlıklı, şablonun üs eğrisi kotu siyaha yakın gösteriyordu; üs 1, makro güç 0.3.
+  - Kontrol: `/dev/stage`'de Ada ve Victor, önden, arkadan ve yandan, konuşma ve boşta; yaka bütün yüzlerde temiz (`mh-fit-audit`). Küçük resimler yeniden, R2'de. Pipeline 439, web 1033 test geçti.
+  - Bilinen: erkek tişörtte pozda koltuk altının arkasında yer yer 1-2 cm'lik deri izi (Epic'inkinde de küçük benek var); kadın mini şortun arkasında kalça ortasında hafif kumaş toplanması.
+
 ## Faz sonu kontrolü
 
 - [x] 2026-10-30: landing (TR), oluşturucuda yeni kadın karakter, Alt'ta iki yeni kadın şortu ve beş yıkama preseti, tişört + kesik paça kot şort sahnede; "Bitti", kayıt, konuşma ekranında TR "Nasılsın?" (~4 sn) ve EN "How are you?" yanıtlandı; konsolda hata yok. Gerçek süreler: 2a ~1, 2b ~5, 2c ~0.8, 2d ~8, 2e ~1 (toplam ~16; tahmin ~60).

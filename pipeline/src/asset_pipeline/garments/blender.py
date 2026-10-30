@@ -54,6 +54,10 @@ def write_job(
             "triangles": triangles.tolist(),
         },
         "material": material,
+        # The arms' skin (shoulder down) the sleeves are laid onto.
+        "arm_triangles": body.triangles[
+            (body.limb if body.limb is not None else body.arm)[body.triangles].all(axis=1)
+        ].tolist(),
         "sim": sim,
         "thickness": thickness,
         "out": str(work / "draped.glb"),

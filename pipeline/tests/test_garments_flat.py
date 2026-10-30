@@ -210,3 +210,61 @@ def test_leg_wrap_splits_the_ring_by_the_front_share(front, left):
     # Starts on the side facing the other leg; the front path passes the front.
     assert np.sign(points[0, 0]) == (-1 if left else 1)
     assert (points[:, 1].max() > 0.07) == front
+
+
+def test_band_is_one_on_the_segment_and_fades_out():
+    piece = Piece("p", tuple(square(0.2)), place_flat)
+    mesh = layout([piece], [], 0.02)
+    band = mesh.band([("p", "bottom")], 0.02)
+    y = mesh.flat[:, 1] - mesh.flat[:, 1].min()
+    assert band[y < 0.005].min() == pytest.approx(1.0)
+    assert band[y > 0.035].max() == pytest.approx(0.0)
+
+
+def test_arm_share_follows_the_sleeves_and_fades_on_the_torso():
+    from asset_pipeline.garments.flat import FlatMesh
+    from asset_pipeline.garments.tee import BACK, FRONT, SLEEVE_L, SLEEVE_R, arm_share
+
+    pieces = [
+        Piece(FRONT, tuple(_named(square(0.3), {"right": "arm_l", "left": "arm_r"})), place_flat),
+        Piece(
+            BACK,
+            tuple(_named(square(0.3, (0.4, 0.0)), {"right": "arm_r", "left": "arm_l"})),
+            place_flat,
+        ),
+        Piece(SLEEVE_L, tuple(square(0.1, (0.8, 0.0))), place_flat),
+        Piece(SLEEVE_R, tuple(square(0.1, (1.0, 0.0))), place_flat),
+    ]
+    mesh = layout(pieces, [], 0.02)
+    assert isinstance(mesh, FlatMesh)
+    share = arm_share(mesh, band=0.06)
+    on = lambda name: mesh.piece == mesh.names.index(name)  # noqa: E731
+    assert np.allclose(share[on(SLEEVE_L)], 1.0)
+    assert np.allclose(share[on(SLEEVE_R)], -1.0)
+    front = on(FRONT)
+    x = mesh.flat[front, 0] - mesh.flat[front, 0].min()
+    # On the front's right edge (its left armhole) the cloth follows the left arm about
+    # three quarters, in the middle not at all.
+    assert share[front][x > 0.299].min() == pytest.approx(20 / 27, abs=0.01)
+    assert np.abs(share[front][(x > 0.12) & (x < 0.18)]).max() == pytest.approx(0.0)
+
+
+def _named(segments, names):
+    return [Segment(names.get(s.name, s.name), s.points) for s in segments]
+
+
+def test_fill_front_and_back_fills_creases_only():
+    from asset_pipeline.garments.collider import fill_front_and_back
+
+    # A round section with a 1 cm crease in the front middle and a deep hollow at the back.
+    angle = np.linspace(0, 2 * np.pi, 72, endpoint=False)
+    ring = np.stack([0.1 * np.sin(angle), 0.1 * np.cos(angle)], 1)
+    crease = np.abs(ring[:, 0]) < 0.015
+    ring[crease & (ring[:, 1] > 0), 1] -= 0.01
+    ring[crease & (ring[:, 1] < 0), 1] += 0.06
+    points = np.c_[ring[:, 0], np.full(len(ring), 1.0), ring[:, 1]]
+    filled = fill_front_and_back(points, lambda h: ring, np.ones(len(points), bool), 0.025)
+    front = crease & (ring[:, 1] > 0)
+    back = crease & (ring[:, 1] < 0)
+    assert (filled[front, 2] > points[front, 2] + 0.005).all()
+    assert np.allclose(filled[back], points[back])
