@@ -18,7 +18,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 (gerçek ~0.8) |
   |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 (gerçek ~8) |
   |  | 2e | Çorap ve külotlu, file çorap hariç (şema v3) | A4.5 | ~12 (gerçek ~1) |
-  | **3 İş seti ve karakter** (~55 sa) | 3a | Kumaş pantolon, gömlek; blazer 7b'de | A4.1 | ~13 (gerçek ~11) |
+  | **3 İş seti ve karakter** (~55 sa) | 3a | Kumaş pantolon, gömlek; blazer 7b'de | A4.1 | ~13 (gerçek ~3.5) |
   |  | 3b | Polo, chino, kravatlı gömlek, sıvanmış kol | A4.6 → A4.15 | ~12 |
   |  | 3c | Kişilik ve ses | C1 → C2 | ~22 |
   |  | 3d | İfade önizleme | C3 | ~8 |
