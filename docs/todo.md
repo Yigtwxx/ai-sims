@@ -295,7 +295,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## Kullanıcıya sorular
 
-(Bekleyen soru yok.)
+- **Bekleyen (2026-10-31, A4.1 gömlek, `docs/plans/faz-3.md` 3a.3):** gömleğin yakası **A** en üst düğme açık (doğal; kapalı yaka 3b'nin kravatlı gömleğinde gelir) ya da **B** en üst düğme kapalı (daha basit, kravatsız resmi durur). Öneri A. Beklerken pantolon (3a.1-3a.2) yapılıyor.
 
 - Cevaplanan (2026-10-29, B2): yüz karışımı kaydırıcı bırakınca güncellenir (seçenek A). Sürüklerken canlı önizleme (B) yapılmayacak.
 
