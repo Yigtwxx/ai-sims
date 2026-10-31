@@ -202,5 +202,9 @@
   "AS_TailoredTrousers": {
     "en": "Tailored trousers",
     "tr": "Kumaş pantolon"
+  },
+  "AS_Shirt": {
+    "en": "Classic shirt",
+    "tr": "Klasik gömlek"
   }
 }

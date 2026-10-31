@@ -164,7 +164,13 @@ PEAK_JOINTS = (
     "thigh_r",
 )
 CLIP_RATE = 15.0
-CREW_NECKS = ("outfit.OA_Crewneckt", "outfit.OA_Sweater", "outfit.OA_Hoodie", "outfit.AS_CrewTee")
+CREW_NECKS = (
+    "outfit.OA_Crewneckt",
+    "outfit.OA_Sweater",
+    "outfit.OA_Hoodie",
+    "outfit.AS_CrewTee",
+    "outfit.AS_Shirt",
+)
 
 
 class FitAuditError(RuntimeError):

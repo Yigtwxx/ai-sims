@@ -1042,6 +1042,29 @@
           "diffuse_color_1": "#c9bba2"
         }
       }
+    ],
+    "AS_Shirt": [
+      {
+        "id": "white",
+        "values": {
+          "diffuse_color_1": "#ebe9e3",
+          "diffuse_color_2": "#f2f0eb"
+        }
+      },
+      {
+        "id": "sky",
+        "values": {
+          "diffuse_color_1": "#b4c8de",
+          "diffuse_color_2": "#eef0f2"
+        }
+      },
+      {
+        "id": "blush",
+        "values": {
+          "diffuse_color_1": "#e2c3ba",
+          "diffuse_color_2": "#f2ece8"
+        }
+      }
     ]
   }
 }

@@ -16,10 +16,17 @@ from numpy.typing import NDArray
 from asset_pipeline.garments import GarmentError
 from asset_pipeline.garments.blender import run_sim, write_job
 from asset_pipeline.garments.body import BaseBody, landmarks, load_base_body
-from asset_pipeline.garments.collider import Neck, closed_body, fill_front_and_back, neck
+from asset_pipeline.garments.collider import (
+    HEAD_REACH,
+    Neck,
+    closed_body,
+    fill_front_and_back,
+    neck,
+)
 from asset_pipeline.garments.flat import FlatMesh
 from asset_pipeline.garments.pack import TEMPLATE, GarmentLines, Look, metres_per_uv, write_unit
 from asset_pipeline.garments.pattern import GarmentMesh
+from asset_pipeline.garments.shirt import SHIRT_FEMALE, SHIRT_MALE, draft_shirt, shirt_lines
 from asset_pipeline.garments.shorts import (
     DENIM_MINI_SHORTS,
     DENIM_SHORTS,
@@ -65,6 +72,7 @@ class Item:
     crotch: bool = False  # goes between the legs: drape against a body with the crotch's
     # small hollows filled
     seat: bool = False  # and bridges the cleft of the seat (trousers): filled at the back
+    neck_reach: float = HEAD_REACH  # metres of the head's neck above its seam in the collider
 
 
 def _pencil_skirt(
@@ -80,6 +88,28 @@ def _shorts(spec: ShortsSpec) -> Draft:
         return shorts.mesh, shorts_lines(shorts, spec)
 
     return draft
+
+
+def _shirt(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
+    if neck is None:
+        raise GarmentError("the shirt's collar is cut to the neck")
+    spec = SHIRT_FEMALE if gender == "female" else SHIRT_MALE
+    draft = draft_shirt(body, neck, spec)
+    return draft.mesh, shirt_lines(draft, spec)
+
+
+def poplin_look(archive: Path, gender: str, uv_metres: float) -> Look:
+    """Cotton poplin: the crew-neck template's own poplin face, at its true fineness and
+    soft (coarser and stronger it reads as a grid)."""
+    return Look(
+        scalars={
+            "DetailTex_UVTtiling": uv_metres / POPLIN_TILE,
+            "DetailTex_NormalStrength": 0.35,
+            "DetailTex_VariationStrength": 0.06,
+            "VariationExpLow": 1.0,
+            "VariationExpHigh": 1.0,
+        },
+    )
 
 
 def _trousers(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
@@ -157,6 +187,8 @@ CROTCH_FILL_HEIGHT = 0.14  # metres above the crotch
 SEAT_FILL_HEIGHT = 0.22  # metres above the crotch, filling the seat's cleft
 SEAT_FILL_REACH = 0.15  # metres: deepest cleft filled
 KNIT_TILE = 0.003  # metres of jersey one knit tile spans
+POPLIN_TILE = 0.0025  # metres of poplin one detail tile spans
+SHIRT_NECK_REACH = 0.12  # the collar's stand reaches higher up the neck than a tee's
 
 # Cotton jersey: soft and stretchy, sewn from flat pieces; gravity comes after the seams.
 JERSEY = {
@@ -199,6 +231,20 @@ TWILL = {
 }
 
 DENIM = {**TWILL, "bending": 1.5, "tension": 40.0, "compression": 40.0}
+# Woven cotton poplin: crisper than jersey and hardly stretches; the neckline starts far
+# from the collar it is sewn to.
+POPLIN = {
+    **JERSEY,
+    "sew_frames": 120.0,
+    "frames": 90.0,
+    "bending": 1.2,
+    "band_bending": 10.0,
+    "tension": 40.0,
+    "compression": 40.0,
+    "shear": 12.0,
+    # Slides down the body: the start is short of the pattern's length over the chest.
+    "friction": 0.6,
+}
 # Worsted wool suiting: crisp, holds its line from the knee down; long legs need longer
 # to settle.
 WOOL = {
@@ -272,6 +318,24 @@ ITEMS = {
         look=denim_look,
         crotch=True,
     ),
+    # Poplin: smooth, no fuzz or pills; buttons and topstitching in colour 2.
+    "AS_Shirt": Item(
+        ("female", "male"),
+        _shirt,
+        {
+            "DoPill": False,
+            "DoFuzz": False,
+            "DoWrinkles": False,
+            "DoDetailVariation": True,
+            "DoMacroVariation": False,
+        },
+        POPLIN,
+        neck=True,
+        thickness=0.0012,
+        look=poplin_look,
+        sim_by_gender={"male": {"hug_radius": 0.07, "hug_gap": 0.0025}},
+        neck_reach=SHIRT_NECK_REACH,
+    ),
     "AS_TailoredTrousers": Item(
         ("female", "male"),
         _trousers,
@@ -309,7 +373,7 @@ def clearance(glb: Path, body: BaseBody) -> float:
 def build(archive: Path, name: str, gender: str, frames: int | None) -> dict[str, object]:
     item = ITEMS[name]
     body = load_base_body(base_body_path(archive, gender))
-    neck_part = neck(archive, gender) if item.neck else None
+    neck_part = neck(archive, gender, reach=item.neck_reach) if item.neck else None
     mesh, lines = item.draft(body, neck_part, gender)
     work = archive / "build" / "garments" / name / gender
     sim = {

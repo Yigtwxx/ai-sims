@@ -37,7 +37,7 @@ class Neck:
     seam_top: float  # highest point of the neck seam
 
 
-def neck(archive: Path, gender: str, face: str | None = None) -> Neck:
+def neck(archive: Path, gender: str, face: str | None = None, reach: float = HEAD_REACH) -> Neck:
     web = archive / "web"
     manifest = json.loads((web / "manifest.json").read_text(encoding="utf-8"))
     entry = next((b for b in manifest["bodies"] if b["gender"] == gender), None)
@@ -59,7 +59,7 @@ def neck(archive: Path, gender: str, face: str | None = None) -> Neck:
     positions = rest - shift
     triangles = head.asset.mesh.triangles
     seam_top = float(positions[head.seam.boundary, 1].max())
-    keep = (positions[triangles, 1] < seam_top + HEAD_REACH).all(1)
+    keep = (positions[triangles, 1] < seam_top + reach).all(1)
     return Neck(positions, triangles[keep].astype(np.int64), seam_top)
 
 

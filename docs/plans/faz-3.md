@@ -5,7 +5,7 @@
 > Süreler saat. "Tahmin" plan anındaki tahmin (Faz 2'nin gerçek sürelerine göre: kıyafette tahminin ~%60'ı), "Gerçek" adım bitince yazılır.
 > Kullanıcı 2026-10-31'de yalnız 3a'yı istedi ("Sadece 3a yı yap şimdi. Sırayla gidicez."): Mac ile PC paralel çalışmıyor, alt fazlar tablodaki sırayla. 3b-3d sırası gelince adımlara bölünür.
 
-## 3a — Kumaş pantolon, gömlek (A4.1), tahmin ~13 (yeniden ~10)
+## 3a — Kumaş pantolon, gömlek (A4.1), tahmin ~13 (yeniden ~10) · gerçek ~11 (bitti 2026-10-31)
 
 **Hedef:** Kendi kumaş pantolonumuz ve uzun kollu gömleğimiz kadın ve erkekte sitede. A4'ün "bitti" tanımı her parça için: kumaş deriye girmiyor, altından cilt görünmüyor, kaydırıcı uçlarında kırılmıyor, idle ve talk'ta yırtılmıyor, renk presetleri çalışıyor. Blazer 7b'de (A4.1'in kutusu açık kalır).
 
@@ -37,21 +37,23 @@
   - Detaylar (haritada): ön ve arka ütü çizgisi (`creases`), bel bandı dikişi, 6 kemer köprüsü (`raised` + punteriz), eğik yan cep ağzı ve dikişi, arka fleto cep (iki dudak), fermuar J'si. Renkler kalem etekle aynı ton: lacivert, antrasit, siyah, deve tüyü, bej.
   - Kontrol: validate hatasız (uyarılar tişörtle aynı). `mh-fit-audit` (Epic kotu ve kargoyla): bütün kaydırıcı durumlarında deri taşması ≤1 köşe / 2 mm; konuşma klibinin adım tepesinde kadında taşma 0, batma 2 köşe / 5.9 mm; erkekte taşma 4 / 4.2 mm, batma 25 / 8.5 mm (iki uyluğun arası). Epic kotu orada 0-1 / ≤2.5 mm. `/dev/stage`'de Ada ve Victor; Oxford ve spor ayakkabıyla paça temiz.
   - Bilinen: botla bağcıklar paçadan taşıyor (Epic kotunda da var, katmanlama sınırı); erkekte önde ağ belirgin; yan dikişte hafif dalga; kıyafet klasöründe önceki dönüşümlerden kalan eski `ktx2`'ler (`mh-prune` siler).
-- [ ] **3a.3 Gömlek kalıbı.** Tahmin 2.5
-  - `shirt.py` (tişörtün `torso_rings`, `torso_place`, `surface_length`, `arm_share`'ini kullanır): ön (tek parça; pat ve düğmeler haritada), arka (roba dikişi haritada), iki uzun kol, iki manşet, yaka.
-  - Kol: omuz → dirsek → bilek eğrisi boyunca dönmeyen çerçeveyle sarılı başlar (`bent_sleeve_place`); kol kapağı tişörtteki gibi kol oyuğuna eşitlenir; manşet bilek çevresi + bolluk, sert bant.
-  - Etek: yanlarda kısa, önde ve arkada uzun yuvarlak gömlek eteği; pantolonun bel bandını örtecek kadar uzun.
-  - Kadın: yan göğüs pensi (yan dikişten göğüs ucuna doğru, aynı parçanın iki kenarı `Seam`), dokuma kumaş göğüste gerilmediği için.
-  - Yaka: kullanıcı kararına göre (aşağıda soru). Yaka ayağı ve yaka kanadı ön şekilli ve iğneli (`pin` = 1) başlar, yaka oyuğu dikiş yaylarıyla ona dikilir; böylece kanat simülasyonda katlanmaya çalışmaz.
-  - Testler: kol yerleşiminin omuz, dirsek ve bilekten geçmesi, manşetin dikiş sayısının kol ağzıyla eşit olması, pensin dikiş çiftleri, etek eğrisinin simetrisi.
-- [ ] **3a.4 Gömlek K/E.** Tahmin 3
-  - Poplin ayarı (`POPLIN`): bükülme ~1, gerilme ~40; kol ve manşet `_ARM` ile yalnız kolu izler (tişörtteki yol).
-  - Detaylar: düğme patı (iki dikiş çizgisi), 6-7 düğme ve iliği, manşette düğme, yaka ve manşet kenar dikişi, arkada roba, erkekte sol göğüs cebi.
-  - `CATEGORY_OVERRIDES` (`top`), `CREW_NECKS`, etiket, renkler (düğme rengi `diffuse_color_2`); dönüşüm, validate, fit-audit (yaka bütün yüzlerde temiz), `/dev/stage`: Ada ve Victor; nötr, göğüs +1, kilo ±1, kas +1; idle ve talk; pantolon, şort ve kalem etekle.
-  - Küçük resim, R2, commit + push.
-- [ ] **3a.5 Kapanış.** Tahmin 0.3
-  - `docs/todo.md`: A4.1'e biten parçalar notu (kutu blazer 7b'ye kadar açık), saat tablosunda 3a'nın gerçek süresi; `docs/handoff.md` "Durum"; bu dosyada gerçek süreler.
+- [x] **3a.3 Gömlek kalıbı.** Tahmin 2.5 · Gerçek ~3.5
+  - `garments/shirt.py`: tek parça ön (yakada V; pat ve düğmeler haritada), arka, iki uzun kol (yen ucu manşet, sert bant), yaka ayağı ve yaka kanadı. Tişörtün ölçü, halka ve kol oyuğu araçlarını kullanır; `ShirtSpec(TeeSpec)`.
+  - Yaka boyna göre kesilir ve iğneli başlar (`collar_rings`): yaka tabanı boyun ekseninden yatay ışınlarla deriye (Möller-Trumbore), boşluk deri normali boyunca; taban, deri boynun kendi sütununun 5 mm dışına inene kadar yukarı tırmanır (`COLLAR_FLARE`; önce omuzun eğimine oturuyor, yaka 9 cm yarıçaplı çıkıyordu). Ayak boyna yaslanır, kanat üstüne katlanıp omuza iner, uçları yana açılır. Kalıptaki yaka oyuğu yakanın yaylarına eşitlenir (`_half_ellipse_width`, `_vee_u`): önce kalıp oyuğu %45 kısaydı, dikiş onu gerip V'yi düzleştiriyordu.
+  - Ön ve arka parça, kalıp boyu (yüzey üzerinden) gerçek yüksekliğe çevrilerek yerleşir (`surface_profile`, `placed_by_height`; erkekte ön panelin üstü 9 cm yüksek başlıyordu). Göğüsten aşağı halkalar o yükseklikten göğse kadar gövdenin zarfı (`hanging_rings`): dokuma kumaş göğüsten düz iner.
+  - V'nin ucu göğüste tutulur (ilk kapalı düğme, `button_held` + iğne): serbestken göğüsle yaka arasındaki gergin köprü V'yi kapatıyordu.
+  - Kol: omuz → dirsek → bilek eğrisi (`arm_line`, `bent_sleeve_place`), çerçeve burulmadan taşınır; omuz yanı kaldırma dirsekte sıfır (ön kol yenin dışında kalıp kol çıplak çıkıyordu). Yen 1.5 cm boşlukla başlar, dikiş süresi 120 kare (sol kol çöküyordu).
+  - Kadında 2.5 cm yan göğüs pensi (aynı parçanın iki kenarı dikiş); ölçümle bulunmaya çalışıldı, omuz eğriliği yüzünden güvenilir değildi.
+  - Testler (`tests/test_garments_shirt.py`, yardımcı ajan): 38 test / 84 durum; kalıp çevreleri, pens, etek, çözücüler, tutulan nokta, yüzey profili, halkalar, büküklü kol, yaka.
+- [x] **3a.4 Gömlek K/E.** Tahmin 3 · Gerçek ~2 (`AS_Shirt`, "Klasik gömlek" / "Classic shirt")
+  - Poplin (`POPLIN`): bükülme 1.2, gerilme 40, sürtünme 0.6 (göğüsteki fazla boy aşağı kaysın), 90 kare; görünüm şablonun poplin yüzü 2.5 mm döşemede ve zayıf (`poplin_look`). Kalınlık 1.2 mm. Gömlek için boyun çarpışmada 12 cm (`neck_reach`).
+  - Detaylar (haritada): pat kenarı ve dikişleri, ön düğmeler (9 cm arayla), V kenarlarında pat dikişi, arkada roba, manşet dikişleri ve düğmesi, yen yırtmacı, yaka kenar dikişleri, erkekte sol göğüs cebi. Düğme ve iplik `diffuse_color_2` (inci tonu).
+  - Renkler: beyaz, açık mavi, pudra. `CATEGORY_OVERRIDES` `top`, `fit_audit.CREW_NECKS`.
+  - Kontrol: validate hatasız (uyarılar tişörtle aynı). Yaka bütün yüzlerde temiz (yalnız Mason'da kilo −1 ve omuz −1'de 1-2 köşe / ~4 mm). Pozlarda kadında taşma ≤3 köşe / 10 mm (Epic tişörtü düzeyinde). Erkekte idle'da koltuk altının ön kıvrımında 27-29 köşe / 12.5 mm: kol inince deri öne şişiyor, gövde kumaşı (kol payı 0) izlemiyor; Epic tişörtü 19, sweatshirt 20, kapüşonlu 21 mm. Kol oyuğu bandı 9 → 4 cm 20 mm'yi 12.5'e indirdi; kol oyuğunu yükseltmek kötüleştirdi.
+  - Bilinen: erkekte koltuk altı önünde ince deri yarığı (yukarıda; dönüştürücünün koltuk altı ağırlık kuralı bütün üstleri etkiliyor); yaka uçları ince sekmeler gibi duruyor; erkekte karında hafif yatay dalga.
+- [x] **3a.5 Kapanış.** Tahmin 0.3 · Gerçek 0.2
+  - 3a gerçek: ~11 sa (tahmin ~13).
 
-### Kullanıcıya soru (3a.3'ten önce)
+### Kullanıcı kararı (2026-10-31)
 
-- Gömleğin yakası: **A** en üst düğme açık (doğal, kravatsız ofis görünümü; kapalı yaka 3b'deki kravatlı gömlekte gelir) ya da **B** en üst düğme kapalı (daha basit, yaka boyna oturur; kravatsız resmi durur). Öneri A. Cevap gelene kadar 3a.1 ve 3a.2 (pantolon) yapılır.
+- Gömleğin yakası **A**: en üst düğme açık ("a olsun"). Ön tek parça, yakada V açıklık; altında pat ve düğmeler haritada. Kapalı yaka 3b'deki kravatlı gömlekte gelir.

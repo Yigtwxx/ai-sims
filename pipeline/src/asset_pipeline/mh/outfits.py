@@ -1486,7 +1486,7 @@ def region_coverage(hidden: Bool, regions: Sequence[str | None]) -> dict[str, fl
     return {region: round(covered[region] / totals[region], 3) for region in sorted(totals)}
 
 
-CATEGORY_OVERRIDES = {"DefaultGarment": "full", "AS_CrewTee": "top"}
+CATEGORY_OVERRIDES = {"DefaultGarment": "full", "AS_CrewTee": "top", "AS_Shirt": "top"}
 
 
 def outfit_category(name: str, coverage: Mapping[str, float]) -> str:

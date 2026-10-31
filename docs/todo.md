@@ -18,7 +18,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   |  | 2c | Küçük resimler; A-pozlu eski görseller gider | D1 | ~5 (gerçek ~0.8) |
   |  | 2d | Tişört, şortlar | A4.2 → A4.3 | ~13 (gerçek ~8) |
   |  | 2e | Çorap ve külotlu, file çorap hariç (şema v3) | A4.5 | ~12 (gerçek ~1) |
-  | **3 İş seti ve karakter** (~55 sa) | 3a | Kumaş pantolon, gömlek; blazer 7b'de | A4.1 | ~13 |
+  | **3 İş seti ve karakter** (~55 sa) | 3a | Kumaş pantolon, gömlek; blazer 7b'de | A4.1 | ~13 (gerçek ~11) |
   |  | 3b | Polo, chino, kravatlı gömlek, sıvanmış kol | A4.6 → A4.15 | ~12 |
   |  | 3c | Kişilik ve ses | C1 → C2 | ~22 |
   |  | 3d | İfade önizleme | C3 | ~8 |
@@ -138,7 +138,7 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
   - **Çıkarılanlar** (kullanıcı kararı, 2026-10-27; ekleme, önerme): doktor önlüğü, reflektörlü iş yeleği, atkı, eldiven; jogger, tulum, koşu şortu, espadril; gece serisinden erkek dar atlet, erkek vücuda oturan tişört ve yüksek bel mini şort; pijamanın şortlu varyantı, açık burun terlik; gömlekte içe sokulu ve yaka düğmesi açık/kapalı varyantları; trençkot, kaban; ince bantlı topuklu sandalet, kalın topuklu ayakkabı; sweatshirt, platform spor ayakkabı, ev terliği, şişme mont (A4.17 Kış tamamen).
 
   - [x] **A4.0 Yol denemesi: kalem etek (kadın).** (2026-10-27, `7c691dc`, `3df9de4`, `1010c10`: `asset-pipeline garment --item AS_PencilSkirt`, sitede. Açık: AO gürültüsü ve kalça −1'deki gri leke B5'te.) En basit kalıp (ön + arka, bel bandı, arka yırtmaç); iş setini de açar. Zincir uçtan uca çalışınca paketleyici ve kalıp altyapısı hazır sayılır. Blender'da sim ya da otomasyon 2-3 denemede yürümezse dur, nedenini "Kullanıcıya sorular"a yaz, Unreal yoluna geçmeyi sor ve beklerken B görevlerine geç.
-  - [ ] **A4.1 İş seti:** (2026-10-31: kumaş pantolon bitti, `AS_TailoredTrousers` K/E; ayrıntı `docs/plans/faz-3.md` 3a.2. Gömlek 3a.3-3a.4'te, blazer 7b'de.)
+  - [ ] **A4.1 İş seti:** (2026-10-31: kumaş pantolon `AS_TailoredTrousers` ve açık yakalı klasik gömlek `AS_Shirt` K/E bitti; ayrıntı `docs/plans/faz-3.md` 3a. Blazer 7b'de, kutu o zamana kadar açık.)
     - Kumaş pantolon, kadın ve erkek (düz paça, bel bandı; ütü çizgisi normal haritada).
     - Uzun kollu düz gömlek, kadın ve erkek (yaka, düğme patı, manşet; düğmeler dokuda). Budanan `OA_Shirt_04`'ün yerini alır.
     - Blazer + gömlek, kadın ve erkek, tek `top` öğe: C9'daki `outer` slotu gelene kadar gömlek blazer'ın içinde modellenir. Tek düğme, çentik yaka. En zor parça olduğu için sona kalır.
@@ -295,7 +295,9 @@ Windows PC'de yürüyen iş listesi (kullanıcı kararı, 2026-10-27: hepsi PC'd
 
 ## Kullanıcıya sorular
 
-- **Bekleyen (2026-10-31, A4.1 gömlek, `docs/plans/faz-3.md` 3a.3):** gömleğin yakası **A** en üst düğme açık (doğal; kapalı yaka 3b'nin kravatlı gömleğinde gelir) ya da **B** en üst düğme kapalı (daha basit, kravatsız resmi durur). Öneri A. Beklerken pantolon (3a.1-3a.2) yapılıyor.
+(Bekleyen soru yok.)
+
+- Cevaplanan (2026-10-31, A4.1 gömlek): yaka **A**, en üst düğme açık (kullanıcı: "a olsun"). Kapalı yaka 3b'deki kravatlı gömlekte gelir.
 
 - Cevaplanan (2026-10-29, B2): yüz karışımı kaydırıcı bırakınca güncellenir (seçenek A). Sürüklerken canlı önizleme (B) yapılmayacak.
 
