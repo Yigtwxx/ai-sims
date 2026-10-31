@@ -72,6 +72,10 @@ def build_garment(job: dict[str, Any]) -> bpy.types.Object:
         # Which arm the cloth follows: written into the GLB for the converter.
         attribute = obj.data.attributes.new("_ARM", "FLOAT", "POINT")
         attribute.data.foreach_set("value", [float(a) for a in garment["arm"]])
+    if "leg" in garment:
+        # Which leg a trouser leg follows, for the converter likewise.
+        attribute = obj.data.attributes.new("_LEG", "FLOAT", "POINT")
+        attribute.data.foreach_set("value", [float(a) for a in garment["leg"]])
     if "stiff" in garment:
         # Hems, bands and cuffs: folded double and stitched, they bend less.
         stiff = obj.vertex_groups.new(name="stiff")

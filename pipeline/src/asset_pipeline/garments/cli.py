@@ -32,6 +32,13 @@ from asset_pipeline.garments.shorts import (
 )
 from asset_pipeline.garments.skirt import draft_pencil_skirt, skirt_lines
 from asset_pipeline.garments.tee import TEE_FEMALE, TEE_MALE, draft_tee, tee_lines
+from asset_pipeline.garments.trousers import (
+    TROUSERS_FEMALE,
+    TROUSERS_MALE,
+    WOOL_SWITCHES,
+    trousers_lines,
+    wool_look,
+)
 from asset_pipeline.mh.convert import archive_root
 from asset_pipeline.mh.geometry import closest_triangles
 from asset_pipeline.mh.glb import accessor_values, read_glb
@@ -57,6 +64,7 @@ class Item:
     sim_by_gender: dict[str, dict[str, float]] = field(default_factory=dict)
     crotch: bool = False  # goes between the legs: drape against a body with the crotch's
     # small hollows filled
+    seat: bool = False  # and bridges the cleft of the seat (trousers): filled at the back
 
 
 def _pencil_skirt(
@@ -74,18 +82,26 @@ def _shorts(spec: ShortsSpec) -> Draft:
     return draft
 
 
-def crotch_filled(body: BaseBody) -> NDArray[np.float64]:
+def _trousers(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh, GarmentLines]:
+    spec = TROUSERS_FEMALE if gender == "female" else TROUSERS_MALE
+    draft = draft_shorts(body, spec)
+    return draft.mesh, trousers_lines(draft, spec)
+
+
+def crotch_filled(body: BaseBody, seat: bool = False) -> NDArray[np.float64]:
     """The body with the groin and seat filled out to each section's hull above the crotch
     (a hand's width each way of the middle), so shorts bridge the creases there; the legs
-    below the crotch stay apart."""
+    below the crotch stay apart. With `seat` the cleft of the seat is filled too, however
+    deep, and higher up: started inside it, trouser cloth stays pinched there."""
     limb = body.limb if body.limb is not None else body.arm
     trunk = body.positions[~limb & (np.abs(body.positions[:, 0]) < 0.3)]
     crotch = crotch_height(trunk, landmarks(body).knee, landmarks(body).hip)
     p = body.positions
     region = ~limb & (np.abs(p[:, 0]) < CROTCH_FILL_HALF_WIDTH)
-    region &= (p[:, 1] > crotch + 0.003) & (p[:, 1] < crotch + CROTCH_FILL_HEIGHT)
+    height = SEAT_FILL_HEIGHT if seat else CROTCH_FILL_HEIGHT
+    region &= (p[:, 1] > crotch + 0.003) & (p[:, 1] < crotch + height)
     sections = Sections(body)
-    return fill_front_and_back(p, sections.at, region)
+    return fill_front_and_back(p, sections.at, region, back_reach=SEAT_FILL_REACH if seat else None)
 
 
 def knit_look(archive: Path, gender: str, uv_metres: float) -> Look:
@@ -138,6 +154,8 @@ def _crew_tee(body: BaseBody, neck: Neck | None, gender: str) -> tuple[FlatMesh,
 
 CROTCH_FILL_HALF_WIDTH = 0.12  # metres
 CROTCH_FILL_HEIGHT = 0.14  # metres above the crotch
+SEAT_FILL_HEIGHT = 0.22  # metres above the crotch, filling the seat's cleft
+SEAT_FILL_REACH = 0.15  # metres: deepest cleft filled
 KNIT_TILE = 0.003  # metres of jersey one knit tile spans
 
 # Cotton jersey: soft and stretchy, sewn from flat pieces; gravity comes after the seams.
@@ -181,6 +199,17 @@ TWILL = {
 }
 
 DENIM = {**TWILL, "bending": 1.5, "tension": 40.0, "compression": 40.0}
+# Worsted wool suiting: crisp, holds its line from the knee down; long legs need longer
+# to settle.
+WOOL = {
+    **TWILL,
+    "frames": 90.0,
+    "bending": 6.0,
+    "band_bending": 18.0,
+    "tension": 40.0,
+    "compression": 40.0,
+    "shear": 15.0,
+}
 # Stretch cotton and stretch denim for the clinging minis: they give over the body.
 STRETCH = {**TWILL, "bending": 0.8, "tension": 15.0, "compression": 15.0, "shear": 5.0}
 STRETCH_DENIM = {**STRETCH, "bending": 1.2, "tension": 25.0, "compression": 25.0}
@@ -243,6 +272,16 @@ ITEMS = {
         look=denim_look,
         crotch=True,
     ),
+    "AS_TailoredTrousers": Item(
+        ("female", "male"),
+        _trousers,
+        WOOL_SWITCHES,
+        WOOL,
+        thickness=0.002,
+        look=wool_look,
+        crotch=True,
+        seat=True,
+    ),
 }
 
 
@@ -280,7 +319,7 @@ def build(archive: Path, name: str, gender: str, frames: int | None) -> dict[str
     }
     collider = closed_body(body, neck_part) if neck_part is not None else None
     if item.crotch:
-        collider = (crotch_filled(body), body.triangles)
+        collider = (crotch_filled(body, item.seat), body.triangles)
     job = write_job(work, mesh, body, f"MI_{name}", sim, item.thickness, collider)
     report = run_sim(job)
     draped = Path(str(report["out"]))

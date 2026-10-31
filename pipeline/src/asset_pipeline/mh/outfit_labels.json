@@ -198,5 +198,9 @@
   "AS_DenimShorts": {
     "en": "Rolled denim shorts",
     "tr": "Kıvrık paça kot şort"
+  },
+  "AS_TailoredTrousers": {
+    "en": "Tailored trousers",
+    "tr": "Kumaş pantolon"
   }
 }

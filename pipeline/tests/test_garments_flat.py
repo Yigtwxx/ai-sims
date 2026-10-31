@@ -312,3 +312,76 @@ def test_fill_front_and_back_fills_creases_only():
     back = crease & (ring[:, 1] < 0)
     assert (filled[front, 2] > points[front, 2] + 0.005).all()
     assert np.allclose(filled[back], points[back])
+
+
+def test_fill_front_and_back_fills_a_deep_back_cleft_with_back_reach():
+    from asset_pipeline.garments.collider import fill_front_and_back
+
+    # The same section: a 6 cm hollow at the back (the cleft of a seat) is left alone by
+    # the front's 2.5 cm reach, filled with a deeper back reach; the front is unchanged.
+    angle = np.linspace(0, 2 * np.pi, 72, endpoint=False)
+    ring = np.stack([0.1 * np.sin(angle), 0.1 * np.cos(angle)], 1)
+    crease = np.abs(ring[:, 0]) < 0.015
+    ring[crease & (ring[:, 1] > 0), 1] -= 0.01
+    ring[crease & (ring[:, 1] < 0), 1] += 0.06
+    points = np.c_[ring[:, 0], np.full(len(ring), 1.0), ring[:, 1]]
+    region = np.ones(len(points), bool)
+    shallow = fill_front_and_back(points, lambda h: ring, region, 0.025)
+    deep = fill_front_and_back(points, lambda h: ring, region, 0.025, back_reach=0.15)
+    back = crease & (ring[:, 1] < 0)
+    front = crease & (ring[:, 1] > 0)
+    assert (deep[back, 2] < points[back, 2] - 0.02).all(), "the cleft is filled outward"
+    assert np.allclose(deep[front], shallow[front]), "the front keeps its own reach"
+
+
+def _legs_layout():
+    """Four 0.1 m pieces named like the shorts', placed so y is the pattern's v."""
+    pieces = [
+        Piece(name, tuple(square(0.1, (0.15 * i, 0.0))), place_flat)
+        for i, name in enumerate(("front_l", "front_r", "back_l", "back_r"))
+    ]
+    return layout(pieces, [], 0.01)
+
+
+def test_leg_share_follows_each_leg_only_below_the_crotch():
+    from asset_pipeline.garments.shorts import LEG_FREE, LEG_FULL, ShortsSpec, _leg_share
+
+    crotch = 0.12
+    mesh = _legs_layout()
+    long_legs = ShortsSpec("t", 0.05, above_ankle=0.0, knee_ease=0.1)
+    share = _leg_share(mesh, crotch, long_legs)
+    assert share is not None
+    y = mesh.positions[:, 1]
+    left = np.isin(mesh.piece, [mesh.names.index("front_l"), mesh.names.index("back_l")])
+    low, high = y < crotch - LEG_FULL, y > crotch - LEG_FREE
+    assert np.allclose(share[low & left], 1.0) and np.allclose(share[low & ~left], -1.0)
+    assert np.allclose(share[high], 0.0), "the seat and crotch keep their bridging weights"
+    assert _leg_share(mesh, crotch, ShortsSpec("s", 0.05, inseam=0.03)) is None, "shorts"
+
+
+def test_trouser_details_crease_on_the_grain_and_loops_on_the_band():
+    from asset_pipeline.garments.shorts import LegPattern
+    from asset_pipeline.garments.trousers import (
+        LOOPS_BACK,
+        LOOPS_FRONT,
+        TROUSERS_FEMALE,
+        trouser_details,
+    )
+
+    front = LegPattern(
+        0.17, 0.25, 0.175, 0.28, 0.035, 0.06, 0.63, 0.82, 0.99, 0.0, knee_v=0.4, knee_width=0.2
+    )
+    back = LegPattern(
+        0.2, 0.29, 0.205, 0.33, 0.09, 0.1, 0.63, 0.82, 0.99, 0.025, knee_v=0.4, knee_width=0.24
+    )
+    lines = trouser_details(front, TROUSERS_FEMALE, front=True, fly=True)
+    crease = lines["creases"][0]
+    assert np.allclose(crease[:, 0], front.grain_u()), "the crease runs down the grain line"
+    assert crease[:, 1].max() < front.top_v - TROUSERS_FEMALE.waistband, "below the band"
+    assert len(lines["raised"]) == len(LOOPS_FRONT)
+    back_lines = trouser_details(back, TROUSERS_FEMALE, front=False, fly=False)
+    # A loop per position and the welt's two lips, all inside the piece's width.
+    assert len(back_lines["raised"]) == len(LOOPS_BACK) + 2
+    for outline in back_lines["raised"]:
+        assert outline[:, 0].min() > 0.0 and outline[:, 0].max() < back.top_width
+    assert back_lines["creases"][0][:, 1].max() < back.crotch_v, "the back crease stops low"

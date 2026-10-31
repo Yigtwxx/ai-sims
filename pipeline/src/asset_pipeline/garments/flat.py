@@ -76,6 +76,7 @@ class FlatMesh:
     hug: tuple[tuple[float, float, float], ...] = ()  # where the cloth is drawn to the skin
     arm: F64 | None = None  # (V,) share following an arm, + left, - right (`ARM_ATTRIBUTE`)
     wrap: F64 | None = None  # (V,) 0..1, how far the drape is laid onto the arm's skin
+    leg: F64 | None = None  # (V,) share following a leg only, + left, - right (`LEG_ATTRIBUTE`)
 
     def distance(self, edges: Sequence[tuple[str, str]]) -> F64:
         """Flat distance of every vertex from the nearest named segment on its own piece
@@ -136,6 +137,7 @@ class FlatMesh:
             "hug": [list(c) for c in self.hug],
             **({"arm": np.round(self.arm, 3).tolist()} if self.arm is not None else {}),
             **({"wrap": np.round(self.wrap, 3).tolist()} if self.wrap is not None else {}),
+            **({"leg": np.round(self.leg, 3).tolist()} if self.leg is not None else {}),
             "welds": self.welds(),
         }
 

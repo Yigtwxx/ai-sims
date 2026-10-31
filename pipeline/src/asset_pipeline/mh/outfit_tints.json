@@ -1010,6 +1010,38 @@
           "diffuse_color_2": "#5a5a5e"
         }
       }
+    ],
+    "AS_TailoredTrousers": [
+      {
+        "id": "navy",
+        "values": {
+          "diffuse_color_1": "#1f2941"
+        }
+      },
+      {
+        "id": "charcoal",
+        "values": {
+          "diffuse_color_1": "#3a3a3c"
+        }
+      },
+      {
+        "id": "black",
+        "values": {
+          "diffuse_color_1": "#1d1d1f"
+        }
+      },
+      {
+        "id": "camel",
+        "values": {
+          "diffuse_color_1": "#a47a4f"
+        }
+      },
+      {
+        "id": "oatmeal",
+        "values": {
+          "diffuse_color_1": "#c9bba2"
+        }
+      }
     ]
   }
 }

@@ -79,10 +79,12 @@ def fill_front_and_back(
     sections: Callable[[float], F64],
     region: NDArray[np.bool_],
     reach: float = FILL_REACH,
+    back_reach: float | None = None,
 ) -> F64:
     """The body with each horizontal section's front and back filled out to its convex
     hull inside `region`: cloth over the groin and the seat bridges the creases there
-    (a fly front, a seat seam), as the hull of that height does."""
+    (a fly front, a seat seam), as the hull of that height does. `back_reach` (default
+    `reach`) is the deepest crease filled at the back: the cleft of the seat."""
     out = positions.copy()
     for height in np.unique(np.round(positions[region, 1], 3)):
         rows = region & (np.round(positions[:, 1], 3) == height)
@@ -99,7 +101,8 @@ def fill_front_and_back(
             # Creases only: skin further in than `reach` faces inward (under the
             # crotch, between the thighs) and stays.
             depth = sign * (edge - positions[here, 2])
-            fill = (depth > 0) & (depth < reach)
+            limit = reach if sign > 0 or back_reach is None else back_reach
+            fill = (depth > 0) & (depth < limit)
             rows_here = np.flatnonzero(here)[fill]
             out[rows_here, 2] = edge[fill]
     # Rows are filled one height at a time: average the lift over the skin around each

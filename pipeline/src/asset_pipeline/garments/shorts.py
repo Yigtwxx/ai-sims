@@ -39,6 +39,10 @@ FLAP_DROP = 0.01  # crotch extensions start this far under the crotch (m)
 CROTCH_BAND = 0.07  # metres under the crotch where the hips' wrap turns into the leg's
 PIN_BAND = 0.012  # metres of the waistband's top edge held where it starts
 KNEE_SIDE_SHARE = 0.35  # of a long leg's narrowing to the knee taken on the side seam
+SHIN_STEP = 0.01  # metres between the sections a long leg's straight start is hulled from
+LEG_FREE = 0.02  # metres under the crotch above which long legs take any skin's weights
+THIGH_SHIFT_RISE = 0.12  # metres above the knee over which a long leg's start moves out
+LEG_FULL = 0.10  # metres under the crotch below which they follow their own leg only
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,10 @@ class ShortsSpec:
     back_raise: float = 0.02  # the back's top higher at the centre back
     crotch_drop: float = 0.02  # the seams' crotch point under the body's (room, no groove)
     crotch_stiff: float = 0.035  # metres either side of the crotch seam that bend little
+    back_crotch_stiff: float | None = None  # the back's (default: crotch_stiff)
+    side_stiff: float = 0.0  # and either side of the side seams
+    thigh_shift_crotch: float = 0.0  # long legs: metres under the crotch over which the
+    # outward start of the thigh comes back in (0: it reaches the crotch)
     waistband: float = 0.035
     hem_band: float = 0.02  # turned-up hem (or a rolled cuff's height)
     spacing: float = 0.011
@@ -130,8 +138,8 @@ class ShortsMeasures:
     girth_hip: float
     girth_thigh: float  # one leg at the hem
     girth_leg: float  # one leg just under the crotch
-    knee: float = 0.0  # the knee's height (narrowest leg there)
-    girth_knee: float = 0.0  # one leg at the knee
+    knee: float = 0.0  # the knee joint's height
+    girth_knee: float = 0.0  # one leg, widest of the knee and the calf below it
 
 
 def _slab(points: F64, height: float, band: float = SECTION) -> F64:
@@ -198,6 +206,11 @@ def measure_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsMeasures:
         raise GarmentError(f"{spec.name}: no hem height")
     sections = Sections(body)
     hip = max(sections.girth(float(h)) for h in np.arange(crotch + 0.02, top, 0.01))
+    # The knee joint (the narrowest leg can be above it, on the man's base body), and the
+    # widest of the knee and the calf below it: a straight leg hangs over both.
+    knee = float(body.joints["calf_l"][1]) if "calf_l" in body.joints else marks.knee
+    below = np.arange(min(hem + 0.05, knee), knee + 0.001, 0.01)
+    girth_knee = max(sections.girth(float(h), LEG_SIDE) for h in below)
     return ShortsMeasures(
         top=top,
         crotch=crotch,
@@ -206,8 +219,8 @@ def measure_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsMeasures:
         girth_hip=hip,
         girth_thigh=sections.girth(hem, LEG_SIDE),
         girth_leg=sections.girth(crotch - 0.015, LEG_SIDE),
-        knee=marks.knee,
-        girth_knee=sections.girth(marks.knee, LEG_SIDE),
+        knee=knee,
+        girth_knee=girth_knee,
     )
 
 
@@ -505,6 +518,22 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
     top = m.top + spec.back_raise + 0.01
     hips, legs = [], []
     sections = Sections(body)
+    # Long legs start below the knee as a straight tube round the knee and calf (the hull
+    # of the leg from that height up to the knee): started on each height's own section
+    # the cloth keeps the calf's shape instead of hanging from the knee.
+    shin: list[tuple[float, F64]] = []
+    if spec.knee_ease is not None:
+        shin = [
+            (float(h), sections.at(float(h), LEG_SIDE))
+            for h in np.arange(m.hem - 0.01, m.knee + SHIN_STEP, SHIN_STEP)
+        ]
+
+    def leg_section(height: float) -> F64:
+        if height >= m.knee or not shin:
+            return sections.at(height, LEG_SIDE)
+        above = [points for h, points in shin if h >= height - 1e-6]
+        return np.concatenate([sections.at(height, LEG_SIDE), *above])
+
     for height in np.arange(m.hem - 0.01, top, 0.005):
         v = float(height - m.hem)
         if height >= m.crotch - CROTCH_BAND - 0.005:
@@ -515,9 +544,18 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
             hips.append(make_ring(offset_hull(hull, grow, 48), float(height)))
         if height < m.crotch + 0.005:
             width = row(front_edges, v) + row(back_edges, v)
-            hull = convex_hull(sections.at(float(height), LEG_SIDE))
+            hull = convex_hull(leg_section(float(height)))
             grow = max(spec.gap, (width - _perimeter(hull)) / (2 * np.pi))
-            legs.append(make_ring(offset_hull(hull, grow, 48), float(height)))
+            ring = offset_hull(hull, grow, 48)
+            if spec.knee_ease is not None:
+                # Long legs: the slack goes to the outside, the inner side starts close to
+                # its own thigh (between the thighs there is room for two thin walls only).
+                # Optionally not at the crotch, where the extensions fold under the middle.
+                t = np.clip((height - m.knee) / THIGH_SHIFT_RISE, 0.0, 1.0)
+                if spec.thigh_shift_crotch > 0:
+                    t *= np.clip((m.crotch - height) / spec.thigh_shift_crotch, 0.0, 1.0)
+                ring = ring + np.array([(grow - spec.gap) * t * t * (3.0 - 2.0 * t), 0.0])
+            legs.append(make_ring(ring, float(height)))
 
     def hip_share(v: F64) -> F64:
         front_w, back_w = front_edges[1](v), back_edges[1](v)
@@ -584,12 +622,29 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
         [
             mesh.band([(n, "top") for n in PIECES], spec.waistband),
             mesh.band([(n, "hem") for n in PIECES], spec.hem_band),
-            mesh.band([(n, "centre") for n in PIECES], spec.crotch_stiff),
+            mesh.band([("front_l", "centre"), ("front_r", "centre")], spec.crotch_stiff),
+            mesh.band(
+                [("back_l", "centre"), ("back_r", "centre")],
+                spec.back_crotch_stiff or spec.crotch_stiff,
+            ),
             mesh.band([(n, "inseam") for n in PIECES], spec.crotch_stiff),
         ]
+        # Pressed seam allowances: a long side seam stays a straight line.
+        + ([mesh.band([(n, "side") for n in PIECES], spec.side_stiff)] if spec.side_stiff else [])
     )
-    pinned = replace(mesh, pin=band, stiff=stiff)
+    pinned = replace(mesh, pin=band, stiff=stiff, leg=_leg_share(mesh, m.crotch, spec))
     return ShortsDraft(pinned, m, front, back, tuple(pieces))
+
+
+def _leg_share(mesh: FlatMesh, crotch: float, spec: ShortsSpec) -> F64 | None:
+    """How far each vertex of a long leg follows its own leg only (+ left, - right): in
+    full from LEG_FULL under the crotch down, none from LEG_FREE under it up. Cloth hanging
+    between the thighs otherwise takes weights from both and tears in a step."""
+    if spec.knee_ease is None:
+        return None
+    left = np.isin(mesh.piece, [mesh.names.index("front_l"), mesh.names.index("back_l")])
+    t = np.clip((crotch - LEG_FREE - mesh.positions[:, 1]) / (LEG_FULL - LEG_FREE), 0.0, 1.0)
+    return np.where(left, 1.0, -1.0) * t * t * (3.0 - 2.0 * t)
 
 
 def shorts_lines(draft: ShortsDraft, spec: ShortsSpec) -> GarmentLines:
