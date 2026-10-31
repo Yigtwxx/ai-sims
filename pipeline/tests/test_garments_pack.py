@@ -78,6 +78,41 @@ def test_garment_maps_draw_seams_and_stay_flat_elsewhere():
     assert (masks[..., 1] == 0).all() and (masks[..., 2] == 0).all(), "one colour, material A"
 
 
+def test_garment_maps_crease_raises_a_narrow_ridge():
+    crease = np.array([[0.5, 0.1], [0.5, 0.9]])
+    maps = garment_maps(GarmentLines(creases=[crease]), uv_metres=1.0, size=256)
+    normal = np.asarray(maps["normalmap"])[..., 0].astype(int)
+    # The red channel tilts toward +u on the left flank and -u on the right: a ridge.
+    left, right = normal[128, 120:128].min(), normal[128, 127:136].max()
+    assert left < 120 and right > 136, f"no ridge: left {left}, right {right}"
+    assert abs(normal[128, 100] - 128) <= 1, "flat away from the crease"
+
+
+def test_garment_maps_raised_patch_stands_out_with_a_shadow_round_it():
+    loop = np.array([[0.4, 0.4], [0.6, 0.4], [0.6, 0.6], [0.4, 0.6]])
+    # 5 pixels per millimetre: the shadow spreads a few pixels out.
+    maps = garment_maps(GarmentLines(raised=[loop]), uv_metres=0.05, size=256)
+    occlusion = np.asarray(maps["AO"])[..., 0].astype(int)
+    assert occlusion[128, 128] == 255, "the patch itself is not shadowed"
+    assert occlusion[128, 100] < 255, f"no shadow just outside: {occlusion[128, 100]}"
+    normal = np.asarray(maps["normalmap"])[..., 0].astype(int)
+    assert abs(normal[128, 128] - 128) <= 1, "flat on top of the patch"
+    assert normal[128, 100:103].min() < 120, "its edge slopes"
+
+
+def test_garment_maps_buttons_take_colour_two_and_gloss():
+    maps = garment_maps(GarmentLines(buttons=[(0.5, 0.5, 0.04)]), uv_metres=1.0, size=256)
+    masks = np.asarray(maps["Masks"])[..., 1]
+    assert masks[128, 128] == 255 and masks[128, 20] == 0, "colour 2 on the button only"
+    ao = np.asarray(maps["AO"])
+    assert ao[128, 128, 1] < ao[128, 20, 1], "glossier than the cloth"
+    assert ao[128, 141, 0] < ao[128, 20, 0], "a shadow round the rim"
+    normal = np.asarray(maps["normalmap"])[..., :3].astype(int)
+    hole = np.round(128 + 256 * 0.04 * 0.3 * np.array([np.sin(np.pi / 4), np.cos(np.pi / 4)]))
+    y, x = int(hole[0]), int(hole[1])
+    assert abs(normal[y - 2 : y + 3, x - 2 : x + 3, :2] - 128).max() > 5, "holes dent it"
+
+
 ARCHIVE = archive_root()
 UNIT = ARCHIVE / "raw" / "outfits" / "female" / "WI_AS_PencilSkirt"
 

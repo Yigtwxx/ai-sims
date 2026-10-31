@@ -38,6 +38,7 @@ LEG_SIDE = 0.005  # x past which skin below the crotch is the left leg's
 FLAP_DROP = 0.01  # crotch extensions start this far under the crotch (m)
 CROTCH_BAND = 0.07  # metres under the crotch where the hips' wrap turns into the leg's
 PIN_BAND = 0.012  # metres of the waistband's top edge held where it starts
+KNEE_SIDE_SHARE = 0.35  # of a long leg's narrowing to the knee taken on the side seam
 
 
 @dataclass(frozen=True)
@@ -45,11 +46,15 @@ class ShortsSpec:
     name: str
     top_below_waist: float  # rise: the waistband's top below the natural waist (m)
     inseam: float | None = None  # hem below the crotch, or
-    above_knee: float | None = None  # hem above the knee joint
+    above_knee: float | None = None  # hem above the knee joint, or
+    above_ankle: float | None = None  # hem above the ankle joint (full length)
     top_ease: float = 0.02  # girth ease (metres of circumference)
     hip_ease: float = 0.04
     hem_ease: float = 0.05
     leg_ease: float = 0.05  # round the thigh just under the crotch
+    knee_ease: float | None = None  # long legs: round the knee (adds a knee point)
+    hem_girth: float | None = None  # the hem's circumference as cut, instead of hem_ease
+    knee_side_share: float = KNEE_SIDE_SHARE
     front_share: float = 0.47  # of each girth on the front pieces
     front_extension: float = 0.045  # crotch extensions past the centre lines
     back_extension: float = 0.09
@@ -125,6 +130,8 @@ class ShortsMeasures:
     girth_hip: float
     girth_thigh: float  # one leg at the hem
     girth_leg: float  # one leg just under the crotch
+    knee: float = 0.0  # the knee's height (narrowest leg there)
+    girth_knee: float = 0.0  # one leg at the knee
 
 
 def _slab(points: F64, height: float, band: float = SECTION) -> F64:
@@ -185,6 +192,8 @@ def measure_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsMeasures:
         hem = crotch - spec.inseam
     elif spec.above_knee is not None and "calf_l" in body.joints:
         hem = float(body.joints["calf_l"][1]) + spec.above_knee
+    elif spec.above_ankle is not None and "foot_l" in body.joints:
+        hem = float(body.joints["foot_l"][1]) + spec.above_ankle
     else:
         raise GarmentError(f"{spec.name}: no hem height")
     sections = Sections(body)
@@ -197,6 +206,8 @@ def measure_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsMeasures:
         girth_hip=hip,
         girth_thigh=sections.girth(hem, LEG_SIDE),
         girth_leg=sections.girth(crotch - 0.015, LEG_SIDE),
+        knee=marks.knee,
+        girth_knee=sections.girth(marks.knee, LEG_SIDE),
     )
 
 
@@ -215,18 +226,52 @@ class LegPattern:
     hip_v: float
     top_v: float
     raise_: float  # top edge higher at the centre line
+    knee_v: float | None = None  # long legs: the knee's height up the piece
+    knee_width: float = 0.0  # and the piece's width there, inner seam to side seam
+    side_share: float = KNEE_SIDE_SHARE  # of the narrowing from crotch to knee on the side
+
+    def _hem_and_knee(self, outer_crotch: float) -> tuple[float, float, float, float]:
+        """u of the side seam and inner seam at the hem and at the knee. Long legs narrow
+        to the knee on both seams (the inseam takes most) and run on to the hem evenly
+        about the grain line; shorts have their side seam straight down."""
+        if self.knee_v is None:
+            outer_hem = outer_crotch - 0.005
+            return outer_hem, outer_hem - self.hem_width, outer_hem, outer_hem - self.hem_width
+        narrowing = outer_crotch + self.extension - self.knee_width
+        outer_knee = outer_crotch - self.side_share * narrowing
+        outer_hem = outer_knee - 0.5 * (self.knee_width - self.hem_width)
+        return outer_hem, outer_hem - self.hem_width, outer_knee, outer_knee - self.knee_width
+
+    def grain_u(self) -> float:
+        """u of the grain line: the middle of the leg at the knee and the hem (long legs),
+        where a pressed crease runs."""
+        outer_crotch = min(self.leg_width - self.extension, self.hip_width)
+        outer_hem, inner_hem, _, _ = self._hem_and_knee(outer_crotch)
+        return 0.5 * (outer_hem + inner_hem)
 
     def segments(self) -> list[Segment]:
         # The side seam comes in below the hips so the leg is its own width at the crotch
         # (the extension reaches the rest of the way round).
         outer_crotch = min(self.leg_width - self.extension, self.hip_width)
-        outer_hem = outer_crotch - 0.005
-        inner_hem = outer_hem - self.hem_width
-        side = PchipInterpolator(
-            [0.0, self.crotch_v, self.hip_v, self.top_v],
-            [outer_hem, outer_crotch, self.hip_width, self.top_width],
-        )
-        v = np.linspace(0.0, self.top_v, 24)
+        outer_hem, inner_hem, outer_knee, inner_knee = self._hem_and_knee(outer_crotch)
+        if self.knee_v is None:
+            side = PchipInterpolator(
+                [0.0, self.crotch_v, self.hip_v, self.top_v],
+                [outer_hem, outer_crotch, self.hip_width, self.top_width],
+            )
+            v = np.linspace(0.0, self.top_v, 24)
+            inseam = polyline((-self.extension, self.crotch_v), (inner_hem, 0.0))
+        else:
+            side = PchipInterpolator(
+                [0.0, self.knee_v, self.crotch_v, self.hip_v, self.top_v],
+                [outer_hem, outer_knee, outer_crotch, self.hip_width, self.top_width],
+            )
+            v = np.linspace(0.0, self.top_v, 64)
+            inner = PchipInterpolator(
+                [0.0, self.knee_v, self.crotch_v], [inner_hem, inner_knee, -self.extension]
+            )
+            down = np.linspace(self.crotch_v, 0.0, 40)
+            inseam = np.stack([inner(down), down], 1)
         side_line = np.stack([side(v), v], 1)
         top = polyline((self.top_width, self.top_v), (0.0, self.top_v + self.raise_))
         crotch_top = self.crotch_v + self.crotch_depth
@@ -246,7 +291,7 @@ class LegPattern:
             Segment("side", side_line),
             Segment("top", top),
             Segment("centre", centre),
-            Segment("inseam", polyline((-self.extension, self.crotch_v), (inner_hem, 0.0))),
+            Segment("inseam", inseam),
         ]
 
 
@@ -409,16 +454,27 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
     limb = body.limb if body.limb is not None else body.arm
     trunk = body.positions[~limb & (np.abs(body.positions[:, 0]) < 0.3)]
 
+    hem_girth = spec.hem_girth if spec.hem_girth is not None else m.girth_thigh + spec.hem_ease
+
     def widths(share: float) -> tuple[float, float, float, float]:
         return (
             share * (m.girth_top + spec.top_ease) / 2,
             share * (m.girth_hip + spec.hip_ease) / 2,
-            share * (m.girth_thigh + spec.hem_ease),
+            share * hem_girth,
             share * (m.girth_leg + spec.leg_ease),
         )
 
     def pattern(share: float, extension: float, depth: float, raise_: float) -> LegPattern:
         top_w, hip_w, hem_w, leg_w = widths(share)
+        knee = (
+            {
+                "knee_v": m.knee - m.hem,
+                "knee_width": share * (m.girth_knee + spec.knee_ease),
+                "side_share": spec.knee_side_share,
+            }
+            if spec.knee_ease is not None
+            else {}
+        )
         return LegPattern(
             top_width=top_w,
             hip_width=hip_w,
@@ -430,6 +486,7 @@ def draft_shorts(body: BaseBody, spec: ShortsSpec) -> ShortsDraft:
             hip_v=0.5 * (m.crotch + m.top) - m.hem,
             top_v=m.top - m.hem,
             raise_=raise_,
+            **knee,
         )
 
     front = pattern(spec.front_share, spec.front_extension, spec.front_crotch_depth, 0.0)

@@ -184,6 +184,50 @@ def test_shorts_leg_outline_closes_counter_clockwise():
     assert at_crotch + leg.extension == pytest.approx(leg.leg_width, abs=1e-3)
 
 
+def test_shorts_leg_without_a_knee_keeps_its_straight_inseam():
+    from asset_pipeline.garments.shorts import LegPattern
+
+    leg = LegPattern(0.19, 0.24, 0.24, 0.27, 0.045, 0.07, 0.07, 0.19, 0.375, 0.0)
+    inseam = {s.name: s.points for s in leg.segments()}["inseam"]
+    assert len(inseam) == 2, f"expected a straight inseam, got {len(inseam)} points"
+    assert leg.grain_u() == pytest.approx(0.5 * (2 * (0.27 - 0.045 - 0.005) - 0.24))
+
+
+def test_long_leg_runs_through_the_knee_and_hangs_about_the_grain():
+    from asset_pipeline.garments.shorts import LegPattern
+
+    # A trouser front: crotch 0.75 m up the piece, knee 0.38 m, 0.21 m wide at the knee
+    # and 0.19 m at the hem.
+    leg = LegPattern(
+        0.18, 0.23, 0.19, 0.30, 0.04, 0.07, 0.75, 0.85, 0.97, 0.0, knee_v=0.38, knee_width=0.21
+    )
+    segments = leg.segments()
+    for a, b in zip(segments, segments[1:] + segments[:1], strict=True):
+        assert np.allclose(a.points[-1], b.points[0]), f"{a.name} -> {b.name} is open"
+    outline = np.concatenate([s.points[:-1] for s in segments])
+    x, y = outline[:, 0], outline[:, 1]
+    assert 0.5 * np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y) > 0, "not counter-clockwise"
+    by = {s.name: s.points for s in segments}
+    side, inseam = by["side"], by["inseam"]
+
+    def at(line, v):
+        order = np.argsort(line[:, 1])
+        return float(np.interp(v, line[order, 1], line[order, 0]))
+
+    width_at_knee = at(side, 0.38) - at(inseam, 0.38)
+    assert width_at_knee == pytest.approx(0.21, abs=2e-3), f"knee width {width_at_knee}"
+    hem = by["hem"]
+    assert hem[-1, 0] - hem[0, 0] == pytest.approx(0.19, abs=1e-6)
+    # Below the knee both seams come in evenly about the grain line.
+    grain = leg.grain_u()
+    assert 0.5 * (at(side, 0.38) + at(inseam, 0.38)) == pytest.approx(grain, abs=2e-3)
+    assert 0.5 * (hem[0, 0] + hem[-1, 0]) == pytest.approx(grain, abs=1e-6)
+    # The inseam takes most of the narrowing from the crotch to the knee.
+    side_in = at(side, 0.75) - at(side, 0.38)
+    inner_in = at(inseam, 0.38) - at(inseam, 0.75)
+    assert inner_in > side_in > 0, f"side {side_in}, inseam {inner_in}"
+
+
 def test_crotch_height_is_where_the_legs_join():
     from asset_pipeline.garments.shorts import crotch_height
 

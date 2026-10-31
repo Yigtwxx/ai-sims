@@ -46,6 +46,11 @@ class GarmentLines:
     ribs: list[F64] = field(default_factory=list)  # knit rib wales (a neckband's grooves)
     fades: list[F64] = field(default_factory=list)  # worn, washed-out bands (denim seams)
     frays: list[F64] = field(default_factory=list)  # loose threads of a cut-off hem
+    creases: list[F64] = field(default_factory=list)  # pressed creases: a sharp ridge
+    raised: list[F64] = field(default_factory=list)  # closed outlines of cloth sewn on top
+    # (belt loops, welt lips): filled, standing out, a shadow round them
+    buttons: list[tuple[float, float, float]] = field(default_factory=list)  # (u, v, radius)
+    # in UV units: four-hole buttons, in colour 2 (`Masks` G) and a little glossier
     stitch_strength: float = 1.0  # how far the stitch colour covers the cloth's
     seam_shadow: float = 0.35  # occlusion in a seam's hollow
 
@@ -86,6 +91,57 @@ def _mask(lines: Sequence[F64], size: int, width: float, blur: float) -> F64:
     return np.asarray(image, np.float64) / 255.0
 
 
+def _fill(outlines: Sequence[F64], size: int, blur: float) -> F64:
+    """Closed outlines filled on a size x size UV image, edges blurred `blur` pixels, 0..1."""
+    image = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(image)
+    for outline in outlines:
+        draw.polygon([(float(u) * size, float(v) * size) for u, v in outline], fill=255)
+    if blur > 0:
+        image = image.filter(ImageFilter.GaussianBlur(float(blur)))
+    return np.asarray(image, np.float64) / 255.0
+
+
+BUTTON_HOLES = 4
+BUTTON_HOLE_RING = 0.3  # of the radius: where the holes sit
+BUTTON_HOLE_RADIUS = 0.12
+BUTTON_DISH = 0.72  # of the radius: the dished middle inside the rim
+BUTTON_SHADOW = 1.4  # of the radius: the shadow the button casts on the cloth around it
+
+
+def _buttons(buttons: Sequence[tuple[float, float, float]], size: int) -> tuple[F64, F64, F64]:
+    """Height, disc mask and cast shadow (0..1) of four-hole buttons: a disc with rounded
+    edges, a dished middle and the holes through it."""
+    height = np.zeros((size, size))
+    disc = np.zeros((size, size))
+    shadow = np.zeros((size, size))
+    for u, v, radius in buttons:
+        r = radius * size
+        cx, cy = u * size, v * size
+        reach = int(np.ceil(BUTTON_SHADOW * r)) + 2
+        x0, x1 = max(0, int(cx) - reach), min(size, int(cx) + reach + 1)
+        y0, y1 = max(0, int(cy) - reach), min(size, int(cy) + reach + 1)
+        if x0 >= x1 or y0 >= y1:
+            continue
+        ys, xs = np.mgrid[y0:y1, x0:x1] + 0.5
+        dx, dy = (xs - cx) / r, (ys - cy) / r
+        d = np.hypot(dx, dy)
+        # Antialiased edge one pixel wide.
+        inside = np.clip((1.0 - d) * r + 0.5, 0.0, 1.0)
+        h = 1.4 * np.clip(1.0 - d**4, 0.0, 1.0)
+        h -= 0.35 * np.clip(1.0 - (d / BUTTON_DISH) ** 2, 0.0, 1.0)
+        for k in range(BUTTON_HOLES):
+            angle = np.pi / 4 + k * 2 * np.pi / BUTTON_HOLES
+            hx, hy = BUTTON_HOLE_RING * np.cos(angle), BUTTON_HOLE_RING * np.sin(angle)
+            hole = np.hypot(dx - hx, dy - hy) / BUTTON_HOLE_RADIUS
+            h -= 0.9 * np.clip((1.0 - hole) * BUTTON_HOLE_RADIUS * r + 0.5, 0.0, 1.0)
+        height[y0:y1, x0:x1] = np.maximum(height[y0:y1, x0:x1], h * inside)
+        disc[y0:y1, x0:x1] = np.maximum(disc[y0:y1, x0:x1], inside)
+        cast = np.clip((BUTTON_SHADOW - d) / (BUTTON_SHADOW - 1.0), 0.0, 1.0) * (1.0 - inside)
+        shadow[y0:y1, x0:x1] = np.maximum(shadow[y0:y1, x0:x1], cast)
+    return height, disc, shadow
+
+
 def _normal_from_height(height: F64, strength: float) -> NDArray[np.uint8]:
     """Tangent-space normal map (OpenGL, +y up the image is -v) from a height field."""
     dy, dx = np.gradient(height)
@@ -108,12 +164,23 @@ def garment_maps(
     rib = _mask(lines.ribs, size, 0.8 * px, 0.35 * px) if lines.ribs else 0.0 * groove
     fade = _mask(lines.fades, size, 5.0 * px, 6.0 * px) if lines.fades else 0.0 * groove
     fray = _mask(lines.frays, size, 0.5 * px, 0.2 * px) if lines.frays else 0.0 * groove
+    crease = _mask(lines.creases, size, 0.8 * px, 1.0 * px) if lines.creases else 0.0 * groove
+    raised = _fill(lines.raised, size, 0.5 * px) if lines.raised else 0.0 * groove
+    under = (
+        _mask([np.vstack([o, o[:1]]) for o in lines.raised], size, 1.5 * px, 1.5 * px)
+        if lines.raised
+        else 0.0 * groove
+    )
+    button, disc, cast = _buttons(lines.buttons, size) if lines.buttons else (0.0 * groove,) * 3
 
     height = -groove + 0.5 * edge - 0.4 * stitch - 0.5 * rib + 0.3 * fray
+    height = height + 0.8 * crease + 0.8 * raised + 1.5 * button
     normal = _normal_from_height(height, strength=2.0)
     ones = np.ones((size, size))
     occlusion = np.clip(1.0 - lines.seam_shadow * shadow - 0.15 * stitch - 0.12 * rib, 0.0, 1.0)
-    wear = np.clip(0.55 + 0.3 * edge + 0.3 * fade + 0.45 * fray, 0.0, 1.0)
+    occlusion = np.clip(occlusion - 0.2 * under * (1.0 - raised) - 0.35 * cast, 0.0, 1.0)
+    wear = np.clip(0.55 + 0.3 * edge + 0.3 * fade + 0.45 * fray + 0.15 * crease, 0.0, 1.0)
+    rough = 1.0 - 0.45 * disc  # buttons are glossier than the cloth
 
     def rgba(*channels: F64) -> Image.Image:
         return Image.fromarray(np.round(np.stack(channels, -1) * 255).astype(np.uint8), "RGBA")
@@ -122,8 +189,8 @@ def garment_maps(
         "normalmap": Image.fromarray(
             np.dstack([normal, np.full((size, size, 1), 255, np.uint8)]), "RGBA"
         ),
-        "AO": rgba(occlusion, ones, 0 * ones, ones),
-        "Masks": rgba(wear, 0 * ones, 0 * ones, ones),
+        "AO": rgba(occlusion, rough * ones, 0 * ones, ones),
+        "Masks": rgba(wear, disc * ones, 0 * ones, ones),
         "CustomStitch": Image.fromarray(
             np.round(np.clip(stitch * lines.stitch_strength, 0, 1) * 255).astype(np.uint8), "L"
         ),
